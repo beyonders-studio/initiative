@@ -56,7 +56,11 @@ from app.services.marketplace.definitions import (
     reserved_prefix_problem,
 )
 from app.services.marketplace.manifest_values import check_public_id
-from app.services.marketplace.tool_plugins import is_tool_plugin, tool_kinds
+from app.services.marketplace.tool_plugins import (
+    is_tool_plugin,
+    tool_changes,
+    tool_kinds,
+)
 
 __all__ = [
     "REGISTRY_SOURCE",
@@ -610,6 +614,10 @@ async def upsert_listing(
     release_notes = manifest.get("release_notes")
     min_app_version = manifest.get("min_app_version")
     if version is None:
+        if kind == "plugin":
+            await _require_tool_compatible(
+                session, listing.id, version_str, definition, public_id=public_id
+            )
         version = MarketplaceListingVersion(
             listing_id=listing.id,
             version=version_str,
@@ -677,6 +685,56 @@ async def upsert_listing(
         )
 
     return listing
+
+
+async def _require_tool_compatible(
+    session: AsyncSession,
+    listing_id: int | None,
+    version: str,
+    definition: dict[str, Any],
+    *,
+    public_id: str,
+) -> None:
+    """Refuse a tool plug-in version that takes from its tool what another
+    version of the listing has: an item table, ever, or within a major
+    version a field, a field's kind or a select's option. Each community keeps
+    its tables and their rows across versions, so a version moves them only
+    by adding; a new major may drop a field, which each community's admin
+    confirms before its column goes. A listing's versions are all tool
+    plug-ins or none is."""
+    published = (
+        await session.exec(
+            select(
+                MarketplaceListingVersion.version,
+                MarketplaceListingVersion.definition,
+            ).where(MarketplaceListingVersion.listing_id == listing_id)
+        )
+    ).all()
+    for other, other_definition in published:
+        if is_tool_plugin(other_definition) != is_tool_plugin(definition):
+            raise CatalogError(
+                f"{public_id} {version}: a tool plug-in's versions all declare a tool"
+            )
+        if not is_tool_plugin(definition):
+            continue
+        older, newer = sorted(
+            ((other, other_definition), (version, definition)),
+            key=lambda pair: _version_tuple(pair[0]),
+        )
+        changes = tool_changes(older[1], newer[1])
+        if changes.removed_tables:
+            raise CatalogError(
+                f"{public_id} {newer[0]}: a version never removes an item table"
+                f" or moves it under another ({', '.join(changes.removed_tables)})"
+            )
+        if changes.drops and (
+            _version_tuple(older[0])[:1] == _version_tuple(newer[0])[:1]
+        ):
+            raise CatalogError(
+                f"{public_id} {newer[0]}: within a major version a field is never"
+                " removed, given another kind or offered fewer options"
+                f" ({', '.join((*changes.dropped_fields, *changes.dropped_options))})"
+            )
 
 
 def _stored_body(

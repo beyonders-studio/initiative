@@ -157,6 +157,8 @@ export interface PluginListItem {
   read_only?: boolean;
   /** A version asking for more access, waiting for the seat's answer. */
   pending_version?: string | null;
+  /** A tool plug-in's (`tool`) removal deletes its tool's content later. */
+  plugin_kind?: string;
 }
 
 function PluginRow({
@@ -189,6 +191,9 @@ function PluginRow({
   const update = useUpdateCommunityPlugin(plugin.id);
   const uninstall = useUninstallCommunityPlugin();
   const canChange = canManage && !closed;
+  // A tool plug-in's tool is the community's content: removing it consents to
+  // that content being deleted once the deletion window ends.
+  const isTool = plugin.plugin_kind === "tool";
 
   const save = (patch: { name?: string; enabled?: boolean }) =>
     update.mutate(patch, {
@@ -197,7 +202,7 @@ function PluginRow({
 
   const remove = () =>
     uninstall.mutate(
-      { pluginId: plugin.id, erase: canErase && erase },
+      { pluginId: plugin.id, erase: canErase && erase && !isTool, deleteContent: isTool },
       {
         onSuccess: () => {
           toast.success(t("plugins:manage.removed", { name: plugin.name }));
@@ -308,13 +313,19 @@ function PluginRow({
         title={t("plugins:manage.removeTitle", { name: plugin.name })}
         description={
           <>
-            {t("plugins:manage.removeBody")}
+            {isTool ? t("plugins:manage.removeToolBody") : t("plugins:manage.removeBody")}
             {confirming && (
               <RemovalNotice pluginId={plugin.id} locale={i18n.resolvedLanguage ?? i18n.language} />
             )}
           </>
         }
-        confirmLabel={erase ? t("plugins:manage.removeAndErase") : t("plugins:manage.remove")}
+        confirmLabel={
+          isTool
+            ? t("plugins:manage.removeTool")
+            : erase
+              ? t("plugins:manage.removeAndErase")
+              : t("plugins:manage.remove")
+        }
         onConfirm={remove}
         isLoading={uninstall.isPending}
         destructive
@@ -322,7 +333,7 @@ function PluginRow({
         {/* Removing keeps what the plug-in calls the community and its members,
             so installing it again picks up where it left off. Erasing is the
             community admins' separate choice. */}
-        {canErase && (
+        {canErase && !isTool && (
           <div className="flex items-start gap-2">
             <Checkbox
               id={`erase-${plugin.id}`}

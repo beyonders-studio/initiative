@@ -4221,6 +4221,12 @@ export interface CommunityPluginUpgradeAsks {
   version: string;
   added_scopes: string[];
   added_surfaces: PluginSurfaceSummary[];
+  added_tables: string[];
+  added_fields: string[];
+  added_options: string[];
+  added_actions: string[];
+  dropped_fields: string[];
+  dropped_options: string[];
   declined: boolean;
 }
 
@@ -4550,6 +4556,10 @@ export interface CommunityPluginUpgrade {
   version: string;
   /** @maxItems 64 */
   add_scopes?: string[];
+  /** @maxItems 160 */
+  drop_fields?: string[];
+  /** @maxItems 1024 */
+  drop_options?: string[];
 }
 
 /**
@@ -14486,6 +14496,7 @@ export type ReadPluginParamOptionsParams = {
 
 export type UninstallCommunityPluginParams = {
   erase?: boolean;
+  delete_content?: boolean;
 };
 
 export type ReadUninstallNoticeParams = {

@@ -86,13 +86,22 @@ export interface UninstallPlugin {
   pluginId: number;
   /** Also ask the plug-in to delete what it holds about the community. */
   erase?: boolean;
+  /** A tool plug-in: consent to its tool's content being deleted once the
+   * deletion window ends. */
+  deleteContent?: boolean;
 }
 
 export const useUninstallCommunityPlugin = (options?: MutationOpts<void, UninstallPlugin>) => {
   return useCommunityMutation<void, UninstallPlugin>(
     {
-      mutationFn: (communityId, { pluginId, erase }) =>
-        uninstallCommunityPlugin(communityId, pluginId, erase ? { erase: true } : undefined),
+      mutationFn: (communityId, { pluginId, erase, deleteContent }) =>
+        uninstallCommunityPlugin(
+          communityId,
+          pluginId,
+          erase || deleteContent
+            ? { ...(erase && { erase: true }), ...(deleteContent && { delete_content: true }) }
+            : undefined
+        ),
       invalidate: () => invalidate(q.plugins()),
       errorKey: "plugins:error",
     },

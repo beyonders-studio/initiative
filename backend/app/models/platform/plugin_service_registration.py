@@ -107,6 +107,7 @@ __all__ = [
     "RegistrationKind",
     "RegistrationSource",
     "browser_base",
+    "in_reach_sql",
     "reach",
     "registration_live_sql",
 ]
@@ -181,6 +182,23 @@ class RegistrationSource:
     REGISTRY = "registry"
 
 
+def in_reach_sql(registration: str, community: str) -> str:
+    """Whether the registration row ``registration`` names reaches the
+    community the SQL expression ``community`` names: the SQL spelling of
+    :func:`reach`. ``NULL`` for an ``operations`` registration where the
+    deployment names no operations community."""
+    return (
+        f"({registration}.availability = '{PluginAvailability.none.value}'"
+        f" OR ({registration}.availability = '{PluginAvailability.operations.value}'"
+        f" AND {community} = (SELECT s.operations_guild_id"
+        " FROM public.app_settings s WHERE s.id = 1))"
+        f" OR ({registration}.availability = '{PluginAvailability.beta.value}'"
+        " AND EXISTS (SELECT 1 FROM public.plugin_beta_communities b"
+        f" WHERE b.listing_uid = {registration}.listing_uid"
+        f" AND b.community_id = {community})))"
+    )
+
+
 def registration_live_sql(
     registration: str = "plugin_service_registrations",
     publisher: str = "publishers",
@@ -209,14 +227,7 @@ def registration_live_sql(
         ""
         if community is None
         else (
-            f" AND ({registration}.availability = '{PluginAvailability.none.value}'"
-            f" OR ({registration}.availability = '{PluginAvailability.operations.value}'"
-            f" AND {community} = (SELECT s.operations_guild_id"
-            " FROM public.app_settings s WHERE s.id = 1))"
-            f" OR ({registration}.availability = '{PluginAvailability.beta.value}'"
-            " AND EXISTS (SELECT 1 FROM public.plugin_beta_communities b"
-            f" WHERE b.listing_uid = {registration}.listing_uid"
-            f" AND b.community_id = {community})))"
+            f" AND {in_reach_sql(registration, community)}"
             " AND NOT EXISTS (SELECT 1 FROM public.plugin_installs i"
             f" WHERE i.guild_id = {community}"
             f" AND i.listing_uid = {registration}.listing_uid"

@@ -46,8 +46,9 @@ from app.db import cohorts, post_commit
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.guild_migrations import GUILD_SCHEMA_REGEX
 from app.db.holds import refuse_while_held
+from app.db.plugin_tools import delete_tool_content
 from app.db.request_context import SystemGuild, Unattributed
-from app.db.schema_provisioning import deprovision_guild
+from app.db.schema_provisioning import deprovision_guild, provision_community_tools
 from app.db.session import SystemSessionLocal, set_rls_context
 from app.models.platform.guild import CommunityStatus, Guild
 from app.models.platform.plugin_community_hook import PluginCommunityHook
@@ -58,6 +59,7 @@ from app.models.platform.plugin_install import (
 )
 from app.services import audit as audit_service
 from app.services.marketplace import community_hooks, plugin_refs
+from app.services.marketplace.tool_plugins import is_tool_plugin
 from app.services.platform import rules
 from app.services.platform.retention import (
     COMMUNITY_DELETION,
@@ -140,13 +142,20 @@ async def _uninstall_deleted(
 
     One staff also suspended there is removed without a word to it: nothing is
     queued for it, nothing is revoked at its vendor, and what waited in its
-    queue for the community is discarded with the row."""
+    queue for the community is discarded with the row.
+
+    A tool plug-in goes with its tool: every row naming it or a kind inside it
+    first (:func:`~app.db.plugin_tools.delete_tool_content`), and, once its
+    install is gone, its tables, with the community's rules rendered again
+    without it. While the platform holds any of its content the whole step
+    waits for the next sweep."""
     from app.services.tenant import guild_plugins as guild_plugins_service
 
     guild_id, install_id = install.guild_id, install.install_id
     deleted_at = install.status_changed_at
     suspended = install.suspended_at is not None
     public_id: str | None = None
+    tool = False
     await session.commit()
     async with cohorts.system_session(guild_id) as guild_session:
         await set_rls_context(guild_session, SystemGuild(guild_id))
@@ -170,6 +179,11 @@ async def _uninstall_deleted(
             return
         if plugin is not None:
             public_id = await guild_plugins_service.install_public_id(plugin)
+            tool = is_tool_plugin(plugin.definition)
+            if tool:
+                await delete_tool_content(
+                    guild_session, plugin.listing_uid, plugin.definition
+                )
             await guild_plugins_service.uninstall_plugin(
                 guild_session, plugin, actor_user_id=None, suspended=suspended
             )
@@ -190,6 +204,9 @@ async def _uninstall_deleted(
         )
     await session.commit()
     await post_commit.settle(guild_session)
+    if tool:
+        # A failure here leaves the tables to the next boot's back-fill.
+        await provision_community_tools(guild_id)
 
 
 async def uninstall_deleted_plugins(session: AsyncSession, *, now: datetime) -> int:

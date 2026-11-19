@@ -82,6 +82,7 @@ from app.models.platform.member_moderation import live_timeout_sql
 from app.models.platform.plugin_install import PluginInstallStatus
 from app.models.platform.plugin_service_registration import (
     RegistrationKind,
+    in_reach_sql,
     registration_live_sql,
 )
 from app.models.platform.user import UserRole, UserStatus
@@ -307,7 +308,84 @@ my_grants AS MATERIALIZED (
     AND g.user_id = {gucs.USER_ID}
     AND {LIVE_GRANT}
     AND {_GRANT_HELD}
+){_tool_states(tools)}"""
+
+
+def _tool_states(tools: ToolSet) -> str:
+    """Each installed tool plug-in's state in the community, as ``tool_states``
+    rows of ``(kind, opens, writes, switched_on)``: its tool is there unless
+    its install is suspended (by staff, by the platform suspending the
+    plug-in, or by the community falling out of its reach), on hold or
+    deleted; written unless its install is read-only too; and on in an
+    initiative only while the community has the install switched on. The
+    states are the platform's, read from its rows for this community, as
+    ``registration_lookup`` reads them. Nothing for a community with none."""
+    if not tools.installed:
+        return ""
+    installs = ", ".join(
+        f"({record.install_id}, '{record.kind}')" for record in tools.installed
+    )
+    hidden = sql_values(
+        status.value
+        for status in (PluginInstallStatus.on_hold, PluginInstallStatus.deleted)
+    )
+    return f""",
+tool_states AS MATERIALIZED (
+  SELECT t.kind, s.opens, s.opens AND s.status <> '{PluginInstallStatus.read_only.value}' AS writes,
+         s.opens AND a.enabled AS switched_on
+  FROM (VALUES {installs}) AS t(install_id, kind)
+  JOIN guild_plugins a ON a.id = t.install_id
+  LEFT JOIN public.plugin_installs pi
+    ON pi.guild_id = {gucs.ROUTED_GUILD_ID} AND pi.install_id = t.install_id
+  CROSS JOIN LATERAL (
+    SELECT COALESCE(pi.status, '{PluginInstallStatus.active.value}') AS status,
+           COALESCE(pi.status NOT IN ({hidden}), true)
+             AND pi.suspended_at IS NULL
+             AND NOT EXISTS (
+               SELECT 1 FROM public.plugin_service_registrations r
+               WHERE r.listing_uid = a.listing_uid
+                 AND r.kind = '{RegistrationKind.TOOL}'
+                 AND (r.suspended_at IS NOT NULL
+                   OR NOT COALESCE({in_reach_sql("r", gucs.ROUTED_GUILD_ID)}, false))
+             ) AS opens
+  ) s
 )"""
+
+
+def _enabled_tools(tools: ToolSet, initiatives: str) -> str:
+    """``app.enabled_tools``: each ``<initiative>:<tool>`` pair whose switch is
+    on in an initiative of ``initiatives`` (a sub-select of ids). With tool
+    plug-ins, a tool whose install the community switched off or whose
+    state hides it has no pair, and each that is there carries the pairs
+    ``app.db.initiative_rls.tool_present`` asks for (:data:`gucs.TOOL_OPEN`,
+    :data:`gucs.TOOL_WRITES`)."""
+    if not tools.installed:
+        return f"""COALESCE((
+      SELECT string_agg(DISTINCT i.id || ':' || t.tool, ',')
+      FROM initiatives i
+      CROSS JOIN LATERAL {_tool_switches(tools)} AS t(tool, enabled)
+      WHERE {_TOOL_ON}
+        AND i.id IN ({initiatives})
+    ), '')"""
+    opens, writes = (
+        pair.replace("{kind}", "' || ts.kind || '")
+        for pair in (gucs.TOOL_OPEN, gucs.TOOL_WRITES)
+    )
+    return f"""COALESCE((
+      SELECT string_agg(DISTINCT p.pair, ',')
+      FROM (
+      SELECT i.id || ':' || t.tool AS pair
+      FROM initiatives i
+      CROSS JOIN LATERAL {_tool_switches(tools)} AS t(tool, enabled)
+      WHERE {_TOOL_ON}
+        AND i.id IN ({initiatives})
+        AND t.tool NOT IN (SELECT ts.kind FROM tool_states ts WHERE NOT ts.switched_on)
+      UNION ALL
+      SELECT '{opens}' FROM tool_states ts WHERE ts.opens
+      UNION ALL
+      SELECT '{writes}' FROM tool_states ts WHERE ts.writes
+      ) p
+    ), '')"""
 
 
 def _held_surfaces(membership: str) -> str:
@@ -442,18 +520,13 @@ _PERSON_STANDING: dict[gucs.Guc, _Expr] = {
       FROM community_defaults cd
       WHERE cd.key LIKE 'initiative\\_tool.%'
     ), '')""",
-    gucs.ENABLED_TOOLS: lambda tools: (
-        f"""COALESCE((
-      SELECT string_agg(DISTINCT i.id || ':' || t.tool, ',')
-      FROM initiatives i
-      CROSS JOIN LATERAL {_tool_switches(tools)} AS t(tool, enabled)
-      WHERE {_TOOL_ON}
-        AND i.id IN (
+    gucs.ENABLED_TOOLS: lambda tools: _enabled_tools(
+        tools,
+        """
           SELECT mi.initiative_id FROM my_initiatives mi
           UNION ALL
           SELECT it.initiative_id FROM my_items it
-        )
-    ), '')"""
+        """,
     ),
     gucs.OVERRIDE_INITIATIVES: """COALESCE((
       SELECT string_agg(DISTINCT mi.initiative_id::text, ',')

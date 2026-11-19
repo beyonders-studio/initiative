@@ -1485,10 +1485,11 @@ class GuildPluginMessages:
     #: GUILD_INSTALLABLE_PLUGIN_KINDS. Publishable and browsable, not installable
     #: here, and told so by name rather than half-mounted.
     KIND_NOT_INSTALLABLE = "COMMUNITY_PLUGIN_KIND_NOT_INSTALLABLE"
-    #: A tool plug-in stays as it was installed: removing, turning off and
-    #: updating one are not built yet.
-    TOOL_UNCHANGEABLE = "COMMUNITY_PLUGIN_TOOL_UNCHANGEABLE"
-    #: The tool plug-in's tables could not be made, so it was not installed.
+    #: Removing a tool plug-in deletes its tool's content once the deletion
+    #: window ends, and the request did not consent to that.
+    TOOL_DELETION_UNCONFIRMED = "COMMUNITY_PLUGIN_TOOL_DELETION_UNCONFIRMED"
+    #: The tool plug-in's tables could not be made as its version declares
+    #: them, so it was not installed or updated.
     TOOL_NOT_PROVISIONED = "COMMUNITY_PLUGIN_TOOL_NOT_PROVISIONED"
 
     # --- configuration ---

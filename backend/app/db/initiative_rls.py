@@ -185,13 +185,30 @@ class DacPath:
     via: tuple[tuple[str, str], ...] = ()
 
 
-def _switch_leg(tool: ToolRecord, initiative: str) -> str:
-    """Whether ``tool`` is switched on for ``initiative``, for this reader."""
+def tool_present(kind_sql: str, write: bool) -> str:
+    """Whether the tool plug-in's tool whose kind ``kind_sql`` (a SQL text
+    expression) names is there for this reader to read, or to write: what its
+    install's state says, for everyone the system engine is not."""
+    pair = gucs.TOOL_WRITES if write else gucs.TOOL_OPEN
+    head, tail = pair.split("{kind}")
     return (
+        f"({_P.system} OR ({_P.this_guild}"
+        f" AND ('{head}' || {kind_sql} || '{tail}') = ANY ({_P.field('enabled_tools')})))"
+    )
+
+
+def _switch_leg(tool: ToolRecord, initiative: str, write: bool = False) -> str:
+    """Whether ``tool`` is switched on for ``initiative``, for this reader. A
+    tool plug-in's is first asked whether its install's state leaves it there
+    at all (:func:`tool_present`), which nobody's standing overrides."""
+    leg = (
         f"({_GUILD_ADMIN} OR {_PAM_ANY} OR {initiative} IS NULL"
         f" OR ({_P.this_guild} AND ({initiative}::text || ':{tool.kind}')"
         f" = ANY ({_P.field('enabled_tools')})))"
     )
+    if tool.install_id is None:
+        return leg
+    return f"({tool_present(f"'{tool.kind}'", write)} AND {leg})"
 
 
 def _resource_call(tool: str, resource_id: str, initiative: str, write: bool) -> str:
@@ -247,7 +264,7 @@ def _tool_gate(
     # initiative the reader is in: an admin, a grantee and a system sweep are
     # already admitted above, so those are the only ones whose switch can decide
     # anything for them.
-    legs.append(_switch_leg(tool, initiative))
+    legs.append(_switch_leg(tool, initiative, write))
 
     key = tool.create_permission if creating else tool.view_permission
     default = "false" if creating else str(tool.spec.on_by_default).lower()
@@ -1487,6 +1504,12 @@ def _named_tool_gate(t: str, write: bool, tools: ToolSet) -> str:
         f" AND ({t}.initiative_id::text || ':' || {t}.dac_tool)"
         f" = ANY ({_P.field('enabled_tools')})))"
     )
+    if tools.installed:
+        installed = sql_values(tool.kind for tool in tools.installed)
+        switch = (
+            f"({switch} AND ({t}.dac_tool IS NULL OR {t}.dac_tool NOT IN ({installed})"
+            f" OR {tool_present(f'{t}.dac_tool', write)}))"
+        )
     key_arms = " ".join(
         f"WHEN '{tool.kind}' THEN '{tool.view_permission}'" for tool in tools
     )

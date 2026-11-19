@@ -4,6 +4,7 @@ community that installs it, and ruled as a built-in tool is."""
 from __future__ import annotations
 
 import copy
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -31,24 +32,38 @@ from app.db.schema_provisioning import (
     stamp_tools,
 )
 from app.models.platform.guild import CommunityRole
+from app.models.platform.plugin_install import PluginInstall, PluginInstallStatus
 from app.models.tenant._mixins import ActorKind
+from app.models.tenant.comment import Comment
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.initiative import InitiativeRule
+from app.models.tenant.reaction import Reaction
+from app.models.tenant.tool_layout import ToolLayout
 from app.services.marketplace.tool_plugins import (
     normalize_tool_plugin_definition,
     tool_kinds,
 )
+from app.services.platform import guild_purge
+from app.services.platform.retention import PLUGIN_INSTALL_DELETION_DAYS
+from app.services.tenant import plugin_updates
 from app.testing import (
     COUNTERS_UID,
     counters_tool_manifest,
-    create_initiative,
+    create_marketplace_listing,
+    create_reaction,
     install_tool_plugin,
+    route_as,
     route_session_to_guild,
 )
 
 #: A second plug-in declaring the same key as Counters (owner ruling: both
 #: install side by side).
 OTHER_UID = "ZZ11TXXKPMG2NB"
+
+_GROUP = f"p_{COUNTERS_UID.lower()}_counter_group"
+_COUNTER = f"p_{COUNTERS_UID.lower()}_counter"
+_KIND = f"counter_group.{COUNTERS_UID.lower()}"
+
 
 _UNIVERSAL_TOOL = {
     "id", "initiative_id", "name", "position", "created_at", "updated_at",
@@ -219,20 +234,39 @@ async def test_install_creates_exactly_the_declared_tables(
 async def test_the_tool_is_on_in_every_initiative_then_and_later(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
+    """Switched on, with each table's starting layouts, in every initiative
+    there is and every one made later: a list and an item page per table."""
     seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
     install = await install_tool_plugin(client, session, seat)
-    later = await create_initiative(session, seat.guild, seat.user)
+    made = await client.post(
+        seat.g("/initiatives/"), headers=seat.headers, json={"name": "Later"}
+    )
+    assert made.status_code == 201, made.text
+    later = made.json()["id"]
     await route_session_to_guild(session, seat.guild.id)
     rows = (
         await session.exec(
             sa.select(InitiativeRule.initiative_id, InitiativeRule.enabled).where(
-                InitiativeRule.key == f"counter_group.{COUNTERS_UID.lower()}:enabled",
+                InitiativeRule.key == f"{_KIND}:enabled",
                 InitiativeRule.initiative_role_id.is_(None),
                 InitiativeRule.install_id == install["id"],
             )
         )
     ).all()
-    assert dict(rows) == {seat.initiative.id: True, later.id: True}
+    assert dict(rows) == {seat.initiative.id: True, later: True}
+    layouts = (
+        await session.exec(
+            sa.select(ToolLayout.initiative_id, ToolLayout.tool, ToolLayout.kind).where(
+                ToolLayout.tool.endswith(COUNTERS_UID.lower())
+            )
+        )
+    ).all()
+    assert sorted(layouts) == sorted(
+        (initiative, f"{key}.{COUNTERS_UID.lower()}", kind)
+        for initiative in (seat.initiative.id, later)
+        for key in ("counter_group", "counter")
+        for kind in ("grid", "detail")
+    )
 
 
 async def test_two_plugins_with_one_key_install_side_by_side(
@@ -271,19 +305,369 @@ async def test_two_plugins_with_one_key_install_side_by_side(
     assert tool_kinds(_counters(), listing_uid=OTHER_UID)[0] == tools.installed[1].kind
 
 
-async def test_a_tool_plugin_is_not_removed_or_updated_yet(
+async def _index_row(session: AsyncSession, guild_id: int, install_id: int):
+    return (
+        await session.exec(
+            sa.select(PluginInstall)
+            .where(
+                PluginInstall.guild_id == guild_id,
+                PluginInstall.install_id == install_id,
+            )
+            .execution_options(populate_existing=True)
+        )
+    ).scalar_one_or_none()
+
+
+async def _publish(session: AsyncSession, version: str, change) -> None:
+    """Publish ``version`` of Counters, its tool as ``change`` leaves it."""
+    manifest = counters_tool_manifest()
+    change(manifest["tool"])
+    await create_marketplace_listing(
+        session,
+        uid=COUNTERS_UID,
+        public_id=f"test.{COUNTERS_UID.lower()}",
+        kind="plugin",
+        name="Counters",
+        version=version,
+        definition=manifest,
+    )
+
+
+async def test_uninstalling_keeps_the_tool_until_its_window_ends(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
-    seat = await acting_user(guild_role=CommunityRole.superadmin)
+    """Removing asks the seat to consent to the content's deletion; the tool
+    is then gone from the community and its tables, rows and rules stay.
+    Installing it again in the window brings back the same install."""
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
     install = await install_tool_plugin(client, session, seat)
     path = seat.g(f"/plugins/{install['id']}")
-    for response in (
-        await client.delete(path, headers=seat.headers),
-        await client.patch(path, headers=seat.headers, json={"enabled": False}),
-        await client.post(f"{path}/upgrade", headers=seat.headers),
+    refused = await client.delete(path, headers=seat.headers)
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["detail"] == GuildPluginMessages.TOOL_DELETION_UNCONFIRMED
+
+    removed = await client.delete(
+        path, headers=seat.headers, params={"delete_content": "true"}
+    )
+    assert removed.status_code == 204, removed.text
+    assert (await client.get(path, headers=seat.headers)).status_code == 404
+    listed = await client.get(seat.g("/plugins/"), headers=seat.headers)
+    assert install["id"] not in {plugin["id"] for plugin in listed.json()["items"]}
+    schema = guild_schema_name(seat.guild.id)
+    assert set(await _columns(session, schema)) == {_GROUP, _COUNTER}
+    row = await _index_row(session, seat.guild.id, install["id"])
+    assert row.status == PluginInstallStatus.deleted.value
+    assert row.uninstalled_at == row.status_changed_at
+    await route_session_to_guild(session, seat.guild.id)
+    rules = await session.scalar(
+        sa.select(sa.func.count()).where(InitiativeRule.install_id == install["id"])
+    )
+    assert rules
+    await session.commit()
+
+    back = await client.post(
+        seat.g("/plugins/"), headers=seat.headers, json={"listing_uid": COUNTERS_UID}
+    )
+    assert back.status_code == 201, back.text
+    assert back.json()["id"] == install["id"]
+    row = await _index_row(session, seat.guild.id, install["id"])
+    assert (row.status, row.uninstalled_at) == (PluginInstallStatus.active.value, None)
+    again = await client.post(
+        seat.g("/plugins/"), headers=seat.headers, json={"listing_uid": COUNTERS_UID}
+    )
+    assert again.json()["detail"] == GuildPluginMessages.ALREADY_INSTALLED
+
+
+async def test_the_window_ending_takes_the_tool_and_what_names_it(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """Past its window, the sweep deletes the rows that name the tool, the
+    install and its rules, then drops its tables and renders the community
+    without it, and no further step is asked of anyone."""
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    install = await install_tool_plugin(client, session, seat)
+    await route_session_to_guild(session, seat.guild.id)
+    group = (
+        await session.exec(
+            sa.text(
+                f"INSERT INTO {_GROUP} (initiative_id, name) VALUES (:i, 'Scores')"
+                " RETURNING id"
+            ),
+            params={"i": seat.initiative.id},
+        )
+    ).scalar_one()
+    comment = Comment(
+        content="Nice",
+        created_by=seat.user.id,
+        created_by_kind=ActorKind.member,
+        subject_type=_KIND,
+        subject_id=group,
+    )
+    session.add(comment)
+    await session.commit()
+    comment_id = comment.id
+    await create_reaction(session, seat.user, comment=comment)
+    layouts = await session.scalar(
+        sa.select(sa.func.count()).where(ToolLayout.tool == _KIND)
+    )
+    assert layouts == 2
+    removed = await client.delete(
+        seat.g(f"/plugins/{install['id']}"),
+        headers=seat.headers,
+        params={"delete_content": "true"},
+    )
+    assert removed.status_code == 204, removed.text
+
+    within = datetime.now(UTC) + timedelta(days=PLUGIN_INSTALL_DELETION_DAYS - 1)
+    assert await guild_purge.uninstall_deleted_plugins(session, now=within) == 0
+    past = datetime.now(UTC) + timedelta(days=PLUGIN_INSTALL_DELETION_DAYS + 1)
+
+    async def hold(held: datetime | None) -> None:
+        """Hold the group, or let it go, past its own guards."""
+        await route_session_to_guild(session, seat.guild.id)
+        await session.exec(sa.text("SET LOCAL session_replication_role = replica"))
+        await session.exec(
+            sa.text(f"UPDATE {_GROUP} SET held_at = :held WHERE id = :id"),
+            params={"held": held, "id": group},
+        )
+        await session.commit()
+
+    # Held by the platform, it waits for the next sweep, deleting nothing.
+    await hold(datetime.now(UTC))
+    assert await guild_purge.uninstall_deleted_plugins(session, now=past) == 0
+    assert set(await _columns(session, guild_schema_name(seat.guild.id))) == {
+        _GROUP,
+        _COUNTER,
+    }
+    await route_session_to_guild(session, seat.guild.id)
+    assert await session.scalar(
+        sa.select(sa.func.count()).where(Comment.id == comment_id)
+    )
+    await session.commit()
+    await hold(None)
+    assert await guild_purge.uninstall_deleted_plugins(session, now=past) == 1
+
+    schema = guild_schema_name(seat.guild.id)
+    assert await _columns(session, schema) == {}
+    assert await _index_row(session, seat.guild.id, install["id"]) is None
+    await route_session_to_guild(session, seat.guild.id)
+    for table, where in (
+        (GuildPlugin, GuildPlugin.id == install["id"]),
+        (InitiativeRule, InitiativeRule.install_id == install["id"]),
+        (Comment, Comment.subject_type == _KIND),
+        (Reaction, Reaction.target_id == comment_id),
+        (ToolLayout, ToolLayout.tool.startswith("counter")),
     ):
-        assert response.status_code == 409, response.text
-        assert response.json()["detail"] == GuildPluginMessages.TOOL_UNCHANGEABLE
+        assert not await session.scalar(
+            sa.select(sa.func.count()).select_from(table).where(where)
+        ), table
+    stamp = await session.scalar(
+        sa.text("SELECT obj_description(to_regnamespace(:s), 'pg_namespace')"),
+        {"s": schema},
+    )
+    assert stamp_tools(stamp) is None
+    await session.commit()
+    assert await _backfill_guild(seat.guild.id, wait=True) is False
+
+    # Installing it now is a new install, with new tables.
+    again = await client.post(
+        seat.g("/plugins/"), headers=seat.headers, json={"listing_uid": COUNTERS_UID}
+    )
+    assert again.status_code == 201, again.text
+    assert set(await _columns(session, schema)) == {_GROUP, _COUNTER}
+
+
+async def test_turning_a_tool_plugin_off_is_its_switch(
+    client: AsyncClient, session: AsyncSession, acting_user, role_session
+):
+    """Off, the tool is on in no initiative, and still there for the
+    community's admin as a switched-off tool is."""
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    install = await install_tool_plugin(client, session, seat)
+    path = seat.g(f"/plugins/{install['id']}")
+    user_id, guild_id = seat.user.id, seat.guild.id
+    pair = f"{seat.initiative.id}:{_KIND}"
+    for enabled in (False, True):
+        response = await client.patch(
+            path, headers=seat.headers, json={"enabled": enabled}
+        )
+        assert response.status_code == 200, response.text
+        reader = await role_session("app_user")
+        context = await route_as(reader, user_id=user_id, guild_id=guild_id)
+        assert (pair in context.enabled_tools) is enabled
+        assert {f"*:{_KIND}", f"+:{_KIND}"} <= set(context.enabled_tools)
+        await reader.rollback()
+
+
+async def test_a_version_adding_to_the_tool_waits_for_the_seat(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """A version adding a field, an option, an item table and an action is
+    held until the seat takes it; taking it adds the column and the table,
+    lays the new table out, and keeps every row."""
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    install = await install_tool_plugin(client, session, seat)
+    await route_session_to_guild(session, seat.guild.id)
+    await session.exec(
+        sa.text(f"INSERT INTO {_GROUP} (initiative_id, name) VALUES (:i, 'Kept')"),
+        params={"i": seat.initiative.id},
+    )
+    await session.commit()
+
+    def grow(tool: dict[str, Any]) -> None:
+        counter = tool["items"][0]
+        counter["fields"].append(
+            {"key": "unit", "name": {"en": "Unit"}, "kind": "text"}
+        )
+        view_mode = next(f for f in counter["fields"] if f["key"] == "view_mode")
+        view_mode["options"].append({"value": "dial", "label": {"en": "Dial"}})
+        tally = copy.deepcopy(counter)
+        tally.update(key="tally", name={"en": "Tally"})
+        del tally["open_while"]
+        tool["items"].append(tally)
+        tool["actions"].append(
+            {**tool["actions"][0], "id": "reset_again", "name": {"en": "Again"}}
+        )
+
+    await _publish(session, "1.1.0", grow)
+    path = seat.g(f"/plugins/{install['id']}")
+    detail = (await client.get(path, headers=seat.headers)).json()
+    asks = detail["pending_update"]
+    assert asks["version"] == "1.1.0"
+    assert asks["added_tables"] == ["tally"]
+    assert asks["added_fields"] == ["counter.unit"]
+    assert asks["added_options"] == ["counter.view_mode.dial"]
+    assert asks["added_actions"] == ["reset_again"]
+    assert asks["dropped_fields"] == []
+    waiting = await client.post(f"{path}/upgrade", headers=seat.headers)
+    assert waiting.status_code == 409, waiting.text
+    assert waiting.json()["detail"]["code"] == GuildPluginMessages.UPGRADE_NEEDS_CONSENT
+
+    taken = await client.post(
+        f"{path}/upgrade", headers=seat.headers, json={"version": "1.1.0"}
+    )
+    assert taken.status_code == 200, taken.text
+    columns = await _columns(session, guild_schema_name(seat.guild.id))
+    tally = f"p_{COUNTERS_UID.lower()}_tally"
+    assert "unit" in columns[_COUNTER] and tally in columns
+    await route_session_to_guild(session, seat.guild.id)
+    assert await session.scalar(sa.text(f"SELECT name FROM {_GROUP}")) == "Kept"
+    await session.exec(
+        sa.text(
+            f"INSERT INTO {_COUNTER} (counter_group_id, name, view_mode)"
+            f" SELECT id, 'Dial', 'dial' FROM {_GROUP}"
+        )
+    )
+    laid_out = await session.scalar(
+        sa.select(sa.func.count()).where(
+            ToolLayout.tool == f"tally.{COUNTERS_UID.lower()}",
+            ToolLayout.initiative_id == seat.initiative.id,
+        )
+    )
+    assert laid_out == 2
+
+
+async def test_the_sweep_takes_a_version_asking_nothing_and_holds_the_rest(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """A version renaming a field adds nothing and is applied, with the
+    community rendered from it; one adding a field waits for the seat."""
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    install = await install_tool_plugin(client, session, seat)
+    guild_id = seat.guild.id
+
+    def rename(tool: dict[str, Any]) -> None:
+        tool["fields"][0]["name"] = {"en": "About"}
+
+    def grow(tool: dict[str, Any]) -> None:
+        rename(tool)
+        tool["fields"].append({"key": "notes", "name": {"en": "Notes"}, "kind": "text"})
+
+    for version, change in (("1.0.1", rename), ("1.1.0", grow)):
+        await _publish(session, version, change)
+        await route_session_to_guild(session, guild_id)
+        await plugin_updates.update_guild(session, guild_id)
+    await route_session_to_guild(session, guild_id)
+    plugin = await session.get(GuildPlugin, install["id"], populate_existing=True)
+    assert (plugin.listing_version, plugin.pending_version) == ("1.0.1", "1.1.0")
+    stamp = await session.scalar(
+        sa.text("SELECT obj_description(to_regnamespace(:s), 'pg_namespace')"),
+        {"s": guild_schema_name(guild_id)},
+    )
+    assert stamp_tools(stamp) == (await provisioned_tools(guild_id)).digest
+    assert "notes" not in (await _columns(session, guild_schema_name(guild_id)))[_GROUP]
+
+
+async def test_a_major_drops_what_the_seat_confirms_and_keeps_the_rest(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """A new major dropping a field and a select's option is applied once the
+    seat names both: the field's column goes, the cells holding the option are
+    emptied, and every other value stays."""
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    install = await install_tool_plugin(client, session, seat)
+    await route_session_to_guild(session, seat.guild.id)
+    await session.exec(
+        sa.text(
+            f"WITH g AS (INSERT INTO {_GROUP} (initiative_id, name)"
+            " VALUES (:i, 'Looks') RETURNING id)"
+            f" INSERT INTO {_COUNTER} (counter_group_id, name, view_mode, color)"
+            " SELECT g.id, v.name, v.mode, '#112233' FROM g, (VALUES"
+            " ('Clock', 'segmented_clock'), ('Bar', 'progress_bar')) AS v(name, mode)"
+        ),
+        params={"i": seat.initiative.id},
+    )
+    await session.commit()
+
+    def shed(tool: dict[str, Any]) -> None:
+        counter = tool["items"][0]
+        counter["fields"] = [f for f in counter["fields"] if f["key"] != "color"]
+        view_mode = next(f for f in counter["fields"] if f["key"] == "view_mode")
+        view_mode["options"].pop()
+        detail = counter["layouts"]["detail"]["side"][0]
+        detail["children"] = [
+            part for part in detail["children"] if part["props"]["field"] != "color"
+        ]
+
+    await _publish(session, "2.0.0", shed)
+    path = seat.g(f"/plugins/{install['id']}")
+    for partial in (
+        {"version": "2.0.0"},
+        {"version": "2.0.0", "drop_fields": ["counter.color"]},
+    ):
+        unconfirmed = await client.post(
+            f"{path}/upgrade", headers=seat.headers, json=partial
+        )
+        assert unconfirmed.status_code == 409, unconfirmed.text
+    asks = unconfirmed.json()["detail"]
+    assert asks["dropped_fields"] == ["counter.color"]
+    assert asks["dropped_options"] == ["counter.view_mode.segmented_clock"]
+    columns = await _columns(session, guild_schema_name(seat.guild.id))
+    assert "color" in columns[_COUNTER]
+
+    taken = await client.post(
+        f"{path}/upgrade",
+        headers=seat.headers,
+        json={
+            "version": "2.0.0",
+            "drop_fields": ["counter.color"],
+            "drop_options": ["counter.view_mode.segmented_clock"],
+        },
+    )
+    assert taken.status_code == 200, taken.text
+    columns = await _columns(session, guild_schema_name(seat.guild.id))
+    assert "color" not in columns[_COUNTER]
+    await route_session_to_guild(session, seat.guild.id)
+    looks = dict(
+        (await session.exec(sa.text(f"SELECT name, view_mode FROM {_COUNTER}"))).all()
+    )
+    assert looks == {"Clock": None, "Bar": "progress_bar"}
+    refused = await session.exec(
+        sa.text(
+            f"SELECT relforcerowsecurity FROM pg_class WHERE oid = '{_COUNTER}'::regclass"
+        )
+    )
+    assert refused.scalar_one() is True
 
 
 async def test_boot_provisions_an_install_whose_provisioning_never_ran(

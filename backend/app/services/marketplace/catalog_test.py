@@ -22,7 +22,7 @@ from app.services.marketplace.definitions import (
     normalize_listing_definition,
     normalize_listing_example,
 )
-from app.testing import create_marketplace_listing
+from app.testing import counters_tool_manifest, create_marketplace_listing
 from app.testing.fake_vendor import declarative_plugin
 
 
@@ -497,6 +497,86 @@ class TestVersions:
         # 1.2.3 are the same floor.
         assert service.version_is_compatible("0.0.1-rc1") is True
         assert service.version_is_compatible(None) is True
+
+
+class TestToolVersions:
+    """A community keeps a tool plug-in's tables across its versions, so a
+    version only adds to them: within a major nothing a field holds goes, and
+    no version takes an item table away."""
+
+    @staticmethod
+    def _tool(version: str, change=None) -> dict:
+        definition = counters_tool_manifest()
+        if change is not None:
+            change(definition["tool"])
+        return _manifest(
+            kind="plugin",
+            public_id="tests.counters",
+            version=version,
+            definition=definition,
+        )
+
+    @staticmethod
+    def _counter(tool: dict) -> dict:
+        return tool["items"][0]
+
+    async def test_a_minor_adds_and_a_major_drops(self, session):
+        def unit(tool):
+            self._counter(tool)["fields"].append(
+                {"key": "unit", "name": {"en": "Unit"}, "kind": "text"}
+            )
+
+        def no_unit(tool):
+            pass
+
+        await service.upsert_listing(session, self._tool("1.0.0"), source="builtin")
+        await service.upsert_listing(
+            session, self._tool("1.1.0", unit), source="builtin"
+        )
+        with pytest.raises(CatalogError, match="counter.unit"):
+            await service.upsert_listing(
+                session, self._tool("1.2.0", no_unit), source="builtin"
+            )
+        await service.upsert_listing(
+            session, self._tool("2.0.0", no_unit), source="builtin"
+        )
+
+    @pytest.mark.parametrize(
+        "change",
+        [
+            lambda tool: tool["items"][0]["fields"][5].update(kind="text"),
+            lambda tool: tool["items"][0]["fields"][6]["options"].pop(),
+        ],
+        ids=["retyped", "fewer options"],
+    )
+    async def test_a_minor_never_changes_what_a_field_holds(self, session, change):
+        await service.upsert_listing(session, self._tool("1.0.0"), source="builtin")
+        with pytest.raises(CatalogError, match="within a major"):
+            await service.upsert_listing(
+                session, self._tool("1.1.0", change), source="builtin"
+            )
+
+    async def test_a_tool_plugin_stays_one(self, session):
+        await service.upsert_listing(session, self._tool("1.0.0"), source="builtin")
+        service_plugin = _manifest(
+            kind="plugin",
+            public_id="tests.counters",
+            version="2.0.0",
+            definition=declarative_plugin("tests.counters"),
+        )
+        with pytest.raises(CatalogError, match="all declare a tool"):
+            await service.upsert_listing(session, service_plugin, source="builtin")
+
+    async def test_no_version_takes_an_item_table_away(self, session):
+        def bare(tool):
+            del tool["items"]
+            del tool["actions"]
+
+        await service.upsert_listing(session, self._tool("1.0.0"), source="builtin")
+        with pytest.raises(CatalogError, match="item table"):
+            await service.upsert_listing(
+                session, self._tool("2.0.0", bare), source="builtin"
+            )
 
 
 class TestPluginApiFloor:

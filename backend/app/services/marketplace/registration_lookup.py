@@ -480,9 +480,17 @@ async def install_state(
 
     A plug-in with no service behind it — a tool instance — is always
     available and never mandatory, and has no state: there is no registration
-    for it to depend on. A service with no registration here keeps the state
-    staff gave its install.
+    for it to depend on. A tool plug-in runs nowhere either, so it is always
+    available and never mandatory, but it has a state: its registration's
+    and its install's, as a service's has. A service with no registration
+    here keeps the state staff gave its install.
     """
+    if isinstance(definition, Mapping) and definition.get("plugin_kind") == "tool":
+        snapshot = await declarative_registration(listing_uid)
+        if snapshot is not None:
+            return InstallState(state=snapshot.state_in(guild_id))
+        held = _install_states.get(listing_uid or "", {}).get(guild_id or 0)
+        return InstallState(state=held or PluginState.active)
     if not _has_registration(definition):
         return InstallState()
     snapshot = await registration_for_definition(definition, listing_uid=listing_uid)

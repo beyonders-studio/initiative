@@ -19,6 +19,7 @@ does not.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import and_, case, func, not_, or_, select
@@ -110,10 +111,15 @@ async def write_plugin_tool_rules(
     initiative: its switch, on, and each role's keys, as a built-in role holds
     a tool's (a manager both, anyone else viewing it and not creating it). In
     ``initiative_id``, or in every initiative. The rows are the install's.
-    Rows already there are kept as they are."""
+    Each of its tables also takes the layouts it declares as the initiative's
+    starting layouts for it, in an initiative that is neither archived nor in
+    the trash: how the table lists its rows and shows one. Rows already there
+    are kept as they are, so a layout somebody changed stays changed and a
+    table a later version adds takes its own."""
     from app.db.plugin_tools import tool_table_name
     from app.models.tenant.guild_plugin import GuildPlugin
     from app.models.tenant.initiative import Initiative, InitiativeRoleModel
+    from app.models.tenant.tool_layout import PLUGIN_DETAIL, ToolLayout
     from app.services.marketplace.tool_plugins import TOOL, tool_kinds
 
     installs = (
@@ -133,7 +139,7 @@ async def write_plugin_tool_rules(
             provisioned.append((install_id, listing_uid, definition))
     if not provisioned:
         return
-    initiatives = select(Initiative.id)
+    initiatives = select(Initiative.id, Initiative.archived_at, Initiative.deleted_at)
     roles = select(
         InitiativeRoleModel.id,
         InitiativeRoleModel.initiative_id,
@@ -142,11 +148,42 @@ async def write_plugin_tool_rules(
     if initiative_id is not None:
         initiatives = initiatives.where(Initiative.id == initiative_id)
         roles = roles.where(InitiativeRoleModel.initiative_id == initiative_id)
-    initiative_ids = (await session.exec(initiatives)).scalars().all()
+    initiative_rows = (await session.exec(initiatives)).all()
+    initiative_ids = [row.id for row in initiative_rows]
+    laid_out = [
+        row.id
+        for row in initiative_rows
+        if row.archived_at is None and row.deleted_at is None
+    ]
     role_rows = (await session.exec(roles)).all()
     rows: list[dict[str, Any]] = []
+    layouts: list[dict[str, Any]] = []
+    now = datetime.now(UTC)
     for install_id, listing_uid, definition in provisioned:
-        kind = tool_kinds(definition, listing_uid=listing_uid)[0]
+        kinds = tool_kinds(definition, listing_uid=listing_uid)
+        tool = definition["tool"]
+        for table_kind, declared in zip(
+            kinds,
+            (tool["layouts"], *(item["layouts"] for item in tool.get("items", []))),
+            strict=True,
+        ):
+            listed = {k: v for k, v in declared["list"].items() if k != "kind"}
+            layouts += [
+                {
+                    "initiative_id": i,
+                    "tool": table_kind,
+                    "kind": kind,
+                    "definition": d,
+                    "created_at": now,
+                    "updated_at": now,
+                }
+                for i in laid_out
+                for kind, d in (
+                    (declared["list"]["kind"], listed),
+                    (PLUGIN_DETAIL, declared["detail"]),
+                )
+            ]
+        kind = kinds[0]
         view, create = f"{kind}:enabled", f"{kind}:create"
         rows += [
             {
@@ -175,6 +212,12 @@ async def write_plugin_tool_rules(
             pg_insert(InitiativeRule)
             .values(rows[start : start + _RULE_ROWS_PER_INSERT])
             .on_conflict_do_nothing(constraint="uq_initiative_rules_subject")
+        )
+    for start in range(0, len(layouts), _RULE_ROWS_PER_INSERT):
+        await session.exec(
+            pg_insert(ToolLayout)
+            .values(layouts[start : start + _RULE_ROWS_PER_INSERT])
+            .on_conflict_do_nothing()
         )
 
 

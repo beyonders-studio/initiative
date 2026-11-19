@@ -165,6 +165,14 @@ class PluginInstall(SQLModel, table=True):
     status_changed_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
+    #: When the community's admin uninstalled it, a tool plug-in, consenting
+    #: to its content being deleted when the deletion window ends: stamped
+    #: with the move to ``deleted``, so it is the community's uninstall only
+    #: while ``status_changed_at`` is the same moment. Until then the
+    #: community may install it again.
+    uninstalled_at: datetime | None = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
     #: Staff suspended the install here, and who did.
     suspended_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
