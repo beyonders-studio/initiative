@@ -74,7 +74,7 @@ If it talks to another service, its row has a **Vendor client** section for the 
 5. Select **Save**.
 
 !!! tip "The GitHub plug-in fills all of that in for you"
-    Its row has **Create the GitHub App**. Give a **GitHub organization** to own the app, or leave it blank for your own account, and select **Create the GitHub App**. GitHub opens with the plug-in's permissions, events and your server's addresses already filled in. Confirm it there, and GitHub sends all six values back to Initiative. You type and copy none of them.
+    Its row has **Create the GitHub App**. Choose who owns the app: **Your GitHub account**, or **A GitHub organization** you're an owner of, giving its name as it appears in its address. Then select **Create the GitHub App**. GitHub opens with the plug-in's permissions, events and your server's addresses already filled in. Confirm it there, and GitHub sends all six values back to Initiative. You type and copy none of them.
 
 ### A plug-in that runs as a container
 
@@ -113,10 +113,15 @@ The **Base URL** and **Browser address** are `http` or `https` addresses with a 
 | **Suspend everywhere** | Every community that added the plug-in stops reaching it at once, and stops seeing it: its data, its settings, its events and its pages. Nothing goes to the plug-in while it's suspended. Nothing is deleted, and **Lift** puts everything where it was. A restart never lifts it for you. |
 | **Install in every community** | Adds it to every community, new ones included, and community admins can't remove it or turn it off. Where it appears and what it may do stay each community's call. Shown as **In every community**. |
 | **Who can use it** | The plug-in says this itself, in each release: **Every community**, **The operations community** (the [operations community](operations-community.md) alone), or, for a plug-in in **Beta**, the communities you pick, as many as you like. Until you pick one, nobody can use a beta plug-in. A community out of its reach can't find it, install it or use it, and a copy already added there disappears until it's back in reach; nothing is deleted. With **Install in every community** also on, it's added only where it can be used. When a release leaves beta, your list is deleted and every community can use it. |
-| **Share installations between communities** | Off, one installation at the vendor (one GitHub organization, say) connects to one community on this server, and the next community to try is told it's taken, never by whom. On, several communities can connect the same one, which suits a server where every community belongs to one company. It won't switch off while an installation is connected to more than one community. Only shown for a plug-in with vendor values. |
 | **Delete** | Removes the registration for good, after you type its identifier to confirm. Adding it back means registering it again. A plug-in from the registry can't be deleted, because the next update would bring it straight back, so suspend it instead. |
 
 A row marked **Publisher switched off** has stopped because every plug-in from that publisher has. Nothing is deleted there either.
+
+### Connect an account for every community
+
+By default each community connects its own account for a plug-in (its own GitHub organization, say), and anyone who controls an account can connect it in as many communities as they like; each one gets that account's updates. On a server where every community works with the same account, connect it once instead: on the plug-in's page, under **Connect for every community**, select **Connect for every community** and finish at the vendor as the account's owner. Every community with the plug-in then uses that account and can't change or disconnect it; their own settings say it was connected for every community.
+
+**Disconnect** ends it for every community. A community that had connected its own account before goes back to it; the others connect one when they want to. The section shows only for a connection the server can run end to end, such as GitHub's organization, and only once the plug-in's vendor values are set.
 
 ??? techspec "Switching a whole publisher off"
     A publisher is the part of a plug-in's identifier before the dot. The publishers list has no page in the app. An owner reaches it through the API with a personal API key that isn't read-only:
