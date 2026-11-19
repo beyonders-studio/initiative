@@ -77,8 +77,6 @@ beforeEach(() => {
   openAddress.mockReset();
 });
 
-vi.mock("./PluginMembersPanel", () => ({ PluginMembersPanel: () => null }));
-
 const renderAs = (role: "superadmin" | "admin") => {
   const community = buildCommunity({ role });
   renderPage(() => <PluginSettingsDialog pluginId={3} open onOpenChange={() => {}} />, {
