@@ -21,7 +21,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from sqlalchemy import and_, case, exists, func, not_, or_, select
+from sqlalchemy import and_, case, func, not_, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql.elements import ColumnElement
@@ -128,13 +128,15 @@ def tool_on_sql(tool: Tool) -> ColumnElement[bool]:
     own = aliased(InitiativeRule)
     return func.coalesce(
         select(row.enabled).where(where).scalar_subquery(),
-        exists().where(
+        select(own.key)
+        .where(
             own.initiative_id == Initiative.id,
             own.initiative_role_id.is_(None),  # type: ignore[union-attr]
             own.install_id.is_(None),  # type: ignore[union-attr]
             own.key == tool.view_permission,
             own.enabled.is_(True),  # type: ignore[union-attr]
-        ),
+        )
+        .exists(),
     )
 
 
@@ -152,7 +154,7 @@ def member_permission_sql(
         and_(
             not_(role.is_builtin),
             not_(role.is_manager),
-            exists().where(custom_roles, off.enabled.is_(False)),  # type: ignore[union-attr]
+            select(off.key).where(custom_roles, off.enabled.is_(False)).exists(),  # type: ignore[union-attr]
         ),
     )
     return case(

@@ -141,7 +141,7 @@ async def test_feedback_is_a_case_its_sender_may_be_contacted_about(
     assert contact_case.filer_subject is None and contact_case.topic == "idea"
     assert tasks[contact_case.task_id].title == "Idea: Print view."
     (opening,) = comments
-    assert opening.task_id == contact_case.task_id
+    assert (opening.subject_type, opening.subject_id) == ("task", contact_case.task_id)
     assert opening.audience == CommentAudience.filer
     assert opening.content == "Print view."
     await set_rls_context(session, Unattributed())
