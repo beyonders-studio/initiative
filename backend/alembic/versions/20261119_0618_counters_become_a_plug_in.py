@@ -334,7 +334,7 @@ def _upgrade_schema(converted: list[int]) -> None:
                     f"UPDATE {_q(table)} SET {_q(column)} = {_case(_q(column), mapping)}"
                     f" WHERE {_q(column)} IN ({_listed(mapping)})"
                 )
-            _rewrite_queries()
+            _rewrite_queries(TABLES)
         else:
             _run(f"DELETE FROM initiative_rules WHERE key IN ({_listed(RULE_KEYS)})")
             for table, column in kind_columns:
@@ -445,15 +445,16 @@ def _rewrite_sql(sql: str, mapping: Mapping[str, str]) -> str | None:
 
         def visit_ColumnRef(self, ancestors: Any, node: ast.ColumnRef) -> Any:
             nonlocal changed
-            first = node.fields[0] if node.fields else None
+            fields = node.fields or ()
+            first = fields[0] if fields else None
             if (
-                len(node.fields) > 1
+                len(fields) > 1
                 and isinstance(first, ast.String)
                 and first.sval in mapping
             ):
                 changed = True
                 return ast.ColumnRef(
-                    fields=(ast.String(sval=mapping[first.sval]), *node.fields[1:])
+                    fields=(ast.String(sval=mapping[first.sval]), *fields[1:])
                 )
             return None
 
@@ -461,17 +462,19 @@ def _rewrite_sql(sql: str, mapping: Mapping[str, str]) -> str | None:
     return RawStream()(tree) if changed else None
 
 
-def _rewrite_queries() -> None:
-    """Each dashboard query reading a counter dataset reads the plug-in's."""
+def _rewrite_queries(mapping: Mapping[str, str]) -> None:
+    """Each dashboard query reading a table of ``mapping`` reads its new
+    name."""
     for dashboard_id, definition in _rows(
-        "SELECT id, definition FROM dashboards"
-        " WHERE definition::text ~ 'counter_groups|counters'"
+        "SELECT id, definition FROM dashboards WHERE definition::text ~ :names",
+        names="|".join(mapping),
     ):
         changed = False
         for widget in (definition or {}).get("widgets") or []:
             binding = widget.get("binding") if isinstance(widget, dict) else None
-            sql = binding.get("sql") if isinstance(binding, dict) else None
-            if isinstance(sql, str) and (new := _rewrite_sql(sql, TABLES)) is not None:
+            if not isinstance(binding, dict) or not isinstance(binding.get("sql"), str):
+                continue
+            if (new := _rewrite_sql(binding["sql"], mapping)) is not None:
                 binding["sql"] = new
                 changed = True
         if changed:
@@ -769,7 +772,7 @@ def _downgrade_schema(converted: list[int]) -> None:
         _bind().execute(
             sa.text("DELETE FROM guild_plugins WHERE id = :p"), {"p": install_id}
         )
-        _rewrite_queries_back()
+        _rewrite_queries({new: old for old, new in TABLES.items()})
     guild_id = int(schema.removeprefix("guild_"))
     with _held("public.plugin_installs"):
         _bind().execute(
@@ -790,21 +793,3 @@ def _drop_plugin_only(table: str) -> None:
         t=table,
     ):
         _run(f"ALTER TABLE {table} DROP CONSTRAINT {_q(name)}")
-
-
-def _rewrite_queries_back() -> None:
-    back = {new: old for old, new in TABLES.items()}
-    for dashboard_id, definition in _rows(
-        "SELECT id, definition FROM dashboards WHERE definition::text ~ 'p_tsjvtcm0s7gv2x_'"
-    ):
-        for widget in (definition or {}).get("widgets") or []:
-            binding = widget.get("binding") if isinstance(widget, dict) else None
-            sql = binding.get("sql") if isinstance(binding, dict) else None
-            if isinstance(sql, str) and (new := _rewrite_sql(sql, back)) is not None:
-                binding["sql"] = new
-        _bind().execute(
-            sa.text(
-                "UPDATE dashboards SET definition = CAST(:d AS jsonb) WHERE id = :i"
-            ),
-            {"d": json.dumps(definition), "i": dashboard_id},
-        )
