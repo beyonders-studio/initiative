@@ -3,7 +3,7 @@ import fs from "fs";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig, loadEnv, type ProxyOptions } from "vite";
 
 import { contentPolicy } from "./electron/content-policy";
 import { buildNotices } from "./scripts/third-party-notices.mjs";
@@ -35,10 +35,23 @@ const CLOUD_ORIGIN = fs
   .readFileSync(path.resolve(import.meta.dirname, "../CLOUD_ORIGIN"), "utf-8")
   .trim();
 
-const createProxyConfig = (supportsWebSocket = false) => ({
+// A WebSocket upgrade keeps the Host the browser sent. Chromium sends no
+// Sec-Fetch-Site on an upgrade, so the backend checks the handshake's Origin
+// against its Host; rewritten to the backend's port, that never matches a page
+// served from a port other than APP_URL's, as a linked worktree's is.
+type DevProxy = Parameters<NonNullable<ProxyOptions["configure"]>>[0];
+
+const keepHostOnUpgrade = (proxy: DevProxy) => {
+  proxy.on("proxyReqWs", (proxyReq, req) => {
+    if (req.headers.host) proxyReq.setHeader("host", req.headers.host);
+  });
+};
+
+const createProxyConfig = (supportsWebSocket = false): ProxyOptions => ({
   target: devProxyTarget,
   changeOrigin: true,
   ws: supportsWebSocket,
+  configure: supportsWebSocket ? keepHostOnUpgrade : undefined,
 });
 
 // The emoji picker (frimousse) fetches its dataset at runtime from
@@ -319,6 +332,7 @@ export default defineConfig({
         ws: true,
         // Log proxy events for debugging
         configure: (proxy) => {
+          keepHostOnUpgrade(proxy);
           proxy.on("error", (err) => {
             console.log("Proxy error:", err);
           });
