@@ -4,6 +4,7 @@ community that installs it, and ruled as a built-in tool is."""
 from __future__ import annotations
 
 import copy
+import re
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -341,6 +342,15 @@ async def test_a_tool_plugins_rows_are_heard_found_and_purged_on_time(
         _due(trash, datetime.now(UTC), tools).execution_options(include_deleted=True)
     )
     assert due.first() == purge_at
+    # Its retention past, the sweep purges it.
+    from app.services.tenant.trash_purge import _run_purge_pass
+
+    await _run_purge_pass(session, now=purge_at + timedelta(days=1), tools=tools)
+    gone = await session.scalar(
+        sa.text("SELECT count(*) FROM p_tsjvtcm0s7gv2x_counter WHERE id = :c"),
+        {"c": counter},
+    )
+    assert gone == 0
 
 
 async def test_the_tool_is_on_in_every_initiative_then_and_later(
@@ -780,6 +790,92 @@ async def test_a_major_drops_what_the_seat_confirms_and_keeps_the_rest(
         )
     )
     assert refused.scalar_one() is True
+
+
+async def test_boot_brings_an_older_item_table_up_to_its_shape(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """An item table made before items were archived has no stamp column. The
+    back-fill of a community whose render moved adds it, and what reads it."""
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    await install_tool_plugin(client, session, seat)
+    schema = guild_schema_name(seat.guild.id)
+    counter = f'"{schema}".p_tsjvtcm0s7gv2x_counter'
+    stamp = await session.scalar(
+        sa.text("SELECT obj_description(to_regnamespace(:s), 'pg_namespace')"),
+        {"s": schema},
+    )
+    await session.exec(
+        sa.text(f"ALTER TABLE {counter} DROP COLUMN archived_at CASCADE")
+    )
+    behind = re.sub(r"schema=[^,]*", "schema=older", stamp)
+    await session.exec(sa.text(f"COMMENT ON SCHEMA \"{schema}\" IS '{behind}'"))
+    await session.commit()
+
+    assert await _backfill_guild(seat.guild.id, wait=True) is True
+
+    assert (
+        "archived_at" in (await _columns(session, schema))["p_tsjvtcm0s7gv2x_counter"]
+    )
+    frozen = await session.scalar(
+        sa.text(
+            "SELECT count(*) FROM pg_trigger WHERE tgrelid = to_regclass(:t)"
+            " AND tgname LIKE '%frozen%'"
+        ),
+        {"t": counter},
+    )
+    assert frozen > 0
+
+
+async def test_a_tool_plugins_search_is_current_by_its_own_sources(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """A community whose tool plug-in's rows were written before they were
+    indexed is behind its own search generation, not the built-in one, and
+    the back-fill indexes them."""
+    from app.db.schema_provisioning import backfill_guild_search
+    from app.db.search_index import search_generation
+
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    await install_tool_plugin(client, session, seat)
+    schema = guild_schema_name(seat.guild.id)
+    await route_session_to_guild(session, seat.guild.id)
+    await session.exec(sa.text("SET LOCAL session_replication_role = replica"))
+    group = (
+        await session.exec(
+            sa.text(
+                "INSERT INTO p_tsjvtcm0s7gv2x_counter_group"
+                " (initiative_id, name, created_by_kind)"
+                " VALUES (:i, 'Unindexed', 'system') RETURNING id"
+            ),
+            params={"i": seat.initiative.id},
+        )
+    ).scalar_one()
+    await session.exec(
+        sa.text(
+            f"COMMENT ON TABLE \"{schema}\".search_entries IS '{search_generation()}'"
+        )
+    )
+    await session.commit()
+    tools = await provisioned_tools(seat.guild.id)
+    assert search_generation(tools) != search_generation()
+
+    await backfill_guild_search()
+
+    await route_session_to_guild(session, seat.guild.id)
+    found = await session.scalar(
+        sa.text(
+            "SELECT count(*) FROM search_entries WHERE entity_id = :g"
+            " AND entity_type = :k"
+        ),
+        {"g": group, "k": f"counter_group.{COUNTERS_UID.lower()}"},
+    )
+    assert found == 1
+    marker = await session.scalar(
+        sa.text("SELECT obj_description(to_regclass(:t), 'pg_class')"),
+        {"t": f'"{schema}".search_entries'},
+    )
+    assert marker == search_generation(tools)
 
 
 async def test_boot_provisions_an_install_whose_provisioning_never_ran(

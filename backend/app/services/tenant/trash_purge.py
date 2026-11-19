@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
-from sqlalchemy import Table
+from sqlalchemy import Table, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
@@ -84,7 +84,11 @@ async def _run_purge_pass(
         # is locked, and left to it.
         model = MODELS_BY_TABLE.get(table.name)
         stmt = (
-            select_including_deleted(model if model is not None else table)
+            (
+                select_including_deleted(model)
+                if model is not None
+                else select(table).execution_options(include_deleted=True)
+            )
             .where(table.c.purge_at.is_not(None))
             .where(table.c.purge_at < now)
             .with_for_update(skip_locked=True)
