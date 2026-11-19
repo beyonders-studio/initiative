@@ -51,7 +51,7 @@ from app.db.authorization import (
     sql_values,
 )
 from app.db.frozen import (
-    FROZEN_TABLES,
+    frozen_tables,
     LIFECYCLE_COLUMNS,
     freeze_leg,
     frozen_guard_trigger,
@@ -63,6 +63,7 @@ from app.db.frozen import (
     render_resource_frozen_for_grant_fn,
 )
 from app.db.guild_migrations import split_sql_statements
+from app.db.names import object_name
 from app.db.initiative_rls import (
     ANSWERED,
     COMMENT_PARENTS,
@@ -190,7 +191,7 @@ def _trash_read_policy(table: str) -> list[str]:
         f"CREATE POLICY trashed_read ON {table} AS RESTRICTIVE FOR SELECT",
         f"  USING ({_TRASH_READ_PREDICATE});",
         (
-            f"CREATE OR REPLACE TRIGGER tr_{table}_stamp_deleted_by"
+            f"CREATE OR REPLACE TRIGGER {object_name('tr', table, 'stamp_deleted_by')}"
             f" BEFORE INSERT OR UPDATE OF deleted_at ON {table} FOR EACH ROW"
             " EXECUTE FUNCTION public.fn_stamp_deleted_by();"
         ),
@@ -519,12 +520,15 @@ def _table_block(table: str, path: InitiativePath, tools: ToolSet) -> str:
         else:  # USING
             lines.append(f"  USING ({pred});")
     lines.extend(_freeze_policies(table, tools))
-    if table in SOFT_DELETE_TABLES:
+    trashable = table in SOFT_DELETE_TABLES or table in tools.tables_carrying(
+        "deleted_at"
+    )
+    if trashable:
         lines.extend(_trash_read_policy(table))
         lines.extend(_query_trash_policy(table))
     if table in _QUERY_TOMBSTONES:
         lines.extend(_query_trash_policy(table, _QUERY_TOMBSTONES[table]))
-    if table in _PURGE_GUARD_TABLES:
+    if table in _PURGE_GUARD_TABLES or table in tools.tables_carrying("deleted_at"):
         # Admin-only hard delete (purge), AND-combined with the PERMISSIVE delete
         # policy above. RESTRICTIVE, so a write-member who clears the permissive
         # leg is still refused unless they are the routed guild admin.
@@ -2029,7 +2033,7 @@ def render_guild_rls_ddl(tools: ToolSet) -> str:
     out += "\n\n" + _SHARE_REQUESTS_SECTION + "\n\n" + _share_requests_block()
     out += "\n\n" + _DRAFT_SECTION + "\n\n" + _draft_block()
     out += "\n\n" + _DEFINITIONS_SECTION + "\n\n" + _definitions_block()
-    out += "\n\n" + render_holds_ddl()
+    out += "\n\n" + render_holds_ddl(tools)
     out += "\n\n" + render_moderation_log_ddl()
     out += (
         "\n\n"
@@ -2041,7 +2045,9 @@ def render_guild_rls_ddl(tools: ToolSet) -> str:
         + "\n"
         + _departure_policies()
     )
-    guards = [f"{frozen_guard_trigger(t)};" for t in sorted(FROZEN_TABLES)]
+    guards = [
+        f"{frozen_guard_trigger(t, tools)};" for t in sorted(frozen_tables(tools))
+    ]
     guards += [
         f"{trigger};"
         for table in sorted(paths)

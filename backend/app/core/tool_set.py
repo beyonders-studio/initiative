@@ -48,6 +48,10 @@ class ToolRecord:
     create_permission: str
     #: The resource its plug-in scopes name.
     scope: str
+    #: The install whose tool this is, for a tool plug-in's: its switch and
+    #: role rows are that install's (``initiative_rules.install_id``). None
+    #: for a built-in tool.
+    install_id: int | None = None
 
 
 @dataclass(frozen=True, eq=False)
@@ -67,6 +71,26 @@ class ToolSet:
     def by_table(self) -> dict[str, ToolRecord]:
         """Each tool by the name of its own table."""
         return {record.table.name: record for record in self.records}
+
+    @cached_property
+    def _columns(self) -> dict[str, frozenset[str]]:
+        return {
+            table.name: frozenset(table.c.keys())
+            for record in self.records
+            for table in (record.table, *record.items)
+        }
+
+    def tables_carrying(self, column: str) -> frozenset[str]:
+        """Every tool's own table and item table that has ``column``: what a
+        rule derived from a mixin reads of a tool built from no model."""
+        return frozenset(
+            table for table, columns in self._columns.items() if column in columns
+        )
+
+    @cached_property
+    def installed(self) -> tuple[ToolRecord, ...]:
+        """The tools an installed tool plug-in brings."""
+        return tuple(record for record in self.records if record.install_id is not None)
 
     @cached_property
     def child_kinds(self) -> tuple[Kind, ...]:
