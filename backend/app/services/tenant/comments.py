@@ -36,10 +36,16 @@ from app.core.messages import (
 )
 from app.core.tools import KINDS, Tool
 from app.db.base import MODELS_BY_TABLE
-from app.db.initiative_rls import COMMENT_PARENTS
+from app.db.initiative_rls import COMMENT_PARENTS, comment_parents
 from app.db.query import ids_in
-from app.db.session import guild_context, install_context, routed_guild_id
+from app.db.session import (
+    guild_context,
+    install_context,
+    routed_guild_id,
+    routed_tools,
+)
 from app.db.soft_delete_filter import select_including_deleted
+from app.db.tool_rows import Located, ToolRow, load_row, locate, table_of
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import User
 from app.models.tenant._mixins import ActorKind, tool_models
@@ -207,7 +213,8 @@ class _ParentContext:
     it anchors to — a task also fills ``task``/``project``, which is the pair
     the task notifications and the task serializer read. Either way the fields
     every caller needs — the kind, the parent id, the initiative (``None`` for
-    a guild-level calendar), a display title — are filled.
+    a guild-level calendar), a display title — are filled. A tool plug-in's
+    row, the tool's or an item's, is ``installed``, and is the thread's row.
     """
 
     kind: str
@@ -220,6 +227,7 @@ class _ParentContext:
     resource: SQLModel | None = None
     extra: ExtraCommentTarget | None = None
     extra_row: SQLModel | None = None
+    installed: ToolRow | None = None
 
     @property
     def ref_type(self) -> str | None:
@@ -228,7 +236,16 @@ class _ParentContext:
         own id, so this is also where a link to the thread goes."""
         if self.extra is not None:
             return self.extra.kind
+        if self.installed is not None:
+            return self.kind
         return self.tool.value if self.tool is not None else None
+
+    @property
+    def row(self) -> Any:
+        """The row the thread is on."""
+        if self.installed is not None:
+            return self.installed
+        return self.extra_row if self.extra is not None else self.resource
 
 
 def subject_of(comment: Comment) -> tuple[str, int]:
@@ -342,6 +359,24 @@ async def _get_tool_context(
     )
 
 
+async def _get_installed_context(
+    session: AsyncSession, located: Located, *, entity_id: int
+) -> _ParentContext | None:
+    """One row of a tool plug-in's, the tool's or an item's, with the tool's
+    row: read through the routed session, so the row is the reader's to
+    reach, as its tool's is."""
+    row = await load_row(session, located, routed_tools(session), entity_id)
+    if row is None:
+        return None
+    return _ParentContext(
+        kind=located.kind,
+        entity_id=int(row.id),
+        initiative_id=row.tool["initiative_id"],
+        title=row.name,
+        installed=row,
+    )
+
+
 async def _load_parent(
     session: AsyncSession,
     *,
@@ -349,6 +384,12 @@ async def _load_parent(
     entity_id: int,
     guild_id: int,
 ) -> _ParentContext | None:
+    tools = routed_tools(session)
+    if kind not in tools.comment_targets:
+        raise _parent_missing(kind)
+    located = locate(tools, kind)
+    if located is not None:
+        return await _get_installed_context(session, located, entity_id=entity_id)
     if kind == "task":
         return await _get_task_context(session, task_id=entity_id, guild_id=guild_id)
     extra = EXTRA_COMMENT_TARGETS.get(kind)
@@ -409,6 +450,23 @@ async def _ensure_parent_access(
     and gets the project's sharing without the project's switch: its thread
     belongs to the task, not to the project's tool surface.
     """
+    if ctx.installed is not None:
+        # Read through the routed session with its tool's row, so the reader
+        # reaches it; the tool's switch and its comment switch answer for the
+        # thread, as a wiki's do for its pages.
+        located = locate(routed_tools(session), ctx.kind)
+        assert located is not None
+        context = guild_context(session)
+        tool = located.tool
+        if context is not None and (
+            f"{ctx.initiative_id}:{tool.kind}" not in context.enabled_tools
+        ):
+            raise CommentPermissionError(
+                KindMessages.TOOL_NOT_ENABLED, params={"kind": tool.kind}
+            )
+        if not ctx.installed.tool.get("comments_enabled", True):
+            raise CommentPermissionError(CommentMessages.COMMENTS_DISABLED)
+        return
     if ctx.extra is not None and not ctx.extra.anchor_switch:
         # An extra whose thread is its own: admitted by the anchor's sharing,
         # asked none of its switches. The task is the one, and its context
@@ -551,7 +609,7 @@ async def _resolved_parent(
     if ctx is None:
         # The policies took the parent out before this ran. In the initiative
         # it is the reader's to know about, so sharing is what refused it.
-        table = COMMENT_PARENTS[kind].table
+        table = comment_parents(routed_tools(session))[kind].table
         if user is not None and await reachability.reader_is_in_the_initiative(
             table, entity_id, cast(int, user.id), guild_id
         ):
@@ -583,19 +641,21 @@ async def _locked_now(session: AsyncSession, ctx: _ParentContext) -> bool:
     this write has committed."""
     from app.db.advisory_locks import LockNamespace, advisory_lock
 
-    row = ctx.extra_row if ctx.extra is not None else ctx.resource
+    row = ctx.row
+    table = table_of(row)
     await advisory_lock(
         session,
         LockNamespace.COMMENT_THREAD,
-        thread_key(routed_guild_id(session), str(row.__tablename__), int(row.id)),
+        thread_key(routed_guild_id(session), table.name, int(row.id)),
     )
-    model = type(row)
-    if not hasattr(model, "comments_locked_at"):
+    if "comments_locked_at" not in table.c:
         return False
     # Read again now that it is this write's turn.
     return (
         await session.exec(
-            select_including_deleted(model.comments_locked_at).where(model.id == row.id)
+            select_including_deleted(table.c.comments_locked_at).where(
+                table.c.id == row.id
+            )
         )
     ).first() is not None
 
@@ -609,8 +669,7 @@ def thread_key(guild_id: int | None, table: str, row_id: int) -> str:
 def thread_locked(ctx: _ParentContext) -> bool:
     """Whether a moderator closed this thread: nothing is added to it or
     edited in it, by anyone, until it is reopened."""
-    row = ctx.extra_row if ctx.extra is not None else ctx.resource
-    return getattr(row, "comments_locked_at", None) is not None
+    return getattr(ctx.row, "comments_locked_at", None) is not None
 
 
 async def get_comment_with_parent(

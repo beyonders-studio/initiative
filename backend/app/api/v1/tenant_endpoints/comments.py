@@ -18,9 +18,9 @@ from app.schemas.tenant.comment import (
     CommentCreate,
     CommentListResponse,
     CommentRead,
-    CommentSubject,
     CommentUpdate,
     RecentActivityEntry,
+    SaidOn,
 )
 from app.services import notifications as notifications_service
 from app.services.tenant import attachments as attachments_service
@@ -49,7 +49,7 @@ async def create_comment(
         content=comment_in.content,
         parent_comment_id=comment_in.parent_comment_id,
         audience=comment_in.audience,
-        subject=(comment_in.subject_type.value, comment_in.subject_id),
+        subject=(comment_in.subject_type, comment_in.subject_id),
     )
 
     await session.commit()
@@ -82,7 +82,7 @@ async def list_comments(
     session: ActorSessionDep,
     current_user: ActorUserDep,
     guild_context: CommentsRead,
-    subject_type: CommentSubject,
+    subject_type: SaidOn,
     subject_id: Annotated[int, Query(gt=0)],
     limit: int = Query(default=20, ge=1, le=100),
     cursor: str | None = Query(default=None),
@@ -94,7 +94,7 @@ async def list_comments(
         session,
         user=current_user,
         guild_id=guild_context.guild_id,
-        subject=(subject_type.value, subject_id),
+        subject=(subject_type, subject_id),
         limit=limit,
         cursor=cursor,
     )
