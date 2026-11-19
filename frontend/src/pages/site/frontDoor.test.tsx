@@ -534,7 +534,7 @@ const RELEASES = [
     version: "0.73.2",
     date: "2026-09-29",
     changes:
-      "### Fixed\n\n- **Uploads resume after a dropped connection.** See [Installation](docs/en/running-a-server/installation.md#checking-an-image-is-ours).\n- **Calendars load faster.**",
+      "### Added\n\n- **Pause an upload.** Hold it for later.\n\n  ![The upload bar, paused](docs/images/releases/upload-pause.webp)\n\n### Fixed\n\n- **Uploads resume after a dropped connection.** See [Installation](docs/en/running-a-server/installation.md#checking-an-image-is-ours).\n- **Calendars load faster.**",
   },
   {
     version: "0.73.1",
@@ -552,16 +552,30 @@ const stubChangelog = () =>
   });
 
 describe("WhatsNewPage", () => {
-  it("lists each release as a post with its headlines", async () => {
+  it("features the latest release, its picture as the cover, over the earlier posts", async () => {
     server.use(stubChangelog());
     renderPage(WhatsNewPage, signedOut);
 
-    const post = await screen.findByRole("link", {
+    const latest = await screen.findByRole("heading", {
+      level: 2,
       name: landing.whatsNew.postTitle.replace("{{version}}", "0.73.2"),
     });
-    expect(post).toHaveAttribute("href", "/whats-new/0.73.2");
+    expect(within(latest).getByRole("link")).toHaveAttribute("href", "/whats-new/0.73.2");
+    expect(screen.getByText(landing.whatsNew.latest)).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "The upload bar, paused" })).toBeInTheDocument();
+    expect(screen.getByText("1 new")).toBeInTheDocument();
+    expect(screen.getByText("2 fixed")).toBeInTheDocument();
+    expect(screen.getByText("Hold it for later.")).toBeInTheDocument();
     expect(screen.getByText("Uploads resume after a dropped connection")).toBeInTheDocument();
-    expect(screen.getByText("Search finds archived wikis")).toBeInTheDocument();
+
+    const earlier = screen.getByRole("region", { name: landing.whatsNew.earlier });
+    expect(
+      within(earlier).getByRole("heading", {
+        level: 3,
+        name: landing.whatsNew.postTitle.replace("{{version}}", "0.73.1"),
+      })
+    ).toBeInTheDocument();
+    expect(within(earlier).getByText("Search finds archived wikis")).toBeInTheDocument();
   });
 
   it("says so when the changelog can't be read", async () => {
@@ -583,7 +597,12 @@ describe("WhatsNewPage", () => {
       "href",
       `${DOCS_URL}running-a-server/installation/#checking-an-image-is-ours`
     );
-    expect(screen.getByRole("heading", { level: 2, name: "Fixed" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 2, name: landing.whatsNew.sections.fixed })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 3, name: "Uploads resume after a dropped connection" })
+    ).toBeInTheDocument();
   });
 
   const renderPost = (origin?: string) =>
@@ -609,7 +628,10 @@ describe("WhatsNewPage", () => {
     renderPost(CLOUD_ORIGIN);
 
     expect(
-      await screen.findByRole("heading", { level: 2, name: intake.ideas.shippedTitle })
+      await screen.findByRole("heading", {
+        level: 2,
+        name: landing.whatsNew.shippedHeadline_one,
+      })
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Resumable uploads" })).toHaveAttribute(
       "href",
