@@ -221,6 +221,19 @@ describe("PluginPlacementPanel", () => {
       expect(rolesLink("Platform")).toBeNull();
     });
 
+    it("says where a tool plug-in's tool is, and links its roles", async () => {
+      const tool = plugin([1], false);
+      tool.definition = { plugin_kind: "tool" };
+      renderPage(() => <PluginPlacementPanel plugin={tool} />);
+
+      expect(
+        await screen.findByText(
+          "This plug-in's tool is there only in the initiatives you choose. In each, the initiative turns it on or off, and its roles say who uses it."
+        )
+      ).toBeTruthy();
+      expect(rolesLink("Platform")).toBeTruthy();
+    });
+
     it("links roles for a plug-in with a field on items and no page", async () => {
       // The roles say who is drawn the field on an item there, as they say
       // who opens a page.

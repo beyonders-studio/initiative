@@ -22,7 +22,7 @@ import type { CommunityPluginDetail } from "@/api/generated/initiativeAPI.schema
 import { useUpdateCommunityPlugin } from "@/hooks/useCommunityPlugins";
 import { useCommunityInitiatives } from "@/hooks/useInitiatives";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { declaredPages, hasInitiativeSurfaces } from "@/lib/pluginSurfaces";
+import { declaredPages, hasInitiativeSurfaces, isToolPlugin } from "@/lib/pluginSurfaces";
 import { initiativeRoute } from "@/lib/tools";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
@@ -120,7 +120,13 @@ export function PluginPlacementPanel({ plugin }: PluginPlacementPanelProps) {
       <div>
         <h3 className="font-medium text-sm">{t("plugins:placement.title")}</h3>
         <p className="text-muted-foreground text-sm">
-          {t(hasPage ? "plugins:placement.description" : "plugins:placement.descriptionNoPage")}
+          {t(
+            isToolPlugin(plugin.definition)
+              ? "plugins:placement.descriptionTool"
+              : hasPage
+                ? "plugins:placement.description"
+                : "plugins:placement.descriptionNoPage"
+          )}
         </p>
       </div>
 

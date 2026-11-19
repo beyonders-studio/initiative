@@ -48,6 +48,7 @@ import { STANDING_SCOPES, scopeSentence, toggleScope } from "@/lib/pluginScopes"
 import {
   communityPluginPath,
   declaredPages,
+  isToolPlugin,
   permissionName,
   pluginHasConnections,
   pluginPermissions,
@@ -217,9 +218,11 @@ export function InstallPluginDialog({
               </h3>
               <p className="text-muted-foreground text-xs">
                 {t(
-                  hasPage
-                    ? "plugins:install.whereDescription"
-                    : "plugins:install.whereDescriptionNoPage"
+                  isToolPlugin(listing.definition)
+                    ? "plugins:install.whereDescriptionTool"
+                    : hasPage
+                      ? "plugins:install.whereDescription"
+                      : "plugins:install.whereDescriptionNoPage"
                 )}
               </p>
             </div>
