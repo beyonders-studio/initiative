@@ -433,7 +433,7 @@ ARCHIVE_TARGETS: tuple[str, ...] = (
 # Property surfaces: EVERY tool carries custom properties, plus every sub-tool —
 # the rows inside a tool that are things in their own right. The properties
 # seam (app.services.tenant.metadata.PROPERTY_LINKS), the value table's
-# CHECK, its policies and the ``PropertyTarget`` schema enum all derive from
+# CHECK, its policies and the property route's kinds all derive from
 # PROPERTY_TARGETS, so a new Tool carries properties with no per-surface edit.
 PROPERTY_TARGETS: tuple[str, ...] = CONTENT_KINDS
 

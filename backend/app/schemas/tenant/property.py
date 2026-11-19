@@ -16,7 +16,6 @@ from pydantic import (
 from app.core.currencies import CURRENCY_CODES
 from app.core.identity_boundary import names_withheld, responding_to_install
 from app.core.messages import PropertyMessages
-from app.core.tools import PROPERTY_TARGETS
 from app.models.tenant.metadata import PLUGIN_ONLY_TYPES, MetadataType
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.platform.user import PluginPerson
@@ -28,16 +27,6 @@ MAX_PROPERTY_FILTERS = 5
 _SLUG_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_\-]*$"
 _HEX_COLOR_PATTERN = r"^#[0-9A-Fa-f]{6}$"
 _SELECT_TYPES = {MetadataType.select, MetadataType.multi_select}
-
-# Derived, never re-declared: every Tool value plus every sub-tool (see
-# PROPERTY_TARGETS in app.core.tools). A new Tool lands here — and in the
-# OpenAPI spec / generated frontend types — automatically.
-PropertyTarget = Enum(
-    "PropertyTarget", {name: name for name in PROPERTY_TARGETS}, type=str
-)
-PropertyTarget.__doc__ = (
-    "What can carry custom property values: every tool and sub-tool."
-)
 
 if TYPE_CHECKING:
     # Built below from the ISO list at runtime; to a type checker, a str enum.
