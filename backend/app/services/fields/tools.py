@@ -168,7 +168,11 @@ def build_wiki_pages() -> Dataset:
 def build_installed(tools: ToolSet) -> dict[str, Dataset]:
     """The datasets of every tool in ``tools`` an installed tool plug-in
     brings, by table: the tool's own, and each item table's, which reaches
-    the table it sits under as a counter reaches its group."""
+    the table it sits under as a counter reaches its group, each tagged as
+    its kind is."""
+    from app.services.tenant.tags import tag_links
+
+    tagged = {link.table.name: link for link in tag_links(tools).values()}
 
     def build(table: Table) -> Dataset:
         return Dataset(
@@ -182,6 +186,7 @@ def build_installed(tools: ToolSet) -> dict[str, Dataset]:
                     for column in table.c
                     if column.info.get("field") == "user_reference"
                 },
+                tags=tagged.get(table.name),
             ),
             relations=tuple(
                 Relation(

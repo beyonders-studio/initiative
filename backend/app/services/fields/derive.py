@@ -157,6 +157,7 @@ def derive_fields(
     internal: frozenset[str] = frozenset(),
     references: Mapping[str, str] = MappingProxyType({}),
     descending: frozenset[str] = frozenset(),
+    tags: Any = None,
 ) -> tuple[FieldSpec, ...]:
     """Everything *model* itself implies: its columns, and its tags.
 
@@ -176,7 +177,8 @@ def derive_fields(
     else decide what that makes it.
 
     *model* may be a table no model maps, a tool plug-in's
-    (``app.db.plugin_tools``): its fields are its columns.
+    (``app.db.plugin_tools``): its fields are its columns, and *tags* its
+    ``TagLinkSpec`` where it is taggable.
     """
     columns = model.c if isinstance(model, Table) else model.__table__.c
     attributes: Any = columns if isinstance(model, Table) else model
@@ -211,11 +213,11 @@ def derive_fields(
                 descending=col.name in descending,
             )
         )
-    tags = _tag_field(model)
-    return tuple(specs) + ((tags,) if tags is not None else ())
+    tagged = _tag_field(model, tags)
+    return tuple(specs) + ((tagged,) if tagged is not None else ())
 
 
-def _tag_field(model: type[DeclarativeBase] | Table) -> FieldSpec | None:
+def _tag_field(model: type[DeclarativeBase] | Table, link: Any) -> FieldSpec | None:
     """The ``tag_ids`` filter, for a model that has tags.
 
     Nearly everything is taggable and everything taggable binds the same way,
@@ -226,17 +228,15 @@ def _tag_field(model: type[DeclarativeBase] | Table) -> FieldSpec | None:
     """
     from app.services.tenant.tags import TAG_LINKS, tagged_entity_ids
 
-    link = next(
-        (spec for spec in TAG_LINKS.values() if spec.entity is model),
-        None,
-    )
+    if link is None:
+        link = next((spec for spec in TAG_LINKS.values() if spec.entity is model), None)
     if link is None:
         return None
 
     def resolve_tag_ids(op: Any, value: Any, ctx: Any) -> Any:
         if not value:
             return None
-        return link.entity.id.in_(
+        return link.table.c.id.in_(
             tagged_entity_ids(link, tuple(value), guild_id=ctx.guild_id)
         )
 

@@ -585,6 +585,7 @@ def test_a_tool_plugins_tables_are_its_communitys_datasets():
     )
     assert items.by_relation["counter_group"].dataset == tool.table.name
     assert items.by_name["keeper"].kind is ControlKind.member
+    assert items.by_name["tag_ids"].kind is ControlKind.tag
     statement = resolve(
         f"SELECT c.name, counter_group.description FROM {counters.name} AS c",
         tools=tools,
