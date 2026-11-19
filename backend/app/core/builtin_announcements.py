@@ -264,4 +264,37 @@ BUILTIN_ANNOUNCEMENTS: tuple[BuiltinAnnouncement, ...] = (
             ),
         ),
     ),
+    BuiltinAnnouncement(
+        slug="0-80-counters-is-a-plug-in",
+        title="Counters is a plug-in now",
+        category=AnnouncementCategory.info,
+        published_at=datetime(2026, 11, 19, tzinfo=UTC),
+        # For the people who had Counters built in. A new account and a fresh
+        # install never did.
+        audience_accounts=AnnouncementAudienceAccounts.existing,
+        only_upgrading_from_below="0.80.0",
+        trigger_route="/c/**",
+        sections=(
+            AnnouncementSection(
+                heading="Initiative grows through plug-ins",
+                body=(
+                    "Tools few communities use are moving out of Initiative and "
+                    "into plug-ins, so a server carries no tables for a tool "
+                    "its communities don't use. **Counters** is the first.\n\n"
+                    "Your counters are where they were. Every community that "
+                    "had counter groups, or had Counters switched on, now has "
+                    "the Counters plug-in, in the initiatives that used it, "
+                    "with the same groups, sharing, links and comments."
+                ),
+            ),
+            AnnouncementSection(
+                heading="More to come",
+                body=(
+                    "Others will follow, and new tools will arrive the same "
+                    "way. Tell us what you think with **Send feedback** in your "
+                    "account menu."
+                ),
+            ),
+        ),
+    ),
 )
