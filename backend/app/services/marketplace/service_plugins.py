@@ -90,6 +90,7 @@ __all__ = [
     "USE_PERMISSION",
     "WIDGET_BINDABLE_DIRECTIONS",
     "declared_permissions",
+    "listing_terms",
     "members_hold",
     "normalize_service_plugin_definition",
     "plugin_widget_type",
@@ -3532,6 +3533,48 @@ def _check_option_sources(
                     )
 
 
+def listing_terms(body: Mapping[str, Any]) -> dict[str, Any]:
+    """What every plug-in carries beside what it does, container, declarative
+    or tool: its help, its starting name, the ages it is for, which
+    communities it reaches, and the oldest plug-in API contract it calls. A
+    term left out, or at its default, is not stored."""
+    cleaned: dict[str, Any] = {}
+    if body.get("help") is not None:
+        cleaned["help"] = _help(body["help"])
+
+    default_name = clean_text(
+        body.get("default_name"),
+        what="service plug-in: default_name",
+        limit=MAX_NAME_LENGTH,
+        required=False,
+    )
+    if default_name is not None:
+        cleaned["default_name"] = default_name
+
+    minimum_age = _minimum_age(body.get("minimum_age"))
+    if minimum_age is not None:
+        cleaned["minimum_age"] = minimum_age
+
+    availability = body.get("availability", PluginAvailability.none.value)
+    if not isinstance(availability, str) or availability not in AVAILABILITIES:
+        fail(
+            "service plug-in: availability must be one of "
+            f"{', '.join(sorted(AVAILABILITIES))}"
+        )
+    if availability != PluginAvailability.none.value:
+        cleaned["availability"] = availability
+
+    # The catalog decides from it whether this deployment serves the version;
+    # kept here so the stored definition still says what its author asked for.
+    try:
+        min_plugin_api = plugin_api.check_min_plugin_api(body.get("min_plugin_api"))
+    except ValueError as exc:
+        fail(f"service plug-in: {exc}")
+    if min_plugin_api is not None:
+        cleaned["min_plugin_api"] = min_plugin_api
+    return cleaned
+
+
 def normalize_service_plugin_definition(
     definition: Any, *, public_id: str | None = None
 ) -> dict[str, Any]:
@@ -3543,6 +3586,8 @@ def normalize_service_plugin_definition(
     for read scopes, at the top of its manifest. One plug-in is never both.
     """
     body = require_mapping(definition, "service plug-in definition")
+    if body.get("tool") is not None:
+        fail("service plug-in: only a tool plug-in declares a tool")
 
     declarative = body.get("service") is None
     service: dict[str, Any] | None = None
@@ -3804,8 +3849,7 @@ def normalize_service_plugin_definition(
         cleaned["settings"] = settings
     if permissions:
         cleaned["permissions"] = permissions
-    if body.get("help") is not None:
-        cleaned["help"] = _help(body["help"])
+    cleaned.update(listing_terms(body))
 
     # After the widgets and endpoints it can name, because every tile is checked
     # against them — the whole point of bundling rather than publishing
@@ -3859,38 +3903,6 @@ def normalize_service_plugin_definition(
                 "an endpoint this plug-in answers reads on"
             )
         cleaned["community_summary"] = summary_id
-
-    default_name = clean_text(
-        body.get("default_name"),
-        what="service plug-in: default_name",
-        limit=MAX_NAME_LENGTH,
-        required=False,
-    )
-    if default_name is not None:
-        cleaned["default_name"] = default_name
-
-    minimum_age = _minimum_age(body.get("minimum_age"))
-    if minimum_age is not None:
-        cleaned["minimum_age"] = minimum_age
-
-    availability = body.get("availability", PluginAvailability.none.value)
-    if not isinstance(availability, str) or availability not in AVAILABILITIES:
-        fail(
-            "service plug-in: availability must be one of "
-            f"{', '.join(sorted(AVAILABILITIES))}"
-        )
-    if availability != PluginAvailability.none.value:
-        cleaned["availability"] = availability
-
-    # The oldest plug-in API contract the plug-in calls. The catalog decides from
-    # it whether this deployment serves the version; kept here so the stored
-    # definition still says what its author asked for.
-    try:
-        min_plugin_api = plugin_api.check_min_plugin_api(body.get("min_plugin_api"))
-    except ValueError as exc:
-        fail(f"service plug-in: {exc}")
-    if min_plugin_api is not None:
-        cleaned["min_plugin_api"] = min_plugin_api
 
     _check_features(cleaned["features"], cleaned)
     check_json_size(

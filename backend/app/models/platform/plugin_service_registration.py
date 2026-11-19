@@ -50,8 +50,9 @@ Some columns exist only because of that split:
   requires (``vendor_required``) holds one, computed by the database.
 
 * ``kind`` — ``container`` for a plug-in Initiative calls, ``declarative`` for
-  one whose calls Initiative makes itself from its manifest. A declarative
-  plug-in's registration has no location and no keys.
+  one whose calls Initiative makes itself from its manifest, ``tool`` for one
+  that declares a tool. Only a container's registration has a location and
+  keys.
 
 **Live** is one rule, stated once in :func:`registration_live_sql`: the
 registration is not suspended, its publisher is enabled, its required vendor
@@ -167,6 +168,8 @@ class RegistrationKind:
     CONTAINER = "container"
     #: Initiative makes the plug-in's calls itself, from its manifest.
     DECLARATIVE = "declarative"
+    #: The plug-in declares a tool, which Initiative serves as its own.
+    TOOL = "tool"
 
 
 class RegistrationSource:

@@ -413,6 +413,111 @@ def maximal_manifest() -> dict:
     }
 
 
+def maximal_tool_manifest() -> dict:
+    """One tool manifest carrying every tool term. A field takes a currency,
+    options or a counter by its kind, and an item one open condition, so those
+    are spread over several and measured together (:func:`_open_conditions`
+    gives the other conditions)."""
+    return {
+        "plugin_kind": "tool",
+        "features": ["tool"],
+        "default_name": "Tallies",
+        "minimum_age": {"default": 13},
+        "min_plugin_api": "4.2",
+        "availability": "beta",
+        "help": {"en": "Count things."},
+        "tool": {
+            "key": "tally_group",
+            "name": {"en": "Tallies"},
+            "instance_name": {"en": "Tally group"},
+            "icon": "gauge",
+            "fields": [
+                {
+                    "key": "price",
+                    "name": {"en": "Price"},
+                    "kind": "currency",
+                    "currency": "EUR",
+                    "default": 2.5,
+                },
+                {
+                    "key": "look",
+                    "name": {"en": "Look"},
+                    "kind": "select",
+                    "options": [{"value": "plain", "label": {"en": "Plain"}}],
+                    "default": "plain",
+                },
+            ],
+            "items": [
+                {
+                    "key": "tally",
+                    "name": {"en": "Tally"},
+                    "fields": [
+                        {
+                            "key": "count",
+                            "name": {"en": "Count"},
+                            "kind": "counter",
+                            "counter": {
+                                "min": 0,
+                                "max": "ceiling",
+                                "step": 1,
+                                "initial": "start",
+                            },
+                        },
+                        {"key": "ceiling", "name": {"en": "Ceiling"}, "kind": "number"},
+                        {"key": "start", "name": {"en": "Start"}, "kind": "number"},
+                    ],
+                    "open_while": {"field": "count", "below": {"field": "ceiling"}},
+                },
+                {
+                    "key": "mark",
+                    "name": {"en": "Mark"},
+                    "parent": "tally",
+                    "fields": [
+                        {"key": "done", "name": {"en": "Done"}, "kind": "checkbox"}
+                    ],
+                },
+            ],
+            "actions": [
+                {
+                    "id": "reset",
+                    "name": {"en": "Reset"},
+                    "on": "tally",
+                    "params": ["start"],
+                    "write": '{"set": {"count": params.start}}',
+                    "confirm": {"en": "Reset it?"},
+                }
+            ],
+        },
+    }
+
+
+def _open_conditions() -> dict:
+    """Every open condition, each on the field kind it reads, as stored."""
+    conditions: dict = {}
+    for field, condition in (
+        ({"kind": "number"}, {"below": 1}),
+        ({"kind": "number"}, {"at_most": 1}),
+        ({"kind": "number"}, {"above": 1}),
+        ({"kind": "number"}, {"at_least": 1}),
+        ({"kind": "number"}, {"equals": 1}),
+        ({"kind": "number"}, {"not_equals": 1}),
+        ({"kind": "checkbox"}, {"is": True}),
+        (
+            {"kind": "select", "options": [{"value": "a", "label": {"en": "A"}}]},
+            {"in": ["a"]},
+        ),
+        ({"kind": "date"}, {"not_passed": True}),
+    ):
+        body = maximal_tool_manifest()
+        body["tool"]["items"][1]["fields"] = [
+            {"key": "state", "name": {"en": "State"}, **field}
+        ]
+        body["tool"]["items"][1]["open_while"] = {"field": "state", **condition}
+        stored = normalize_listing_definition("plugin", body)
+        conditions.update(stored["tool"]["items"][1]["open_while"])
+    return conditions
+
+
 def maximal_declarative_manifest() -> dict:
     """One declarative manifest carrying every declarative term.
 
@@ -717,13 +822,19 @@ def declarative() -> dict:
 
 
 @pytest.fixture(scope="module")
-def nodes(published, declarative) -> list[tuple[str, dict]]:
-    return _nodes(published, declarative)
+def tool() -> dict:
+    """The maximal tool manifest as this build would store it."""
+    return normalize_listing_definition("plugin", maximal_tool_manifest())
 
 
-def _nodes(published: dict, declarative: dict) -> list[tuple[str, dict]]:
+@pytest.fixture(scope="module")
+def nodes(published, declarative, tool) -> list[tuple[str, dict]]:
+    return _nodes(published, declarative, tool)
+
+
+def _nodes(published: dict, declarative: dict, tool: dict) -> list[tuple[str, dict]]:
     """Each contract object beside the published node that should carry it,
-    measured across both manifests where neither alone carries every field."""
+    measured across the manifests where no one alone carries every field."""
     connection, other = published["connections"]
     read, written, _emitted = published["endpoints"]
     widget = published["widgets"][0]
@@ -737,8 +848,18 @@ def _nodes(published: dict, declarative: dict) -> list[tuple[str, dict]]:
     section = part["tree"]
     field_node, stack, button = section["children"]
     value_node, text = stack["children"]
+    declared = tool["tool"]
+    price, look = declared["fields"]
+    tally, mark = declared["items"]
+    count = tally["fields"][0]
     return [
-        ("manifest", {**published, **declarative}),
+        ("manifest", {**published, **declarative, **tool}),
+        ("tool", declared),
+        ("toolField", {**price, **look, **count}),
+        ("toolCounter", count["counter"]),
+        ("toolItem", {**tally, **mark}),
+        ("toolOpenWhile", _open_conditions()),
+        ("toolAction", declared["actions"][0]),
         ("connection", {**connection, **other, **workspace}),
         ("connectionField", connection["fields"][0]),
         ("connectionFlow", connection["flow"]),
@@ -891,10 +1012,17 @@ def test_the_maximal_manifests_really_are_maximal(nodes):
     contract defines with fields is one these manifests reach. A change, and
     a list's element, is what a ``write`` answers rather than a term a
     manifest stores, and the changes engine holds an answer to it
-    (``metadata.apply_changes``), an element's every term."""
+    (``metadata.apply_changes``), an element's every term. A tool action's
+    change is an answer too, read once tool actions run."""
     reached = {owner for owner, _ in nodes} - {"other"}
     with_fields = {name for name in contract.objects() if contract.fields(name)}
-    assert with_fields - reached == {"change", "targetedChange", "listElement"}
+    assert with_fields - reached == {
+        "change",
+        "targetedChange",
+        "listElement",
+        "toolChange",
+        "toolItemChange",
+    }
     assert set(metadata_service._ELEMENT_TERMS) == set(contract.fields("listElement"))
 
 
@@ -1006,6 +1134,7 @@ def test_a_manifest_this_build_fully_understands_reports_nothing():
     """The ordinary case. A report on a plug-in written against this contract
     would be a false alarm on every verification."""
     assert contract.discarded_terms(maximal_manifest()) == []
+    assert contract.discarded_terms(maximal_tool_manifest()) == []
 
 
 # --- what only the plug-in can know --------------------------------------------

@@ -36,6 +36,7 @@ from app.testing import (
     set_beta_communities,
 )
 from app.testing.fake_vendor import declarative_plugin
+from app.testing.tool_plugins import counters_tool_manifest
 from app.testing.tuf_repository import service_plugin_definition
 
 #: Where the deployment calls the plug-in.
@@ -787,6 +788,54 @@ async def test_a_container_republished_as_declarative_leaves_its_location(sessio
     ],
 )
 async def test_a_registration_block_says_the_plugins_own_kind(session, listing):
+    with pytest.raises(CatalogError):
+        await upsert_listing(session, listing, source="local")
+
+
+TOOL = {"kind": "tool", "scope_ceiling": []}
+
+
+def _tool_listing(registration) -> dict:
+    return {**_plugin_listing(registration), "definition": counters_tool_manifest()}
+
+
+async def test_a_tool_plugin_registers_as_a_tool_with_no_location(session):
+    """It runs no code, so its registration is a tool's: no image, no address,
+    no keys and no scopes, named by its listing as a declarative plug-in is."""
+    await upsert_listing(session, _tool_listing(TOOL), source="local")
+    await session.commit()
+
+    row = await _registration(session)
+    assert (row.public_id, row.kind) == ("acme.widgets", "tool")
+    assert (row.base_url, row.jwks, row.image_digest, row.scope_ceiling) == (
+        None,
+        None,
+        None,
+        [],
+    )
+    with pytest.raises(HTTPException) as refused:
+        await service.update_registration(session, row.id, base_url=BASE_URL)
+    assert refused.value.detail == PluginServiceMessages.DECLARATIVE_NOT_PLACED
+
+
+@pytest.mark.parametrize(
+    "listing",
+    [
+        _tool_listing(CONTAINER),
+        _tool_listing(DECLARATIVE),
+        _tool_listing({**TOOL, "image": IMAGE}),
+        _tool_listing({**TOOL, "scope_ceiling": ["projects:read"]}),
+        _plugin_listing(TOOL),
+    ],
+    ids=[
+        "tool-plugin-container-block",
+        "tool-plugin-declarative-block",
+        "image",
+        "scopes",
+        "container-plugin-tool-block",
+    ],
+)
+async def test_a_tool_registration_says_it_is_a_tool_and_nothing_more(session, listing):
     with pytest.raises(CatalogError):
         await upsert_listing(session, listing, source="local")
 

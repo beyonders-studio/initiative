@@ -525,7 +525,7 @@
   "PLUGIN_DATA_CONNECTION_REQUIRED": "Connect your own account to this plug-in to see your data here.",
   "PLUGIN_SERVICE_UNAVAILABLE": "The plug-in isn't responding right now. Try again shortly.",
   "PLUGIN_SERVICE_REGISTRY_MANAGED": "This plug-in came from the registry, which brings it back on every refresh. Switch it off instead.",
-  "PLUGIN_SERVICE_DECLARATIVE_NOT_PLACED": "Initiative makes this plug-in's calls itself, so it has no address, origins or keys to give.",
+  "PLUGIN_SERVICE_DECLARATIVE_NOT_PLACED": "This plug-in runs in no container of its own, so it has no address, origins or keys to give.",
   "PLUGIN_SERVICE_STATED_BY_LISTING": "A plug-in's listing states that. Here you give only where it runs, its keys, its vendor client and its reach.",
   "PLUGIN_DATA_RESPONSE_TOO_LARGE": "The plug-in sent back more data than a widget can show.",
   "PLUGIN_DATA_BUSY": "This plug-in has too many requests in flight. Try again shortly.",

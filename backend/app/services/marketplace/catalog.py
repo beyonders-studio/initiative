@@ -33,6 +33,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.version import get_version
+from app.db import kind_codes
 from app.db.query import apply_pagination
 from app.db.session import routed_guild_id
 from app.models.platform.marketplace import (
@@ -55,6 +56,7 @@ from app.services.marketplace.definitions import (
     reserved_prefix_problem,
 )
 from app.services.marketplace.manifest_values import check_public_id
+from app.services.marketplace.tool_plugins import is_tool_plugin, tool_kinds
 
 __all__ = [
     "REGISTRY_SOURCE",
@@ -641,6 +643,13 @@ async def upsert_listing(
         raise CatalogVersionReused(
             f"{public_id}: version {version_str} is already published with "
             "different content; publish a new version instead"
+        )
+
+    if is_tool_plugin(definition):
+        # The tool's kinds take their codes now, so every community that
+        # installs any version of it addresses its rows by the same ones.
+        await kind_codes.assign_plugin_kind_codes(
+            session, tool_kinds(definition, listing_uid=uid)
         )
 
     if not version.awaiting_review:

@@ -90,9 +90,12 @@ def test_no_kind_code_ever_moves_or_is_reused():
     the codes rows were already written with."""
     from app.core.relationships import PERSON
     from app.core.tools import KINDS
+    from app.models.platform.plugin_kind_code import FIRST_PLUGIN_KIND_CODE
 
     ledger = list(_ASSIGNED_CODES.values())
     assert len(ledger) == len(set(ledger))
+    # A tool plug-in's kinds take codes from here up (``plugin_kind_codes``).
+    assert max(ledger) < FIRST_PLUGIN_KIND_CODE
     assert not _RETIRED_CODES & set(ledger)
 
     current = {kind.value: kind.code for kind in (*KINDS.values(), PERSON)}
