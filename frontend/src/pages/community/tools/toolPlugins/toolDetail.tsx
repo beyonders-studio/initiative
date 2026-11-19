@@ -1,0 +1,218 @@
+/**
+ * A tool plug-in's row on its own page, drawn from the detail layout its table
+ * declared: its name and declared fields, each with its kind's editor, the
+ * initiative's properties, and the parts every tool's page has.
+ */
+
+import type { ComponentType, ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+
+import type { Tool } from "@/api/generated/initiativeAPI.schemas";
+import { ToolCommentsPanel } from "@/components/comments/ToolCommentsPanel";
+import { useSearchMembers } from "@/hooks/useUsers";
+import { type InitiativeDetail, useInitiativeExtension } from "@/lib/layouts/initiativeExtension";
+import {
+  fieldSummary,
+  type ToolFieldDecl,
+  type ToolRow,
+  type ToolTable,
+  toolText,
+} from "@/lib/toolPlugins";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { type ItemHome, useItemContext, useItemHome } from "@/ui/layouts/DetailLayoutView";
+import { at, detailLayoutSpec, type Region } from "@/ui/layouts/detailLayout";
+import { FieldFrame, ReadField, sameJson, useFieldDraft } from "@/ui/layouts/editing";
+import { type ItemSaves, TitleField } from "@/ui/layouts/fieldEditors";
+import type { LayoutNode } from "@/ui/layouts/tree";
+import { formatDateTime } from "@/ui/lib/formatDate";
+import { PropertyInput } from "@/ui/properties/PropertyInput";
+import { PropertyValueCell } from "@/ui/properties/PropertyValueCell";
+import { isEmptyPropertyValue } from "@/ui/properties/propertyHelpers";
+
+import { toolFields } from "./toolFields";
+
+/** What a row's changes send: its name, or its declared fields' values. */
+export interface ToolRowUpdate {
+  name?: string;
+  values?: Record<string, unknown>;
+}
+
+/** What a row's page shares with its parts. */
+export interface ToolRowContext {
+  /** The server says the reader cannot change the row. */
+  readOnly: boolean;
+  initiativeId: number;
+  /** How its fields are saved, each on its own. */
+  saves: ItemSaves<ToolRow, ToolRowUpdate>;
+  /** The menu of what else can be done with it. */
+  actions: ReactNode;
+}
+
+type EditorProps = { item: ToolRow; label: string };
+
+const useRowHome = () => useItemHome() as ItemHome<ToolRow, ToolRowUpdate>;
+
+const NameEditor = ({ item, label }: EditorProps) => {
+  const { t } = useTranslation("plugins");
+  const home = useRowHome();
+  return (
+    <TitleField
+      id={`tool-row-name-${item.id}`}
+      field="name"
+      label={label}
+      value={item.name}
+      save={home.saves.useSave(label)}
+      readOnly={home.readOnly}
+      placeholder={t("tool.namePlaceholder")}
+    />
+  );
+};
+
+/**
+ * One declared field, saved on its own: a colour with the colour picker, any
+ * other kind with the editor a property of its kind has. Its options are the
+ * declaration's, so none is made from what is typed. A reader sees its value,
+ * and nothing where it holds none.
+ */
+const DeclaredFieldEditor = ({ field, item, label }: EditorProps & { field: ToolFieldDecl }) => {
+  const { i18n } = useTranslation();
+  const home = useRowHome();
+  const searchMembers = useSearchMembers();
+  const save = home.saves.useSave(label);
+  const saved: unknown = item.values[field.key] ?? null;
+  const draft = useFieldDraft<unknown>(
+    saved,
+    (value) =>
+      save.save({
+        patch: { values: { [field.key]: value } },
+        shows: { values: { ...item.values, [field.key]: value } },
+      }),
+    sameJson
+  );
+  const summary = fieldSummary(field, item, i18n.language);
+  if (home.readOnly) {
+    if (isEmptyPropertyValue(saved)) return null;
+    return (
+      <ReadField label={label}>
+        {field.kind === "color" ? (
+          <span
+            className="block h-5 w-5 rounded-full border"
+            style={{ backgroundColor: String(saved) }}
+          >
+            <span className="sr-only">{String(saved)}</span>
+          </span>
+        ) : (
+          <PropertyValueCell summary={summary} variant="cell" />
+        )}
+      </ReadField>
+    );
+  }
+  return (
+    <FieldFrame label={label} save={save} changed={draft.changed} keys={draft.keys}>
+      {field.kind === "color" ? (
+        <ColorPickerPopover
+          value={String(draft.value ?? "")}
+          onChangeComplete={draft.edit}
+          triggerLabel={label}
+        />
+      ) : (
+        <PropertyInput
+          definition={summary}
+          value={draft.value}
+          onChange={draft.edit}
+          initiativeId={home.initiativeId}
+          canOpen={home.canOpen}
+          searchMembers={searchMembers}
+        />
+      )}
+    </FieldFrame>
+  );
+};
+
+/** Who can change it, said where it cannot be. */
+const Notice = () => {
+  const { t } = useTranslation("plugins");
+  const { readOnly } = useItemContext<ToolRowContext>();
+  return readOnly ? (
+    <p className="rounded-md border border-border bg-muted/50 px-3 py-2 text-muted-foreground text-sm">
+      {t("tool.readOnly")}
+    </p>
+  ) : null;
+};
+
+/** When it was added and last changed. */
+const Byline = ({ row }: { row: ToolRow }) => {
+  const { t } = useTranslation("plugins");
+  return (
+    <p className="text-muted-foreground text-xs">
+      {t("tool.byline", {
+        added: formatDateTime(row.created_at),
+        changed: formatDateTime(row.updated_at),
+      })}
+    </p>
+  );
+};
+
+/** Its comments, the thread every tool's row has. */
+const Comments = ({ row, kind }: { row: ToolRow; kind: string }) => (
+  <ToolCommentsPanel tool={kind as Tool} entity={row} />
+);
+
+/** A declared layout's regions, a region it leaves out holding nothing. On
+ *  one column the main column's parts come first, then the side's. */
+const regionsOf = (table: ToolTable): Record<Region, LayoutNode[]> => {
+  const { header, main, side } = table.layouts.detail as Partial<
+    Record<Region, LayoutNode[] | null>
+  >;
+  const columns = [...(main ?? []), ...(side ?? [])].map((node, index) => at(index + 1, node));
+  return {
+    header: header ?? [],
+    main: columns.slice(0, main?.length ?? 0),
+    side: columns.slice(main?.length ?? 0),
+  };
+};
+
+/**
+ * One table's rows' detail: the layout it declared, as shipped, with an
+ * editor for its name and each field it declares. Its rows' links, its
+ * properties and its comments are the ones every tool's rows have.
+ */
+export const toolDetail = (
+  table: ToolTable,
+  language: string
+): InitiativeDetail<ToolRow, ToolRowContext, ToolRowUpdate> => ({
+  spec: detailLayoutSpec({
+    kind: table.kind,
+    shipped: regionsOf(table),
+    fieldParts: ["field", "properties"],
+  }),
+  fields: (_definitions, added) =>
+    new Map([...toolFields(table, language), ...added.map((field) => [field.id, field] as const)]),
+  namespaces: ["plugins", "common"],
+  editors: {
+    name: NameEditor,
+    ...Object.fromEntries(
+      table.fields.map((field): [string, ComponentType<EditorProps>] => [
+        field.key,
+        (props) => <DeclaredFieldEditor {...props} field={field} />,
+      ])
+    ),
+  },
+  parts: {
+    byline: (_node, row) => <Byline row={row} />,
+    notice: () => <Notice />,
+    comments: (_node, row) => <Comments row={row} kind={table.kind} />,
+  },
+  home: (row, context) => ({
+    saves: context.saves,
+    readOnly: context.readOnly,
+    initiativeId: context.initiativeId,
+    canOpen: { tool: table.kind as Tool, id: row.id },
+    links: {
+      entity: { id: row.id, initiative_id: context.initiativeId },
+      title: row.name || toolText(table.name, language),
+    },
+    actions: context.actions,
+  }),
+  useExtension: useInitiativeExtension,
+});
