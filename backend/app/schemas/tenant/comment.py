@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
+from typing import Annotated
 
 from pydantic import (
     ConfigDict,
@@ -16,7 +17,7 @@ from app.core.tools import COMMENT_TARGETS
 from app.models.platform.user import Presence
 from app.models.tenant.comment import CommentAudience
 from app.schemas.base import RichMentionStr, RichTextStr, SanitizedBaseModel
-from app.schemas.kinds import with_installed
+from app.schemas.kinds import WithInstalled
 from app.schemas.platform.user import PersonShape, ProfileDecorations
 from app.schemas.tenant.created_by import CreatedByRead
 from app.schemas.tenant.reaction import ReactionGroup
@@ -77,7 +78,7 @@ CommentSubject = Enum(
     "CommentSubject", [(target, target) for target in COMMENT_TARGETS], type=str
 )
 #: What a comment is said on: a built-in subject, or a tool plug-in's kind.
-SaidOn = with_installed(CommentSubject)
+SaidOn = Annotated[str, WithInstalled(CommentSubject)]
 
 
 class CommentCreate(CommentBase):

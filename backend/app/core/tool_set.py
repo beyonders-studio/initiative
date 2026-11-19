@@ -55,7 +55,7 @@ class ToolRecord(ToolRefusals):
     install_id: int | None = None
 
     @property
-    def value(self) -> str:  # type: ignore[override]
+    def value(self) -> str:
         """Its kind, as a refusal names it."""
         return self.kind
 
@@ -94,7 +94,9 @@ class ToolSet:
     def installed_tables(self) -> tuple[Table, ...]:
         """The installed tools' tables, each tool's own before its items."""
         return tuple(
-            table for record in self.installed for table in (record.table, *record.items)
+            table
+            for record in self.installed
+            for table in (record.table, *record.items)
         )
 
     @cached_property

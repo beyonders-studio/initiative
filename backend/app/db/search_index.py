@@ -418,9 +418,7 @@ def archive_parents(
     sits under its governing tool."""
     if source.archive_parents is not None:
         return source.archive_parents()
-    if "archived_at" in table.columns or not (
-        source.dac_tool and source.dac_id
-    ):
+    if "archived_at" in table.columns or not (source.dac_tool and source.dac_id):
         return ()
     tool = source.dac_tool.table.name
     if "archived_at" not in tables[tool].columns:
@@ -433,9 +431,7 @@ def _archived_expr(
 ) -> str | None:
     """Whether a row is archived: stamped itself, or under something that is."""
     legs = [_flag_expr(table, "archived", row)]
-    legs += [
-        parent.archived(row) for parent in archive_parents(table, source, tables)
-    ]
+    legs += [parent.archived(row) for parent in archive_parents(table, source, tables)]
     present = [leg for leg in legs if leg]
     return f"({' OR '.join(present)})" if present else None
 
@@ -512,7 +508,9 @@ def _tool_source(tool: ToolRecord) -> SearchSource:
     return SearchSource(
         tool.kind,
         title="name",
-        body=("description",) if tool.install_id is None else _declared_text(tool.table),
+        body=("description",)
+        if tool.install_id is None
+        else _declared_text(tool.table),
         dac_tool=tool,
     )
 
@@ -528,7 +526,9 @@ def _inside(kind: SearchEntityType, **fields: Any) -> SearchSource:
     )
 
 
-def _two_hop_dac(row: str, kind: str, hops: tuple[tuple[str, str], ...]) -> tuple[str, str]:
+def _two_hop_dac(
+    row: str, kind: str, hops: tuple[tuple[str, str], ...]
+) -> tuple[str, str]:
     """The sharing gate of an item two hops under its tool: the tool's kind,
     and the id its middle row names."""
     (fk, mid), (mid_fk, _) = hops

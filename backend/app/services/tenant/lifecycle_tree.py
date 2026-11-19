@@ -54,12 +54,16 @@ class Edge:
     def under(self, child: FromClause, parent_ids: Sequence[int]) -> Any:
         """``child`` rows filed under any of these parents."""
         tie = ids_in(child.c[self.column], parent_ids)
-        return tie if self.kind is None else and_(child.c.subject_type == self.kind, tie)
+        return (
+            tie if self.kind is None else and_(child.c.subject_type == self.kind, tie)
+        )
 
     def ties(self, child: FromClause, parent: FromClause) -> Any:
         """``child`` filed under ``parent``, as a join condition."""
         tie = parent.c.id == child.c[self.column]
-        return tie if self.kind is None else and_(child.c.subject_type == self.kind, tie)
+        return (
+            tie if self.kind is None else and_(child.c.subject_type == self.kind, tie)
+        )
 
 
 #: parent table -> [edge to a child]
@@ -93,10 +97,7 @@ def cascade_children(tools: ToolSet) -> dict[Table, list[Edge]]:
         for column in child.columns:
             for fk in column.foreign_keys:
                 parent = fk.column.table
-                if (
-                    parent not in binned
-                    or (fk.ondelete or "").upper() == "SET NULL"
-                ):
+                if parent not in binned or (fk.ondelete or "").upper() == "SET NULL":
                     continue
                 tree.setdefault(parent, []).append(Edge(child, column.name))
     # A comment names what it is said on by kind, not by a key, so it is filed

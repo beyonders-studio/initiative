@@ -195,6 +195,7 @@ def sweeps() -> tuple[Sweep, ...]:
             events="INSERT OR UPDATE OF purge_at",
             when="NEW.purge_at IS NOT NULL",
         )
+
     dispatchers = (export_worker.jobs, import_worker.jobs)
 
     def job_is(direction: DataJobDirection, statuses: Iterable[DataJobStatus]) -> str:
@@ -436,7 +437,10 @@ def sweeps() -> tuple[Sweep, ...]:
                 ),
             ),
             sources=(
-                *(binned(SQLModel.metadata.tables[name]) for name in SOFT_DELETE_TABLES),
+                *(
+                    binned(SQLModel.metadata.tables[name])
+                    for name in SOFT_DELETE_TABLES
+                ),
                 on_row(
                     "uploads",
                     "{row}.created_at",

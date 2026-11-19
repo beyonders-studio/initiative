@@ -26,20 +26,16 @@ from app.api.deps import (
     plugin_scope_checked,
 )
 from app.core.references import parse_ref
-from app.core.search import SearchEntityType
 from app.db.guild_standing import InstallContext
 from app.db.plugin_rls import SEARCH_ENTRY_READ_SCOPE
 from app.db.search_index import entity_types
 from app.db.session import routed_tools
 from app.models.platform.user import User
-from app.schemas.kinds import with_installed
-from app.schemas.tenant.search import SearchResults, SearchSuggestion
+from app.schemas.tenant.search import FoundKind, SearchResults, SearchSuggestion
 from app.services.tenant import search as search_service
 
 router = APIRouter(route_class=ActorRoute)
 
-#: A kind the community indexes.
-SearchKind = with_installed(SearchEntityType)
 
 #: ``/suggest`` for a person or an installed plug-in. A plug-in needs the read scope
 #: of each kind it asks for, which the service checks once it has ``types``.
@@ -80,9 +76,7 @@ async def search_community(
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
     search: str = Query(description="What to search for.", max_length=1000),
-    types: list[SearchKind] | None = Query(
-        default=None, description=_TYPE_DESCRIPTION
-    ),
+    types: list[FoundKind] | None = Query(default=None, description=_TYPE_DESCRIPTION),
     initiative_id: int | None = Query(
         default=None, description="Restrict to one initiative."
     ),
@@ -116,9 +110,7 @@ async def recent_community(
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
-    types: list[SearchKind] | None = Query(
-        default=None, description=_TYPE_DESCRIPTION
-    ),
+    types: list[FoundKind] | None = Query(default=None, description=_TYPE_DESCRIPTION),
     initiative_id: int | None = Query(
         default=None, description="Restrict to one initiative."
     ),
@@ -151,9 +143,7 @@ async def suggest_community(
     session: ActorSessionDep,
     guild_context: SuggestByEntityType,
     search: str = Query(description="What to jump to.", max_length=200),
-    types: list[SearchKind] | None = Query(
-        default=None, description=_TYPE_DESCRIPTION
-    ),
+    types: list[FoundKind] | None = Query(default=None, description=_TYPE_DESCRIPTION),
     initiative_id: int | None = Query(
         default=None, description="Restrict to one initiative."
     ),

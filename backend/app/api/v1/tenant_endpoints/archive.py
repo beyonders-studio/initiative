@@ -43,16 +43,12 @@ from app.models.platform.guild import AdminSurface
 from app.models.platform.user import User
 from app.models.tenant._mixins import archive_models
 from app.models.tenant.task import Task
-from app.schemas.kinds import with_installed
-from app.schemas.tenant.archive import ArchivableType, ArchiveResponse
+from app.schemas.tenant.archive import ArchivableType, ArchivedKind, ArchiveResponse
 from app.services.permissions import Action, DacResource, require_access
 from app.services.tenant import archive as archive_service
 from app.services.tenant import column_limits
 
 router = APIRouter(route_class=ActorRoute)
-
-#: A kind that can be archived: a built-in one, or a tool plug-in's.
-ArchiveKind = with_installed(ArchivableType)
 
 
 def _governing(entity_type: str) -> Tool:
@@ -200,7 +196,7 @@ async def _authorize(
 
 @router.post("/archive/{entity_type}/{entity_id}", response_model=ArchiveResponse)
 async def archive_entity(
-    entity_type: ArchiveKind,
+    entity_type: ArchivedKind,
     entity_id: int,
     session: ActorSessionDep,
     current_user: ActorUserDep,
@@ -223,7 +219,7 @@ async def archive_entity(
 
 @router.post("/unarchive/{entity_type}/{entity_id}", response_model=ArchiveResponse)
 async def unarchive_entity(
-    entity_type: ArchiveKind,
+    entity_type: ArchivedKind,
     entity_id: int,
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],

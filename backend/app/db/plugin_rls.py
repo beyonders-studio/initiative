@@ -168,9 +168,7 @@ def _search_entry_read_scopes() -> dict[str, PluginScopeResource]:
 #: ``projects`` and ``tag`` to ``tags``. An entry that names a governing tool
 #: also needs that tool's read scope (a comment on a task needs ``projects``
 #: beside ``comments``), which the index's policy reads off the row.
-SEARCH_ENTRY_READ_SCOPE: dict[str, PluginScopeResource] = (
-    _search_entry_read_scopes()
-)
+SEARCH_ENTRY_READ_SCOPE: dict[str, PluginScopeResource] = _search_entry_read_scopes()
 
 #: Tables no plug-in reaches, whose policies refuse an installed plug-in outright
 #: beside the grant it does not hold: a reaction is one person's gesture, a

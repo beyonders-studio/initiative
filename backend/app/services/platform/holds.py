@@ -219,9 +219,7 @@ async def _unstamp(session: AsyncSession, hold_id: int, tools: ToolSet) -> None:
         )
 
 
-async def _cover_again(
-    session: AsyncSession, released_id: int, tools: ToolSet
-) -> None:
+async def _cover_again(session: AsyncSession, released_id: int, tools: ToolSet) -> None:
     """Hold again, under the hold that covers it, whatever releasing
     ``released_id`` let go that another open hold still covers: a comment
     held on its own and then inside its task, or an upload two held things

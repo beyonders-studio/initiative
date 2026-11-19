@@ -1021,7 +1021,9 @@ def _trash_kind(model: type) -> str:
     from app.api.v1.tenant_endpoints.trash import ENTITY_REGISTRY
 
     return next(
-        kind for kind, (t, _) in ENTITY_REGISTRY.items() if t is model.__table__  # type: ignore[attr-defined]
+        kind
+        for kind, (t, _) in ENTITY_REGISTRY.items()
+        if t is model.__table__  # type: ignore[attr-defined]
     )
 
 

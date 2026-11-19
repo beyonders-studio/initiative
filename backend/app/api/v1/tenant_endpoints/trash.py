@@ -55,10 +55,9 @@ from app.models.tenant._mixins import ActorKind
 from app.models.tenant.comment import Comment
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.task import Task
-from app.schemas.kinds import with_installed
 from app.schemas.tenant.trash import (
-    EntityType,
     RestoreResponse,
+    TrashedKind,
     TrashItem,
     TrashListResponse,
 )
@@ -74,9 +73,6 @@ from app.services.tenant.soft_delete import (
 )
 
 router = APIRouter()
-
-#: A kind the trash holds: a built-in one, or a tool plug-in's.
-TrashKind = with_installed(EntityType)
 
 
 def _entry(target: str) -> tuple[Table, str]:
@@ -335,7 +331,7 @@ async def _load_trash_entity(
     response_model=RestoreResponse,
 )
 async def restore_trash_entity(
-    entity_type: TrashKind,
+    entity_type: TrashedKind,
     entity_id: int,
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -388,7 +384,7 @@ async def restore_trash_entity(
     response_class=Response,
 )
 async def purge_trash_entity(
-    entity_type: TrashKind,
+    entity_type: TrashedKind,
     entity_id: int,
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],

@@ -2,18 +2,20 @@
 
 from __future__ import annotations
 
+from typing import Annotated
+
 from pydantic import BaseModel, ConfigDict
 
 from app.core.search import SearchEntityType
 from app.core.tools import Tool
 from app.schemas.base import MentionStr
-from app.schemas.kinds import with_installed
+from app.schemas.kinds import WithInstalled
 from app.schemas.query import PageMeta
 
 #: What a result is, and the tool it lives in: a built-in kind or tool, or a
 #: tool plug-in's.
-FoundKind = with_installed(SearchEntityType)
-FoundIn = with_installed(Tool)
+FoundKind = Annotated[str, WithInstalled(SearchEntityType)]
+FoundIn = Annotated[str, WithInstalled(Tool)]
 
 
 class SearchHit(BaseModel):

@@ -7,19 +7,20 @@ archivable by joining the ``Tool`` enum rather than by being listed again here.
 
 from datetime import datetime
 from enum import Enum
+from typing import Annotated
 
 from pydantic import ConfigDict
 
 from app.core.tools import ARCHIVE_TARGETS
 from app.schemas.base import SanitizedBaseModel
-from app.schemas.kinds import with_installed
+from app.schemas.kinds import WithInstalled
 
 ArchivableType = Enum(
     "ArchivableType", {name: name for name in ARCHIVE_TARGETS}, type=str
 )
 ArchivableType.__doc__ = "Things that can be archived."
 #: What was archived: a built-in kind, or a tool plug-in's.
-ArchivedKind = with_installed(ArchivableType)
+ArchivedKind = Annotated[str, WithInstalled(ArchivableType)]
 
 
 class ArchiveResponse(SanitizedBaseModel):

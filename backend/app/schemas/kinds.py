@@ -7,26 +7,29 @@ plug-in's kind (``<key>.<uid>``, ``app.db.plugin_tools``) is taken there too,
 in the form it has; whether the community has that tool is the route's to
 ask, of the community's tool set, and a kind it does not have is not found.
 
-What a client sends is published as the enum until the plug-in API's kinds
-widen. What it is sent may name a tool plug-in's kind, so an answer
-publishes the enum or a string.
+Both ways the kind is published as the enum until the plug-in API's kinds
+widen (the tool plug-ins design, step 6): only a community with a tool
+plug-in installed sends or is sent one of its kinds, and no client draws one
+yet.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Annotated, Any
+from typing import Any
 
-from pydantic import GetCoreSchemaHandler
+from pydantic import GetCoreSchemaHandler, GetJsonSchemaHandler
+from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import core_schema
 
 from app.db.plugin_tools import is_plugin_kind
 
 
 @dataclass(frozen=True)
-class _Kinds:
-    """Takes ``enum``'s values and a tool plug-in's kind, as a ``str``."""
+class WithInstalled:
+    """``Annotated[str, WithInstalled(enum)]`` takes ``enum``'s values and a
+    tool plug-in's kind, as a ``str``."""
 
     enum: type[Enum]
 
@@ -54,7 +57,10 @@ class _Kinds:
             ),
         )
 
-
-def with_installed(enum: type[Enum]) -> Any:
-    """``enum``'s values, and a tool plug-in's kind, as a ``str``."""
-    return Annotated[str, _Kinds(enum)]
+    def __get_pydantic_json_schema__(
+        self, schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        # An answer is serialized as the enum or a string; it is published
+        # as the enum, as a request is.
+        found = handler(schema)
+        return found["anyOf"][0] if "anyOf" in found else found

@@ -17,6 +17,7 @@ plus one record. The frontend reads the records from the file
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from app.core.errors import CodedError
 from app.core.messages import KindMessages
@@ -42,7 +43,10 @@ class ToolRefusals:
     (``app.core.tool_set.ToolRecord``). A method rather than a constant: each
     call is a fresh exception to raise."""
 
-    value: str
+    if TYPE_CHECKING:
+
+        @property
+        def value(self) -> str: ...
 
     def not_found(self, status_code: int = 404) -> CodedError:
         """No such <tool>, or not one this reader can see."""
