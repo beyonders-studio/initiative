@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { app, BrowserWindow, Menu, Notification, nativeImage, Tray } from "./app.mjs";
+import { app, BrowserWindow, Menu, Notification, nativeImage, powerMonitor, Tray } from "./app.mjs";
 
 /** What the platform hands a plugin: the way to tell the page something. */
 interface Context {
@@ -21,6 +21,13 @@ const HIDDEN = "--hidden";
  */
 const QUIT = "--quit";
 
+/**
+ * How often the computer is asked how long it has gone without input. Input
+ * since the last asking is the person at the computer, in this app or any
+ * other, and the page reports it as the browser reports a click.
+ */
+const COMPUTER_POLL_MS = 30_000;
+
 /** The tray menu's words, in the person's language; the page sends them. */
 interface TrayMenu {
   open: string;
@@ -31,7 +38,8 @@ interface TrayMenu {
  * The desktop app's own shell: system notifications, the unread badge, and
  * staying in the tray when the window closes. Windows and Linux keep running
  * in the tray while the person wants them to; a Mac keeps running in the dock,
- * as Mac apps do.
+ * as Mac apps do. It also tells the page when the person is at the computer,
+ * which a browser tab can only tell from input to itself.
  */
 export class Desktop {
   static __capacitorElectronPlugin = {
@@ -87,6 +95,7 @@ export class Desktop {
         window.hide();
       });
     });
+    this.watchComputer();
   }
 
   /** Show one notification. Clicking it brings the window back and hands the page `tag`. */
@@ -186,6 +195,23 @@ export class Desktop {
       return;
     }
     mainWindow()?.setTitleBarOverlay({ color, symbolColor });
+  }
+
+  /**
+   * Say "computerActive" whenever the computer saw input since it was last
+   * asked. A computer that cannot tell reports no time without input at all,
+   * which would read as someone always there, so its readings count only once
+   * one has shown it going quiet; until then the page's own input is the sign.
+   */
+  private watchComputer() {
+    let readable = false;
+    setInterval(() => {
+      if (powerMonitor.getSystemIdleTime() * 1000 >= COMPUTER_POLL_MS) {
+        readable = true;
+      } else if (readable) {
+        this.context.notifyListeners("computerActive");
+      }
+    }, COMPUTER_POLL_MS);
   }
 
   /** Closing hides the window only where there is a way back: the dock, or the tray. */

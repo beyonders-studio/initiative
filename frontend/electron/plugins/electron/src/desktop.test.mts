@@ -1,6 +1,7 @@
 /**
  * The desktop app's shell: what closing the window does, what a notification
- * click hands back, and what the computer is told about opening at sign-in.
+ * click hands back, what the computer is told about opening at sign-in, and
+ * when the page hears that the person is at the computer.
  */
 import type { EventEmitter } from "node:events";
 import { mkdtempSync, readFileSync } from "node:fs";
@@ -40,6 +41,8 @@ type FakeWindow = InstanceType<typeof FakeWindow>;
 const electron = vi.hoisted(() => ({
   windows: [] as unknown[],
   userData: "",
+  /** Seconds the computer has gone without input. */
+  idle: 0,
   app: null as unknown as EventEmitter & Record<string, ReturnType<typeof vi.fn>>,
 }));
 
@@ -61,6 +64,7 @@ vi.mock("./app.mjs", () => {
     BrowserWindow: { getAllWindows: () => electron.windows },
     Menu: { buildFromTemplate: (template: unknown) => template },
     Notification: FakeNotification,
+    powerMonitor: { getSystemIdleTime: () => electron.idle },
     nativeImage: {
       createFromPath: () => ({ resize: () => ({}) }),
       createFromDataURL: (url: string) => ({ url }),
@@ -287,5 +291,26 @@ describe("opening at sign-in", () => {
       openAtLogin: true,
       args: ["--hidden"],
     });
+  });
+});
+
+describe("the person at the computer", () => {
+  it("is reported once the computer has shown it can tell", () => {
+    vi.useFakeTimers();
+    electron.idle = 0;
+    const { notifyListeners } = started();
+    // Nothing but zeroes is also what a computer that cannot tell says.
+    vi.advanceTimersByTime(60_000);
+    expect(notifyListeners).not.toHaveBeenCalledWith("computerActive");
+
+    electron.idle = 45;
+    vi.advanceTimersByTime(30_000);
+    expect(notifyListeners).not.toHaveBeenCalledWith("computerActive");
+
+    // Typing in another app since the last asking.
+    electron.idle = 4;
+    vi.advanceTimersByTime(30_000);
+    expect(notifyListeners).toHaveBeenCalledWith("computerActive");
+    vi.useRealTimers();
   });
 });
