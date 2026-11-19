@@ -129,7 +129,12 @@ export function PluginPendingUpdate({
 
   const accept = () =>
     upgrade.mutate(
-      { version: asks.version, add_scopes: asks.added_scopes },
+      {
+        version: asks.version,
+        add_scopes: asks.added_scopes,
+        // Listed below: accepting is confirming they go.
+        drop_fields: asks.dropped_fields,
+      },
       {
         onSuccess: (updated) =>
           toast.success(t("plugins:manage.upgraded", { version: updated.listing_version })),
@@ -157,6 +162,19 @@ export function PluginPendingUpdate({
             })}
           </li>
         ))}
+        {(
+          [
+            ["newTable", asks.added_tables],
+            ["newField", asks.added_fields],
+            ["newOption", asks.added_options],
+            ["newAction", asks.added_actions],
+            ["dropsField", asks.dropped_fields],
+          ] as const
+        ).flatMap(([sentence, keys]) =>
+          keys.map((key) => (
+            <li key={`${sentence}:${key}`}>{t(`plugins:updates.${sentence}`, { key })}</li>
+          ))
+        )}
       </ul>
       {asks.declined && (
         <p className="text-muted-foreground text-xs">
@@ -164,8 +182,16 @@ export function PluginPendingUpdate({
         </p>
       )}
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" disabled={busy} pending={upgrade.isPending} onClick={accept}>
-          {t("plugins:updates.accept")}
+        <Button
+          size="sm"
+          variant={asks.dropped_fields.length ? "destructive" : "default"}
+          disabled={busy}
+          pending={upgrade.isPending}
+          onClick={accept}
+        >
+          {asks.dropped_fields.length
+            ? t("plugins:updates.acceptDropping")
+            : t("plugins:updates.accept")}
         </Button>
         {!asks.declined && (
           <Button

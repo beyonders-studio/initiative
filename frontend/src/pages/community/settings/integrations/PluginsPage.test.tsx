@@ -21,6 +21,7 @@ let notice: CommunityPluginUninstallNotice | undefined;
 let closedSurfaces: string[] | null = null;
 let pendingVersion: string | null = null;
 let readOnly = false;
+let pluginKind = "service";
 const openAddress = vi.fn();
 const uninstall = vi.hoisted(() => vi.fn());
 
@@ -56,6 +57,7 @@ vi.mock("@/hooks/useCommunityPlugins", async (importOriginal) => ({
           created_at: "2026-10-01T00:00:00Z",
           pending_version: pendingVersion,
           read_only: readOnly,
+          plugin_kind: pluginKind,
         },
       ],
     },
@@ -73,6 +75,7 @@ beforeEach(() => {
   closedSurfaces = null;
   pendingVersion = null;
   readOnly = false;
+  pluginKind = "service";
   openAddress.mockReset();
   uninstall.mockReset();
   uninstall.mockResolvedValue(undefined);
@@ -130,6 +133,19 @@ describe("erasing its data", () => {
     await userEvent.click(screen.getByRole("button", { name: "Remove and erase" }));
 
     await waitFor(() => expect(uninstall).toHaveBeenCalledWith(1, 4, { erase: true }));
+  });
+});
+
+describe("removing a tool plug-in", () => {
+  it("says its tool's content goes in 30 days, and consents to that", async () => {
+    pluginKind = "tool";
+    await openRemoval();
+
+    expect(screen.getByText(/In 30 days everything in it is deleted/)).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Also erase its data" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Remove and delete in 30 days" }));
+
+    await waitFor(() => expect(uninstall).toHaveBeenCalledWith(1, 4, { delete_content: true }));
   });
 });
 
