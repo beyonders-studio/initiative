@@ -65,35 +65,58 @@ const plainText = (markdown: string): string =>
     .replace(/[*`]/g, "")
     .trim();
 
-/** A change's bullet, its indented lines brought back to the margin, split
- *  into its bold lead, which is how a release names a change, and the rest. */
-const changeOf = (lines: string[]): Change => {
+/** A stretch of a release: a top-level bullet, or text outside any bullet. */
+type Block = { bullet: boolean; lines: string[] };
+
+/** Lines split at their top-level bullets. A line at the margin that isn't a
+ *  bullet, such as an upgrade step, starts a block of its own, and a fenced
+ *  code block stays whole in the block it opens in. A bullet's indented lines
+ *  come back to the margin. */
+const blocksOf = (lines: string[]): Block[] => {
+  const blocks: Block[] = [];
+  let fenced = false;
+  for (const line of lines) {
+    const current = blocks.at(-1);
+    if (!fenced && line.startsWith("- ")) blocks.push({ bullet: true, lines: [line.slice(2)] });
+    else if (current && (fenced || !current.bullet || !line.trim() || /^\s/.test(line)))
+      current.lines.push(current.bullet ? line.replace(/^ {2}/, "") : line);
+    else if (line.trim()) blocks.push({ bullet: false, lines: [line] });
+    if (line.trimStart().startsWith("```")) fenced = !fenced;
+  }
+  return blocks;
+};
+
+/** A block as a change: a bullet's bold lead, which is how a release names a
+ *  change, as its headline in plain text, and the rest as its body. Text
+ *  outside a bullet has no headline. */
+const changeOf = ({ bullet, lines }: Block): Change => {
   const whole = lines.join("\n").trim();
   const issues = [...whole.matchAll(/\(#(\d+)\)/g)].map((match) => match[1]);
   const text = whole.replace(/[ \t]*\(#\d+\)/g, "");
-  const lead = text.match(/^\*\*(.+?)\*\*[ \t]*/);
+  const lead = bullet ? text.match(/^\*\*(.+?)\*\*[ \t]*/) : null;
   return lead
-    ? { headline: lead[1].replace(/[.:]$/, ""), body: text.slice(lead[0].length), issues }
+    ? {
+        headline: plainText(lead[1]).replace(/[.:]$/, ""),
+        body: text.slice(lead[0].length),
+        issues,
+      }
     : { headline: "", body: text, issues };
 };
 
-/** A release's sections (Added, Changed, Fixed, …), each with its changes:
- *  one per top-level bullet. */
+/** A release's sections (Added, Changed, Fixed, …), each with its changes.
+ *  Anything before the first heading is a section with no name. */
 const sectionsOf = (changes: string): ReleaseSection[] =>
   changes
     .split(/^### /m)
-    .slice(1)
-    .map((section) => {
-      const [name = "", ...lines] = section.split("\n");
-      const bullets: string[][] = [];
-      for (const line of lines) {
-        if (line.startsWith("- ")) bullets.push([line.slice(2)]);
-        else bullets.at(-1)?.push(line.replace(/^ {2}/, ""));
-      }
+    .map((chunk, index) => {
+      const [heading = "", ...lines] = index === 0 ? ["", ...chunk.split("\n")] : chunk.split("\n");
+      const name = heading.trim();
       return {
-        key: name.trim().toLowerCase().replace(/\s+/g, ""),
-        name: name.trim(),
-        changes: bullets.map(changeOf),
+        key: name.toLowerCase().replace(/\s+/g, ""),
+        name,
+        changes: blocksOf(lines)
+          .map(changeOf)
+          .filter((change) => change.headline || change.body),
       };
     })
     .filter((section) => section.changes.length > 0);
