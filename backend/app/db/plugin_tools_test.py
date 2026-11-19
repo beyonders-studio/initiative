@@ -368,8 +368,9 @@ async def test_the_tool_is_there_where_it_is_placed(
     rows a built-in tool's are: keyed by its kind, owned by no install, each
     role holding its keys as it holds a built-in tool's. Its layouts are
     drawn as declared, so none is stored. It is on only where its install is
-    placed: not in an initiative made after the install until placed there,
-    and unplaced, its rows stay for placing it again."""
+    placed, by the standing and by the initiative's ``can``: not in an
+    initiative made after the install until placed there, and unplaced, its
+    rows stay for placing it again."""
     seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
     install = await install_tool_plugin(client, session, seat)
     made = await client.post(
@@ -419,6 +420,13 @@ async def test_the_tool_is_there_where_it_is_placed(
             f"*:{_KIND}",
             f"+:{_KIND}",
         }
+        for initiative in (first, later):
+            read = await client.get(
+                seat.g(f"/initiatives/{initiative}"), headers=seat.headers
+            )
+            assert (_KIND in read.json()["can"]["view"]) is (
+                initiative in (placed or [first])
+            )
     await route_session_to_guild(session, seat.guild.id)
     assert len(rows) == await session.scalar(
         sa.select(sa.func.count()).where(InitiativeRule.key.startswith(_KIND))
