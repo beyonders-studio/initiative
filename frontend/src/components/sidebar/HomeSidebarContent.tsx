@@ -23,7 +23,6 @@ import {
 import { useDirectMessagesEnabled } from "@/hooks/useDirectMessages";
 import { useMessagesWaiting } from "@/hooks/useMyMessages";
 import { useHasFiledTickets } from "@/hooks/useTickets";
-import { Badge } from "@/ui/badge";
 
 export const HomeSidebarContent = () => {
   const { t } = useTranslation("nav");
@@ -69,9 +68,6 @@ export const HomeSidebarContent = () => {
             to: "/messages",
             label: t("myMessages"),
             icon: MessageSquare,
-            // Encrypted messaging is new and moving: the badge is the one
-            // place somebody is told before they rely on it.
-            badge: t("alphaBadge"),
             waiting: messagesWaiting,
             // Climbing out of the conversations leaves this list showing
             // while the thread is still open behind it, so picking My Messages
@@ -114,11 +110,6 @@ export const HomeSidebarContent = () => {
                       >
                         <item.icon className="h-4 w-4" />
                         <span>{item.label}</span>
-                        {item.badge ? (
-                          <Badge variant="secondary" className="h-4 shrink-0 px-1.5 text-3xs">
-                            {item.badge}
-                          </Badge>
-                        ) : null}
                         {/* A dot carries no text, so the count it stands for
                             is written out for anyone not looking at it. */}
                         {item.waiting ? (

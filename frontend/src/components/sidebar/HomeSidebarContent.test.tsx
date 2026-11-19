@@ -85,16 +85,6 @@ describe("the home sidebar", () => {
     expect(screen.queryByRole("button", { name: /back to navigation/i })).toBeNull();
   });
 
-  it("marks My Messages as alpha, and nothing else", async () => {
-    // Encrypted messaging is new and moving. The nav item is where somebody
-    // is told that before they rely on it.
-    setup("/");
-
-    const badges = await screen.findAllByText("ALPHA");
-    expect(badges).toHaveLength(1);
-    expect(badges[0].closest("a")).toHaveTextContent("My Messages");
-  });
-
   it("drills into the conversations on My Messages", async () => {
     setup("/messages");
 
