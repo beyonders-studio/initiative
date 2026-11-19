@@ -41,6 +41,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import CommonMessages
+from app.core.tool_set import ToolRecord
 from app.core.tools import Tool
 from app.db import cohorts
 from app.db.request_context import SystemGuild
@@ -78,13 +79,13 @@ class Governing:
     one of its files: ``resource_id`` is None and ``resource_ids`` selects
     those files."""
 
-    tool: Tool
+    tool: Tool | ToolRecord
     resource_id: int | None
     initiative_id: int | None
     resource_ids: Any = None
 
     @classmethod
-    def of(cls, tool: Tool, row: Any) -> Governing:
+    def of(cls, tool: Tool | ToolRecord, row: Any) -> Governing:
         return cls(tool, row.id, row.initiative_id)
 
     @classmethod
@@ -346,7 +347,7 @@ class PersonRef:
 #: Every person column, by the tool whose sharing decides who it may name —
 #: beside a person-valued property, which :func:`person_refs` adds for every
 #: tool from the properties seam.
-PERSON_REFS: dict[Tool, tuple[PersonRef, ...]] = {
+PERSON_REFS: dict[str, tuple[PersonRef, ...]] = {
     Tool.project: (
         PersonRef(
             TaskAssignee.user_id,
@@ -375,14 +376,16 @@ _NAMING = MetadataValue.property_id.not_in(
 )
 
 
-def _property_ref(tool: Tool) -> PersonRef | None:
+def _property_ref(tool: Tool | ToolRecord) -> PersonRef | None:
     """A person-valued property on anything ``tool`` governs: the tool row
     itself and every sub-tool row inside it, read from the properties seam. A
     collection is governed by no one row, so it is not among them."""
     from app.services.tenant.metadata import PROPERTY_LINKS
 
     specs = [
-        spec for spec in PROPERTY_LINKS.values() if spec.tool is tool and spec.shared
+        spec
+        for spec in PROPERTY_LINKS.values()
+        if spec.tool == tool.value and spec.shared
     ]
     if not specs:
         return None
@@ -407,10 +410,10 @@ def _property_ref(tool: Tool) -> PersonRef | None:
     return PersonRef(MetadataValue.value_user_id, within, clears=True)
 
 
-def person_refs(tool: Tool) -> tuple[PersonRef, ...]:
+def person_refs(tool: Tool | ToolRecord) -> tuple[PersonRef, ...]:
     """Every person column on content inside ``tool``'s rows."""
     prop = _property_ref(tool)
-    return (*PERSON_REFS.get(tool, ()), *((prop,) if prop is not None else ()))
+    return (*PERSON_REFS.get(tool.value, ()), *((prop,) if prop is not None else ()))
 
 
 async def named_on(session: AsyncSession, governing: Governing) -> set[int]:

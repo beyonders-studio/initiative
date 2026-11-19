@@ -335,7 +335,7 @@ async def apply_plugin_initial_sharing(
         return
     if payload is None or "grants" not in payload.model_fields_set:
         return
-    require_install_may_share(actor, kind)
+    require_install_may_share(actor, routed_tools(session).by_kind[kind])
     refuse_install_community_share(actor, initiative_id)
     await permissions_service.replace_resource_grants(
         session,
@@ -689,15 +689,16 @@ def _missing(model: type) -> Exception:
 
 async def set_resource_grants(
     session: Any,
-    kind: Tool,
+    kind: str,
     resource_id: int,
     user: User | None,
     guild_context: ActorContext,
     grants: list[ResourceGrantSchema],
     note: str | None = None,
 ) -> None:
-    """Replace one resource's sharing the unified way: load + 404, authorize
-    the share action (``Action.share``), rebuild every non-owner grant from
+    """Replace the sharing of one row of the tool ``kind`` names, a built-in
+    tool's or a tool plug-in's, the unified way: load + 404, authorize the
+    share action (``Action.share``), rebuild every non-owner grant from
     ``grants`` (owner preserved), then take anyone the new sharing does not
     reach off the content inside it (``named_people.sweep``). Commits. Raises
     ``HTTPException`` 404 (missing) / 403 (no manage access) / 409 (archived or
@@ -713,28 +714,27 @@ async def set_resource_grants(
     names, or raises to edit, hears they were let in, with ``note`` where the
     giver wrote one. A grant to a role or to every member tells only those who
     asked."""
-    require_install_may_share(guild_context, kind)
-    row = await load_authorized(
-        session,
-        kind,
-        resource_id,
-        user,
-        guild_context,
-        action=Action.share,
+    tool = routed_tools(session).by_kind[kind]
+    require_install_may_share(guild_context, tool)
+    row = await load_kind(
+        session, tool.kind, resource_id, user, guild_context, action=Action.share
     )
     refuse_install_community_share(guild_context, row.initiative_id)
-    settled = named_people.Governing.of(kind, row)
-    if kind is Tool.file:
+    settled = named_people.Governing.of(tool, row)
+    if tool.kind == Tool.file:
         # Who a collection may name is whoever can open a file in it.
         collections_service.settle_after_commit(session, left_files=[row.id])
     resource_id = row.id
+    owner = await ownership_service.current_owner(
+        session, tool=tool, resource_id=resource_id
+    )
     before, after = await permissions_service.replace_resource_grants(
         session,
-        resource_type=kind,
+        resource_type=tool.kind,
         resource_id=resource_id,
         guild_id=guild_context.guild_id,
         initiative_id=row.initiative_id,
-        owner_id=ownership_service.owner_user_id_of(row),
+        owner_id=owner.user_id if owner is not None else None,
         grants=grants,
         actor_user_id=guild_context.user_id,
         by_install=isinstance(guild_context, InstallContext),
@@ -745,13 +745,13 @@ async def set_resource_grants(
     if await named_people.sweep(session, settled):
         await session.commit()
     if user is not None:
-        await _tell_let_in(session, kind, resource_id, user, before, after, note)
+        await _tell_let_in(session, tool, resource_id, user, before, after, note)
         await session.commit()
 
 
 async def _tell_let_in(
     session: Any,
-    kind: Tool,
+    tool: ToolRecord,
     resource_id: int,
     giver: User,
     before: dict[tuple[str, int | None], str],
@@ -763,7 +763,7 @@ async def _tell_let_in(
     view."""
     told = await share_requests_service.settle_reached(
         session,
-        tool=kind,
+        tool=tool,
         resource_id=resource_id,
         sharing=after,
         answerer=giver,
@@ -783,19 +783,18 @@ async def _tell_let_in(
     if not let_in:
         return
     name = await notifications_service.actor_name(session, giver)
-    title = (
-        await share_requests_service.names(session, [(kind.value, resource_id)])
-    ).get((kind.value, resource_id), "")
+    about = (tool.kind, resource_id)
+    title = (await share_requests_service.names(session, [about])).get(about, "")
     for level, user_ids in let_in.items():
         await notifications_service.notify(
             session,
             NotificationType.share_granted,
             user_ids,
-            about=(kind.value, resource_id),
+            about=about,
             key=share_requests_service.granted_key(level, note),
             values={"answerer": name, "count": "1", "title": title, "note": note or ""},
             data=share_requests_service.granted_data(
-                name, level, kind.value, resource_id, note
+                name, level, tool.kind, resource_id, note
             ),
             actor=giver,
         )

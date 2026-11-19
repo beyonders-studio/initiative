@@ -407,15 +407,13 @@ async def replace_resource_grants(
                     reader,
                     initiative_id=initiative_id,
                     user_ids=valid_users,
-                    permission_key=tool.view_permission,
-                    default=tool.spec.on_by_default,
+                    tool=tool,
                 ),
                 await rls_service.roles_permitting(
                     reader,
                     initiative_id=initiative_id,
                     role_ids=valid_roles,
-                    permission_key=tool.view_permission,
-                    default=tool.spec.on_by_default,
+                    tool=tool,
                 ),
             )
 

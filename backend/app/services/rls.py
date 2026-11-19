@@ -14,6 +14,8 @@ this account hold the seat, is there a membership row — are the standing's:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from sqlalchemy import and_, func, or_
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -31,6 +33,10 @@ from app.models.tenant.initiative import (
     PermissionKey,
 )
 from app.services.tenant.initiative_tools import member_permission_sql
+
+if TYPE_CHECKING:
+    from app.core.tool_set import ToolRecord
+    from app.core.tools import Tool
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -91,33 +97,28 @@ async def check_initiative_permission(
     )
 
 
-def _role_permits(permission_key: PermissionKey | str, default: bool | None):
+def _role_permits(tool: Tool | ToolRecord):
     """Whether a role (``InitiativeRoleModel``, outer-joined to its row for
-    ``permission_key``) grants the key — the same rule as
+    ``tool``'s view key) lets its holder view ``tool`` — the same rule as
     :func:`check_initiative_permission`: a manager holds every key, a stored
-    row decides, and the key's default decides when there is none: the
-    documented one, unless ``default`` names it (a tool plug-in's key)."""
-    if default is None:
-        default = DEFAULT_PERMISSION_VALUES.get(permission_key, False)
+    row decides, and the tool's own default decides when there is none."""
     return or_(
         InitiativeRoleModel.is_manager,
         func.coalesce(
-            member_permission_sql(
-                InitiativeRoleModel, getattr(permission_key, "value", permission_key)
-            ),
+            member_permission_sql(InitiativeRoleModel, tool.view_permission),
             InitiativeRule.enabled,
-            default,
+            tool.spec.on_by_default,
         ),
     )
 
 
-def _with_permission_row(statement, permission_key: PermissionKey | str):
+def _with_permission_row(statement, tool: Tool | ToolRecord):
     return statement.outerjoin(
         InitiativeRule,
         and_(
             InitiativeRule.initiative_role_id == InitiativeRoleModel.id,
             InitiativeRule.install_id.is_(None),
-            InitiativeRule.key == permission_key,
+            InitiativeRule.key == tool.view_permission,
         ),
     )
 
@@ -127,10 +128,9 @@ async def members_permitted(
     *,
     initiative_id: int,
     user_ids: set[int],
-    permission_key: PermissionKey | str,
-    default: bool | None = None,
+    tool: Tool | ToolRecord,
 ) -> set[int]:
-    """Which of ``user_ids`` hold ``permission_key`` in ``initiative_id``.
+    """Which of ``user_ids`` may view ``tool`` in ``initiative_id``.
 
     :func:`check_initiative_permission` asked about many people at once, so
     sharing can narrow a list of grantees without restating what a role
@@ -142,11 +142,11 @@ async def members_permitted(
         select(InitiativeMember.user_id).join(
             InitiativeRoleModel, InitiativeRoleModel.id == InitiativeMember.role_id
         ),
-        permission_key,
+        tool,
     ).where(
         InitiativeMember.initiative_id == initiative_id,
         InitiativeMember.user_id.in_(list(user_ids)),
-        _role_permits(permission_key, default),
+        _role_permits(tool),
     )
     return set((await session.exec(statement)).all())
 
@@ -156,18 +156,15 @@ async def roles_permitting(
     *,
     initiative_id: int,
     role_ids: set[int],
-    permission_key: PermissionKey | str,
-    default: bool | None = None,
+    tool: Tool | ToolRecord,
 ) -> set[int]:
-    """Which of ``role_ids`` grant ``permission_key`` — the role-shaped form of
-    :func:`members_permitted`, for sharing addressed to a role."""
+    """Which of ``role_ids`` let their holders view ``tool`` — the role-shaped
+    form of :func:`members_permitted`, for sharing addressed to a role."""
     if not role_ids:
         return set()
-    statement = _with_permission_row(
-        select(InitiativeRoleModel.id), permission_key
-    ).where(
+    statement = _with_permission_row(select(InitiativeRoleModel.id), tool).where(
         InitiativeRoleModel.initiative_id == initiative_id,
         InitiativeRoleModel.id.in_(list(role_ids)),
-        _role_permits(permission_key, default),
+        _role_permits(tool),
     )
     return set((await session.exec(statement)).all())

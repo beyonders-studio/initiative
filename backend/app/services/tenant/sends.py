@@ -28,7 +28,7 @@ from app.core.messages import SendMessages
 from app.core.tools import KINDS
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import User
-from app.models.tenant.initiative import InitiativeMember, PermissionKey
+from app.models.tenant.initiative import InitiativeMember
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.services import notifications as notifications_service
 from app.services import permissions as permissions_service
@@ -168,7 +168,7 @@ async def _let_in(
         session,
         initiative_id=subject.initiative_id,
         user_ids=set(user_ids),
-        permission_key=PermissionKey(subject.tool.view_permission),
+        tool=subject.tool,
     )
     if set(user_ids) - permitted:
         raise subject.tool.grantee_lacks_access()

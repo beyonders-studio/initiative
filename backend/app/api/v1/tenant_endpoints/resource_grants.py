@@ -1,9 +1,8 @@
 """Unified resource-grants endpoint — set sharing on many resources at once.
 
-Every DAC resource (project, file, counter group, calendar event)
-already replaces its sharing the same way through
-``resource_access.set_resource_grants``. This router exposes that one flow in
-bulk so the client can share/unshare a multi-selection in a single request
+Every tool's row, a built-in tool's or a tool plug-in's, replaces its sharing
+the same way through ``resource_access.set_resource_grants``. This router
+exposes that one flow in bulk so the client can share/unshare a multi-selection in a single request
 instead of one PUT per item.
 
 Bulk is **best-effort per item** (the caller only ever selects things it can
@@ -23,7 +22,10 @@ from app.api.deps import (
     get_current_active_user,
 )
 from app.core.errors import CodedError
+from app.core.tools import Tool
+from app.db.session import routed_tools
 from app.models.platform.user import User
+from app.schemas.kinds import require_kind
 from app.schemas.tenant.resource_grant import (
     ResourceGrantBulkItemResult,
     ResourceGrantBulkRequest,
@@ -60,11 +62,13 @@ async def bulk_set_resource_grants(
     back an earlier success (authorization is checked before any write, so a skip
     leaves the transaction clean)."""
     results: list[ResourceGrantBulkItemResult] = []
+    tools = routed_tools(session)
     for item in payload.items:
         try:
+            kind = require_kind(tools, item.resource_type, Tool, items=False)
             await resource_access.set_resource_grants(
                 session,
-                item.resource_type,
+                kind,
                 item.resource_id,
                 current_user,
                 guild_context,
@@ -74,19 +78,17 @@ async def bulk_set_resource_grants(
             # As a single replace does: whoever the new sharing leaves out is
             # closed now, and whoever stays is told to refetch.
             await sockets.recheck_room(
-                resource_room(
-                    guild_context.guild_id, item.resource_type.value, item.resource_id
-                )
+                resource_room(guild_context.guild_id, kind, item.resource_id)
             )
             sockets.signal(
                 guild_context.guild_id,
-                item.resource_type,
+                tools.by_kind[kind],
                 item.resource_id,
                 "permissions_changed",
             )
             results.append(
                 ResourceGrantBulkItemResult(
-                    resource_type=item.resource_type,
+                    resource_type=kind,
                     resource_id=item.resource_id,
                     status="ok",
                 )

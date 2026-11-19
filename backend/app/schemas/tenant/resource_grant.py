@@ -14,7 +14,6 @@ from typing import Literal
 from pydantic import ConfigDict, Field, model_validator
 
 from app.core.identity_boundary import PersonId
-from app.core.tools import Tool
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.models.tenant.share_request import MAX_MESSAGE_LENGTH
 from app.schemas.base import SanitizedBaseModel
@@ -78,9 +77,10 @@ def initiative_readable() -> list[ResourceGrantSchema]:
 class ResourceGrantBulkItem(SanitizedBaseModel):
     """One tool's full target sharing state in a bulk request — the same ``grants``
     body the per-resource ``PUT /{id}/grants`` takes, tagged with which tool it
-    applies to (the app-wide ``Tool`` enum)."""
+    applies to: a built-in tool's kind, or a kind of a tool plug-in the
+    community has installed (``app.schemas.kinds``)."""
 
-    resource_type: Tool
+    resource_type: str
     resource_id: int
     grants: list[ResourceGrantSchema]
 
@@ -101,7 +101,7 @@ class ResourceGrantBulkItemResult(SanitizedBaseModel):
     (``forbidden``) or that doesn't exist (``not_found``) is skipped without
     blocking the rest."""
 
-    resource_type: Tool
+    resource_type: str
     resource_id: int
     status: Literal["ok", "forbidden", "not_found"]
     detail: str | None = None

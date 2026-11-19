@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 __all__ = [
     "COUNTERS_UID",
     "add_counter",
+    "add_counter_group",
     "counters_tool_manifest",
     "install_tool_plugin",
 ]
@@ -295,3 +296,33 @@ async def add_counter(
     ).scalar_one()
     await session.commit()
     return tools, group, row
+
+
+async def add_counter_group(
+    session: AsyncSession, initiative_id: int, *, uid: str = COUNTERS_UID
+) -> tuple[int, int]:
+    """A Counters group in ``initiative_id`` with one counter in it, added on
+    ``session``: a request's, so its person makes and owns them. Returns the
+    group's id and the counter's."""
+    from sqlalchemy import text
+
+    tables = f"p_{uid.lower()}_counter_group", f"p_{uid.lower()}_counter"
+    group = (
+        await session.exec(
+            text(
+                f"INSERT INTO {tables[0]} (initiative_id, name)"
+                " VALUES (:i, 'Scores') RETURNING id"
+            ),
+            params={"i": initiative_id},
+        )
+    ).scalar_one()
+    counter = (
+        await session.exec(
+            text(
+                f"INSERT INTO {tables[1]} (counter_group_id, name)"
+                " VALUES (:g, 'Laps') RETURNING id"
+            ),
+            params={"g": group},
+        )
+    ).scalar_one()
+    return group, counter
