@@ -65,6 +65,7 @@ from app.services.marketplace.tool_plugins import (
     MAX_TOOL_KEY_LENGTH,
     TOOL_COLUMNS,
     TOOL_FIELD_KINDS,
+    field_start,
 )
 
 __all__ = [
@@ -76,6 +77,7 @@ __all__ = [
     "drop_ddl",
     "drop_tool_tables",
     "is_plugin_kind",
+    "kept_tool_set",
     "provisioned_tools",
     "structure_ddl",
     "tool_set",
@@ -288,12 +290,12 @@ def _field_column(field: Mapping[str, Any]) -> sa.Column:
     kind = field.get("kind")
     if kind not in TOOL_FIELD_KINDS or kind not in _FIELD_TYPES:
         raise PluginToolError(f"field {key!r}: {kind!r} is not a field kind")
-    default: Any = None
-    if kind == "counter":
-        start = (field.get("counter") or {}).get("initial")
-        default = _literal(start if isinstance(start, int | float) else 0, "number")
-    elif field.get("default") is not None:
-        default = _literal(field["default"], kind)
+    start = field_start(field)
+    default = (
+        None
+        if start is None
+        else _literal(start, "number" if kind == "counter" else kind)
+    )
     return sa.Column(
         key, _FIELD_TYPES[kind](), server_default=default, info={"field": kind}
     )
@@ -492,7 +494,8 @@ def tools_digest(installed: Sequence[InstalledTool]) -> str | None:
 _SETS: OrderedDict[str, ToolSet] = OrderedDict()
 
 
-def _kept(digest: str) -> ToolSet | None:
+def kept_tool_set(digest: str) -> ToolSet | None:
+    """The tool set this process built for ``digest``, if it keeps one."""
     found = _SETS.get(digest)
     if found is not None:
         _SETS.move_to_end(digest)
@@ -508,7 +511,7 @@ def community_tool_set(
     digest = tools_digest(installed)
     if digest is None:
         return BUILTIN_TOOLS
-    found = _kept(digest)
+    found = kept_tool_set(digest)
     if found is None:
         metadata = sa.MetaData()
         records = (build_tool(tool, codes, metadata) for tool in _ordered(installed))
@@ -701,7 +704,7 @@ async def tool_set(session: Any, stamped: str | None | EllipsisType = ...) -> To
 
     if stamped is None:
         return BUILTIN_TOOLS
-    found = None if stamped is ... else _kept(stamped)
+    found = None if stamped is ... else kept_tool_set(stamped)
     if found is not None:
         return found
     installed = [
@@ -709,7 +712,7 @@ async def tool_set(session: Any, stamped: str | None | EllipsisType = ...) -> To
         for row in (await session.exec(_DEFINITIONS)).all()
     ]
     digest = tools_digest(installed)
-    found = BUILTIN_TOOLS if digest is None else _kept(digest)
+    found = BUILTIN_TOOLS if digest is None else kept_tool_set(digest)
     if found is not None:
         return found
     async with db_session.system_engine.connect() as conn:

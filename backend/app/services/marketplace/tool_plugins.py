@@ -33,6 +33,7 @@ that serves or calls is refused rather than dropped.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
@@ -80,6 +81,7 @@ __all__ = [
     "TOOL_LIST_LAYOUTS",
     "TOOL_PLUGIN_TERMS",
     "ToolChanges",
+    "field_start",
     "is_tool_plugin",
     "normalize_tool_plugin_definition",
     "tool_changes",
@@ -360,6 +362,19 @@ def value_fits(field: dict[str, Any], raw: Any) -> bool:
         "select": lambda: isinstance(raw, str) and raw in options,
         "user_reference": lambda: type(raw) is int and raw > 0,
     }[kind]()
+
+
+def field_start(field: Mapping[str, Any]) -> Any:
+    """What a new row's field holds when nothing is written to it: its
+    default, false for a checkbox, nothing otherwise; a counter starts at its
+    ``initial``, a number here, and one naming a field is read from the row
+    it is on."""
+    if field["kind"] == "counter":
+        start = (field.get("counter") or {}).get("initial")
+        return start if _number(start) else 0
+    if field.get("default") is not None:
+        return field["default"]
+    return False if field["kind"] == "checkbox" else None
 
 
 def _default(field: dict[str, Any], raw: Any, *, what: str) -> Any:

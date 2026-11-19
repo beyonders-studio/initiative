@@ -49,7 +49,11 @@ from app.models.tenant.resource_grant import ResourceGrant
 from app.schemas.tenant.archive import ToolCan
 from app.schemas.tenant.plugin_tool import PluginToolRowRead, PluginToolValues
 from app.services.marketplace.declarative import action_change
-from app.services.marketplace.tool_plugins import NEVER_EMPTY, value_fits
+from app.services.marketplace.tool_plugins import (
+    NEVER_EMPTY,
+    field_start,
+    value_fits,
+)
 from app.services.membership import live_membership_clause
 from app.services.permissions import (
     Action,
@@ -226,10 +230,11 @@ def column_values(
             raise _invalid(key)
         values[key] = _column_value(field, raw)
     if current is None:
+        # A counter starts as its bounds say, below.
         starts = {
-            key: _column_value(field, field["default"])
+            key: _column_value(field, start)
             for key, field in declared.items()
-            if field.get("default") is not None
+            if field["kind"] != "counter" and (start := field_start(field)) is not None
         }
         values = {**starts, **values}
     merged = {**(current or {}), **values}
@@ -339,18 +344,24 @@ async def rows_under(
     archived: bool = False,
     page_number: int | None = None,
     page_size: int = 0,
+    for_update: bool = False,
 ) -> list[ToolRow]:
     """``located``'s rows under ``under`` in their order: every one, or the
-    page ``page_number`` names, windowed as every list is."""
+    page ``page_number`` names, windowed as every list is. ``for_update``
+    locks every one, in the order of their ids, so two writers that each lock
+    a parent's items never wait on each other in turn."""
     table = located.table
-    statement = (
-        select_rows(located, tools)
-        .where(*_under(located, under, archived=archived))
-        .order_by(table.c.position, table.c.id)
+    statement = select_rows(located, tools).where(
+        *_under(located, under, archived=archived)
     )
+    if for_update:
+        statement = statement.order_by(table.c.id).with_for_update(of=table)
+    else:
+        statement = statement.order_by(table.c.position, table.c.id)
     if page_number is not None:
         statement = apply_pagination(statement, page_number, page_size)
-    return [row_of(table, found) for found in (await session.exec(statement)).all()]
+    rows = [row_of(table, found) for found in (await session.exec(statement)).all()]
+    return sorted(rows, key=lambda row: (row.position, row.id))
 
 
 async def count_under(
@@ -550,7 +561,9 @@ async def run_action(
     """Run the action ``action_id`` declared on ``located``'s table on
     ``row``, which the caller loaded for an edit: evaluate its ``write`` over
     the row and the items directly under it, and make the change it answers,
-    each value held to its field, as the reader. The caller commits."""
+    each value held to its field, as the reader. The items it reads are
+    locked with the row until the caller commits, so a change made beside it
+    is not lost under it."""
     action = _action(located, action_id)
     params = given_values(located, given)
     asked = set(action.get("params", []))
@@ -561,7 +574,9 @@ async def run_action(
     under = children(located, tools)
     items: dict[str, list[ToolRow]] = {}
     for child in under:
-        items[_key(child.kind)] = await rows_under(session, child, tools, row.id)
+        items[_key(child.kind)] = await rows_under(
+            session, child, tools, row.id, for_update=True
+        )
     change = await action_change(
         action["write"],
         item=document(located, row),

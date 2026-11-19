@@ -325,11 +325,14 @@ async def resolve_subject(
         tool, row = governed
         resource_id = row.id
         governing = Governing.of(tool, row)
-    target_path = (
-        reference_path(kind, entity_id)
-        if kind in _ADDRESSABLE or kind not in KINDS
-        else reference_path(tool, row.id)
-    )
+    if kind not in KINDS:
+        # A tool plug-in's row opens on the page every tool plug-in's rows
+        # share, its tool's or an item's, in its initiative.
+        target_path = f"/i/{row.initiative_id}/t/{kind}/{entity_id}"
+    elif kind in _ADDRESSABLE:
+        target_path = reference_path(kind, entity_id)
+    else:
+        target_path = reference_path(tool, row.id)
     if only is not None:
         return Subject(
             about=ref,

@@ -566,16 +566,22 @@ async def apply_install_standing(
     The statement is rendered from the community's tools, which its schema's
     stamp names and the statement reads back: it is rendered from the tools
     the community's last install request found, and again from the stamp's
-    where they changed since.
+    where they changed since. A set this process does not keep is built from
+    the community's installs as the system engine reads them, which the
+    install's own role does not.
     """
-    from app.db.plugin_tools import tool_set
+    from app.db.plugin_tools import kept_tool_set, provisioned_tools
     from app.db.schema_provisioning import stamp_tools
 
     tools = _INSTALL_TOOLS.get(context.guild_id, BUILTIN_TOOLS)
     row = await compute_install_standing(session, named_refs, tools)
     stamped = stamp_tools(row.get("schema_stamp"))
     if stamped != tools.digest:
-        tools = await tool_set(session, stamped)
+        tools = (
+            BUILTIN_TOOLS
+            if stamped is None
+            else kept_tool_set(stamped) or await provisioned_tools(context.guild_id)
+        )
         row = await compute_install_standing(session, named_refs, tools)
     _INSTALL_TOOLS[context.guild_id] = tools
     completed = replace(context, tools=tools).with_standing(row)
