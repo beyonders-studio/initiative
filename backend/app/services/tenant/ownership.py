@@ -10,9 +10,9 @@ the first:
   ``level='owner'``. A live permission, and the only thing this module moves.
 
 Comments, tasks and uploads have an author and no owner at all; they take
-their permissions from the tool that holds them. The members of :class:`Tool` are
-exactly the things that have an owner, so :data:`OWNABLE` derives from that enum
-and ``ownership_test.py`` fails if a tool is ever missing from it.
+their permissions from the tool that holds them. The tools of the community's
+tool set, built-in or a tool plug-in's, are exactly the things that have an
+owner, so what is owned is read from that set.
 
 **Ownership is optional.** There is no "ownerless" grant row — the
 ``resource_grants_one_grantee`` constraint requires every row to name one
@@ -48,14 +48,12 @@ import app.db.base  # noqa: F401 — registers every model, so each tool's is fo
 from app.core.audit_events import AuditEventType
 from app.core.messages import UserMessages
 from app.core.plugin_scopes import (
-    PluginScopeResource,
     UnknownPluginScope,
     expand,
-    tool_resource,
 )
 from app.core.tool_set import ToolRecord, ToolSet
 from app.core.tools import Tool
-from app.db.session import install_context, routed_tools
+from app.db.session import install_context, routed_tools, session_tools
 from app.db.tool_rows import table_of
 from app.models.platform.guild import GuildMembership
 from app.models.tenant._mixins import ActorKind, tool_models
@@ -66,31 +64,6 @@ from app.schemas.tenant.ownership import OwnerPluginSummary
 from app.services import audit as audit_service
 from app.services import permissions as permissions_service
 from app.services.marketplace import catalog as catalog_service
-
-
-@dataclass(frozen=True)
-class OwnableSpec:
-    """Where one tool's rows live.
-
-    That is the whole per-tool variation: no model carries an owner column, so
-    finding who owns a row is the same query for every tool. The label shown for
-    a row comes from ``SoftDeleteMixin.display_field()``, which already names it
-    for the trash can and the recents bar.
-    """
-
-    model: Any
-
-    @property
-    def display_column(self) -> str:
-        return self.model.display_field()
-
-
-#: Derived from the enum rather than listed: a tool's table is its plural, so the
-#: model is found by that name and the pairing cannot drift. A tool with no model
-#: fails here at import, naming its table, rather than going quietly unowned.
-OWNABLE: dict[Tool, OwnableSpec] = {
-    tool: OwnableSpec(tool_models()[tool.plural]) for tool in Tool
-}
 
 
 def tool_for_row(row: Any, tools: ToolSet) -> ToolRecord | None:
@@ -105,7 +78,7 @@ def tool_for_row(row: Any, tools: ToolSet) -> ToolRecord | None:
 
 @dataclass(frozen=True)
 class OwnedItem:
-    tool: Tool
+    tool: ToolRecord
     id: int
     name: str
     #: The initiative the row belongs to, which a plug-in owner must be placed in.
@@ -213,7 +186,7 @@ async def annotate_owner_plugins(session: AsyncSession, rows: Iterable[Any]) -> 
 # ── Reading what is owned ────────────────────────────────────────────────────
 
 
-def _owner_grant_resource_ids(tool: Tool, user_id: int | None = None):
+def _owner_grant_resource_ids(tool: ToolRecord, user_id: int | None = None):
     stmt = sa_select(ResourceGrant.resource_id).where(
         ResourceGrant.resource_type == tool.value,
         ResourceGrant.level == ResourceAccessLevel.owner,
@@ -225,15 +198,28 @@ def _owner_grant_resource_ids(tool: Tool, user_id: int | None = None):
     return stmt
 
 
-async def _owned_rows(session: AsyncSession, tool: Tool, user_id: int) -> list[Any]:
+def _rows(tool: ToolRecord) -> Any:
+    """The rows of ``tool`` that are not in the trash: each one's id, its
+    initiative and what it is called (``SoftDeleteMixin.display_field()``, a
+    tool plug-in's row its name)."""
+    table = tool.table
+    model = tool_models().get(table.name)
+    name = model.display_field() if model is not None else "name"
+    return sa_select(
+        table.c.id, table.c.initiative_id, table.c[name].label("name")
+    ).where(table.c.deleted_at.is_(None))
+
+
+async def _owned_rows(
+    session: AsyncSession, tool: ToolRecord, user_id: int
+) -> list[Any]:
     """Rows of ``tool`` whose owner grant names this user."""
-    model = OWNABLE[tool].model
-    stmt = select(model).where(model.id.in_(_owner_grant_resource_ids(tool, user_id)))
-    return list((await session.exec(stmt)).unique().all())
+    ids = _owner_grant_resource_ids(tool, user_id)
+    return list((await session.exec(_rows(tool).where(tool.table.c.id.in_(ids)))).all())
 
 
 async def _unowned_rows(
-    session: AsyncSession, tool: Tool, *, guild_id: int
+    session: AsyncSession, tool: ToolRecord, *, guild_id: int
 ) -> list[Any]:
     """Rows of ``tool`` that no current member of the guild and no live
     install owns.
@@ -257,18 +243,14 @@ async def _unowned_rows(
             ResourceGrant.plugin_install_id.in_(live_installs),
         ),
     )
-    stmt = select(OWNABLE[tool].model).where(OWNABLE[tool].model.id.not_in(owned))
-    return list((await session.exec(stmt)).unique().all())
+    stmt = _rows(tool).where(tool.table.c.id.not_in(owned))
+    return list((await session.exec(stmt)).all())
 
 
-def _as_items(tool: Tool, rows: list[Any]) -> list[OwnedItem]:
-    column = OWNABLE[tool].display_column
+def _as_items(tool: ToolRecord, rows: list[Any]) -> list[OwnedItem]:
     return [
         OwnedItem(
-            tool=tool,
-            id=row.id,
-            name=getattr(row, column, None) or "",
-            initiative_id=row.initiative_id,
+            tool=tool, id=row.id, name=row.name or "", initiative_id=row.initiative_id
         )
         for row in rows
     ]
@@ -280,7 +262,7 @@ async def summarize_owned_content(
     """Everything this user owns in the routed guild, tool by tool. The session
     must already be routed into the guild's schema."""
     items: list[OwnedItem] = []
-    for tool in OWNABLE:
+    for tool in await session_tools(session):
         items.extend(_as_items(tool, await _owned_rows(session, tool, user_id)))
     return items
 
@@ -291,7 +273,7 @@ async def summarize_unowned_content(
     """Everything in the guild that no current member owns — what a guild admin
     watches accumulate as people leave, and can claim in one go."""
     items: list[OwnedItem] = []
-    for tool in OWNABLE:
+    for tool in await session_tools(session):
         items.extend(
             _as_items(tool, await _unowned_rows(session, tool, guild_id=guild_id))
         )
@@ -301,11 +283,9 @@ async def summarize_unowned_content(
 # ── Which plug-ins may own ───────────────────────────────────────────────────────
 
 
-def _written_resources(
-    scopes: Iterable[str],
-) -> frozenset[PluginScopeResource | str]:
-    """The resources ``scopes`` let a plug-in write. A scope the vocabulary no
-    longer names grants nothing."""
+def _written_resources(scopes: Iterable[str]) -> frozenset[str]:
+    """The resources ``scopes`` let a plug-in write, as a tool's ``scope``
+    names them. A scope the vocabulary no longer names grants nothing."""
     known: list[str] = []
     for scope in scopes or ():
         try:
@@ -313,7 +293,7 @@ def _written_resources(
         except UnknownPluginScope:
             continue
         known.append(scope)
-    return expand(known)[1]
+    return frozenset(getattr(r, "value", r) for r in expand(known)[1])
 
 
 async def eligible_plugin_owners(
@@ -358,7 +338,7 @@ async def eligible_plugin_owners(
         written = _written_resources(granted_scopes)
         where = placed.get(install_id, set())
         if all(
-            tool_resource(item.tool) in written
+            item.tool.scope in written
             and item.initiative_id is not None
             and item.initiative_id in where
             for item in items
@@ -622,7 +602,7 @@ async def _record_ownership_move(
     from_user_id: int | None,
     to: Owner,
     guild_id: int | None,
-    counts: dict[Tool, int],
+    counts: dict[ToolRecord, int],
 ) -> None:
     """One record for one move, with what it moved counted by tool.
 
@@ -649,9 +629,9 @@ async def _record_ownership_move(
 
 async def _move(
     session: AsyncSession,
-    rows_by_tool: dict[Tool, list[Any]],
+    rows_by_tool: dict[ToolRecord, list[Any]],
     to: Owner,
-) -> dict[Tool, int]:
+) -> dict[ToolRecord, int]:
     """Hand every row to ``to``, refusing a plug-in that may not own all of them.
     Returns a per-tool count; moving nothing is nothing to refuse."""
     items = [
@@ -661,7 +641,7 @@ async def _move(
         await require_plugin_owner_eligible(
             session, install_id=to.plugin_install_id, items=items
         )
-    moved: dict[Tool, int] = {}
+    moved: dict[ToolRecord, int] = {}
     for tool, rows in rows_by_tool.items():
         for row in rows:
             await set_resource_owner(session, tool=tool, row=row, new_owner=to)
@@ -677,7 +657,7 @@ async def transfer_content_ownership(
     to: Owner,
     guild_id: int | None = None,
     actor_user_id: int | None = None,
-) -> dict[Tool, int]:
+) -> dict[ToolRecord, int]:
     """Move everything ``from_user_id`` owns in the routed guild to ``to``.
     Returns a per-tool count of what moved. Caller commits.
 
@@ -685,7 +665,8 @@ async def transfer_content_ownership(
     moves and the answer is 422 ``OWNER_PLUGIN_NOT_ELIGIBLE``. ``actor_user_id``
     is who did it; without one the move is unrecorded."""
     rows_by_tool = {
-        tool: await _owned_rows(session, tool, from_user_id) for tool in OWNABLE
+        tool: await _owned_rows(session, tool, from_user_id)
+        for tool in await session_tools(session)
     }
     moved = await _move(session, rows_by_tool, to)
     await _record_ownership_move(
@@ -705,14 +686,15 @@ async def claim_unowned_content(
     guild_id: int,
     to: Owner,
     actor_user_id: int | None = None,
-) -> dict[Tool, int]:
+) -> dict[ToolRecord, int]:
     """Give every resource no current member or live install owns to ``to``.
     Returns a per-tool count. Caller commits.
 
     A plug-in receives it only when it may own every item, as for a transfer.
     ``actor_user_id`` is who did it; without one the claim is unrecorded."""
     rows_by_tool = {
-        tool: await _unowned_rows(session, tool, guild_id=guild_id) for tool in OWNABLE
+        tool: await _unowned_rows(session, tool, guild_id=guild_id)
+        for tool in await session_tools(session)
     }
     claimed = await _move(session, rows_by_tool, to)
     await _record_ownership_move(
@@ -728,8 +710,6 @@ async def claim_unowned_content(
 
 
 __all__ = [
-    "OWNABLE",
-    "OwnableSpec",
     "OwnedItem",
     "Owner",
     "annotate_owner_plugins",
