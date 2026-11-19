@@ -107,57 +107,40 @@ async def write_switches(
     )
 
 
-#: Rule rows per INSERT, each of these values.
-_RULE_COLUMNS = ("initiative_id", "initiative_role_id", "key", "enabled")
+#: Rule rows per INSERT, well under the values a statement binds.
 _RULE_ROWS_PER_INSERT = 1000
 
 
 async def write_installed_tools(session: AsyncSession, tools: ToolSet) -> None:
     """Give every initiative what it would hold of ``tools``' installed tools
-    had they been there when it was made: each tool's switch, on, and each
-    role's keys for it, a built-in role's as it holds every tool's
-    (``BuiltinRole.holds``) and a custom role's as the member role's. Rows
-    already there are kept, so a switch turned off stays off. Once the
-    community's rules are rendered with ``tools``, which admit the keys."""
-    if not tools.installed:
-        return
-    initiatives = (await session.exec(select(Initiative.id))).scalars().all()
-    roles = (
-        await session.exec(
-            select(
-                InitiativeRoleModel.id,
-                InitiativeRoleModel.initiative_id,
-                InitiativeRoleModel.name,
-                InitiativeRoleModel.is_builtin,
-            )
-        )
-    ).all()
+    had they been there when it was made: each one's switch, on, and each
+    role's keys for it, as ``BuiltinRole.holds`` says (a custom role's as the
+    member role's). Rows already there are kept, so a switch turned off stays
+    off. Once the community's rules are rendered with ``tools``."""
+    switches = [tool.view_permission for tool in tools.installed]
+    keys = {*switches, *(tool.create_permission for tool in tools.installed)}
     holds = {role.name: role.holds(tools) for role in BUILTIN_ROLES}
-    keys = {
-        key
-        for tool in tools.installed
-        for key in (tool.view_permission, tool.create_permission)
-    }
     member = holds[BUILTIN_MEMBER_ROLE]
+    role = InitiativeRoleModel
     rows = [
-        (initiative_id, None, tool.view_permission, True)
-        for initiative_id in initiatives
-        for tool in tools.installed
+        (initiative_id, None, key, True)
+        for initiative_id in (await session.exec(select(Initiative.id))).scalars()
+        for key in switches
     ] + [
-        (role.initiative_id, role.id, key, enabled)
-        for role in roles
-        for key, enabled in (
-            holds.get(role.name, member) if role.is_builtin else member
-        ).items()
+        (initiative_id, role_id, key, enabled)
+        for role_id, initiative_id, name, builtin in await session.exec(
+            select(role.id, role.initiative_id, role.name, role.is_builtin)
+        )
+        for key, enabled in (holds.get(name, member) if builtin else member).items()
         if key in keys
     ]
-    # In batches, each well under the number of values a statement binds.
+    columns = ("initiative_id", "initiative_role_id", "key", "enabled")
     for start in range(0, len(rows), _RULE_ROWS_PER_INSERT):
         await session.exec(
             pg_insert(InitiativeRule)
             .values(
                 [
-                    dict(zip(_RULE_COLUMNS, row, strict=True))
+                    dict(zip(columns, row))
                     for row in rows[start : start + _RULE_ROWS_PER_INSERT]
                 ]
             )

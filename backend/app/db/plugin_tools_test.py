@@ -99,6 +99,13 @@ def _set(definition: dict[str, Any], uid: str = COUNTERS_UID):
     return community_tool_set([InstalledTool(uid, definition)], codes)
 
 
+async def _stamp(session: AsyncSession, schema: str) -> str | None:
+    return await session.scalar(
+        sa.text("SELECT obj_description(to_regnamespace(:s), 'pg_namespace')"),
+        {"s": schema},
+    )
+
+
 async def _columns(session: AsyncSession, schema: str) -> dict[str, set[str]]:
     rows = await session.exec(
         sa.text(
@@ -245,10 +252,7 @@ async def test_install_creates_exactly_the_declared_tables(
     assert types["view_mode"] == "text"
     # The community's stamp names its tools, and a back-fill finds nothing to
     # do for a community that is current.
-    stamp = await session.scalar(
-        sa.text("SELECT obj_description(to_regnamespace(:s), 'pg_namespace')"),
-        {"s": schema},
-    )
+    stamp = await _stamp(session, schema)
     assert stamp_tools(stamp) is not None
     await session.commit()
     assert await _backfill_guild(seat.guild.id, wait=True) is False
@@ -372,38 +376,26 @@ async def test_the_tool_is_on_in_every_initiative_then_and_later(
     assert made.status_code == 201, made.text
     later = made.json()["id"]
     await route_session_to_guild(session, seat.guild.id)
+    role = InitiativeRoleModel
     rows = (
         await session.exec(
-            sa.select(
-                InitiativeRule.initiative_id,
-                InitiativeRoleModel.name,
-                InitiativeRule.key,
-                InitiativeRule.enabled,
-            )
-            .outerjoin(
-                InitiativeRoleModel,
-                InitiativeRoleModel.id == InitiativeRule.initiative_role_id,
-            )
-            .where(
-                InitiativeRule.key.startswith(_KIND),
-                InitiativeRule.install_id.is_(None),
-            )
+            sa.select(InitiativeRule.initiative_id, role.name, InitiativeRule.key)
+            .add_columns(InitiativeRule.enabled)
+            .outerjoin(role, role.id == InitiativeRule.initiative_role_id)
+            .where(InitiativeRule.key.startswith(_KIND))
         )
     ).all()
-    expected = [
-        (initiative, role, f"{_KIND}:{key}", key == "enabled" or manager)
-        for initiative in (seat.initiative.id, later)
-        for role, manager in (
-            ("moderator", True),
-            ("project_manager", True),
-            ("member", False),
-        )
-        for key in ("enabled", "create")
-    ] + [
-        (initiative, None, f"{_KIND}:enabled", True)
-        for initiative in (seat.initiative.id, later)
-    ]
-    assert sorted(rows, key=str) == sorted(expected, key=str)
+    roles = ("moderator", "project_manager", "member", None)
+    assert sorted(rows, key=str) == sorted(
+        [
+            (initiative, role, f"{_KIND}:{key}", key == "enabled" or role != "member")
+            for initiative in (seat.initiative.id, later)
+            for role in roles
+            for key in ("enabled", "create")
+            if role or key == "enabled"
+        ],
+        key=str,
+    )
     assert not await session.scalar(
         sa.select(sa.func.count()).where(ToolLayout.tool.endswith(COUNTERS_UID.lower()))
     )
@@ -507,10 +499,7 @@ async def test_an_install_that_fails_once_rendered_leaves_nothing(
     assert not await session.scalar(
         sa.select(sa.func.count()).where(InitiativeRule.key.startswith(_KIND))
     )
-    stamp = await session.scalar(
-        sa.text("SELECT obj_description(to_regnamespace(:s), 'pg_namespace')"),
-        {"s": schema},
-    )
+    stamp = await _stamp(session, schema)
     assert stamp_tools(stamp) is None
 
 
@@ -638,10 +627,7 @@ async def test_the_window_ending_takes_the_tool_and_what_names_it(
         assert not await session.scalar(
             sa.select(sa.func.count()).select_from(table).where(where)
         ), table
-    stamp = await session.scalar(
-        sa.text("SELECT obj_description(to_regnamespace(:s), 'pg_namespace')"),
-        {"s": schema},
-    )
+    stamp = await _stamp(session, schema)
     assert stamp_tools(stamp) is None
     await session.commit()
     assert await _backfill_guild(seat.guild.id, wait=True) is False
@@ -849,10 +835,7 @@ async def test_boot_brings_an_older_item_table_up_to_its_shape(
     await install_tool_plugin(client, session, seat)
     schema = guild_schema_name(seat.guild.id)
     counter = f'"{schema}".p_tsjvtcm0s7gv2x_counter'
-    stamp = await session.scalar(
-        sa.text("SELECT obj_description(to_regnamespace(:s), 'pg_namespace')"),
-        {"s": schema},
-    )
+    stamp = await _stamp(session, schema)
     await session.exec(
         sa.text(f"ALTER TABLE {counter} DROP COLUMN archived_at CASCADE")
     )
@@ -951,10 +934,7 @@ async def test_boot_provisions_an_install_whose_provisioning_never_ran(
     session.add(install)
     await session.commit()
     schema = guild_schema_name(seat.guild.id)
-    stamp = await session.scalar(
-        sa.text("SELECT obj_description(to_regnamespace(:s), 'pg_namespace')"),
-        {"s": schema},
-    )
+    stamp = await _stamp(session, schema)
     assert stamp_tools(stamp) is None
     assert await _columns(session, schema) == {}
 
@@ -964,10 +944,7 @@ async def test_boot_provisions_an_install_whose_provisioning_never_ran(
         "p_tsjvtcm0s7gv2x_counter_group",
         "p_tsjvtcm0s7gv2x_counter",
     }
-    stamp = await session.scalar(
-        sa.text("SELECT obj_description(to_regnamespace(:s), 'pg_namespace')"),
-        {"s": schema},
-    )
+    stamp = await _stamp(session, schema)
     assert stamp_tools(stamp) == (await provisioned_tools(seat.guild.id)).digest
     policies = await session.scalar(
         sa.text(
