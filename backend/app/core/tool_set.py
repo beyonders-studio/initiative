@@ -59,6 +59,10 @@ class ToolSet:
     """The tools of one community, in the order the renderers list them."""
 
     records: tuple[ToolRecord, ...]
+    #: What the community's installed tool plug-ins are
+    #: (``app.db.plugin_tools.installed_digest``); None for the built-in
+    #: tools alone.
+    digest: str | None = None
 
     def __iter__(self) -> Iterator[ToolRecord]:
         return iter(self.records)
