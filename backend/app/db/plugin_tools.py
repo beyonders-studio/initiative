@@ -75,7 +75,7 @@ from app.services.marketplace.tool_plugins import (
     RANDOM_COLOR,
     TOOL_COLUMNS,
     TOOL_FIELD_KINDS,
-    field_start,
+    effective_defaults,
 )
 
 __all__ = [
@@ -268,10 +268,9 @@ def _compiled(clause: Any) -> sa.TextClause:
 
 
 #: A colour from the app's palette, picked as each row goes in.
-_RANDOM_COLOR = _compiled(
-    sa.literal(list(COLOR_PALETTE), postgresql.ARRAY(sa.Text))[
-        sa.cast(sa.func.floor(sa.func.random() * len(COLOR_PALETTE)), sa.Integer) + 1
-    ]
+_RANDOM_COLOR = sa.text(
+    f"({_compiled(sa.literal(list(COLOR_PALETTE), postgresql.ARRAY(sa.Text)))})"
+    f"[floor(random() * {len(COLOR_PALETTE)})::integer + 1]"
 )
 
 
@@ -317,12 +316,12 @@ _FIELD_TYPES: dict[str, Any] = {
 }
 
 
-def _field_column(field: Mapping[str, Any]) -> sa.Column:
+def _field_column(field: Mapping[str, Any], start: Any) -> sa.Column:
+    """A declared field's column, defaulting to ``start``."""
     key = _field_key(field.get("key"))
     kind = field.get("kind")
     if kind not in TOOL_FIELD_KINDS or kind not in _FIELD_TYPES:
         raise PluginToolError(f"field {key!r}: {kind!r} is not a field kind")
-    start = field_start(field)
     default = (
         None
         if start is None
@@ -447,7 +446,8 @@ def _table(
             sa.ForeignKey(table.c.id, ondelete="CASCADE"),
             nullable=False,
         )
-    declared = [_field_column(field) for field in fields]
+    starts = effective_defaults(fields)
+    declared = [_field_column(field, starts.get(field.get("key"))) for field in fields]
     seen = {"id", anchor.name, "name", "position", "created_at", "updated_at"}
     for column in declared:
         if column.name in seen:
@@ -626,7 +626,9 @@ def community_tool_set(
 def _structure(table: sa.Table, record: ToolRecord) -> list[str]:
     """``table`` as its tool declares it now: made where it is missing, and
     otherwise brought up to it by adding what a later version adds (a column,
-    a select's options, a field's default). Nothing here removes anything."""
+    a select's options, a field's default, its checks). A field made required
+    is filled last, once its options and the checks are the version's own.
+    Nothing here removes anything."""
     create = CreateTable(
         table,
         if_not_exists=True,
@@ -639,6 +641,7 @@ def _structure(table: sa.Table, record: ToolRecord) -> list[str]:
     quoted = _DIALECT.identifier_preparer.quote(table.name)
     ddl = _DIALECT.ddl_compiler(_DIALECT, None)
     statements = [str(create.compile(dialect=_DIALECT)).strip()]
+    fills: list[str] = []
     for column in table.columns:
         if column.primary_key:
             continue
@@ -657,7 +660,7 @@ def _structure(table: sa.Table, record: ToolRecord) -> list[str]:
                 )
             )
             if not column.nullable:
-                statements.append(_required(quoted, name))
+                fills.append(_required(quoted, name))
     for check in sorted(
         (c for c in table.constraints if c.info.get(_OPTIONS)),
         key=lambda c: str(c.name),
@@ -689,6 +692,7 @@ def _structure(table: sa.Table, record: ToolRecord) -> list[str]:
         for check in declared
     )
     statements.append(f"ALTER TABLE {quoted} " + ", ".join((*retired, *added)))
+    statements += fills
     statements += [
         str(CreateIndex(index, if_not_exists=True).compile(dialect=_DIALECT))
         for index in sorted(table.indexes, key=lambda index: str(index.name))
@@ -769,7 +773,8 @@ def drop_ddl(listing_uid: str, before: Mapping[str, Any], changes: Any) -> str:
     ``changes`` (``tool_plugins.ToolChanges``) against the definition
     ``before``. A dropped field's column goes, with whatever reads it; a
     dropped option is emptied from the cells holding it (a select's set to
-    NULL, a multi-select's without it) and the rest keep their values. A cell
+    NULL, or to the new version's default where the field is required, a
+    multi-select's without it) and the rest keep their values. A cell
     the platform holds is never emptied: the version is refused instead.
     Schema-relative; the parts rendered after it put back what reads the
     tables and their row security."""
@@ -811,6 +816,9 @@ def drop_ddl(listing_uid: str, before: Mapping[str, Any], changes: Any) -> str:
             ),
             f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY",
             f"ALTER TABLE {table} DISABLE TRIGGER USER",
+            # A required select's emptied cells take the version's default
+            # as the structure rendered after this brings it back to NOT NULL.
+            f"ALTER TABLE {table} ALTER COLUMN {column} DROP NOT NULL",
             f"UPDATE {table} SET {column} = {kept} WHERE {holding}",
             f"ALTER TABLE {table} ENABLE TRIGGER USER",
             f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY",

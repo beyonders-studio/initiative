@@ -44,7 +44,7 @@ from __future__ import annotations
 
 import math
 import operator
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
@@ -95,7 +95,7 @@ __all__ = [
     "TOOL_LIST_LAYOUTS",
     "TOOL_PLUGIN_TERMS",
     "ToolChanges",
-    "field_start",
+    "effective_defaults",
     "is_tool_plugin",
     "normalize_tool_plugin_definition",
     "tool_changes",
@@ -403,19 +403,6 @@ def value_fits(field: dict[str, Any], raw: Any) -> bool:
     }[kind]()
 
 
-def field_start(field: Mapping[str, Any]) -> Any:
-    """What a new row's field holds when nothing is written to it: its
-    default, false for a checkbox, nothing otherwise; a counter starts at its
-    ``initial``, a number here, and one naming a field is read from the row
-    it is on."""
-    if field["kind"] == "counter":
-        start = (field.get("counter") or {}).get("initial")
-        return start if _number(start) else 0
-    if field.get("default") is not None:
-        return field["default"]
-    return False if field["kind"] == "checkbox" else None
-
-
 def _default(field: dict[str, Any], raw: Any, *, what: str) -> Any:
     """A field's default, of its kind's own shape."""
     kind = field["kind"]
@@ -600,7 +587,7 @@ def _checks(raw: Any, *, fields: list[dict[str, Any]], what: str) -> list[dict]:
     declared = require_list(raw, f"{what} checks", MAX_TOOL_CHECKS)
     if not declared:
         fail(f"{what} checks: leave 'checks' out for a table with none")
-    defaults = {field["key"]: field.get("default") for field in fields}
+    defaults = effective_defaults(fields)
     checks = []
     for index, entry in enumerate(declared):
         at = f"{what} check {index}"
@@ -620,18 +607,52 @@ def _checks(raw: Any, *, fields: list[dict[str, Any]], what: str) -> list[dict]:
     return checks
 
 
+def effective_defaults(
+    fields: Iterable[Mapping[str, Any]], given: Mapping[str, Any] | None = None
+) -> dict[str, Any]:
+    """What each of a table's declared fields holds on a new row when nothing
+    is written to it: its default, false for a checkbox, nothing otherwise. A
+    counter starts at its ``initial``: a number, or the number field it names
+    as the row holds it (``given``, the values written), else as that field
+    starts; 0 where that is nothing. The one answer a table's column defaults,
+    its checks at publish and a new row's values are read from."""
+    fields = list(fields)
+    written = given or {}
+    starts: dict[str, Any] = {
+        field["key"]: (
+            field["default"]
+            if field.get("default") is not None
+            else (False if field["kind"] == "checkbox" else None)
+        )
+        for field in fields
+        if field["kind"] != "counter"
+    }
+    counters: dict[str, Any] = {}
+    for field in fields:
+        if field["kind"] != "counter":
+            continue
+        start = (field.get("counter") or {}).get("initial")
+        if isinstance(start, str):
+            start = (
+                written[start] if written.get(start) is not None else starts.get(start)
+            )
+        counters[field["key"]] = 0 if start is None else start
+    return {**starts, **counters}
+
+
 def tool_row_problems(
     table: Mapping[str, Any], row: Mapping[str, Any]
 ) -> list[tuple[str, str]]:
     """What is wrong with ``row``, a row of the declared ``table`` (the tool
     block or one of its items) as it would be stored, by its fields' keys:
-    each required field it leaves empty, as ``(key, "required")``, and each
-    check it breaks, as ``(key, <comparison>)``. A check whose either side is
-    empty holds, as the table's CHECK does."""
+    each required field it empties, as ``(key, "required")``, and each check
+    it breaks, as ``(key, <comparison>)``. A field ``row`` leaves out takes
+    its column's default, which a required field always has; a check whose
+    either side is empty holds, as the table's CHECK does."""
     problems = [
         (field["key"], "required")
         for field in table.get("fields", ())
-        if field.get("required") and row.get(field["key"]) is None
+        if field.get("required") and field["key"] in row and row[field["key"]] is None
     ]
     for check in table.get("checks", ()):
         ((term, operand),) = ((t, v) for t, v in check.items() if t != "field")

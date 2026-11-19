@@ -730,6 +730,9 @@ async def test_a_version_adding_to_the_tool_waits_for_the_seat(
         low.update(default=0, required=True)
         view_mode = next(f for f in counter["fields"] if f["key"] == "view_mode")
         view_mode["options"].append({"value": "dial", "label": {"en": "Dial"}})
+        # A dial is not a look a counter is drawn in.
+        for listed in counter["layouts"]["lists"]:
+            listed.pop("displays")
         tally = copy.deepcopy(counter)
         tally.update(key="tally", name={"en": "Tally"})
         del tally["open_while"]
@@ -772,6 +775,51 @@ async def test_a_version_adding_to_the_tool_waits_for_the_seat(
     with pytest.raises(IntegrityError, match="not-null"):
         async with session.begin_nested():
             await session.exec(sa.text(f"UPDATE {_COUNTER} SET min = NULL"))
+
+
+def _view_mode(tool: dict[str, Any]) -> dict[str, Any]:
+    return next(f for f in tool["items"][0]["fields"] if f["key"] == "view_mode")
+
+
+async def test_a_select_made_required_takes_its_new_option(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """A version offering a new option and making its select required with
+    that option as its default fills the empty cells with it: the select's
+    options are the version's before the cells are filled."""
+    first = counters_tool_manifest()
+    _view_mode(first["tool"]).pop("required")
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    install = await install_tool_plugin(client, session, seat, definition=first)
+    await route_session_to_guild(session, seat.guild.id)
+    await session.exec(
+        sa.text(
+            f"WITH g AS (INSERT INTO {_GROUP} (initiative_id, name)"
+            " VALUES (:i, 'Group') RETURNING id)"
+            f" INSERT INTO {_COUNTER} (counter_group_id, name, view_mode)"
+            " SELECT id, 'Unset', NULL FROM g"
+        ),
+        params={"i": seat.initiative.id},
+    )
+    await session.commit()
+
+    def dial(tool: dict[str, Any]) -> None:
+        view_mode = _view_mode(tool)
+        view_mode["options"].append({"value": "dial", "label": {"en": "Dial"}})
+        view_mode["default"] = "dial"
+        # A dial is not a look a counter is drawn in.
+        for listed in tool["items"][0]["layouts"]["lists"]:
+            listed.pop("displays")
+
+    await _publish(session, "1.1.0", dial)
+    taken = await client.post(
+        seat.g(f"/plugins/{install['id']}/upgrade"),
+        headers=seat.headers,
+        json={"version": "1.1.0"},
+    )
+    assert taken.status_code == 200, taken.text
+    await route_session_to_guild(session, seat.guild.id)
+    assert await session.scalar(sa.text(f"SELECT view_mode FROM {_COUNTER}")) == "dial"
 
 
 async def test_the_sweep_takes_a_version_asking_nothing_and_holds_the_rest(
@@ -870,7 +918,8 @@ async def test_a_major_drops_what_the_seat_confirms_and_keeps_the_rest(
     looks = dict(
         (await session.exec(sa.text(f"SELECT name, view_mode FROM {_COUNTER}"))).all()
     )
-    assert looks == {"Clock": None, "Bar": "bar"}
+    # A required look takes its default in place of the option it lost.
+    assert looks == {"Clock": "number", "Bar": "bar"}
     refused = await session.exec(
         sa.text(
             f"SELECT relforcerowsecurity FROM pg_class WHERE oid = '{_COUNTER}'::regclass"

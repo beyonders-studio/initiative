@@ -341,6 +341,17 @@ REFUSALS: dict[str, tuple[Callable[[dict], None], str]] = {
         _checks({"field": "min", "below": {"field": "description"}}),
         "not a number or counter field of this table",
     ),
+    "a check a counter's start breaks": (
+        _checks({"field": "count", "at_least": {"field": "step"}}),
+        "defaults do not hold",
+    ),
+    "a check a counter's own start breaks": (
+        lambda body: (
+            _field(body, "count").__setitem__("counter", {"initial": 5})
+            or _checks({"field": "count", "below": 3})(body)
+        ),
+        "defaults do not hold",
+    ),
     "a check the defaults break": (
         _checks({"field": "initial_count", "at_least": {"field": "step"}}),
         "defaults do not hold",

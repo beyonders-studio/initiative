@@ -51,7 +51,9 @@ from app.schemas.tenant.plugin_tool import PluginToolRowRead, PluginToolValues
 from app.services.marketplace.declarative import action_change
 from app.services.marketplace.tool_plugins import (
     NEVER_EMPTY,
-    field_start,
+    RANDOM_COLOR,
+    effective_defaults,
+    tool_row_problems,
     value_fits,
 )
 from app.services.membership import live_membership_clause
@@ -196,12 +198,15 @@ def _bound(raw: Any, values: Mapping[str, Any]) -> Decimal | None:
     return None if value is None else Decimal(str(value))
 
 
-def _clamped(field: Mapping[str, Any], values: Mapping[str, Any]) -> Decimal:
-    """A counter field's value in ``values``, held to its bounds there."""
+def _clamped(
+    field: Mapping[str, Any], values: Mapping[str, Any], start: Any
+) -> Decimal:
+    """A counter field's value in ``values``, or ``start``, held to its
+    bounds there."""
     counter = field.get("counter") or {}
     count = values.get(field["key"])
     if count is None:
-        count = _bound(counter.get("initial"), values) or Decimal(0)
+        count = Decimal(str(start))
     low = _bound(counter.get("min"), values)
     high = _bound(counter.get("max"), values)
     if low is not None:
@@ -218,10 +223,11 @@ def column_values(
     current: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     """The columns a write of ``given`` (declared fields by key) sets, held to
-    the declaration: a new row's (``current`` None), with each field's default
-    and each counter's start, or a change to a row holding ``current``. A
-    counter is held to its bounds whenever it or a field bounding it
-    changes."""
+    the declaration: a new row's (``current`` None), with each field's start
+    (``effective_defaults``), or a change to a row holding ``current``. A
+    counter is held to its bounds whenever it or a field bounding it changes,
+    and the row as it would be stored to its required fields and checks
+    (``tool_row_problems``)."""
     declared = declared_fields(located)
     values: dict[str, Any] = {}
     for key, raw in given.items():
@@ -229,14 +235,20 @@ def column_values(
         if field is None:
             raise _invalid(key)
         values[key] = _column_value(field, raw)
+    starts = effective_defaults(declared.values(), {**(current or {}), **values})
     if current is None:
-        # A counter starts as its bounds say, below.
-        starts = {
-            key: _column_value(field, start)
-            for key, field in declared.items()
-            if field["kind"] != "counter" and (start := field_start(field)) is not None
+        # A counter starts as its bounds say, below; a random colour as its
+        # column picks it.
+        values = {
+            **{
+                key: _column_value(field, starts[key])
+                for key, field in declared.items()
+                if field["kind"] != "counter"
+                and starts[key] is not None
+                and starts[key] != RANDOM_COLOR
+            },
+            **values,
         }
-        values = {**starts, **values}
     merged = {**(current or {}), **values}
     for key, field in declared.items():
         if field["kind"] != "counter":
@@ -246,9 +258,11 @@ def column_values(
         }
         if current is not None and key not in values and not bounds & values.keys():
             continue
-        count = _clamped(field, merged)
+        count = _clamped(field, merged, starts[key])
         if current is None or key in values or count != current.get(key):
             values[key] = merged[key] = count
+    for key, _ in tool_row_problems(_table_block(located), merged):
+        raise _invalid(key)
     return values
 
 

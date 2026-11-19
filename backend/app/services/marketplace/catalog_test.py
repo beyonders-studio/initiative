@@ -544,7 +544,7 @@ class TestToolVersions:
     @pytest.mark.parametrize(
         "change",
         [
-            lambda tool: tool["items"][0]["fields"][5].update(kind="text"),
+            lambda tool: tool["fields"][0].update(kind="number"),
             lambda tool: tool["items"][0]["fields"][6]["options"].pop(),
         ],
         ids=["retyped", "fewer options"],
