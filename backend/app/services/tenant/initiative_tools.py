@@ -38,7 +38,7 @@ from app.models.tenant.initiative import (
     BUILTIN_ROLES,
     INITIATIVE_CUSTOM_ROLES,
     INITIATIVE_MEMBER_PREFIX,
-    INITIATIVE_TOOL_KEYS,
+    INITIATIVE_TOOL_PREFIX,
     Initiative,
     InitiativeRoleModel,
     InitiativeRule,
@@ -178,17 +178,17 @@ async def tool_on_in(session: AsyncSession, initiative: Any, tool: Tool) -> bool
     context = actor_context(session)
     if context is not None:
         return tool_on(context, initiative, tool)
-    row, where = _community(INITIATIVE_TOOL_KEYS[tool])
+    row, where = _community(f"{INITIATIVE_TOOL_PREFIX}{tool.value}")
     switch = await session.scalar(select(row.enabled).where(where))
     if switch is None:
         return own_switch(initiative, tool)
     return switch
 
 
-def tool_on_sql(tool: Tool) -> ColumnElement[bool]:
+def tool_on_sql(tool: Tool | ToolRecord) -> ColumnElement[bool]:
     """:func:`tool_on` over ``initiatives`` rows, for a query's filter. The
     community's row is read once for the statement."""
-    row, where = _community(INITIATIVE_TOOL_KEYS[tool])
+    row, where = _community(f"{INITIATIVE_TOOL_PREFIX}{tool.value}")
     own = aliased(InitiativeRule)
     return func.coalesce(
         select(row.enabled).where(where).scalar_subquery(),

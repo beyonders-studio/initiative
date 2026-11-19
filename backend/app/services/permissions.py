@@ -395,11 +395,10 @@ async def replace_resource_grants(
     # belongs to no initiative, so no initiative role speaks for it.
     if not guild_scoped:
         # Local: rls imports this module.
-        from app.models.tenant.initiative import PermissionKey
+        from app.db.session import routed_tools
         from app.services import rls as rls_service
 
-        tool = Tool(resource_type)
-        view_key = PermissionKey(tool.view_permission)
+        tool = routed_tools(session).by_kind[resource_type]
 
         async def permitted(reader: Any) -> tuple[set[int], set[int]]:
             return (
@@ -407,13 +406,15 @@ async def replace_resource_grants(
                     reader,
                     initiative_id=initiative_id,
                     user_ids=valid_users,
-                    permission_key=view_key,
+                    permission_key=tool.view_permission,
+                    default=tool.spec.on_by_default,
                 ),
                 await rls_service.roles_permitting(
                     reader,
                     initiative_id=initiative_id,
                     role_ids=valid_roles,
-                    permission_key=view_key,
+                    permission_key=tool.view_permission,
+                    default=tool.spec.on_by_default,
                 ),
             )
 

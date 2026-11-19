@@ -700,14 +700,8 @@ _INSTALL_STANDING: dict[gucs.Guc, _Expr] = {
       FROM community_defaults cd
       WHERE cd.key LIKE 'initiative\\_tool.%'
     ), '')""",
-    gucs.ENABLED_TOOLS: lambda tools: (
-        f"""COALESCE((
-      SELECT string_agg(DISTINCT i.id || ':' || t.tool, ',')
-      FROM initiatives i
-      JOIN placed p ON p.initiative_id = i.id
-      CROSS JOIN LATERAL {_tool_switches(tools)} AS t(tool, enabled)
-      WHERE {_TOOL_ON}
-    ), '')"""
+    gucs.ENABLED_TOOLS: lambda tools: _enabled_tools(
+        tools, "SELECT p.initiative_id FROM placed p"
     ),
     gucs.OVERRIDE_INITIATIVES: """COALESCE((
       SELECT string_agg(DISTINCT o.initiative_id::text, ',')
@@ -963,7 +957,7 @@ denied AS (
   WHERE NOT EXISTS (
     SELECT 1 FROM granted gr WHERE gr.pair = p.initiative_id || ':' || k.key
   )
-)
+){_tool_states(tools)}
 SELECT
   (SELECT EXISTS (SELECT 1 FROM install)) AS live,
   obj_description(to_regnamespace(current_schema()), 'pg_namespace') AS schema_stamp,

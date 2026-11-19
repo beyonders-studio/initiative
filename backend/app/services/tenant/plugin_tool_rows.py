@@ -252,7 +252,7 @@ def given_values(located: Located, given: PluginToolValues) -> dict[str, Any]:
     ``people``, every other field's from ``fields``."""
     declared = declared_fields(located)
     for key in given.fields:
-        if key in declared and declared[key]["kind"] == "user_reference":
+        if key not in declared or declared[key]["kind"] == "user_reference":
             raise _invalid(key)
     for key in given.people:
         if key not in declared or declared[key]["kind"] != "user_reference":
@@ -273,7 +273,7 @@ async def require_members(
     named = {
         key: value
         for key, value in values.items()
-        if value is not None and declared[key]["kind"] == "user_reference"
+        if value is not None and declared.get(key, {}).get("kind") == "user_reference"
     }
     if not named:
         return
