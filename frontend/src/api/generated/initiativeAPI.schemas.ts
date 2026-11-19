@@ -3759,7 +3759,7 @@ export const CommunityInviteGrantLevel = {
  */
 export interface CommunityInviteGrant {
   initiative_id: number;
-  resource_type?: Tool | null;
+  resource_type?: string | null;
   resource_id?: number | null;
   level?: CommunityInviteGrantLevel;
 }
@@ -9369,7 +9369,7 @@ export interface OperatorUsernameUpdate {
  * One thing someone owns, or that nobody does.
  */
 export interface OwnedContentItem {
-  tool: Tool;
+  tool: string;
   id: number;
   name: string;
 }
@@ -9379,7 +9379,7 @@ export type OwnedContentResponseCounts = { [key: string]: number };
 /**
  * What a user owns in this guild, or what no current member owns.
  *
- * ``counts`` is per tool, keyed by the ``Tool`` value, so the dialog can say
+ * ``counts`` is per tool, keyed by the tool's kind, so the dialog can say
  * "3 projects, 1 calendar" without walking the list. ``eligible_plugins`` are the
  * installed plug-ins that may own every item listed, which the dialog offers
  * beside the community's admins.
