@@ -14,11 +14,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.messages import GuildPluginMessages
 from app.core.tool_set import BUILTIN_TOOLS
 from app.db.guild_ddl import render_guild_rls_ddl
+from app.db.kind_codes import assign_plugin_kind_codes
 from app.db.plugin_tools import (
     InstalledTool,
     PluginToolError,
     community_tool_set,
     provisioned_tools,
+    structure_ddl,
 )
 from app.db.schema_provisioning import (
     GuildRoleKind,
@@ -26,9 +28,11 @@ from app.db.schema_provisioning import (
     get_provisioning_bundle,
     guild_role_name,
     guild_schema_name,
-    stamp_has_tools,
+    stamp_tools,
 )
 from app.models.platform.guild import CommunityRole
+from app.models.tenant._mixins import ActorKind
+from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.initiative import InitiativeRule
 from app.services.marketplace.tool_plugins import (
     normalize_tool_plugin_definition,
@@ -139,20 +143,27 @@ def test_the_render_with_a_tool_rules_its_tables_and_without_one_names_none():
 async def test_a_community_with_no_tool_plugin_keeps_the_bundle():
     bundle = await get_provisioning_bundle()
     assert bundle.for_tools(BUILTIN_TOOLS) is bundle
-    assert not stamp_has_tools(bundle.stamp)
+    assert stamp_tools(bundle.stamp) is None
 
 
 def test_an_item_under_an_item_walks_two_hops():
     definition = _counters()
-    definition["tool"]["items"].append(
+    # Declared before the item it sits under.
+    definition["tool"]["items"].insert(
+        0,
         {
             "key": "tally",
             "name": {"en": "Tally"},
             "parent": "counter",
             "fields": [{"key": "note", "name": {"en": "Note"}, "kind": "text"}],
-        }
+        },
     )
-    ddl = render_guild_rls_ddl(_set(definition))
+    tools = _set(definition)
+    structure = structure_ddl(tools)
+    assert structure.index("CREATE TABLE IF NOT EXISTS p_tsjvtcm0s7gv2x_counter (") < (
+        structure.index("CREATE TABLE IF NOT EXISTS p_tsjvtcm0s7gv2x_tally (")
+    )
+    ddl = render_guild_rls_ddl(tools)
     assert "CREATE POLICY initiative_member_select ON p_tsjvtcm0s7gv2x_tally " in ddl
     assert (
         "FROM p_tsjvtcm0s7gv2x_counter dmid JOIN p_tsjvtcm0s7gv2x_counter_group dpar"
@@ -192,7 +203,7 @@ async def test_install_creates_exactly_the_declared_tables(
         sa.text("SELECT obj_description(to_regnamespace(:s), 'pg_namespace')"),
         {"s": schema},
     )
-    assert stamp_has_tools(stamp)
+    assert stamp_tools(stamp) is not None
     await session.commit()
     assert await _backfill_guild(seat.guild.id, wait=True) is False
     # No installed plug-in reaches the tables: the plug-in role holds no
@@ -273,3 +284,68 @@ async def test_a_tool_plugin_is_not_removed_or_updated_yet(
     ):
         assert response.status_code == 409, response.text
         assert response.json()["detail"] == GuildPluginMessages.TOOL_UNCHANGEABLE
+
+
+async def test_boot_provisions_an_install_whose_provisioning_never_ran(
+    session: AsyncSession, acting_user
+):
+    """An install row committed without its tables, its rules or its switch
+    rows, and a stamp naming no tools: the back-fill provisions all of it."""
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    definition = _counters()
+    await assign_plugin_kind_codes(
+        session, tool_kinds(definition, listing_uid=COUNTERS_UID)
+    )
+    await route_session_to_guild(session, seat.guild.id)
+    install = GuildPlugin(
+        listing_uid=COUNTERS_UID,
+        listing_version="1.0.0",
+        plugin_kind="tool",
+        name="Counters",
+        definition=definition,
+        config={},
+        granted_scopes=[],
+        created_by=seat.user.id,
+        created_by_kind=ActorKind.member,
+    )
+    session.add(install)
+    await session.commit()
+    schema = guild_schema_name(seat.guild.id)
+    stamp = await session.scalar(
+        sa.text("SELECT obj_description(to_regnamespace(:s), 'pg_namespace')"),
+        {"s": schema},
+    )
+    assert stamp_tools(stamp) is None
+    assert await _columns(session, schema) == {}
+
+    assert await _backfill_guild(seat.guild.id, wait=True) is True
+
+    assert set(await _columns(session, schema)) == {
+        "p_tsjvtcm0s7gv2x_counter_group",
+        "p_tsjvtcm0s7gv2x_counter",
+    }
+    stamp = await session.scalar(
+        sa.text("SELECT obj_description(to_regnamespace(:s), 'pg_namespace')"),
+        {"s": schema},
+    )
+    assert stamp_tools(stamp) == (await provisioned_tools(seat.guild.id)).digest
+    policies = await session.scalar(
+        sa.text(
+            "SELECT count(*) FROM pg_policy"
+            " WHERE polrelid = to_regclass(:t) AND polname LIKE 'initiative_member_%'"
+        ),
+        {"t": f'"{schema}".p_tsjvtcm0s7gv2x_counter_group'},
+    )
+    assert policies == 4
+    await route_session_to_guild(session, seat.guild.id)
+    switch = await session.scalar(
+        sa.select(InitiativeRule.enabled).where(
+            InitiativeRule.initiative_id == seat.initiative.id,
+            InitiativeRule.initiative_role_id.is_(None),
+            InitiativeRule.install_id == install.id,
+        )
+    )
+    assert switch is True
+    # Once current, the next boot leaves it alone.
+    await session.commit()
+    assert await _backfill_guild(seat.guild.id, wait=True) is False

@@ -254,9 +254,11 @@ class ProvisioningBundle:
         renders (its tables' structure, the registry CHECKs, the grants and the
         row security) rendered from it, the rest as they are. The bundle itself
         for a community with no tool plug-in, so its render does not move.
-        Rendered once per process per set."""
-        if not tools.installed:
+        Rendered once per process per set, from the built-in bundle."""
+        if tools is self.tools or not tools.installed:
             return self
+        if self.tools.installed:
+            raise ValueError("a community's bundle is rendered from the built-in one")
         key = (id(self), tools.digest)
         found = _community_bundles.get(key)
         if found is not None:
@@ -325,9 +327,14 @@ _community_bundles: dict[tuple[int, str | None], ProvisioningBundle] = {}
 TOOLS_ITEM = "tools"
 
 
-def stamp_has_tools(stamp: str | None) -> bool:
-    """Whether a schema stamped ``stamp`` was rendered with tool plug-ins."""
-    return f",{TOOLS_ITEM}=" in (stamp or "")
+def stamp_tools(stamp: str | None) -> str | None:
+    """The digest of the tool plug-ins a schema stamped ``stamp`` was rendered
+    with, or None where it names none."""
+    for item in (stamp or "").removeprefix(_STAMP_PREFIX).split(","):
+        name, _, value = item.partition("=")
+        if name == TOOLS_ITEM:
+            return value
+    return None
 
 
 def _every_community(ddl: str, operations: str) -> str:
@@ -1172,9 +1179,8 @@ async def _backfill_guild(guild_id: int, *, wait: bool) -> bool | None:
     Returns whether anything was applied, or None when ``wait`` is False and
     another process holds the lock.
     """
-    from app.db.plugin_tools import provisioned_tools
+    from app.db.plugin_tools import installed_tools, provisioned_tools, tools_digest
 
-    bundle = await get_provisioning_bundle()
     async with db_session.provisioning_engine.begin() as conn:
         if not await advisory_lock(
             conn, LockNamespace.GUILD_PROVISION, guild_id, wait=wait
@@ -1185,19 +1191,19 @@ async def _backfill_guild(guild_id: int, *, wait: bool) -> bool | None:
             text("SELECT obj_description(to_regnamespace(:s), 'pg_namespace')"),
             {"s": guild_schema_name(guild_id)},
         )
-        # A community rendered with tool plug-ins is compared with its own
-        # render; the installs are read only for such a community.
-        if stamp_has_tools(stamp):
-            bundle = bundle.for_tools(await provisioned_tools(guild_id))
+        # Compared with the community's own render, from its installs as they
+        # stand: an install whose provisioning never finished leaves a stamp
+        # that names other tools, or none, and is provisioned here.
+        installed = await installed_tools(guild_id)
+        tools = await provisioned_tools(guild_id, installed)
+        bundle = (await get_provisioning_bundle()).for_tools(tools)
         parts = PARTS if settings.FORCE_GUILD_BACKFILL else bundle.stale_parts(stamp)
         if parts:
-            # The installs as they stand now, which the stamp written below
-            # names.
-            tools = await provisioned_tools(guild_id)
-            bundle = bundle.for_tools(tools)
             await _apply_parts(
                 conn, guild_id, parts, validate_checks=False, tools=tools
             )
+    if stamp_tools(stamp) != tools_digest(installed):
+        await _switch_installed_tools_on(guild_id)
     if "checks" in parts:
         # After the replacement commits, so the scan holds no lock that stops
         # the guild's reads and writes. A failure leaves ``checks`` pending.
@@ -1207,6 +1213,28 @@ async def _backfill_guild(guild_id: int, *, wait: bool) -> bool | None:
             await apply_guild_checks(conn, schema, replace=False, bundle=bundle)
             await _write_stamp(conn, schema, bundle.stamp)
     return bool(parts)
+
+
+async def _switch_installed_tools_on(guild_id: int) -> None:
+    """Write the switch and role rows of ``guild_id``'s tool plug-ins where
+    they are missing, once its rules admit them: what an install whose
+    provisioning never finished did not get. Rows already there are kept."""
+    from app.db import cohorts
+    from app.db.request_context import SystemGuild
+    from app.services.tenant.initiative_tools import write_plugin_tool_rules
+
+    async with cohorts.system_session(guild_id) as session:
+        await db_session.set_rls_context(session, SystemGuild(guild_id))
+        await write_plugin_tool_rules(session)
+        await session.commit()
+
+
+async def _tools_behind(guild_id: int, stamp: str | None) -> bool:
+    """Whether ``guild_id``'s installed tool plug-ins are other than the ones
+    its stamp says it was rendered with."""
+    from app.db.plugin_tools import installed_tools, tools_digest
+
+    return stamp_tools(stamp) != tools_digest(await installed_tools(guild_id))
 
 
 async def backfill_guild_schemas() -> BackfillSummary:
@@ -1261,13 +1289,23 @@ async def backfill_guild_schemas() -> BackfillSummary:
                 )
             )
         ).all()
-    behind = [
-        gid
-        for gid, stamp in rows
-        if settings.FORCE_GUILD_BACKFILL or bundle.stale_parts(stamp)
-    ]
-
     limit = asyncio.Semaphore(_BACKFILL_CONCURRENCY)
+
+    async def is_behind(guild_id: int, stamp: str | None) -> bool:
+        if settings.FORCE_GUILD_BACKFILL or bundle.stale_parts(stamp):
+            return True
+        # Current by the built-in render: behind only if it has tool
+        # plug-ins its stamp does not name, one read of its installs.
+        async with limit:
+            try:
+                return await _tools_behind(guild_id, stamp)
+            except Exception:
+                logger.exception("reading the tool plug-ins of guild %s", guild_id)
+                return True
+
+    checked = await asyncio.gather(*(is_behind(gid, stamp) for gid, stamp in rows))
+    behind = [gid for (gid, _), late in zip(rows, checked, strict=True) if late]
+
     failed_guild_ids: list[int] = []
 
     async def backfill(guild_id: int, wait: bool) -> bool | None:

@@ -99,6 +99,10 @@ async def write_switches(
     )
 
 
+#: Rule rows per INSERT: five values each.
+_RULE_ROWS_PER_INSERT = 1000
+
+
 async def write_plugin_tool_rules(
     session: AsyncSession, *, initiative_id: int | None = None
 ) -> None:
@@ -107,6 +111,7 @@ async def write_plugin_tool_rules(
     a tool's (a manager both, anyone else viewing it and not creating it). In
     ``initiative_id``, or in every initiative. The rows are the install's.
     Rows already there are kept as they are."""
+    from app.db.plugin_tools import tool_table_name
     from app.models.tenant.guild_plugin import GuildPlugin
     from app.models.tenant.initiative import Initiative, InitiativeRoleModel
     from app.services.marketplace.tool_plugins import TOOL, tool_kinds
@@ -118,7 +123,15 @@ async def write_plugin_tool_rules(
             .order_by(GuildPlugin.id)
         )
     ).all()
-    if not installs:
+    # Only an install whose tool's tables exist: they are made in the same
+    # transaction as the rules that admit its rows, so an install still being
+    # provisioned is left to the step that provisions it.
+    provisioned = []
+    for install_id, listing_uid, definition in installs:
+        table = tool_table_name(listing_uid, definition["tool"]["key"])
+        if await session.scalar(select(func.to_regclass(table))):
+            provisioned.append((install_id, listing_uid, definition))
+    if not provisioned:
         return
     initiatives = select(Initiative.id)
     roles = select(
@@ -132,7 +145,7 @@ async def write_plugin_tool_rules(
     initiative_ids = (await session.exec(initiatives)).scalars().all()
     role_rows = (await session.exec(roles)).all()
     rows: list[dict[str, Any]] = []
-    for install_id, listing_uid, definition in installs:
+    for install_id, listing_uid, definition in provisioned:
         kind = tool_kinds(definition, listing_uid=listing_uid)[0]
         view, create = f"{kind}:enabled", f"{kind}:create"
         rows += [
@@ -156,10 +169,11 @@ async def write_plugin_tool_rules(
             for role_id, role_initiative, is_manager in role_rows
             for key, enabled in ((view, True), (create, bool(is_manager)))
         ]
-    if rows:
+    # In batches, each well under the number of values a statement binds.
+    for start in range(0, len(rows), _RULE_ROWS_PER_INSERT):
         await session.exec(
             pg_insert(InitiativeRule)
-            .values(rows)
+            .values(rows[start : start + _RULE_ROWS_PER_INSERT])
             .on_conflict_do_nothing(constraint="uq_initiative_rules_subject")
         )
 

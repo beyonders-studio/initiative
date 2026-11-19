@@ -67,9 +67,11 @@ __all__ = [
     "community_tool_set",
     "community_tools",
     "installed_digest",
+    "installed_tools",
     "provisioned_tools",
     "structure_ddl",
     "tool_table_name",
+    "tools_digest",
 ]
 
 #: The prefix of every table a tool plug-in has.
@@ -388,7 +390,9 @@ def build_tool(
         children.append(
             PluginKind(item_kind, codes[item_kind], table_name=tables[item_key].name)
         )
-    item_tables = tuple(tables[item["key"]] for item in items)
+    # Parents first, as they were built, so each table's key names a table
+    # created before it.
+    item_tables = tuple(table for item_key, table in tables.items() if item_key != key)
     return ToolRecord(
         kind=kind,
         plural=own.name,
@@ -539,10 +543,17 @@ async def community_tools(session: Any) -> ToolSet:
     return found
 
 
-async def provisioned_tools(guild_id: int) -> ToolSet:
-    """The tool set of ``guild_id`` as its installs stand, read on the
-    system engine, for provisioning: :data:`BUILTIN_TOOLS` for a community
-    whose schema does not exist yet."""
+def tools_digest(installed: Sequence[InstalledTool]) -> str | None:
+    """What a community's schema stamp names its tool plug-ins by: the digest
+    of ``installed`` in install order, or None for a community with none."""
+    if not installed:
+        return None
+    return installed_digest(sorted(installed, key=lambda tool: tool.install_id))
+
+
+async def installed_tools(guild_id: int) -> list[InstalledTool]:
+    """``guild_id``'s installed tool plug-ins, read on the system engine:
+    none for a community whose schema does not exist yet."""
     from app.db import cohorts
     from app.db import session as db_session
     from app.db.request_context import SystemGuild
@@ -554,10 +565,20 @@ async def provisioned_tools(guild_id: int) -> ToolSet:
             {"t": f'"{guild_schema_name(guild_id)}".guild_plugins'},
         )
         if not exists:
-            return BUILTIN_TOOLS
+            return []
         await db_session.set_rls_context(session, SystemGuild(guild_id))
         installed = await _installed(session)
         await session.rollback()
+    return installed
+
+
+async def provisioned_tools(
+    guild_id: int, installed: Sequence[InstalledTool] | None = None
+) -> ToolSet:
+    """The tool set of ``guild_id`` as its installs stand (``installed``, or
+    read now), for provisioning."""
+    if installed is None:
+        installed = await installed_tools(guild_id)
     if not installed:
         return BUILTIN_TOOLS
     return community_tool_set(installed, await _codes())
