@@ -34,6 +34,7 @@ from app.models.tenant._mixins import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
+    from app.core.tool_set import ToolSet
     from app.models.tenant.calendar import Calendar
     from app.models.tenant.counter import CounterGroup
     from app.models.tenant.file import File
@@ -231,6 +232,30 @@ def _quoted(keys) -> str:
     return ", ".join(f"'{key}'" for key in keys)
 
 
+def _rule_keys(tools: "ToolSet | None") -> str:
+    """Which keys a rule row may hold, in a community with ``tools``: a tool's
+    or the community's own with no install; anything an install's row names,
+    by role or for the whole community; and, in an initiative with no role, an
+    installed tool plug-in's switch, which is its install's row."""
+    keys = (
+        "(install_id IS NULL AND ((initiative_id IS NOT NULL AND key IN ("
+        + _quoted(key.value for key in PermissionKey)
+        + ")) OR (initiative_id IS NULL AND initiative_role_id IS NULL"
+        + " AND key IN ("
+        + _quoted(COMMUNITY_DEFAULT_KEYS)
+        + "))))"
+        + " OR (install_id IS NOT NULL"
+        + " AND (initiative_id IS NULL) = (initiative_role_id IS NULL))"
+    )
+    switches = [] if tools is None else [r.view_permission for r in tools.installed]
+    if not switches:
+        return keys
+    return (
+        f"{keys} OR (install_id IS NOT NULL AND initiative_id IS NOT NULL"
+        f" AND initiative_role_id IS NULL AND key IN ({_quoted(switches)}))"
+    )
+
+
 class InitiativeRule(SQLModel, table=True):
     """One of an initiative's rules: what one of its roles may do with a tool
     (``PermissionKey``). Kept in the community's own schema beside the
@@ -245,16 +270,9 @@ class InitiativeRule(SQLModel, table=True):
     __tablename__ = "initiative_rules"
     __table_args__ = (
         CheckConstraint(
-            "(install_id IS NULL AND ((initiative_id IS NOT NULL AND key IN ("
-            + _quoted(key.value for key in PermissionKey)
-            + ")) OR (initiative_id IS NULL AND initiative_role_id IS NULL"
-            + " AND key IN ("
-            + _quoted(COMMUNITY_DEFAULT_KEYS)
-            + "))))"
-            + " OR (install_id IS NOT NULL"
-            + " AND (initiative_id IS NULL) = (initiative_role_id IS NULL))",
+            _rule_keys(None),
             name="ck_initiative_rules_key",
-            info={FROM_REGISTRY: True},
+            info={FROM_REGISTRY: _rule_keys},
         ),
         ForeignKeyConstraint(
             ["initiative_role_id", "initiative_id"],

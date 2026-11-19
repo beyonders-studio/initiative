@@ -1485,6 +1485,11 @@ class GuildPluginMessages:
     #: GUILD_INSTALLABLE_PLUGIN_KINDS. Publishable and browsable, not installable
     #: here, and told so by name rather than half-mounted.
     KIND_NOT_INSTALLABLE = "COMMUNITY_PLUGIN_KIND_NOT_INSTALLABLE"
+    #: A tool plug-in stays as it was installed: removing, turning off and
+    #: updating one are not built yet.
+    TOOL_UNCHANGEABLE = "COMMUNITY_PLUGIN_TOOL_UNCHANGEABLE"
+    #: The tool plug-in's tables could not be made, so it was not installed.
+    TOOL_NOT_PROVISIONED = "COMMUNITY_PLUGIN_TOOL_NOT_PROVISIONED"
 
     # --- configuration ---
     #: The request named a connection the pinned definition does not declare.

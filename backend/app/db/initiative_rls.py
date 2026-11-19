@@ -319,10 +319,13 @@ def _dac_via(
     return DacPath(tool=tool, via=((fk, parent),), predicate=build)
 
 
-def _dac_two_hop(mid: str, mid_fk: str, parent: str, fk: str) -> DacPath:
+def _dac_two_hop(
+    mid: str, mid_fk: str, parent: str, fk: str, tool: ToolRecord | None = None
+) -> DacPath:
     """Two hops to the governing resource: ``table.<fk> -> mid -> parent`` — a
-    task's tag link by its task's project, an attendee by its event's calendar."""
-    tool = BUILTIN_TOOLS.by_table[parent]
+    task's tag link by its task's project, an attendee by its event's calendar.
+    ``tool`` is the record of ``parent``, a built-in tool's when not given."""
+    tool = tool or BUILTIN_TOOLS.by_table[parent]
 
     def build(t: str, c: str, w: bool) -> str | None:
         if c == "SELECT" and parent_answers_for_reads(mid):
@@ -606,6 +609,34 @@ def via_event_calendar(fk: str = "calendar_event_id") -> InitiativePath:
     )
 
 
+def _via_item(tool: ToolRecord, mid: str, mid_fk: str, fk: str) -> InitiativePath:
+    """Two hops through another of a tool plug-in's items:
+    ``table.<fk> -> mid -> the tool's table``, the walk the built-in two-hop
+    paths make, written for any tool's tables."""
+    parent = tool.table.name
+
+    def walk(row: str) -> str:
+        return (
+            f"FROM {mid} dmid JOIN {parent} dpar ON dpar.id = dmid.{mid_fk} "
+            f"WHERE dmid.id = {row}.{fk}"
+        )
+
+    return InitiativePath(
+        predicate=lambda t, w: (
+            f"EXISTS (SELECT 1 {walk(t)} AND {_access('dpar.initiative_id', w)})"
+        ),
+        initiative_expr=lambda r: f"(SELECT dpar.initiative_id {walk(r)})",
+        parents=lambda r: _parent_chain(
+            f"{mid} dmid",
+            "dmid.id",
+            f"{r}.{fk}",
+            (mid, "dmid.id"),
+            (parent, f"dmid.{mid_fk}"),
+        ),
+        dac=_dac_two_hop(mid, mid_fk, parent, fk, tool),
+    )
+
+
 #: The two-hop paths, by the item table the walk goes through.
 _TWO_HOP: dict[str, Callable[[str], InitiativePath]] = {
     "tasks": via_task_project,
@@ -654,10 +685,13 @@ def item_path(tool: ToolRecord, item: Table) -> InitiativePath:
         )
     fk = through[0].parent.name
     mid = through[0].column.table.name
+    mid_fk = _keys_to(tables[mid], (parent,))[0].parent.name
+    if tool.install_id is not None:
+        # A tool plug-in's item under another of its items.
+        return _via_item(tool, mid, mid_fk, fk)
     if mid not in _TWO_HOP:
         raise ValueError(f"{table} walks through {mid}, which has no two-hop path")
     path = _TWO_HOP[mid](fk)
-    mid_fk = _keys_to(tables[mid], (parent,))[0].parent.name
     if path.dac is None or path.dac.via != ((fk, mid), (mid_fk, parent)):
         raise ValueError(f"{table}: the {mid} path does not walk {mid}.{mid_fk}")
     return path
@@ -1707,6 +1741,13 @@ def collection_files_path() -> InitiativePath:
     )
 
 
+@cache
+def _paths(tools: ToolSet) -> dict[str, InitiativePath]:
+    """:func:`paths_for`, once per tool set, for a path that walks to
+    another table's."""
+    return paths_for(tools)
+
+
 def content_kind_path(tools: ToolSet) -> InitiativePath:
     """A row about one piece of content, reached exactly like the content
     itself: ``(entity_type, entity_id)`` is the pair the entity function takes,
@@ -1719,7 +1760,8 @@ def content_kind_path(tools: ToolSet) -> InitiativePath:
     def locate(r: str) -> str:
         arms = " ".join(
             f"WHEN '{etype}' THEN "
-            f"(SELECT {initiative_of(tbl, 're')} FROM {tbl} re WHERE re.id = {r}.entity_id)"
+            f"(SELECT {initiative_of(tbl, 're', paths=_paths(tools))} FROM {tbl} re"
+            f" WHERE re.id = {r}.entity_id)"
             for etype, tbl in content_kind_tables(tools).items()
         )
         return f"(CASE {r}.entity_type {arms} END)"
@@ -1859,13 +1901,20 @@ NAMED_PEOPLE: tuple[NamedPerson, ...] = (
 )
 
 
-def initiative_of(table: str, row: str, *, qualify: str = "") -> str:
+def initiative_of(
+    table: str,
+    row: str,
+    *,
+    qualify: str = "",
+    paths: Mapping[str, InitiativePath] | None = None,
+) -> str:
     """The initiative a row of ``table`` belongs to, as a sub-select, walked
     through the hops its policies declare. ``qualify`` goes before each table
     name (a schema). A table that names its subject as a ``(kind, id)`` pair,
     or holds its own ``initiative_id``, has no hops to walk, and answers
-    through its own ``initiative_expr``."""
-    path = INITIATIVE_PATHS[table]
+    through its own ``initiative_expr``. ``paths`` are a community's
+    (:func:`paths_for`), the built-in tools' when not given."""
+    path = (paths or INITIATIVE_PATHS)[table]
     if path.dac is None or not path.dac.via:
         return path.initiative_expr(row)
     hops = path.dac.via

@@ -41,6 +41,7 @@ routing of one community and the standing of another.
 
 from __future__ import annotations
 
+import functools
 import json
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, fields, replace
@@ -143,8 +144,22 @@ def _tool_switches(tools: ToolSet) -> str:
         FROM (VALUES {keys}) AS k(tool, key)
         LEFT JOIN initiative_rules sw
           ON sw.initiative_id = i.id AND sw.key = k.key
-         AND sw.initiative_role_id IS NULL AND sw.install_id IS NULL
+         AND sw.initiative_role_id IS NULL AND {_tool_rows(tools, "sw")}
       )"""
+
+
+def _tool_rows(tools: ToolSet, alias: str) -> str:
+    """Which of ``alias``'s rule rows a tool's keys are read from: a built-in
+    tool's carry no install, and an installed tool plug-in's are its
+    install's."""
+    if not tools.installed:
+        return f"{alias}.install_id IS NULL"
+    owned = ", ".join(
+        f"({record.install_id}, '{key}')"
+        for record in tools.installed
+        for key in (record.view_permission, record.create_permission)
+    )
+    return f"({alias}.install_id IS NULL OR ({alias}.install_id, {alias}.key) IN ({owned}))"
 
 
 #: A key's expression, or how one reads the community's tools.
@@ -215,12 +230,14 @@ _TOOL_ON = (
     f" WHERE cd.key = '{INITIATIVE_TOOL_PREFIX}' || t.tool), t.enabled)"
 )
 
-#: The reader's own rows the person statement reads, each table once. Every
-#: key below is an aggregate over one of these, so a new key picks a row set
-#: rather than reading its table again. ``my_items`` is a guest's: the
-#: initiatives of the items shared with them by name, read only when the
-#: membership row is a guest's.
-_PERSON_ROWS = f"""
+
+def _person_rows(tools: ToolSet) -> str:
+    """The reader's own rows the person statement reads, each table once.
+    Every key below is an aggregate over one of these, so a new key picks a
+    row set rather than reading its table again. ``my_items`` is a guest's:
+    the initiatives of the items shared with them by name, read only when the
+    membership row is a guest's."""
+    return f"""
 WITH my_row AS MATERIALIZED (
   SELECT m.role, m.joined_at,
          (m.role <> '{CommunityRole.guest.value}' OR {_ROUTED_AS_GUEST}) AS routed
@@ -258,7 +275,7 @@ my_role_permissions AS MATERIALIZED (
   FROM my_initiatives m
   JOIN initiative_rules rp
     ON rp.initiative_id = m.initiative_id AND rp.initiative_role_id = m.role_id
-   AND rp.install_id IS NULL
+   AND {_tool_rows(tools, "rp")}
   LEFT JOIN community_defaults cd
     ON {_HELD_FOR_MEMBERS} AND cd.key = '{INITIATIVE_MEMBER_PREFIX}' || rp.key
 ),
@@ -481,7 +498,7 @@ _PERSON_STANDING: dict[gucs.Guc, _Expr] = {
 #: community's own schema.
 def standing_sql(tools: ToolSet) -> str:
     """The person statement of a community with ``tools``."""
-    return f"""{_PERSON_ROWS}
+    return f"""{_person_rows(tools)}
 SELECT
 {_writes(_PERSON_STANDING, tools)}
 """
@@ -1028,6 +1045,9 @@ class GuildContext:
     content_hold: bool = False
     #: The community's tools, which its rules were rendered from.
     tools: ToolSet = BUILTIN_TOOLS
+    #: What its schema's stamp names those tools by (its ``tools=`` item), read
+    #: with the membership; None for a community with no tool plug-in.
+    rendered_tools: str | None = None
 
     # --- Identity ------------------------------------------------------------
 
@@ -1463,8 +1483,16 @@ def standing_values(
     return {guc: getattr(context, guc.bind, None) for guc in gucs.STANDING}
 
 
-async def compute_guild_standing(session: AsyncSession) -> dict[str, Any]:
-    """Run :data:`STANDING_SQL` and return the row it wrote.
+@functools.cache
+def _community_standing_sql(tools: ToolSet) -> str:
+    return standing_sql(tools)
+
+
+async def compute_guild_standing(
+    session: AsyncSession, tools: ToolSet = BUILTIN_TOOLS
+) -> dict[str, Any]:
+    """Run :data:`STANDING_SQL`, or the community's own where it has tool
+    plug-ins, and return the row it wrote.
 
     The routed session has just had every standing key cleared, so what this
     writes is the whole of it. It binds nothing: the user and the community are
@@ -1472,7 +1500,8 @@ async def compute_guild_standing(session: AsyncSession) -> dict[str, Any]:
     """
     from sqlalchemy import text
 
-    row = (await session.exec(text(STANDING_SQL))).one()
+    statement = STANDING_SQL if not tools.installed else _community_standing_sql(tools)
+    row = (await session.exec(text(statement))).one()
     return dict(row._mapping)
 
 

@@ -68,6 +68,7 @@ from app.db.initiative_rls import (
     governing_walk,
     paths_for,
 )
+from app.db.names import object_name
 from app.db.soft_delete_filter import SOFT_DELETE_TABLES
 from app.models.tenant._mixins import ArchiveMixin, SoftDeleteMixin, archive_models
 from app.models.tenant.wiki import WikiPage
@@ -348,20 +349,41 @@ def is_frozen_write(exc: DBAPIError) -> bool:
     return False
 
 
-def _own_frozen(alias: str, table: str) -> str | None:
+def archivable_tables(tools: ToolSet) -> frozenset[str]:
+    """:data:`ARCHIVABLE_TABLES`, with the tables of ``tools`` that carry the
+    archive column: a tool plug-in's, built from the same mixin."""
+    return ARCHIVABLE_TABLES | tools.tables_carrying("archived_at")
+
+
+def trashable_tables(tools: ToolSet) -> frozenset[str]:
+    """:data:`TRASHABLE_TABLES`, with the tables of ``tools`` that carry the
+    trash's columns."""
+    return TRASHABLE_TABLES | tools.tables_carrying("deleted_at")
+
+
+def frozen_tables(tools: ToolSet) -> frozenset[str]:
+    """:data:`FROZEN_TABLES` in a community with ``tools``."""
+    return archivable_tables(tools) | trashable_tables(tools)
+
+
+def _self_stamped(table: str, tools: ToolSet) -> bool:
+    return table in archivable_tables(tools) and table in trashable_tables(tools)
+
+
+def _own_frozen(alias: str, table: str, tools: ToolSet) -> str | None:
     """Whether the row aliased ``alias`` is itself archived or trashed."""
     legs = []
-    if table in ARCHIVABLE_TABLES:
+    if table in archivable_tables(tools):
         legs.append(f"{alias}.archived_at IS NOT NULL")
-    if table in TRASHABLE_TABLES:
+    if table in trashable_tables(tools):
         legs.append(f"{alias}.deleted_at IS NOT NULL")
     if not legs:
         return None
     return " OR ".join(legs)
 
 
-def _trashed(alias: str, table: str) -> str | None:
-    if table not in TRASHABLE_TABLES:
+def _trashed(alias: str, table: str, tools: ToolSet) -> str | None:
+    if table not in trashable_tables(tools):
         return None
     return f"{alias}.deleted_at IS NOT NULL"
 
@@ -428,7 +450,7 @@ def _dispatch_tables(tools: ToolSet) -> tuple[str, ...]:
         for table in paths
         if (walk := governing_walk(table, paths)) is not None and (hop := walk[1])
     }
-    guild_frozen = {t for t in FROZEN_TABLES if t in paths}
+    guild_frozen = {t for t in frozen_tables(tools) if t in paths}
     # Every tool's own table, which a grant asks about by its kind.
     tools_own = {tool.table.name for tool in tools}
     return tuple(sorted(hops | guild_frozen | tools_own | {"initiatives"}))
@@ -463,7 +485,7 @@ def render_resource_frozen_fn(tools: ToolSet) -> str:
             f"        SELECT * INTO fz FROM {table} WHERE id = rid;",
             "        IF NOT FOUND THEN RETURN true; END IF;",
         ]
-        trashed = _trashed("fz", table)
+        trashed = _trashed("fz", table, tools)
         if trashed is not None:
             # Asked by a DELETE, a trashed row ends the walk: what is under it
             # is being purged, not edited.
@@ -473,9 +495,9 @@ def render_resource_frozen_fn(tools: ToolSet) -> str:
         checks = [
             c
             for c in (
-                _own_frozen("fz", table),
+                _own_frozen("fz", table, tools),
                 None
-                if table in SELF_STAMPED_TABLES
+                if _self_stamped(table, tools)
                 else _parent_call(table, "fz", trashed_ok="trashed_ok", tools=tools),
             )
             if c is not None
@@ -602,11 +624,11 @@ def frozen_write_triggers(table: str, tools: ToolSet) -> list[str]:
     is what a restore has to put them back to.
     """
     out: list[str] = []
-    if table in SELF_STAMPED_TABLES:
-        own = _own_frozen("OLD", table)
-        trashed = _trashed("OLD", table)
+    if _self_stamped(table, tools):
+        own = _own_frozen("OLD", table, tools)
+        trashed = _trashed("OLD", table, tools)
         out.append(
-            f"CREATE OR REPLACE TRIGGER tr_{table}_frozen_delete "
+            f"CREATE OR REPLACE TRIGGER {object_name('tr', table, 'frozen_delete')} "
             f"BEFORE DELETE ON {table} FOR EACH ROW "
             f"WHEN (({own}) AND NOT ({trashed})) "
             f"EXECUTE FUNCTION public.fn_frozen_ancestor_guard()"
@@ -617,14 +639,14 @@ def frozen_write_triggers(table: str, tools: ToolSet) -> list[str]:
             moving_into = f"{prior} OR {moving_into}"
         if moving_into is not None:
             out.append(
-                f"CREATE OR REPLACE TRIGGER tr_{table}_frozen_ancestor_update "
+                f"CREATE OR REPLACE TRIGGER {object_name('tr', table, 'frozen_ancestor_update')} "
                 f"BEFORE UPDATE ON {table} FOR EACH ROW WHEN ({moving_into}) "
                 f"EXECUTE FUNCTION public.fn_frozen_parent_guard()"
             )
         under_trash = _trashed_ancestor_leg(table, "NEW", tools)
         if under_trash is not None:
             out.append(
-                f"CREATE OR REPLACE TRIGGER tr_{table}_frozen_trashed_ancestor_update "
+                f"CREATE OR REPLACE TRIGGER {object_name('tr', table, 'frozen_trashed_ancestor_update')} "
                 f"BEFORE UPDATE ON {table} FOR EACH ROW "
                 f"WHEN (OLD.deleted_at IS NOT NULL AND NEW.deleted_at IS NULL "
                 f"AND {under_trash}) "
@@ -646,7 +668,9 @@ def frozen_write_triggers(table: str, tools: ToolSet) -> list[str]:
     prior = freeze_leg(table, "UPDATE", tools, alias="OLD")
     proposed = freeze_leg(table, "UPDATE", tools, alias="NEW")
     if prior is not None and proposed is not None:
-        inherits_the_archive = table in TRASHABLE_TABLES - ARCHIVABLE_TABLES
+        inherits_the_archive = table in trashable_tables(tools) - archivable_tables(
+            tools
+        )
         guard = (
             "fn_frozen_row_guard" if inherits_the_archive else "fn_frozen_parent_guard"
         )
@@ -656,7 +680,7 @@ def frozen_write_triggers(table: str, tools: ToolSet) -> list[str]:
             # Either side, so a grant raised to owner or lowered from it passes.
             when = f"NOT ({unfrozen('OLD')} OR {unfrozen('NEW')}) AND ({when})"
         out.append(
-            f"CREATE OR REPLACE TRIGGER tr_{table}_frozen_ancestor_update "
+            f"CREATE OR REPLACE TRIGGER {object_name('tr', table, 'frozen_ancestor_update')} "
             f"BEFORE UPDATE ON {table} FOR EACH ROW "
             f"WHEN ({on_departure('UPDATE', when)}) "
             f"EXECUTE FUNCTION public.{guard}()"
@@ -668,7 +692,7 @@ def frozen_write_triggers(table: str, tools: ToolSet) -> list[str]:
             was = _trashed_ancestor_leg(table, "OLD", tools)
             will_be = _trashed_ancestor_leg(table, "NEW", tools)
             out.append(
-                f"CREATE OR REPLACE TRIGGER tr_{table}_frozen_trashed_ancestor_update "
+                f"CREATE OR REPLACE TRIGGER {object_name('tr', table, 'frozen_trashed_ancestor_update')} "
                 f"BEFORE UPDATE ON {table} FOR EACH ROW "
                 f"WHEN ({on_departure('UPDATE', f'{was} OR {will_be}')}) "
                 f"EXECUTE FUNCTION public.fn_frozen_parent_guard()"
@@ -677,7 +701,7 @@ def frozen_write_triggers(table: str, tools: ToolSet) -> list[str]:
     if doomed is None:
         return out
     out.append(
-        f"CREATE OR REPLACE TRIGGER tr_{table}_frozen_ancestor_delete "
+        f"CREATE OR REPLACE TRIGGER {object_name('tr', table, 'frozen_ancestor_delete')} "
         f"BEFORE DELETE ON {table} FOR EACH ROW "
         f"WHEN ({on_departure('DELETE', doomed)}) "
         f"EXECUTE FUNCTION public.fn_frozen_ancestor_guard()"
@@ -806,7 +830,7 @@ $frozen_guard$;
 """
 
 
-def frozen_guard_trigger(table: str) -> str:
+def frozen_guard_trigger(table: str, tools: ToolSet) -> str:
     """The BEFORE UPDATE attachment for one frozen-capable table.
 
     The ``WHEN`` clause is the whole of the fast path: the executor evaluates it
@@ -814,11 +838,11 @@ def frozen_guard_trigger(table: str) -> str:
     before the other row triggers, so what it compares is the statement's own
     change rather than another trigger's edit of it.
     """
-    when = _own_frozen("OLD", table)
-    if when is None:  # pragma: no cover — FROZEN_TABLES is built from these
+    when = _own_frozen("OLD", table, tools)
+    if when is None:  # pragma: no cover — frozen_tables is built from these
         raise ValueError(f"{table} carries no lifecycle columns")
     return (
-        f"CREATE OR REPLACE TRIGGER tr_{table}_frozen_guard "
+        f"CREATE OR REPLACE TRIGGER {object_name('tr', table, 'frozen_guard')} "
         f"BEFORE UPDATE ON {table} FOR EACH ROW WHEN ({when}) "
         f"EXECUTE FUNCTION public.fn_frozen_row_guard()"
     )

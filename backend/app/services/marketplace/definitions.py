@@ -166,7 +166,9 @@ PLUGIN_KINDS: frozenset[str] = frozenset({"tool_instance", "service", "tool"})
 #: *mount* — and a kind added to the vocabulary ahead of its machinery is
 #: refused by name rather than half-mounted. ``tool`` is one: it registers, and
 #: is not installed until this build creates a tool's tables in a community.
-GUILD_INSTALLABLE_PLUGIN_KINDS: frozenset[str] = frozenset({"tool_instance", "service"})
+GUILD_INSTALLABLE_PLUGIN_KINDS: frozenset[str] = frozenset(
+    {"tool_instance", "service", "tool"}
+)
 
 #: Tools a plug-in may mount at guild scope. A tool qualifies when its content is
 #: meaningful without an initiative — a calendar of the guild's own events is,

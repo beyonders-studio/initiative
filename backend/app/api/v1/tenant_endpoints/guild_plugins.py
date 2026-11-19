@@ -44,7 +44,7 @@ from fastapi import (
     Request,
     status,
 )
-from sqlalchemy import func, union
+from sqlalchemy import delete, func, union
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -77,6 +77,7 @@ from app.core.rules import SURFACE_PLUGINS
 from app.db import post_commit
 from app.db.guild_standing import GuildContext
 from app.db.query import build_paginated_response, paginated_query
+from app.db.schema_provisioning import provision_community_tools
 from app.db.session import routed_guild_id
 from app.models.platform.guild import GuildMembership
 from app.models.tenant.guild_plugin import GuildPlugin
@@ -125,10 +126,11 @@ from app.services.marketplace.installs import (
     count_install,
     resolve_listing_install,
 )
+from app.services.marketplace.tool_plugins import is_tool_plugin
 from app.services.membership import initiative_scope_clause
 from app.services.platform import billing_ping
 from app.services.tenant import guild_plugins as guild_plugins_service
-from app.services.tenant import plugin_age
+from app.services.tenant import initiative_tools, plugin_age
 from app.services.tenant import plugin_config as plugin_config_service
 from app.services.tenant import plugin_connection_flows as flows_service
 from app.services.tenant import plugin_connections as connections_service
@@ -359,6 +361,41 @@ async def _require_removable(plugin: GuildPlugin, guild_id: int) -> None:
             status_code=status.HTTP_409_CONFLICT,
             detail=GuildPluginMessages.MANDATORY,
         )
+
+
+def _require_changeable(plugin: GuildPlugin) -> None:
+    """Refuse to remove, turn off or update a tool plug-in: its tables and
+    rules are made on install, and nothing yet takes them back or changes
+    them."""
+    if is_tool_plugin(plugin.definition):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=GuildPluginMessages.TOOL_UNCHANGEABLE,
+        )
+
+
+async def _provision_tool(session: AsyncSession, plugin: GuildPlugin) -> None:
+    """Make a tool plug-in's tables and render its community's rules, once
+    the install has committed, then switch its tool on in every initiative:
+    rule rows its community's rules admit once they are rendered with it.
+    Until then the tool is off everywhere. Where any of it fails, the install
+    is taken back, its rule rows with it, and the community rendered again
+    without it, so no install stands without its tables."""
+    guild_id, plugin_id = routed_guild_id(session), plugin.id
+    try:
+        await provision_community_tools(guild_id)
+        await initiative_tools.write_plugin_tool_rules(session)
+        await session.commit()
+    except Exception as exc:
+        logger.exception("tool plug-in %s: provisioning guild %s", plugin_id, guild_id)
+        await session.rollback()
+        await session.exec(delete(GuildPlugin).where(GuildPlugin.id == plugin_id))
+        await session.commit()
+        await provision_community_tools(guild_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=GuildPluginMessages.TOOL_NOT_PROVISIONED,
+        ) from exc
 
 
 def _connection_or_404(plugin: GuildPlugin, connection_id: str) -> dict:
@@ -661,6 +698,10 @@ async def install_community_plugin(
             status_code=status.HTTP_409_CONFLICT,
             detail=GuildPluginMessages.ALREADY_INSTALLED,
         ) from exc
+    if is_tool_plugin(definition):
+        # The install holds no lock the provisioning waits on once it has
+        # committed, so its tables are made now, before anything reads it.
+        await _provision_tool(session, plugin)
     await session.refresh(plugin)
     await guild_plugins_service.assign_settings(
         session, plugin, guild_id=guild_context.guild_id
@@ -710,6 +751,7 @@ async def upgrade_community_plugin(
     # takes the row: a plug-in writing a flow's result back at the same moment
     # must land on one side of the prune or the other.
     plugin = await _load(session, plugin_id, for_update=True)
+    _require_changeable(plugin)
 
     # The listing is resolved here rather than inside the shared apply, so a
     # withdrawn or missing one is reported as the HTTP answer it deserves
@@ -893,6 +935,7 @@ async def update_community_plugin(
     if "enabled" in data and data["enabled"] is not None:
         if not data["enabled"]:
             await _require_removable(plugin, guild_context.guild_id)
+            _require_changeable(plugin)
         plugin.enabled = data["enabled"]
     if data.get("auto_update") is not None:
         plugin.auto_update = data["auto_update"]
@@ -991,6 +1034,7 @@ async def uninstall_community_plugin(
     # finds no install and is refused.
     plugin = await _load(session, plugin_id, for_update=True)
     await _require_removable(plugin, guild_context.guild_id)
+    _require_changeable(plugin)
     if erase and not guild_context.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

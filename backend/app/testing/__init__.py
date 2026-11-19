@@ -107,7 +107,11 @@ from app.testing.routing import (
 )
 from app.testing.schema_harness import guild_of, route_session_to_guild
 from app.testing.server import in_request_tasks
-from app.testing.tool_plugins import COUNTERS_UID, counters_tool_manifest
+from app.testing.tool_plugins import (
+    COUNTERS_UID,
+    counters_tool_manifest,
+    install_tool_plugin,
+)
 
 __all__ = [
     "COUNTERS_UID",
@@ -184,6 +188,7 @@ __all__ = [
     "guild_of",
     "guild_url",
     "in_request_tasks",
+    "install_tool_plugin",
     "lexical_body",
     "make_actor",
     "make_operations_community",

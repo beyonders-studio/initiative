@@ -188,7 +188,7 @@ async def test_reprovisioning_and_a_vacuum_wait_for_each_other_in_turn(
             await conn.exec_driver_sql(f"ANALYZE {table}")
             await conn.commit()
 
-    async def rls_once_a_vacuum_waits(conn, schema: str) -> None:
+    async def rls_once_a_vacuum_waits(conn, schema: str, bundle=None) -> None:
         vacuums.append(asyncio.create_task(vacuum()))
         async with engine.connect() as probe:
             while not vacuum_pid or not await probe.scalar(
@@ -200,7 +200,7 @@ async def test_reprovisioning_and_a_vacuum_wait_for_each_other_in_turn(
             ):
                 assert not vacuums[0].done(), "the vacuum did not wait"
                 await asyncio.sleep(0.05)
-        await real_apply_guild_rls(conn, schema)
+        await real_apply_guild_rls(conn, schema, bundle)
 
     try:
         async with engine.begin() as conn:
