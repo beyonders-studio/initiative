@@ -1175,7 +1175,6 @@
     "operationsOnlyHelp": "Solo la comunidad de operaciones puede encontrarla e instalarla. Las copias instaladas en cualquier otra comunidad dejan de funcionar. No se elimina nada.",
     "operationsMandatoryBadge": "En la comunidad de operaciones",
     "operationsMandatoryHelp": "Junto con «Instalar en todas las comunidades», se añade solo a la comunidad de operaciones, y sus administradores no pueden quitarla ni desactivarla.",
-    "sharedRoutesHelp": "Permite que una instalación en el proveedor, como una organización de GitHub, se conecte a varias comunidades de este servidor. Se puede desactivar cuando cada instalación esté conectada a una sola comunidad.",
     "keysTitle": "Claves de firma",
     "keysHelp": "Las claves públicas con las que este complemento firma sus aserciones para tokens de acceso. El complemento solo está activo cuando tiene un conjunto de claves pegado o una dirección del conjunto de claves. Puede tener ambos.",
     "jwksLabel": "Conjunto de claves pegado (JWKS)",
@@ -1223,9 +1222,34 @@
     "vendorSetupTitle": "Crear la GitHub App",
     "vendorSetupHelp": "GitHub se abre con los permisos y eventos de este complemento y las direcciones de Initiative ya rellenados. Confírmalo allí y GitHub enviará aquí los valores de la nueva aplicación, así que no tienes que escribir ni copiar ninguno.",
     "vendorSetupHelpReplace": "Sus valores están configurados. Crear una nueva GitHub App los sustituye por los de la nueva app.",
-    "vendorSetupOrganizationLabel": "Organización de GitHub",
-    "vendorSetupOrganizationPlaceholder": "Opcional",
-    "vendorSetupOrganizationHelp": "La organización a la que pertenece la nueva aplicación. Déjalo en blanco para crearla en tu propia cuenta de GitHub.",
+    "platformConnections": {
+      "title": "Conectar para todas las comunidades",
+      "help": "Conecta una cuenta una sola vez y todas las comunidades con este complemento la usarán. Mientras esté conectada, las comunidades no pueden cambiarla ni desconectarla. Si la dejas sin conectar, cada comunidad conecta la suya.",
+      "connect": "Conectar para todas las comunidades",
+      "connecting": "Abriendo…",
+      "connectedTo": "Conectada a {{account}} para todas las comunidades",
+      "notConnected": "Sin conectar. Cada comunidad conecta la suya.",
+      "removed": "Eliminada en el proveedor",
+      "needsVendor": "Primero establece arriba los valores del proveedor.",
+      "disconnect": "Desconectar",
+      "disconnectTitle": "¿Desconectar {{name}} para todas las comunidades?",
+      "disconnectHelp": "Todas las comunidades con este complemento dejan de usar esta cuenta. Las que habían conectado la suya antes vuelven a ella; las demás tienen que conectar una.",
+      "connectError": "No se pudo empezar a conectar.",
+      "disconnectError": "No se pudo desconectar."
+    },
+    "vendorSetupOwnerLabel": "¿A quién pertenece la aplicación de GitHub?",
+    "vendorSetupOwner": {
+      "account": {
+        "label": "A tu cuenta de GitHub",
+        "help": "Pertenece a la cuenta con la que has iniciado sesión en GitHub."
+      },
+      "organization": {
+        "label": "A una organización de GitHub",
+        "help": "Pertenece a una organización de la que eres propietario, para que no dependa de la cuenta de una sola persona."
+      }
+    },
+    "vendorSetupOrganizationLabel": "Nombre de la organización",
+    "vendorSetupOrganizationHelp": "Tal como aparece en su dirección: github.com/<nombre>.",
     "vendorSetupCreate": "Crear la GitHub App",
     "vendorSetupStarting": "Abriendo GitHub…",
     "vendorSetupError": "No se pudo iniciar la configuración en GitHub.",
@@ -1250,7 +1274,6 @@
     "allowedOriginsHelp": "Uno por línea. Déjalo en blanco para permitir solo el origen de la dirección del navegador.",
     "allowedOriginsHelpEdit": "Uno por línea. Déjalo en blanco para mantener los orígenes actuales.",
     "mandatoryLabel": "Instalar en todas las comunidades",
-    "sharedRoutesLabel": "Compartir instalaciones entre comunidades",
     "created": "Servicio de complemento registrado.",
     "saved": "Servicio de complemento actualizado.",
     "deleted": "Servicio de complemento eliminado.",

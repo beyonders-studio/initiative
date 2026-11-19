@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -31,7 +31,7 @@ const buildRegistration = (
   mandatory: false,
   availability: "none",
   beta_communities: [],
-  shared_routes: false,
+  platform_connections: [],
   suspended_at: null,
   source: "operator",
   image_digest: null,
@@ -64,6 +64,8 @@ const readKeysMutate = vi.fn();
 const connectMutate = vi.fn();
 const startSetupMutate = vi.fn();
 const completeSetupMutate = vi.fn();
+const connectEveryMutate = vi.fn();
+const disconnectEveryMutate = vi.fn();
 
 vi.mock("@/lib/mascotToast", () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
@@ -93,6 +95,8 @@ vi.mock("@/hooks/usePluginServices", () => ({
   useConnectPluginService: () => ({ mutate: connectMutate, isPending: false }),
   useStartVendorSetup: () => ({ mutate: startSetupMutate, isPending: false }),
   useCompleteVendorSetup: () => ({ mutate: completeSetupMutate, isPending: false }),
+  useConnectForEveryCommunity: () => ({ mutate: connectEveryMutate, isPending: false }),
+  useDisconnectForEveryCommunity: () => ({ mutate: disconnectEveryMutate, isPending: false }),
 }));
 
 // The beta's community picker searches every community on the server.
@@ -535,13 +539,9 @@ describe("PluginServicePage", () => {
 
       await user.clear(clientId);
       await user.type(clientId, "gh-app-2");
-      await user.click(
-        screen.getByRole("switch", { name: "Share installations between communities" })
-      );
       await user.click(screen.getByRole("button", { name: "Save" }));
 
       expect(updateMutate.mock.calls[0][0].data).toMatchObject({
-        shared_routes: true,
         vendor_values: { client_id: "gh-app-2" },
       });
     });
@@ -569,7 +569,6 @@ describe("PluginServicePage", () => {
 
       expect(updateMutate.mock.calls[0][0].data).toEqual({
         mandatory: false,
-        shared_routes: false,
         vendor_values: { client_id: "gh-app" },
       });
     });
@@ -616,8 +615,14 @@ describe("PluginServicePage", () => {
       expect(screen.getByText("Values missing")).toBeInTheDocument();
       // Typing them in is the other way, folded away until asked for.
       expect(screen.queryByLabelText(/Client id/)).toBeNull();
-      await user.type(screen.getByLabelText("GitHub organization"), "acme");
-      await user.click(screen.getByRole("button", { name: "Create the GitHub App" }));
+      // The operator's own account owns it unless they pick an organization,
+      // whose name they then have to give.
+      expect(screen.queryByLabelText(/Organization name/)).toBeNull();
+      await user.click(screen.getByRole("radio", { name: "A GitHub organization" }));
+      const create = screen.getByRole("button", { name: "Create the GitHub App" });
+      expect(create).toBeDisabled();
+      await user.type(screen.getByLabelText(/Organization name/), "acme");
+      await user.click(create);
 
       expect(startSetupMutate).toHaveBeenCalledWith(
         { registrationId: 1, organization: "acme" },
@@ -634,6 +639,55 @@ describe("PluginServicePage", () => {
 
       await user.click(screen.getByRole("button", { name: "Or enter the values yourself" }));
       expect(screen.getByLabelText(/Client id/)).toBeInTheDocument();
+    });
+
+    it("connects an account for every community, and disconnects it after asking", async () => {
+      const user = userEvent.setup();
+      const workspace = {
+        connection_id: "workspace",
+        label: { en: "GitHub organization" },
+        connected: false,
+        account_label: null,
+        connected_at: null,
+        removed: false,
+      };
+      registrations = [
+        buildRegistration({
+          kind: "declarative",
+          vendor_ready: true,
+          platform_connections: [workspace],
+        }),
+      ];
+      await renderPluginPage();
+
+      expect(
+        screen.getByText("Not connected. Each community connects its own.")
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Connect for every community" }));
+      expect(connectEveryMutate).toHaveBeenCalledWith({
+        registrationId: 1,
+        connectionId: "workspace",
+      });
+
+      cleanup();
+      registrations = [
+        buildRegistration({
+          kind: "declarative",
+          vendor_ready: true,
+          platform_connections: [{ ...workspace, connected: true, account_label: "acme" }],
+        }),
+      ];
+      await renderPluginPage();
+
+      expect(screen.getByText("Connected to acme for every community")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Disconnect" }));
+      expect(disconnectEveryMutate).not.toHaveBeenCalled();
+      const dialog = await screen.findByRole("alertdialog");
+      await user.click(within(dialog).getByRole("button", { name: "Disconnect" }));
+      expect(disconnectEveryMutate).toHaveBeenCalledWith({
+        registrationId: 1,
+        connectionId: "workspace",
+      });
     });
 
     it("offers no GitHub App to a plug-in whose listing has no setup", async () => {

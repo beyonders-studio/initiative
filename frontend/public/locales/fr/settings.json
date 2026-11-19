@@ -1175,7 +1175,6 @@
     "operationsOnlyHelp": "Seule la communauté d'exploitation peut le trouver et l'installer. Les copies installées dans toute autre communauté cessent de fonctionner. Rien n'est supprimé.",
     "operationsMandatoryBadge": "Dans la communauté d'exploitation",
     "operationsMandatoryHelp": "Activé avec « Installer dans toutes les communautés », il n'est ajouté qu'à la communauté d'exploitation, et ses administratrices et administrateurs ne peuvent ni le retirer ni le désactiver.",
-    "sharedRoutesHelp": "Permet à une installation chez le fournisseur, comme une organisation GitHub, d'être connectée à plusieurs communautés de ce serveur. Cette option peut être désactivée une fois que chaque installation n'est connectée qu'à une seule communauté.",
     "keysTitle": "Clés de signature",
     "keysHelp": "Les clés publiques avec lesquelles ce plug-in signe ses assertions pour les jetons d'accès. Le plug-in n'est actif qu'avec un jeu de clés collé ou une adresse de jeu de clés. Il peut avoir les deux.",
     "jwksLabel": "Jeu de clés collé (JWKS)",
@@ -1223,9 +1222,34 @@
     "vendorSetupTitle": "Créer la GitHub App",
     "vendorSetupHelp": "GitHub s'ouvre avec les autorisations et les événements de ce plug-in et les adresses d'Initiative déjà remplis. Confirmez-la là-bas, et GitHub renvoie ici les valeurs de la nouvelle application : vous n'en saisissez ni n'en copiez aucune.",
     "vendorSetupHelpReplace": "Ses valeurs sont définies. Créer une nouvelle GitHub App les remplace par celles de la nouvelle app.",
-    "vendorSetupOrganizationLabel": "Organisation GitHub",
-    "vendorSetupOrganizationPlaceholder": "Facultatif",
-    "vendorSetupOrganizationHelp": "L'organisation propriétaire de la nouvelle application. Laissez vide pour la créer sous votre propre compte GitHub.",
+    "platformConnections": {
+      "title": "Connecter pour toutes les communautés",
+      "help": "Connectez un compte une seule fois et toutes les communautés qui ont ce plug-in l'utilisent. Tant qu'il est connecté, les communautés ne peuvent ni le modifier ni le déconnecter. S'il reste non connecté, chaque communauté connecte le sien.",
+      "connect": "Connecter pour toutes les communautés",
+      "connecting": "Ouverture…",
+      "connectedTo": "Connecté à {{account}} pour toutes les communautés",
+      "notConnected": "Non connecté. Chaque communauté connecte le sien.",
+      "removed": "Supprimé chez le fournisseur",
+      "needsVendor": "Renseignez d'abord les valeurs du fournisseur ci-dessus.",
+      "disconnect": "Déconnecter",
+      "disconnectTitle": "Déconnecter {{name}} pour toutes les communautés ?",
+      "disconnectHelp": "Toutes les communautés qui ont ce plug-in cessent d'utiliser ce compte. Celles qui avaient connecté le leur auparavant y reviennent ; les autres doivent en connecter un.",
+      "connectError": "Impossible de commencer la connexion.",
+      "disconnectError": "Impossible de déconnecter."
+    },
+    "vendorSetupOwnerLabel": "À qui appartient l'application GitHub ?",
+    "vendorSetupOwner": {
+      "account": {
+        "label": "À votre compte GitHub",
+        "help": "Elle appartient au compte avec lequel vous êtes connecté à GitHub."
+      },
+      "organization": {
+        "label": "À une organisation GitHub",
+        "help": "Elle appartient à une organisation dont vous êtes propriétaire, pour ne pas dépendre du compte d'une seule personne."
+      }
+    },
+    "vendorSetupOrganizationLabel": "Nom de l'organisation",
+    "vendorSetupOrganizationHelp": "Tel qu'il apparaît dans son adresse : github.com/<nom>.",
     "vendorSetupCreate": "Créer la GitHub App",
     "vendorSetupStarting": "Ouverture de GitHub…",
     "vendorSetupError": "Impossible de lancer la configuration sur GitHub.",
@@ -1250,7 +1274,6 @@
     "allowedOriginsHelp": "Une par ligne. Laissez vide pour n'autoriser que l'origine de l'adresse du navigateur.",
     "allowedOriginsHelpEdit": "Une par ligne. Laissez vide pour conserver les origines actuelles.",
     "mandatoryLabel": "Installer dans toutes les communautés",
-    "sharedRoutesLabel": "Partager les installations entre communautés",
     "created": "Service de plug-in enregistré.",
     "saved": "Service de plug-in mis à jour.",
     "deleted": "Service de plug-in supprimé.",

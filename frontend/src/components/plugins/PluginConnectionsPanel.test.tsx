@@ -43,6 +43,7 @@ const base: CommunityPluginConnectionRead = {
   status: null,
   account_label: null,
   blocked: false,
+  platform: false,
 };
 
 /** The community's own credential, granted at the vendor rather than typed. */
@@ -111,6 +112,21 @@ describe("a community credential granted at the vendor", () => {
 
     expect(await screen.findByText("beyonders-studio")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reconnect" })).toBeInTheDocument();
+  });
+
+  it("shows one the server connected for every community, with nothing to change", async () => {
+    render({
+      ...vendorFlow,
+      platform: true,
+      satisfied: true,
+      has_value: { owner: true },
+      values: { owner: "beyonders-studio" },
+    });
+
+    expect(await screen.findByText("beyonders-studio")).toBeInTheDocument();
+    expect(screen.getByText(/connected this for every community/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reconnect" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Clear" })).not.toBeInTheDocument();
   });
 
   it("tells a member who cannot manage it what they are waiting on", async () => {

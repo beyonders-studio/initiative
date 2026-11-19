@@ -20,6 +20,7 @@ import { Label } from "@/ui/label";
 import { Switch } from "@/ui/switch";
 import { Textarea } from "@/ui/textarea";
 
+import { PlatformConnectionsSection } from "./PlatformConnectionsSection";
 import { VendorClientSection, type VendorRefusal } from "./VendorClientSection";
 
 /** What the operator stated, before it is shaped into a create or a patch. */
@@ -34,8 +35,6 @@ export interface PluginServiceFormValues {
   /** Where the plug-in publishes its key set, or "" for none. */
   jwksUri: string;
   mandatory: boolean;
-  /** One vendor installation may connect to several communities. */
-  sharedRoutes: boolean;
   /** The communities a beta plug-in reaches; sent only while it is beta. */
   betaCommunities: PickedCommunity[];
   /** Vendor values that were typed, by key. "" clears one; a key left out is kept. */
@@ -50,7 +49,6 @@ interface FormState {
   jwks: string;
   jwksUri: string;
   mandatory: boolean;
-  sharedRoutes: boolean;
   betaCommunities: PickedCommunity[];
   vendorValues: Record<string, string>;
 }
@@ -63,7 +61,6 @@ const seed = (editing: PluginServiceRegistrationRead | null): FormState => ({
   jwks: editing?.jwks ? JSON.stringify(editing.jwks, null, 2) : "",
   jwksUri: editing?.jwks_uri ?? "",
   mandatory: editing?.mandatory ?? false,
-  sharedRoutes: editing?.shared_routes ?? false,
   betaCommunities: editing?.beta_communities ?? [],
   vendorValues: {},
 });
@@ -197,7 +194,6 @@ export const PluginServiceForm = ({
       allowedOrigins: parseAllowedOrigins(form.allowedOrigins),
       jwksUri: form.jwksUri.trim(),
       mandatory: form.mandatory,
-      sharedRoutes: form.sharedRoutes,
       betaCommunities: form.betaCommunities,
       vendorValues: Object.fromEntries(
         Object.entries(form.vendorValues).map(([key, value]) => [key, value.trim()])
@@ -418,10 +414,12 @@ export const PluginServiceForm = ({
           onValueChange={(key, value) =>
             setForm((prev) => ({ ...prev, vendorValues: { ...prev.vendorValues, [key]: value } }))
           }
-          sharedRoutes={form.sharedRoutes}
-          onSharedRoutesChange={(sharedRoutes) => setForm((prev) => ({ ...prev, sharedRoutes }))}
           refusal={vendorRefusal}
         />
+      )}
+
+      {editing && editing.platform_connections.length > 0 && (
+        <PlatformConnectionsSection plain={plain} registration={editing} />
       )}
 
       <SettingsSection plain={plain} title={t("pluginServices.reachTitle")}>

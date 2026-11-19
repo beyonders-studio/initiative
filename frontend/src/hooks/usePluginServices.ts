@@ -2,6 +2,7 @@ import { keepPreviousData, useQueryClient } from "@tanstack/react-query";
 
 import type {
   ListPluginServicesParams,
+  PluginPlatformConnectStart,
   PluginServicePublishedKey,
   PluginServiceRegistrationCreate,
   PluginServiceRegistrationListResponse,
@@ -12,8 +13,10 @@ import type {
 import {
   completePluginServiceVendorSetup,
   connectPluginService,
+  connectPluginServiceForEveryCommunity,
   createPluginService,
   deletePluginService,
+  disconnectPluginServiceForEveryCommunity,
   getReadPluginServiceQueryKey,
   readPluginServiceKeys,
   startPluginServiceVendorSetup,
@@ -155,3 +158,41 @@ export const useCompleteVendorSetup = (
     },
     options
   );
+
+export interface PlatformConnectionVariables {
+  registrationId: number;
+  connectionId: string;
+}
+
+/** Start connecting one of the plug-in's community connections for every
+ *  community: where to send the operator. */
+export const useConnectForEveryCommunity = (
+  options?: MutationOpts<PluginPlatformConnectStart, PlatformConnectionVariables>
+) =>
+  useApiMutation<PluginPlatformConnectStart, PlatformConnectionVariables>(
+    {
+      mutationFn: ({ registrationId, connectionId }) =>
+        connectPluginServiceForEveryCommunity(registrationId, connectionId),
+      errorKey: "settings:pluginServices.platformConnections.connectError",
+    },
+    options
+  );
+
+/** End a connection the platform made for every community. */
+export const useDisconnectForEveryCommunity = (
+  options?: MutationOpts<PluginServiceRegistrationRead, PlatformConnectionVariables>
+) => {
+  const client = useQueryClient();
+  return useApiMutation<PluginServiceRegistrationRead, PlatformConnectionVariables>(
+    {
+      mutationFn: ({ registrationId, connectionId }) =>
+        disconnectPluginServiceForEveryCommunity(registrationId, connectionId),
+      invalidate: (registration) => {
+        client.setQueryData(getReadPluginServiceQueryKey(registration.id), registration);
+        return invalidate(q.pluginServices());
+      },
+      errorKey: "settings:pluginServices.platformConnections.disconnectError",
+    },
+    options
+  );
+};

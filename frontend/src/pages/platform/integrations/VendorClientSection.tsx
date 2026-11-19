@@ -15,7 +15,7 @@ import { CopyButton } from "@/ui/copy-button";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
-import { Switch } from "@/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
 import { Textarea } from "@/ui/textarea";
 
 /** A save the plug-in's vendor check refused: the fields it blames, what to
@@ -31,8 +31,6 @@ export interface VendorClientSectionProps {
   /** The values typed so far, by key; a key left out keeps what is stored. */
   values: Record<string, string>;
   onValueChange: (key: string, value: string) => void;
-  sharedRoutes: boolean;
-  onSharedRoutesChange: (sharedRoutes: boolean) => void;
   plain?: boolean;
   refusal?: VendorRefusal | null;
 }
@@ -55,8 +53,6 @@ export const VendorClientSection = ({
   registration,
   values,
   onValueChange,
-  sharedRoutes,
-  onSharedRoutesChange,
   plain,
   refusal,
 }: VendorClientSectionProps) => {
@@ -64,15 +60,21 @@ export const VendorClientSection = ({
   const hasSetup = registration.vendor_setup === "github_app_manifest";
   const blamed = new Set(refusal?.fields ?? []);
   const [manualOpen, setManualOpen] = useState(false);
-  // The GitHub organization to own the app the vendor's setup creates.
+  // Who owns the app the vendor's setup creates: the operator's own GitHub
+  // account, or an organization they administer, which GitHub's address names.
+  const [owner, setOwner] = useState<"account" | "organization">("account");
   const [organization, setOrganization] = useState("");
+  const missingOrganization = owner === "organization" && !organization.trim();
   const [setupError, setSetupError] = useState<string | null>(null);
   const startSetup = useStartVendorSetup();
 
   const handleVendorSetup = () => {
     setSetupError(null);
     startSetup.mutate(
-      { registrationId: registration.id, organization: organization.trim() },
+      {
+        registrationId: registration.id,
+        organization: owner === "organization" ? organization.trim() : "",
+      },
       {
         onSuccess: postToVendor,
         onError: (error) =>
@@ -194,21 +196,51 @@ export const VendorClientSection = ({
           )}
         </p>
       </div>
-      <Field
-        className="max-w-sm"
-        label={t("pluginServices.vendorSetupOrganizationLabel")}
-        hint={t("pluginServices.vendorSetupOrganizationHelp")}
+      <fieldset className="space-y-2">
+        <legend className="mb-2 font-medium text-sm">
+          {t("pluginServices.vendorSetupOwnerLabel")}
+        </legend>
+        <RadioGroup
+          value={owner}
+          onValueChange={(value) => setOwner(value as "account" | "organization")}
+          className="gap-2"
+        >
+          {(["account", "organization"] as const).map((choice) => (
+            <div key={choice} className="flex items-start gap-3">
+              <RadioGroupItem id={`vendor-owner-${choice}`} value={choice} className="mt-1" />
+              <div className="space-y-0.5">
+                <Label htmlFor={`vendor-owner-${choice}`}>
+                  {t(`pluginServices.vendorSetupOwner.${choice}.label`)}
+                </Label>
+                <p className="text-muted-foreground text-xs">
+                  {t(`pluginServices.vendorSetupOwner.${choice}.help`)}
+                </p>
+              </div>
+            </div>
+          ))}
+        </RadioGroup>
+        {owner === "organization" && (
+          <Field
+            className="max-w-sm pl-7"
+            label={t("pluginServices.vendorSetupOrganizationLabel")}
+            hint={t("pluginServices.vendorSetupOrganizationHelp")}
+          >
+            <Input
+              value={organization}
+              onChange={(event) => setOrganization(event.target.value)}
+              placeholder="my-org"
+              maxLength={39}
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </Field>
+        )}
+      </fieldset>
+      <Button
+        type="button"
+        onClick={handleVendorSetup}
+        disabled={startSetup.isPending || missingOrganization}
       >
-        <Input
-          value={organization}
-          onChange={(event) => setOrganization(event.target.value)}
-          placeholder={t("pluginServices.vendorSetupOrganizationPlaceholder")}
-          maxLength={39}
-          autoComplete="off"
-          spellCheck={false}
-        />
-      </Field>
-      <Button type="button" onClick={handleVendorSetup} disabled={startSetup.isPending}>
         {startSetup.isPending
           ? t("pluginServices.vendorSetupStarting")
           : t("pluginServices.vendorSetupCreate")}
@@ -269,20 +301,6 @@ export const VendorClientSection = ({
       ) : (
         manual
       )}
-
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <Label htmlFor="plugin-service-shared-routes" className="font-medium">
-            {t("pluginServices.sharedRoutesLabel")}
-          </Label>
-          <p className="text-muted-foreground text-xs">{t("pluginServices.sharedRoutesHelp")}</p>
-        </div>
-        <Switch
-          id="plugin-service-shared-routes"
-          checked={sharedRoutes}
-          onCheckedChange={(checked) => onSharedRoutesChange(Boolean(checked))}
-        />
-      </div>
     </SettingsSection>
   );
 };

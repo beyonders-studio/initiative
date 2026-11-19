@@ -161,8 +161,11 @@ function CommunityConnection({
   // so a connection whose every field is managed has no form at all — which is
   // exactly the case a flow exists for.
   const fields = connection.fields as unknown as PluginConnectionField[];
-  const typed = fields.filter((field) => !field.managed);
-  const vendorFlow = connection.runs_flow;
+  // The server's operator connected it for every community: it is shown, and
+  // only they can change it.
+  const platform = connection.platform;
+  const typed = platform ? [] : fields.filter((field) => !field.managed);
+  const vendorFlow = connection.runs_flow && !platform;
 
   // What the flow recorded, shown rather than reduced to "Set". Otherwise the
   // admin who just chose an account at a vendor has no way to see which one
@@ -208,9 +211,13 @@ function CommunityConnection({
     >
       {canManage ? (
         <>
-          {vendorFlow && (
+          {(vendorFlow || platform) && (
             <p className="text-muted-foreground text-sm">
-              {t("plugins:connections.communityFlowExplainer")}
+              {t(
+                platform
+                  ? "plugins:connections.platformExplainer"
+                  : "plugins:connections.communityFlowExplainer"
+              )}
             </p>
           )}
           {connection.account_label && (
@@ -263,7 +270,7 @@ function CommunityConnection({
                 {t("common:save")}
               </Button>
             )}
-            {connection.satisfied && (
+            {connection.satisfied && !platform && (
               <Button
                 size="sm"
                 variant="outline"

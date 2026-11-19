@@ -107,6 +107,7 @@
     "cleared": "Identifiant effacé.",
     "memberSet": "Une administratrice ou un administrateur de la communauté l'a configuré.",
     "memberNotSet": "Une administratrice ou un administrateur de la communauté doit encore le configurer.",
+    "platformExplainer": "L'opérateur de ce serveur a connecté ceci pour toutes les communautés, c'est donc prêt à l'emploi ici. Lui seul peut le modifier ou le déconnecter.",
     "communityFlowExplainer": "Celle-ci s'accorde chez le fournisseur plutôt qu'en la saisissant. Se connecter ouvre sa page d'installation, où vous choisissez le compte et ce que ce plug-in peut voir.",
     "personalExplainer": "Celle-ci vous identifie en tant que vous, donc chaque membre connecte son propre compte. Personne d'autre ne voit le vôtre.",
     "connect": "Connecter",
@@ -229,7 +230,7 @@
     },
     "refused": {
       "title": "Non connecté",
-      "body": "L'autre service n'a pas terminé la connexion. Rien n'a changé ici — réessayez depuis les réglages du plug-in."
+      "body": "La connexion a été refusée : l'autre service n'a pas terminé la connexion, ou le compte n'est pas le vôtre (pour une organisation, vous devez en être l'un des propriétaires). Rien n'a changé ici — réessayez depuis les réglages du plug-in."
     },
     "expired": {
       "title": "Ce lien a expiré",
@@ -246,10 +247,6 @@
     "sign_in_required": {
       "title": "Connectez-vous pour terminer",
       "body": "Terminez la connexion dans le navigateur où vous êtes connecté à Initiative, en tant que la personne qui l'a commencée."
-    },
-    "taken": {
-      "title": "Déjà connectée ailleurs",
-      "body": "Cette organisation est déjà connectée à une autre communauté de ce serveur, rien n'a donc changé ici. Pour la connecter ici, déconnectez-la d'abord là-bas, ou retirez l'application de l'organisation chez l'autre service, puis reconnectez-la."
     },
     "closeTab": "Vous pouvez fermer cet onglet."
   },

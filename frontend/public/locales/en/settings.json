@@ -1175,7 +1175,6 @@
     "operationsOnlyHelp": "Only the operations community can find and install it. Copies installed in any other community stop working. Nothing is deleted.",
     "operationsMandatoryBadge": "In the operations community",
     "operationsMandatoryHelp": "Turned on with Install in every community, it's added to the operations community only, and its admins cannot remove it or turn it off.",
-    "sharedRoutesHelp": "Lets one installation at the vendor, such as a GitHub organization, connect to several communities on this server. It can be turned off once each installation is connected to one community.",
     "keysTitle": "Signing keys",
     "keysHelp": "The public keys this plug-in signs its access-token assertions with. The plug-in is live only once it has a pasted key set or a key set address. It can have both.",
     "jwksLabel": "Pasted key set (JWKS)",
@@ -1223,9 +1222,34 @@
     "vendorSetupTitle": "Create the GitHub App",
     "vendorSetupHelp": "GitHub opens with this plug-in's permissions, events and Initiative's addresses filled in. Confirm it there, and GitHub sends the new app's values back here, so you type and copy none of them.",
     "vendorSetupHelpReplace": "Its values are set. Creating a new GitHub App replaces them with the new app's.",
-    "vendorSetupOrganizationLabel": "GitHub organization",
-    "vendorSetupOrganizationPlaceholder": "Optional",
-    "vendorSetupOrganizationHelp": "The organization that owns the new app. Leave blank to create it under your own GitHub account.",
+    "platformConnections": {
+      "title": "Connect for every community",
+      "help": "Connect an account once and every community with this plug-in uses it. While it's connected, communities can't change or disconnect it. Leave it unconnected and each community connects its own.",
+      "connect": "Connect for every community",
+      "connecting": "Opening…",
+      "connectedTo": "Connected to {{account}} for every community",
+      "notConnected": "Not connected. Each community connects its own.",
+      "removed": "Removed at the vendor",
+      "needsVendor": "Set the vendor values above first.",
+      "disconnect": "Disconnect",
+      "disconnectTitle": "Disconnect {{name}} for every community?",
+      "disconnectHelp": "Every community with this plug-in stops using this account. Communities that connected their own before go back to it; the rest have to connect one.",
+      "connectError": "Could not start connecting.",
+      "disconnectError": "Could not disconnect."
+    },
+    "vendorSetupOwnerLabel": "Who owns the GitHub App?",
+    "vendorSetupOwner": {
+      "account": {
+        "label": "Your GitHub account",
+        "help": "The account you're signed in to on GitHub owns it."
+      },
+      "organization": {
+        "label": "A GitHub organization",
+        "help": "An organization you're an owner of owns it, so it doesn't depend on one person's account."
+      }
+    },
+    "vendorSetupOrganizationLabel": "Organization name",
+    "vendorSetupOrganizationHelp": "As it appears in its address: github.com/<name>.",
     "vendorSetupCreate": "Create the GitHub App",
     "vendorSetupStarting": "Opening GitHub…",
     "vendorSetupError": "Could not start the setup at GitHub.",
@@ -1250,7 +1274,6 @@
     "allowedOriginsHelp": "One per line. Leave blank to allow only the browser address's own origin.",
     "allowedOriginsHelpEdit": "One per line. Leave blank to keep the current origins.",
     "mandatoryLabel": "Install in every community",
-    "sharedRoutesLabel": "Share installations between communities",
     "created": "Plug-in service registered.",
     "saved": "Plug-in service updated.",
     "deleted": "Plug-in service deleted.",
