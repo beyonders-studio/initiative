@@ -24,6 +24,7 @@ import { useTranslation } from "react-i18next";
 
 import { ListingKind } from "@/api/generated/initiativeAPI.schemas";
 import { ReportButton } from "@/components/moderation/ReportButton";
+import { ListingTermsBadge } from "@/components/plugins/ListingTermsBadge";
 import { PluginOffer } from "@/components/plugins/PluginOffer";
 import { DashboardCanvas } from "@/components/tools/dashboards/DashboardCanvas";
 import { useBillingPortal } from "@/hooks/useBillingPortal";
@@ -49,18 +50,12 @@ import {
   BreadcrumbSeparator,
 } from "@/ui/breadcrumb";
 import { Button } from "@/ui/button";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/ui/carousel";
 import { Skeleton } from "@/ui/skeleton";
 import { StatusMessage } from "@/ui/status-message";
 
 import { InstallListingDialog } from "./InstallListingDialog";
 import { InstallPluginDialog } from "./InstallPluginDialog";
+import { ListingDescription, ListingGallery } from "./ListingGallery";
 import { ListingProvenance } from "./ListingProvenance";
 import { ProjectListingPreview } from "./ProjectListingPreview";
 
@@ -197,6 +192,7 @@ export function ListingPage() {
                     {t("card.version", { version: listing.latest_version.version })}
                   </Badge>
                 )}
+                <ListingTermsBadge listing={listing} />
                 {listing.beta && <Badge variant="secondary">{t("card.beta")}</Badge>}
                 {minimumAge != null && (
                   <Badge variant="outline">{t("detail.minimumAge", { age: minimumAge })}</Badge>
@@ -291,31 +287,16 @@ export function ListingPage() {
         )}
       </div>
 
-      {listing?.long_description && (
-        <p className="max-w-3xl whitespace-pre-line text-sm leading-relaxed">
-          {listing.long_description}
-        </p>
-      )}
-
       {listing?.images?.length ? (
-        <Carousel>
-          <CarouselContent className="-ml-3">
-            {listing.images.map((image) => (
-              <CarouselItem key={image} className="max-w-full basis-auto pl-3">
-                <img
-                  src={resolveArtworkUrl(listingImageUrl(image, listing.source, dark)) ?? undefined}
-                  alt=""
-                  aria-hidden
-                  className="h-48 rounded-lg border object-cover"
-                  loading="lazy"
-                />
-              </CarouselItem>
-            ))}
-          </CarouselContent>
-          <CarouselPrevious />
-          <CarouselNext />
-        </Carousel>
+        <ListingGallery
+          name={listing.name}
+          sources={listing.images.map(
+            (image) => resolveArtworkUrl(listingImageUrl(image, listing.source, dark)) ?? image
+          )}
+        />
       ) : null}
+
+      {listing?.long_description && <ListingDescription text={listing.long_description} />}
 
       {/* Each tool previews its own way: a project as its board, a dashboard on
           its canvas. A plug-in mounts one of this build's tools and has nothing

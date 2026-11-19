@@ -55,6 +55,8 @@ export function buildMarketplaceListing(
     installable: true,
     unavailable: null,
     beta: false,
+    paid: false,
+    included: false,
     updated_at: "2026-01-15T00:00:00.000Z",
     ...overrides,
   };

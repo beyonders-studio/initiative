@@ -10,6 +10,7 @@ import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
 import type { MarketplaceListingSummary } from "@/api/generated/initiativeAPI.schemas";
+import { ListingTermsBadge } from "@/components/plugins/ListingTermsBadge";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { resolveArtworkUrl } from "@/lib/uploadUrl";
 import { Badge } from "@/ui/badge";
@@ -67,6 +68,7 @@ export function MarketplaceCard({ listing, installedCount = 0 }: MarketplaceCard
                   {t("card.version", { version: listing.latest_version.version })}
                 </span>
               )}
+              <ListingTermsBadge listing={listing} className="text-xs" />
               {listing.beta && (
                 <Badge variant="secondary" className="text-xs">
                   {t("card.beta")}
