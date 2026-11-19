@@ -643,7 +643,7 @@ def _refusal(
     if action is Action.export:
         initiative = (
             None
-            if "initiative" in inspect(row).unloaded
+            if isinstance(row, ToolRow) or "initiative" in inspect(row).unloaded
             else getattr(row, "initiative", None)
         )
         return HTTPException(

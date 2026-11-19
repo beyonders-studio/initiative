@@ -174,7 +174,15 @@ def build_installed(tools: ToolSet) -> dict[str, Dataset]:
         return Dataset(
             model=table,
             name_override=table.name,
-            fields=derive_fields(table),
+            # A declared person is an id with no key to ``users``: say so.
+            fields=derive_fields(
+                table,
+                references={
+                    column.name: "users"
+                    for column in table.c
+                    if column.info.get("field") == "user_reference"
+                },
+            ),
             relations=tuple(
                 Relation(
                     name=fk.column.table.info[DECLARED]["key"],

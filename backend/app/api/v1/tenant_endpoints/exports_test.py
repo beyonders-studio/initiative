@@ -3985,6 +3985,24 @@ async def test_a_tool_plugins_tool_exports_and_backs_up_from_its_declaration(
     resp = await _export(client, a, tool.kind, ids=[group_id], format="pdf")
     assert resp.status_code == 400, resp.text
 
+    # Shared to read, a member is refused the export in its own words.
+    reader = await acting_user(
+        guild=a.guild, initiative=a.initiative, initiative_role="member"
+    )
+    session.add(
+        ResourceGrant(
+            resource_type=tool.kind,
+            resource_id=group_id,
+            user_id=reader.user.id,
+            level=ResourceAccessLevel.read,
+            initiative_id=a.initiative.id,
+        )
+    )
+    await session.commit()
+    resp = await _export(client, reader, tool.kind, ids=[group_id], format="json")
+    assert resp.status_code == 403, resp.text
+    assert resp.json()["detail"] == "EXPORT_OWNER_REQUIRED"
+
     resp = await _export(client, a, "initiative", initiative_id=a.initiative.id)
     archive = await _rendered_zip(client, a, monkeypatch, role_session, resp)
     manifest = json.loads(archive.read("manifest.json"))

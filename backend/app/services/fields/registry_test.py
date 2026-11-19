@@ -29,6 +29,7 @@ from app.services.fields import (
 from app.services.fields.derive import derive_fields
 from app.services.fields.grouping import groupable
 from app.services.fields.registry import dataset_names
+from app.services.fields.spec import ControlKind, FieldType
 from app.services.query.resolve import resolve
 
 pytestmark = pytest.mark.always
@@ -419,7 +420,6 @@ class TestDeclaration:
         Its ``id`` is nonetheless a person, which is what decides the picker —
         and a number box in its place is what a reader would have had to type
         an account id into."""
-        from app.services.fields.spec import ControlKind, FieldType
 
         spec = dataset("members").by_name["id"]
         assert spec.kind is ControlKind.member
@@ -565,7 +565,12 @@ def test_a_tool_plugins_tables_are_its_communitys_datasets():
     from app.services.query.resolve import QueryError
     from app.testing.tool_plugins import COUNTERS_UID, counters_tool_manifest
 
-    definition = normalize_tool_plugin_definition(counters_tool_manifest())
+    manifest = counters_tool_manifest()
+    # A declared person, which no foreign key marks as one.
+    manifest["tool"]["items"][0]["fields"].append(
+        {"key": "keeper", "name": {"en": "Keeper"}, "kind": "user_reference"}
+    )
+    definition = normalize_tool_plugin_definition(manifest)
     uid = COUNTERS_UID.lower()
     codes = {f"counter_group.{uid}": 1024, f"counter.{uid}": 1025}
     tools = community_tool_set([InstalledTool(COUNTERS_UID, definition)], codes)
@@ -579,6 +584,7 @@ def test_a_tool_plugins_tables_are_its_communitys_datasets():
         items.by_name
     )
     assert items.by_relation["counter_group"].dataset == tool.table.name
+    assert items.by_name["keeper"].kind is ControlKind.member
     statement = resolve(
         f"SELECT c.name, counter_group.description FROM {counters.name} AS c",
         tools=tools,
