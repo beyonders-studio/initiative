@@ -62,9 +62,12 @@ from app.services.marketplace.tool_plugins import (
 __all__ = [
     "InstalledTool",
     "PluginKind",
+    "PluginToolError",
     "build_tool",
     "community_tool_set",
+    "community_tools",
     "installed_digest",
+    "provisioned_tools",
     "structure_ddl",
     "tool_table_name",
 ]
