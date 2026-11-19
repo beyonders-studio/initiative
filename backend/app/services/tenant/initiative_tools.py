@@ -136,7 +136,13 @@ async def write_plugin_tool_rules(
         kind = tool_kinds(definition, listing_uid=listing_uid)[0]
         view, create = f"{kind}:enabled", f"{kind}:create"
         rows += [
-            {"initiative_id": i, "key": view, "enabled": True, "install_id": install_id}
+            {
+                "initiative_id": i,
+                "initiative_role_id": None,
+                "key": view,
+                "enabled": True,
+                "install_id": install_id,
+            }
             for i in initiative_ids
         ]
         rows += [

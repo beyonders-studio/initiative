@@ -518,7 +518,7 @@ async def _codes() -> dict[str, int]:
 
 
 async def _installed(session: Any) -> list[InstalledTool]:
-    rows = (await session.execute(_DEFINITIONS)).all()
+    rows = (await session.exec(_DEFINITIONS)).all()
     return [InstalledTool(row.id, row.listing_uid, row.definition) for row in rows]
 
 
@@ -526,7 +526,7 @@ async def community_tools(session: Any) -> ToolSet:
     """The tool set of the community ``session`` is routed to. One read of
     its installs; their declarations and the kind codes are read only the
     first time this process sees them."""
-    rows = tuple(tuple(row) for row in (await session.execute(_INSTALLED)).all())
+    rows = tuple(tuple(row) for row in (await session.exec(_INSTALLED)).all())
     if not rows:
         return BUILTIN_TOOLS
     found = _BY_ROWS.get(rows)
@@ -540,11 +540,12 @@ async def provisioned_tools(guild_id: int) -> ToolSet:
     """The tool set of ``guild_id`` as its installs stand, read on the
     system engine, for provisioning: :data:`BUILTIN_TOOLS` for a community
     whose schema does not exist yet."""
+    from app.db import cohorts
     from app.db import session as db_session
     from app.db.request_context import SystemGuild
     from app.db.schema_provisioning import guild_schema_name
 
-    async with db_session.SystemSessionLocal() as session:
+    async with cohorts.system_session(guild_id) as session:
         exists = await session.scalar(
             sa.text("SELECT to_regclass(:t) IS NOT NULL"),
             {"t": f'"{guild_schema_name(guild_id)}".guild_plugins'},

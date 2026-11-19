@@ -130,7 +130,7 @@ from app.services.marketplace.tool_plugins import is_tool_plugin
 from app.services.membership import initiative_scope_clause
 from app.services.platform import billing_ping
 from app.services.tenant import guild_plugins as guild_plugins_service
-from app.services.tenant import plugin_age
+from app.services.tenant import initiative_tools, plugin_age
 from app.services.tenant import plugin_config as plugin_config_service
 from app.services.tenant import plugin_connection_flows as flows_service
 from app.services.tenant import plugin_connections as connections_service
@@ -376,16 +376,22 @@ def _require_changeable(plugin: GuildPlugin) -> None:
 
 async def _provision_tool(session: AsyncSession, plugin: GuildPlugin) -> None:
     """Make a tool plug-in's tables and render its community's rules, once
-    the install has committed. Where that fails, the install is taken back,
-    its rule rows with it, so no install stands without its tables."""
-    guild_id = routed_guild_id(session)
+    the install has committed, then switch its tool on in every initiative:
+    rule rows its community's rules admit once they are rendered with it.
+    Until then the tool is off everywhere. Where any of it fails, the install
+    is taken back, its rule rows with it, and the community rendered again
+    without it, so no install stands without its tables."""
+    guild_id, plugin_id = routed_guild_id(session), plugin.id
     try:
         await provision_community_tools(guild_id)
-    except Exception as exc:
-        logger.exception("tool plug-in %s: provisioning guild %s", plugin.id, guild_id)
-        await session.rollback()
-        await session.exec(delete(GuildPlugin).where(GuildPlugin.id == plugin.id))
+        await initiative_tools.write_plugin_tool_rules(session)
         await session.commit()
+    except Exception as exc:
+        logger.exception("tool plug-in %s: provisioning guild %s", plugin_id, guild_id)
+        await session.rollback()
+        await session.exec(delete(GuildPlugin).where(GuildPlugin.id == plugin_id))
+        await session.commit()
+        await provision_community_tools(guild_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=GuildPluginMessages.TOOL_NOT_PROVISIONED,

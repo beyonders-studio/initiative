@@ -665,7 +665,9 @@ def serialize_guild_plugin(
         needs_config=state.needs_config,
         config_state=state.state,
         config_state_detail=state.detail,
-        tool=definition.get("tool"),
+        # A tool instance names the built-in tool it mounts; a tool plug-in's
+        # ``tool`` is the tool it declares, which mounts none.
+        tool=tool if isinstance(tool := definition.get("tool"), str) else None,
         avatar_url=avatar_url,
         features=list(features) if isinstance(features, list) else [],
         definition=definition,
