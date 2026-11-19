@@ -79,6 +79,7 @@ from app.services.marketplace.tool_plugins import (
 )
 
 __all__ = [
+    "DECLARED",
     "InstalledTool",
     "PluginKind",
     "PluginToolError",
@@ -94,6 +95,10 @@ __all__ = [
     "tool_table_name",
     "tools_digest",
 ]
+
+#: The ``info`` key of a tool plug-in's table holding its declaration: the
+#: tool's block, or the item's.
+DECLARED = "declared"
 
 #: The prefix of every table a tool plug-in has.
 TABLE_PREFIX = "p_"
@@ -428,11 +433,13 @@ def _table(
     name: str,
     *,
     parent: tuple[str, sa.Table] | None,
-    fields: Sequence[Mapping[str, Any]],
-    checks: Sequence[Mapping[str, Any]],
+    declared: Mapping[str, Any],
 ) -> sa.Table:
     """A tool's own table (``parent`` None) or an item table under
-    ``parent``, a ``(column, table)``."""
+    ``parent``, a ``(column, table)``, as ``declared``: the tool's block or
+    the item's, kept in the table's ``info`` for what reads a declared fact
+    (an item's ``open_while``, a field's name)."""
+    fields = declared.get("fields", [])
     initiatives = SQLModel.metadata.tables["initiatives"]
     if parent is None:
         anchor = sa.Column(
@@ -447,9 +454,9 @@ def _table(
             nullable=False,
         )
     starts = effective_defaults(fields)
-    declared = [_field_column(field, starts.get(field.get("key"))) for field in fields]
+    columns = [_field_column(field, starts.get(field.get("key"))) for field in fields]
     seen = {"id", anchor.name, "name", "position", "created_at", "updated_at"}
-    for column in declared:
+    for column in columns:
         if column.name in seen:
             raise PluginToolError(f"{name}: two columns named {column.name!r}")
         seen.add(column.name)
@@ -461,7 +468,7 @@ def _table(
         anchor,
         sa.Column("name", sa.String(255), nullable=False),
         sa.Column("position", COUNTER_NUMBER, nullable=False, server_default="0"),
-        *declared,
+        *columns,
         *universal,
         sa.Column(
             "created_at",
@@ -475,10 +482,16 @@ def _table(
             nullable=False,
             server_default=sa.func.now(),
         ),
-        *_checks(name, (column.name for column in universal), fields, checks),
+        *_checks(
+            name,
+            (column.name for column in universal),
+            fields,
+            declared.get("checks", []),
+        ),
         # A tool row is read back by no RETURNING clause, as a built-in
         # tool's is (``CounterGroup``): nothing is shared with anyone yet.
         implicit_returning=parent is not None,
+        info={DECLARED: declared},
     )
     sa.Index(object_name("ix", name, anchor.name), table.c[anchor.name])
     sa.Index(
@@ -510,8 +523,7 @@ def build_tool(
         metadata,
         tool_table_name(uid, key),
         parent=None,
-        fields=block.get("fields", []),
-        checks=block.get("checks", []),
+        declared=block,
     )
     tables = {key: own}
     children: list[Kind] = []
@@ -526,8 +538,7 @@ def build_tool(
             metadata,
             tool_table_name(uid, item_key),
             parent=(f"{_key(parent_key, 'parent key')}_id", tables[parent_key]),
-            fields=item.get("fields", []),
-            checks=item.get("checks", []),
+            declared=item,
         )
         item_kind = _kind(uid, item_key)
         if item_kind not in codes:
