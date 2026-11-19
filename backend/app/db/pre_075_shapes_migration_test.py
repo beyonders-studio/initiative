@@ -27,6 +27,7 @@ from app.testing import (
     create_upload,
     create_user,
 )
+from app.testing.later_revisions import step_newest
 
 _VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
 
@@ -123,7 +124,14 @@ async def test_notification_lines_take_todays_shape(session) -> None:
     await session.commit()
 
     migration = _load("20261109_0594_notification_lines_take_todays_shape.py")
+    schema = f"guild_{guild.id}"
+    # The revisions after it come off around it.
+    after = migration.revision
+    await session.run_sync(
+        _run(lambda: step_newest(forward=False, after=after), schema)
+    )
     await session.run_sync(_run(migration.upgrade))
+    await session.run_sync(_run(lambda: step_newest(forward=True, after=after), schema))
     await session.commit()
 
     stored = {

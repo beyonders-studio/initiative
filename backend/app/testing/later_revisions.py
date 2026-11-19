@@ -3,7 +3,7 @@ touch, for a test that runs an older revision on today's schema.
 
 Such a test takes these off one guild schema first, newest first, and puts
 them back last, oldest first. A new revision that reshapes a table an older
-revision's test reaches is added to ``LATER`` here, once, rather than to every
+revision's test reaches is added to ``NEWEST`` here, once, rather than to every
 such test.
 
 Putting them back ends with ``public.relationship_kind_code`` as boot renders
@@ -21,6 +21,8 @@ from typing import Any
 
 from sqlalchemy import text
 
+from alembic import op
+from app.db.guest_access import GUEST_OWN_GRANTS_POLICY, GUEST_ROWS_POLICY
 from app.db.kind_codes import kind_code_sql
 
 _VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
@@ -38,20 +40,18 @@ LATER: tuple[str, ...] = (
 )
 
 #: The revisions that reshape tables every older revision writes, oldest
-#: first: who made a row and the triggers that stamp it, then each tool's
-#: switch leaving ``initiatives`` for ``initiative_rules``. A test running an
-#: older revision takes these off around it too (:func:`step_newest`).
+#: first: who made a row and the triggers that stamp it, a plug-in's rows in
+#: ``initiative_rules``, each tool's switch leaving ``initiatives`` for
+#: ``initiative_rules``, and a comment naming its subject as a pair. A test
+#: running an older revision takes the ones after it off around it
+#: (:func:`step_newest`).
 NEWEST: tuple[str, ...] = (
     "20261109_0591_who_made_it.py",
     "20261109_0592_every_author_is_stamped.py",
+    "20261110_0606_plug_ins_answer_to_the_communitys_roles.py",
     "20261118_0613_each_tools_switch_is_a_rule.py",
+    "20261118_0614_comments_name_their_subject_as_a_pair.py",
 )
-
-
-#: A comment names its subject as a pair, where every older revision wrote the
-#: column for its kind: a test running an older revision on comments takes
-#: this off around it too (:func:`step_comment_subjects`).
-COMMENT_SUBJECTS = "20261118_0614_comments_name_their_subject_as_a_pair.py"
 
 
 def _load(name: str) -> ModuleType:
@@ -78,11 +78,9 @@ def _steps(bind: Any, *, forward: bool) -> list[Callable[[], None]]:
             contacts._apply_upgrade,
             pair._upgrade,
             lambda: step_newest(forward=True),
-            lambda: step_comment_subjects(forward=True),
             lambda: restate_kind_code(bind),
         ]
     return [
-        lambda: step_comment_subjects(forward=False),
         lambda: step_newest(forward=False),
         pair._downgrade,
         contacts._apply_downgrade,
@@ -95,25 +93,44 @@ def _steps(bind: Any, *, forward: bool) -> list[Callable[[], None]]:
     ]
 
 
-def step_newest(*, forward: bool) -> None:
-    """Take :data:`NEWEST` off the schema the search path leads with
-    (``forward=False``), newest first, or put it back. Run inside an alembic
+def _one_schema(revision: ModuleType, *, forward: bool) -> Callable[[], None]:
+    """A revision's step for one schema, by either name it gives it."""
+    name = "upgrade" if forward else "downgrade"
+    return getattr(revision, f"_apply_{name}", None) or getattr(revision, f"_{name}")
+
+
+def _drop_guest_policies() -> None:
+    """Drop the guest policies (``app.db.guest_access``) on the schema the
+    search path leads with. They read columns older revisions drop, and a
+    start renders them again."""
+    bind = op.get_bind()
+    for table, policy in bind.execute(
+        text(
+            "SELECT tablename, policyname FROM pg_policies"
+            " WHERE schemaname = current_schema() AND policyname IN (:rows, :own)"
+        ),
+        {"rows": GUEST_ROWS_POLICY, "own": GUEST_OWN_GRANTS_POLICY},
+    ).all():
+        op.execute(f'DROP POLICY "{policy}" ON "{table}"')
+
+
+def step_newest(*, forward: bool, after: str = "") -> None:
+    """Take the revisions of :data:`NEWEST` later than revision ``after`` (all
+    of them by default) off the schema the search path leads with
+    (``forward=False``), newest first, or put them back. Run inside an alembic
     ``Operations`` context."""
-    revisions = [_load(name) for name in NEWEST]
+    revisions = [
+        revision
+        for revision in (_load(name) for name in NEWEST)
+        if revision.revision > after
+    ]
     if forward:
         for revision in revisions:
-            revision._upgrade()
+            _one_schema(revision, forward=True)()
     else:
+        _drop_guest_policies()
         for revision in reversed(revisions):
-            revision._downgrade()
-
-
-def step_comment_subjects(*, forward: bool) -> None:
-    """Take :data:`COMMENT_SUBJECTS` off the schema the search path leads with
-    (``forward=False``), or put it back. Run inside an alembic ``Operations``
-    context."""
-    subjects = _load(COMMENT_SUBJECTS)
-    (subjects._apply_upgrade if forward else subjects._apply_downgrade)()
+            _one_schema(revision, forward=False)()
 
 
 def restate_kind_code(bind: Any) -> None:
