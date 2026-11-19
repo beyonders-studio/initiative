@@ -54,8 +54,9 @@ export interface PropertyInputProps {
   canOpen?: { tool: string; id: number | null | undefined };
   /** Adds an option named `label` to a select property, or finds the one
    *  already named so, and answers with it. A failure is told by this, and
-   *  rejects. */
-  appendOption: (
+   *  rejects. Left out, its options are fixed and none is made from what is
+   *  typed. */
+  appendOption?: (
     definition: { id: number; options: PropertyOption[] },
     label: string
   ) => Promise<PropertyOption>;
@@ -642,7 +643,7 @@ const PropertyOptionPicker = ({
 
   // A failure rejects, so the picker keeps the typed name to try again.
   const handleCreate = async (label: string) => {
-    if (adding) return;
+    if (adding || !appendOption) return;
     setAdding(true);
     try {
       const id = "id" in definition ? definition.id : definition.property_id;
@@ -680,8 +681,12 @@ const PropertyOptionPicker = ({
     })),
     open,
     onOpenChange: setOpen,
-    typedLabel: (typed: string) => typed && t("input.createOption", { label: typed }),
-    onCreate: handleCreate,
+    ...(appendOption
+      ? {
+          typedLabel: (typed: string) => typed && t("input.createOption", { label: typed }),
+          onCreate: handleCreate,
+        }
+      : {}),
     loading: adding,
     searchPlaceholder: t("input.searchOptions"),
     emptyMessage: t("picker.empty"),

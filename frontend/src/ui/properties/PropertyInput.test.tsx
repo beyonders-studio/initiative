@@ -438,7 +438,7 @@ describe("PropertyInput", () => {
         name: "Status",
         options: [draft],
       });
-      const appendOption = vi.fn<PropertyInputProps["appendOption"]>(async () => ({
+      const appendOption = vi.fn<NonNullable<PropertyInputProps["appendOption"]>>(async () => ({
         value: "in_review",
         label: "In Review",
         color: null,
@@ -474,6 +474,24 @@ describe("PropertyInput", () => {
       await userEvent.type(searchBox, "live");
       expect(screen.queryByRole("option", { name: /Create "live"/i })).not.toBeInTheDocument();
       expect(screen.getByRole("option", { name: /Live/i })).toBeInTheDocument();
+    });
+
+    it("offers no Create where its options are fixed", async () => {
+      const definition = def({
+        type: MetadataType.select,
+        options: [buildPropertyOption({ value: "live", label: "Live" })],
+      });
+      renderWithProviders(
+        <KitInput
+          definition={definition}
+          value=""
+          onChange={vi.fn()}
+          searchMembers={async () => []}
+        />
+      );
+      await userEvent.click(screen.getByRole("button", { name: /Select/i }));
+      await userEvent.type(await screen.findByPlaceholderText(/Search or create/i), "In Review");
+      expect(screen.queryByRole("option", { name: /Create "In Review"/i })).not.toBeInTheDocument();
     });
   });
 });
