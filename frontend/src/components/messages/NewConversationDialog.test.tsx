@@ -121,6 +121,18 @@ describe("NewConversationDialog", () => {
     expect(screen.getByRole("button", { name: /Actions for hedy/i })).toBeEnabled();
   });
 
+  it("opens from outside without drawing a button of its own", async () => {
+    const onOpenChange = vi.fn();
+    renderPage(() => <NewConversationDialog open onOpenChange={onOpenChange} />, {
+      initialRoute: "/messages",
+    });
+
+    expect(await screen.findByRole("dialog", { name: "Start a conversation" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Start a conversation" })).toBeNull();
+    await userEvent.click(screen.getByText("ada"));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
   it("goes to the conversation rather than deciding anything about it", async () => {
     const { router } = await open();
     await userEvent.click(screen.getByText("ada"));
