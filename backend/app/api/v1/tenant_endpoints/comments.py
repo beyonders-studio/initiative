@@ -20,7 +20,6 @@ from app.schemas.tenant.comment import (
     CommentRead,
     CommentUpdate,
     RecentActivityEntry,
-    SaidOn,
 )
 from app.services import notifications as notifications_service
 from app.services.tenant import attachments as attachments_service
@@ -82,7 +81,7 @@ async def list_comments(
     session: ActorSessionDep,
     current_user: ActorUserDep,
     guild_context: CommentsRead,
-    subject_type: SaidOn,
+    subject_type: str,
     subject_id: Annotated[int, Query(gt=0)],
     limit: int = Query(default=20, ge=1, le=100),
     cursor: str | None = Query(default=None),

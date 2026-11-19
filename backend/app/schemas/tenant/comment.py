@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Annotated
 
 from pydantic import (
     ConfigDict,
@@ -17,7 +16,6 @@ from app.core.tools import COMMENT_TARGETS
 from app.models.platform.user import Presence
 from app.models.tenant.comment import CommentAudience
 from app.schemas.base import RichMentionStr, RichTextStr, SanitizedBaseModel
-from app.schemas.kinds import WithInstalled
 from app.schemas.platform.user import PersonShape, ProfileDecorations
 from app.schemas.tenant.created_by import CreatedByRead
 from app.schemas.tenant.reaction import ReactionGroup
@@ -77,14 +75,12 @@ class CommentBase(SanitizedBaseModel):
 CommentSubject = Enum(
     "CommentSubject", [(target, target) for target in COMMENT_TARGETS], type=str
 )
-#: What a comment is said on: a built-in subject, or a tool plug-in's kind.
-SaidOn = Annotated[str, WithInstalled(CommentSubject)]
 
 
 class CommentCreate(CommentBase):
     """A comment, and what it is said on."""
 
-    subject_type: SaidOn
+    subject_type: str
     subject_id: int = Field(gt=0)
     parent_comment_id: int | None = Field(default=None, gt=0)
     #: Who it is said to. ``filer`` only on an operations case somebody filed,
@@ -134,7 +130,7 @@ class CommentRead(CommentBase, CreatedByRead):
     )
 
     id: int
-    subject_type: SaidOn
+    subject_type: str
     subject_id: int
     parent_comment_id: int | None = None
     created_at: datetime

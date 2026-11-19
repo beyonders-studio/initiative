@@ -40,7 +40,8 @@ from app.core.tools import KIND_BY_TABLE, KINDS, Tool, kind_refusal
 from app.db.frozen import ancestor_is_frozen, row_is_frozen
 from app.db.guild_standing import InstallContext
 from app.db.initiative_rls import governing_path
-from app.db.session import require_actor_context
+from app.db.session import require_actor_context, routed_tools
+from app.db.tool_rows import load_row, locate
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import User
 from app.models.tenant.calendar_event import CalendarEvent
@@ -585,16 +586,50 @@ async def load_kind(
     entity_id: int,
     user: User | None,
     guild_context: ActorContext,
+    *,
+    access: str = "read",
+    action: Action | None = None,
 ) -> Any:
     """A tool or a row inside one, by its kind, read as its own page reads it
-    and refused in its own words."""
+    and refused in its own words: a model's instance, or a tool plug-in's row
+    (``app.db.tool_rows.ToolRow``), which answers to its tool's sharing as a
+    task answers to its project's. A kind the community does not have is not
+    found."""
     from app.db.base import MODELS_BY_TABLE
 
+    tools = routed_tools(session)
+    located = locate(tools, kind)
+    if located is not None:
+        row = await load_row(session, located, tools, entity_id)
+        if row is None:
+            raise kind_refusal(kind, KindMessages.NOT_FOUND, 404)
+        permissions_service.require_access(
+            permissions_service.DacResource(located.tool),
+            row,
+            context=guild_context,
+            access=access,
+            action=action,
+        )
+        return row
+    if kind not in KINDS:
+        raise kind_refusal(kind, KindMessages.NOT_FOUND, 404)
     if KINDS[kind].parent is None:
         return await load_authorized(
-            session, Tool(kind), entity_id, user, guild_context
+            session,
+            Tool(kind),
+            entity_id,
+            user,
+            guild_context,
+            access=access,
+            action=action,
         )
-    return await load_child(session, MODELS_BY_TABLE[KINDS[kind].table], entity_id)
+    return await load_child(
+        session,
+        MODELS_BY_TABLE[KINDS[kind].table],
+        entity_id,
+        access=access,
+        action=action,
+    )
 
 
 def parent_of(row: Any) -> Any:

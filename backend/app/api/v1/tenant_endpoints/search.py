@@ -31,7 +31,7 @@ from app.db.plugin_rls import SEARCH_ENTRY_READ_SCOPE
 from app.db.search_index import entity_types
 from app.db.session import routed_tools
 from app.models.platform.user import User
-from app.schemas.tenant.search import FoundKind, SearchResults, SearchSuggestion
+from app.schemas.tenant.search import SearchResults, SearchSuggestion
 from app.services.tenant import search as search_service
 
 router = APIRouter(route_class=ActorRoute)
@@ -76,7 +76,7 @@ async def search_community(
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
     search: str = Query(description="What to search for.", max_length=1000),
-    types: list[FoundKind] | None = Query(default=None, description=_TYPE_DESCRIPTION),
+    types: list[str] | None = Query(default=None, description=_TYPE_DESCRIPTION),
     initiative_id: int | None = Query(
         default=None, description="Restrict to one initiative."
     ),
@@ -110,7 +110,7 @@ async def recent_community(
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
-    types: list[FoundKind] | None = Query(default=None, description=_TYPE_DESCRIPTION),
+    types: list[str] | None = Query(default=None, description=_TYPE_DESCRIPTION),
     initiative_id: int | None = Query(
         default=None, description="Restrict to one initiative."
     ),
@@ -143,7 +143,7 @@ async def suggest_community(
     session: ActorSessionDep,
     guild_context: SuggestByEntityType,
     search: str = Query(description="What to jump to.", max_length=200),
-    types: list[FoundKind] | None = Query(default=None, description=_TYPE_DESCRIPTION),
+    types: list[str] | None = Query(default=None, description=_TYPE_DESCRIPTION),
     initiative_id: int | None = Query(
         default=None, description="Restrict to one initiative."
     ),
