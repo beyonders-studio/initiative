@@ -184,11 +184,17 @@ def _names_a_person(field: Any) -> bool:
 
 def _draws_a_person(properties: dict[str, Any]) -> bool:
     """Whether an object with ``properties`` names a person and says who they
-    are. ``name`` beside an ``id`` of the object's own is the object's name."""
+    are. ``name`` beside an ``id`` of the object's own is the object's name,
+    and people in a map by key (a tool plug-in row's ``people``, by field) are
+    the people its fields name, not who the object is."""
     details = _PERSON_DETAILS & set(properties)
     if "id" in properties and not _names_a_person(properties["id"]):
         details.discard("name")
-    return bool(details) and any(map(_names_a_person, properties.values()))
+    return bool(details) and any(
+        _names_a_person(field)
+        for field in properties.values()
+        if "additionalProperties" not in field
+    )
 
 
 @pytest.mark.always

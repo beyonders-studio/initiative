@@ -288,10 +288,11 @@ class InitiativeCan(SanitizedBaseModel):
     #: Read who is in it: its members, the community's admin and a grantee,
     #: not a guest given items in it.
     roster: bool = False
-    #: The tools the caller may open here.
-    view: list[Tool] = Field(default_factory=list)
-    #: The tools the caller may make a new one of here.
-    create: list[Tool] = Field(default_factory=list)
+    #: The tools the caller may open here, by kind: a built-in tool's, or a
+    #: tool plug-in's the community installed.
+    view: list[str] = Field(default_factory=list)
+    #: The tools the caller may make a new one of here, by kind.
+    create: list[str] = Field(default_factory=list)
 
 
 class InitiativeRead(InitiativeBase):
@@ -501,6 +502,13 @@ class InitiativeSummary(SanitizedBaseModel):
     color: str | None = None
 
 
+def _kinds(actions: Any, verb: str) -> list[str]:
+    """The tools ``actions`` lets the caller ``verb``, in the order the
+    community's tools are listed."""
+    prefix = f"{verb}:"
+    return [a.removeprefix(prefix) for a in actions or () if a.startswith(prefix)]
+
+
 def initiative_can(initiative: Initiative) -> InitiativeCan:
     """What the caller may do in ``initiative``, as the schema's
     ``initiative_actions`` answered it in the SELECT that loaded the row."""
@@ -509,8 +517,8 @@ def initiative_can(initiative: Initiative) -> InitiativeCan:
         manage="manage" in held,
         moderate="moderate" in held,
         roster="roster" in held,
-        view=[t for t in Tool if f"view:{t.value}" in held],
-        create=[t for t in Tool if f"create:{t.value}" in held],
+        view=_kinds(initiative.actions, "view"),
+        create=_kinds(initiative.actions, "create"),
     )
 
 

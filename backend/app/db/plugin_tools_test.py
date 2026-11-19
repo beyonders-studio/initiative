@@ -256,11 +256,11 @@ async def test_install_creates_exactly_the_declared_tables(
     assert stamp_tools(stamp) is not None
     await session.commit()
     assert await _backfill_guild(seat.guild.id, wait=True) is False
-    # No installed plug-in reaches the tables: the plug-in role holds no
-    # grant on them, whatever scope an install is given.
+    # The plug-in role is granted the tables, as a built-in tool's: which
+    # rows an install reaches is its tool's scope, which the policies ask.
     plugin_role = guild_role_name(seat.guild.id, GuildRoleKind.plugin)
     for table in columns:
-        assert not await session.scalar(
+        assert await session.scalar(
             sa.text("SELECT has_table_privilege(:r, :t, 'SELECT, INSERT')"),
             {"r": plugin_role, "t": f'"{schema}".{table}'},
         )

@@ -7557,8 +7557,8 @@ export interface InitiativeCan {
   manage: boolean;
   moderate: boolean;
   roster: boolean;
-  view: Tool[];
-  create: Tool[];
+  view: string[];
+  create: string[];
 }
 
 /**
