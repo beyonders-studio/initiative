@@ -9,7 +9,7 @@ worker):
   (see ``schemas/tenant/backup_export.py``). One archive a future import
   wizard consumes whole.
 * ``report`` — the same enumeration rendered in per-tool report formats
-  chosen by the caller (a project PDF beside a counter group CSV beside a
+  chosen by the caller (a project PDF beside a contacts CSV beside a
   calendar ICS), zipped with the same folder layout, no manifest/assets.
 
 Layout (identical for both scopes — an initiative backup is a guild backup
@@ -18,7 +18,6 @@ with one ``initiatives/`` entry, so ONE import path serves both)::
     manifest.json                                   (backup mode)
     initiatives/{id}-{slug}/projects/{id}-{slug}.initiative-project.json
     initiatives/{id}-{slug}/files/{id}-{slug}.json
-    initiatives/{id}-{slug}/counter-groups/{id}-{slug}.initiative-counter-group.json
     initiatives/{id}-{slug}/calendars/{id}-{slug}.initiative-calendar.json
     initiatives/{id}-{slug}/posts/{id}-{slug}.initiative-post.json
     initiatives/{id}-{slug}/wikis/{id}-{slug}.initiative-wiki.json
@@ -1636,7 +1635,6 @@ _SECTIONS: tuple[BackupSection, ...] = (
         write_apart=_ScopeBuilder._write_uploaded_file,
         before_envelope=_ScopeBuilder._collect_embedded_assets,
     ),
-    BackupSection(Tool.counter_group),
     BackupSection(Tool.calendar),
     BackupSection(Tool.post, in_reports=False),
     BackupSection(Tool.wiki, in_reports=False, fetch=_fetch_wiki_pages),

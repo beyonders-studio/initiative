@@ -340,6 +340,89 @@ tool plug-in's among them, named by its kind as a string in place of the
 - POST /api/v1/communities/{community_id}/invites removed `#/components/schemas/Tool` from the `grants/items/resource_type` request property `anyOf` list
 - POST /api/v1/communities/{community_id}/invites added `subschema #1` to the `grants/items/resource_type` response property `anyOf` list for the response status `201`
 
+### Counters is a tool plug-in
+
+Counters leaves the core and becomes the bundled Counters tool plug-in, and
+every community's counters move into it. Its rows are read and written through
+the tool plug-in routes (`/plugin-tools/{kind}/…`) with the kinds
+`counter_group.tsjvtcm0s7gv2x` and `counter.tsjvtcm0s7gv2x`. The counter group
+and counter routes, `GET /me/counter-groups`, their schemas, the counter's own
+detail layout and value chip, and `counter_group` and `counter` as built-in
+kinds go.
+
+- GET /api/v1/c/{community_id}/activity/ removed the enum value `counter_group` from the property `anyOf[subschema #1: Tool]/` of the `query` request parameter `tool`
+- POST /api/v1/c/{community_id}/activity/catch-up removed the enum value `counter_group` of the request property `tool/anyOf[subschema #1: Tool]/`
+- GET /api/v1/c/{community_id}/counter-groups/ api path removed without deprecation
+- POST /api/v1/c/{community_id}/counter-groups/ api path removed without deprecation
+- DELETE /api/v1/c/{community_id}/counter-groups/{group_id} api path removed without deprecation
+- GET /api/v1/c/{community_id}/counter-groups/{group_id} api path removed without deprecation
+- PATCH /api/v1/c/{community_id}/counter-groups/{group_id} api path removed without deprecation
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/counters api path removed without deprecation
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/duplicate api path removed without deprecation
+- PUT /api/v1/c/{community_id}/counter-groups/{group_id}/grants api path removed without deprecation
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/reset-all api path removed without deprecation
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/sort api path removed without deprecation
+- DELETE /api/v1/c/{community_id}/counters/{counter_id} api path removed without deprecation
+- GET /api/v1/c/{community_id}/counters/{counter_id} api path removed without deprecation
+- PATCH /api/v1/c/{community_id}/counters/{counter_id} api path removed without deprecation
+- POST /api/v1/c/{community_id}/counters/{counter_id}/duplicate api path removed without deprecation
+- POST /api/v1/c/{community_id}/counters/{counter_id}/reset api path removed without deprecation
+- POST /api/v1/c/{community_id}/counters/{counter_id}/set api path removed without deprecation
+- POST /api/v1/c/{community_id}/counters/{counter_id}/step api path removed without deprecation
+- POST /api/v1/c/{community_id}/initiatives/ removed the enum value `counter_group` of the request property `tools/propertyNames/`
+- PATCH /api/v1/c/{community_id}/initiatives/defaults removed the enum value `counter_group` of the request property `tools/propertyNames/`
+- PATCH /api/v1/c/{community_id}/initiatives/defaults removed the enum value `counter_groups_enabled` of the request property `member_permissions/propertyNames/`
+- PATCH /api/v1/c/{community_id}/initiatives/defaults removed the enum value `create_counter_groups` of the request property `member_permissions/propertyNames/`
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id} removed the enum value `counter_group` of the request property `tools/propertyNames/`
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/roles removed the enum value `counter_groups_enabled` of the request property `permissions/anyOf[subschema #1]/propertyNames/`
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/roles removed the enum value `create_counter_groups` of the request property `permissions/anyOf[subschema #1]/propertyNames/`
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id}/roles/{role_id} removed the enum value `counter_groups_enabled` of the request property `permissions/anyOf[subschema #1]/propertyNames/`
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id}/roles/{role_id} removed the enum value `create_counter_groups` of the request property `permissions/anyOf[subschema #1]/propertyNames/`
+- GET /api/v1/c/{community_id}/layouts/ removed the enum value `counter_group` from the `query` request parameter `tool`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `counter_group` from the `query` request parameter `tool`
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/CounterDetailFieldId` from the `oneOf[subschema #2: DetailLayoutWrite]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` request property `anyOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/CounterDetailFieldId` from the `oneOf[subschema #2: DetailLayoutWrite]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` request property `anyOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/CounterDetailFieldId` from the `oneOf[subschema #2: DetailLayoutWrite]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` request property `anyOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/CounterDetailFieldId` from the `oneOf[subschema #2: DetailLayoutWrite]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #3: DetailFieldPart]/props/field` request property `anyOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/CounterDetailFieldId` from the `oneOf[subschema #2: DetailLayoutWrite]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` request property `anyOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/CounterDetailFieldId` from the `oneOf[subschema #2: DetailLayoutWrite]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` request property `anyOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/CounterDetailFieldId` from the `oneOf[subschema #2: DetailLayoutWrite]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` request property `anyOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/CounterDetailFieldId` from the `oneOf[subschema #2: DetailLayoutWrite]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #3: DetailFieldPart]/props/field` request property `anyOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/CounterDetailFieldId` from the `oneOf[subschema #2: DetailLayoutWrite]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` request property `anyOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/CounterDetailFieldId` from the `oneOf[subschema #2: DetailLayoutWrite]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` request property `anyOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/CounterDetailFieldId` from the `oneOf[subschema #2: DetailLayoutWrite]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` request property `anyOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/CounterDetailFieldId` from the `oneOf[subschema #2: DetailLayoutWrite]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #3: DetailFieldPart]/props/field` request property `anyOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `count` of the request property `oneOf[subschema #2: DetailLayoutWrite]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #6: OwnPart]/type`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `count` of the request property `oneOf[subschema #2: DetailLayoutWrite]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #6: OwnPart]/type`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `count` of the request property `oneOf[subschema #2: DetailLayoutWrite]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #6: OwnPart]/type`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `count` of the request property `oneOf[subschema #2: DetailLayoutWrite]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #6: OwnPart]/type`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `count` of the request property `oneOf[subschema #2: DetailLayoutWrite]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #6: OwnPart]/type`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `count` of the request property `oneOf[subschema #2: DetailLayoutWrite]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #6: OwnPart]/type`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `count` of the request property `oneOf[subschema #2: DetailLayoutWrite]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #6: OwnPart]/type`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `count` of the request property `oneOf[subschema #2: DetailLayoutWrite]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #6: OwnPart]/type`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `count` of the request property `oneOf[subschema #2: DetailLayoutWrite]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #6: OwnPart]/type`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `count` of the request property `oneOf[subschema #2: DetailLayoutWrite]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #6: OwnPart]/type`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `count` of the request property `oneOf[subschema #2: DetailLayoutWrite]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #6: OwnPart]/type`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `count` of the request property `oneOf[subschema #2: DetailLayoutWrite]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #6: OwnPart]/type`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `counter` of the request property `oneOf[subschema #2: DetailLayoutWrite]/kind`
+- PUT /api/v1/c/{community_id}/layouts/default removed the enum value `counter_group` from the `query` request parameter `tool`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} removed the enum value `counter_group` from the `query` request parameter `tool`
+- GET /api/v1/c/{community_id}/marketplace/listings removed the enum value `counter_group` from the property `anyOf[subschema #1: ListingKind]/` of the `query` request parameter `kind`
+- POST /api/v1/c/{community_id}/marketplace/share removed the enum value `counter_group` of the request property `kind`
+- POST /api/v1/c/{community_id}/plugins/{plugin_id}/actions/{action_id} removed the enum value `counter` of the request property `entity_type`
+- POST /api/v1/c/{community_id}/sends/ removed the enum value `counter` of the request property `kind`
+- POST /api/v1/c/{community_id}/sends/ removed the enum value `counter_group` of the request property `kind`
+- GET /api/v1/c/{community_id}/share-requests/ removed the enum value `counter_group` from the property `anyOf[subschema #1: Tool]/` of the `query` request parameter `resource_type`
+- POST /api/v1/c/{community_id}/share-requests/ removed the enum value `counter_group` of the request property `resource_type`
+- GET /api/v1/c/{community_id}/share-requests/standing removed the enum value `counter` from the `query` request parameter `kind`
+- GET /api/v1/c/{community_id}/share-requests/standing removed the enum value `counter_group` from the `query` request parameter `kind`
+- GET /api/v1/c/{community_id}/users/search removed the enum value `counter_group` from the property `anyOf[subschema #1: Tool]/` of the `query` request parameter `tool`
+- POST /api/v1/communities/{community_id}/invites removed the enum value `counter_group` of the request property `grants/items/resource_type/anyOf[subschema #1: Tool]/`
+- GET /api/v1/fields/{dataset} removed the enum value `counter_groups` from the `path` request parameter `dataset`
+- GET /api/v1/fields/{dataset} removed the enum value `counters` from the `path` request parameter `dataset`
+- POST /api/v1/me/api-keys removed the enum value `counter_group` of the request property `resource_type/anyOf[subschema #1: Tool]/`
+- GET /api/v1/me/counter-groups api path removed without deprecation
+
 ### An initiative's tool switches are one map
 
 Each initiative's switch for each tool is a rule of the initiative's, read and

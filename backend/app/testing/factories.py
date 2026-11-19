@@ -76,7 +76,6 @@ from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
 from app.models.tenant.collection import Collection, CollectionFile
 from app.models.tenant.comment import Comment
 from app.models.tenant.contact import Contact
-from app.models.tenant.counter import Counter, CounterGroup
 from app.models.tenant.dashboard import Dashboard
 from app.models.tenant.data_job import DataJob, DataJobDirection
 from app.models.tenant.file import File
@@ -2131,7 +2130,6 @@ async def create_comment(
     wiki: Wiki | None = None,
     file: File | None = None,
     project: Project | None = None,
-    counter_group: CounterGroup | None = None,
     calendar: Calendar | None = None,
     dashboard: Dashboard | None = None,
     post: Post | None = None,
@@ -2149,7 +2147,6 @@ async def create_comment(
         "collection": collection,
         Tool.project.value: project,
         Tool.file.value: file,
-        Tool.counter_group.value: counter_group,
         Tool.calendar.value: calendar,
         Tool.dashboard.value: dashboard,
         Tool.post.value: post,
@@ -2292,63 +2289,6 @@ async def create_task_status(
         await session.refresh(status)
 
     return status
-
-
-async def create_counter_group(
-    session: AsyncSession,
-    initiative: Initiative,
-    creator: User,
-    *,
-    name: str | None = None,
-    commit: bool = True,
-    **overrides: Any,
-) -> CounterGroup:
-    """Create a counter group with an owner grant for ``creator``."""
-    await route_session_to_guild(session, guild_of(initiative))
-
-    defaults = {
-        "initiative_id": initiative.id,
-        "name": name or f"Test Counters {datetime.now(UTC).timestamp()}",
-        "created_by": creator.id,
-        "created_by_kind": ActorKind.member,
-    }
-    group = CounterGroup(**{**defaults, **overrides})
-    session.add(group)
-
-    if commit:
-        await session.commit()
-        await session.refresh(group)
-
-        await create_resource_grant(
-            session, group, level=ResourceAccessLevel.owner, user=creator
-        )
-
-    return group
-
-
-async def create_counter(
-    session: AsyncSession,
-    group: CounterGroup,
-    *,
-    name: str | None = None,
-    commit: bool = True,
-    **overrides: Any,
-) -> Counter:
-    """Create a counter inside ``group``."""
-    await route_session_to_guild(session, guild_of(group))
-
-    defaults = {
-        "counter_group_id": group.id,
-        "name": name or f"Counter {datetime.now(UTC).timestamp()}",
-    }
-    counter = Counter(**{**defaults, **overrides})
-    session.add(counter)
-
-    if commit:
-        await session.commit()
-        await session.refresh(counter)
-
-    return counter
 
 
 async def create_upload(
@@ -2778,7 +2718,6 @@ async def create_contact(
 TOOL_FACTORIES: dict[Tool, Any] = {
     Tool.project: create_project,
     Tool.file: create_file,
-    Tool.counter_group: create_counter_group,
     Tool.calendar: create_calendar,
     Tool.dashboard: create_dashboard,
     Tool.post: create_post,
@@ -2823,9 +2762,6 @@ async def _collection_holding(
 CHILD_FACTORIES: dict[str, Any] = {
     "task": lambda session, project, creator, **kw: create_task(session, project, **kw),
     "calendar_event": create_calendar_event,
-    "counter": lambda session, group, creator, **kw: create_counter(
-        session, group, **kw
-    ),
     "wiki_page": create_wiki_page,
     # A collection is in Files rather than in one file: its tool row is the
     # file it starts with.

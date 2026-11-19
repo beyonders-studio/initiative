@@ -68,7 +68,7 @@ async def test_registering_a_tool_gives_its_kinds_codes_the_database_packs_with(
     }
     assert await _code(session, GROUP) == FIRST_PLUGIN_KIND_CODE
     assert await _code(session, COUNTER) == FIRST_PLUGIN_KIND_CODE + 1
-    assert await _code(session, "counter_group") == 4
+    assert await _code(session, "wiki") == 15
 
 
 async def test_a_kind_keeps_its_code_and_a_new_one_takes_the_next(session):

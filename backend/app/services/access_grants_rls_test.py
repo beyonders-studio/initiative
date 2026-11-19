@@ -18,8 +18,8 @@ from app.db.schema_provisioning import guild_schema_name
 from app.db.session import set_rls_context
 from app.models.platform.user import UserRole
 from app.models.tenant._mixins import ActorKind
-from app.models.tenant.counter import CounterGroup
 from app.models.tenant.file import File
+from app.models.tenant.wiki import Wiki
 from app.services.platform import app_settings as app_settings_service
 from app.testing import (
     create_access_grant,
@@ -175,7 +175,7 @@ async def test_pam_read_grant_does_not_fault_legacy_isolation_tables(
 
     A grantee leaves ``current_guild_id`` unset, so a policy that casts it to
     int without a NULLIF guard raises ``invalid input syntax for type integer``
-    and faults the whole query (counters, …). This guards migration
+    and faults the whole query (wikis, …). This guards migration
     ``20260530_0095``.
     """
     owner = await create_user(session, email="owner4@example.com", role=UserRole.owner)
@@ -184,7 +184,7 @@ async def test_pam_read_grant_does_not_fault_legacy_isolation_tables(
     )
     guild = await create_guild(session, creator=owner)
     init = await create_initiative(session, guild, owner)
-    cg = CounterGroup(
+    cg = Wiki(
         initiative_id=init.id,
         name="Stats",
         created_by=owner.id,
@@ -200,12 +200,10 @@ async def test_pam_read_grant_does_not_fault_legacy_isolation_tables(
     # This would raise InvalidTextRepresentationError pre-0095.
     visible_cg = (
         await reader.exec(
-            text("SELECT id FROM counter_groups WHERE id = :c"), params={"c": cg.id}
+            text("SELECT id FROM wikis WHERE id = :c"), params={"c": cg.id}
         )
     ).all()
-    assert len(visible_cg) == 1, (
-        "read grant should see the granted guild's counter groups"
-    )
+    assert len(visible_cg) == 1, "read grant should see the granted guild's wikis"
 
 
 async def test_no_pam_flag_sees_nothing(session: AsyncSession):

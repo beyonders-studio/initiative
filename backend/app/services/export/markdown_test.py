@@ -110,7 +110,7 @@ def test_mentions_read_as_the_app_shows_them():
     assert {"text": "Fix it"} in runs
     # Every kind the app can mention.
     (kinds,) = blocks_from_markdown(
-        "#counter-group[Q1](9), #wiki-page[Home](2), #file[Map](3)"
+        "#calendar-event[Q1](9), #wiki-page[Home](2), #file[Map](3)"
     )
     assert "".join(r["text"] for r in kinds["runs"]) == "Q1, Home, Map"
     assert {"text": "@Bo"} in runs

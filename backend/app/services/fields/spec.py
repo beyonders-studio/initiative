@@ -69,7 +69,6 @@ class ControlKind(str, Enum):
     project = "project"
     initiative = "initiative"
     calendar = "calendar"
-    counter_group = "counter_group"
     #: An id pointing at something the UI has not been taught to browse. It
     #: reads and it compares, so a query may name it; there is simply no picker,
     #: which is why a field of this kind is never offered as a control.
@@ -118,7 +117,6 @@ CONTROLS: dict[ControlKind, tuple[FieldType, frozenset[FilterOp]]] = {
     ControlKind.project: (FieldType.reference, _EQ),
     ControlKind.initiative: (FieldType.reference, _IN),
     ControlKind.calendar: (FieldType.reference, _IN),
-    ControlKind.counter_group: (FieldType.reference, _IN),
     ControlKind.reference: (FieldType.reference, _IN),
     ControlKind.property: (FieldType.reference, _IN),
     ControlKind.property_value: (FieldType.text, _EQ),

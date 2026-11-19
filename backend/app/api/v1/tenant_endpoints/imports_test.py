@@ -28,7 +28,6 @@ from app.testing.factories import (
     assign_tag,
     create_calendar_event,
     create_child_entity,
-    create_counter_group,
     create_file,
     create_import_job,
     create_initiative,
@@ -68,68 +67,51 @@ async def _second_initiative(session, a, **flags):
     return initiative
 
 
-async def test_envelope_import_roundtrips_counter_group(client, acting_user, session):
-    """Export a counter group as its envelope, import it into another
-    initiative: its counters and tags survive; the importer gets an owner
-    grant; tags match-or-create against the guild."""
+async def test_envelope_import_roundtrips_wiki(client, acting_user, session):
+    """Export a wiki as its envelope, import it into another initiative: its
+    pages and tags survive; the importer gets an owner grant; tags
+    match-or-create against the guild."""
     from sqlmodel import select
 
-    from app.models.tenant.counter import Counter, CounterGroup
     from app.models.tenant.resource_grant import ResourceGrant
+    from app.models.tenant.wiki import Wiki, WikiPage
+    from app.testing.factories import create_wiki, create_wiki_page
 
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    group = await create_counter_group(session, a.initiative, a.user, name="Party Gold")
-    from decimal import Decimal
-
-    from app.models.tenant.counter import Counter as C
-
-    session.add(
-        C(
-            counter_group_id=group.id,
-            name="GP",
-            count=Decimal("42.5"),
-            step=Decimal(1),
-            initial_count=Decimal(0),
-            position=Decimal(0),
-        )
-    )
-    await assign_tag(session, group, await create_tag(session, a.guild, name="Loot"))
+    await switch_tools(session, a.initiative, {Tool.wiki: True})
+    wiki = await create_wiki(session, a.initiative, a.user, name="Party Lore")
+    await create_wiki_page(session, wiki, a.user, title="GP")
+    await assign_tag(session, wiki, await create_tag(session, a.guild, name="Loot"))
     await session.commit()
 
-    envelope = await _export_json(
-        client, a, "/exports/counter_group", {"ids": [group.id]}
-    )
+    envelope = await _export_json(client, a, "/exports/wiki", {"ids": [wiki.id]})
     assert envelope["tags"] == ["Loot"]
     # A name listed again in another case is the same tag, attached once.
     envelope["tags"].append("loot")
-    target = await _second_initiative(session, a, tools={Tool.counter_group: True})
+    target = await _second_initiative(session, a, tools={Tool.wiki: True})
     resp = await _import_envelope(client, a, envelope, target.id)
     assert resp.status_code == 201, resp.text
     assert resp.json()["result"]["matched"]["tags"] == 1
 
     imported = (
         await session.exec(
-            select(CounterGroup).where(
-                CounterGroup.initiative_id == target.id,
-                CounterGroup.name == "Party Gold",
+            select(Wiki).where(
+                Wiki.initiative_id == target.id, Wiki.name == "Party Lore"
             )
         )
     ).one()
-    counter = (
-        await session.exec(
-            select(Counter).where(Counter.counter_group_id == imported.id)
-        )
+    page = (
+        await session.exec(select(WikiPage).where(WikiPage.wiki_id == imported.id))
     ).one()
-    assert counter.name == "GP"
-    assert float(counter.count) == 42.5
+    assert page.title == "GP"
     await tags_service.annotate_tags(session, [imported])
     assert [tag.name for tag in annotated_tags(imported)] == ["Loot"]
     grant = (
         await session.exec(
             select(ResourceGrant).where(
-                ResourceGrant.resource_type == "counter_group",
+                ResourceGrant.resource_type == "wiki",
                 ResourceGrant.resource_id == imported.id,
                 ResourceGrant.user_id == a.user.id,
             )
@@ -292,7 +274,6 @@ async def _tool_with_a_row(session, a, tool):
     "tool",
     [
         "project",
-        "counter_group",
         "calendar",
         "wiki",
         "dashboard",
@@ -411,9 +392,10 @@ async def test_a_renamed_property_is_one_definition_for_every_row(
         MetadataValue,
     )
     from app.testing.factories import (
-        create_counter,
         create_property_definition,
         create_property_value,
+        create_wiki,
+        create_wiki_page,
     )
 
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
@@ -424,14 +406,12 @@ async def test_a_renamed_property_is_one_definition_for_every_row(
     await create_property_definition(
         session, target, name="Status", type=MetadataType.number
     )
-    group = await create_counter_group(session, a.initiative, a.user)
+    wiki = await create_wiki(session, a.initiative, a.user)
     for name in ("First", "Second"):
-        counter = await create_counter(session, group, name=name)
-        await create_property_value(session, counter, status, value_text=name)
+        page = await create_wiki_page(session, wiki, a.user, title=name)
+        await create_property_value(session, page, status, value_text=name)
 
-    envelope = await _export_json(
-        client, a, "/exports/counter_group", {"ids": [group.id]}
-    )
+    envelope = await _export_json(client, a, "/exports/wiki", {"ids": [wiki.id]})
     resp = await _import_envelope(client, a, envelope, target.id)
     assert resp.status_code == 201, resp.text
 
@@ -440,7 +420,7 @@ async def test_a_renamed_property_is_one_definition_for_every_row(
             select(MetadataDefinition.name)
             .join(MetadataValue)
             .where(
-                MetadataValue.entity_type == "counter",
+                MetadataValue.entity_type == "wiki_page",
                 MetadataDefinition.initiative_id == target.id,
             )
         )
@@ -538,14 +518,14 @@ async def test_envelope_import_authorization_gates(client, acting_user, session)
     assert not_a_link.status_code == 400
     assert not_a_link.json()["detail"] == "FILE_SMART_LINK_URL_INVALID"
 
-    group_envelope = {
-        "type": "initiative-counter-group",
+    wiki_envelope = {
+        "type": "initiative-wiki",
         "schema_version": 1,
         "name": "Q",
-        "counters": [],
+        "pages": [],
     }
-    await switch_tools(session, a.initiative, {Tool.counter_group: False})
-    disabled = await _import_envelope(client, a, group_envelope, a.initiative.id)
+    await switch_tools(session, a.initiative, {Tool.wiki: False})
+    disabled = await _import_envelope(client, a, wiki_envelope, a.initiative.id)
     assert disabled.status_code == 400
     assert disabled.json()["detail"] == "IMPORT_TOOL_DISABLED"
 
@@ -577,17 +557,19 @@ async def test_large_envelope_becomes_job_and_worker_applies_it(
     from sqlmodel import select
 
     from app.models.platform.notification import Notification, NotificationType
-    from app.models.tenant.counter import CounterGroup
+    from app.models.tenant.wiki import Wiki
 
     monkeypatch.setattr(import_limits, "IMPORT_INLINE_MAX_ROWS", 0)
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     envelope = {
-        "type": "initiative-counter-group",
+        "type": "initiative-wiki",
         "schema_version": 1,
-        "name": "Big Tally",
-        "counters": [{"name": f"Counter {i}", "position": float(i)} for i in range(3)],
+        "name": "Big Lore",
+        "pages": [
+            {"title": f"Page {i}", "slug": f"page-{i}", "position": i} for i in range(3)
+        ],
     }
     resp = await _import_envelope(client, a, envelope, a.initiative.id)
     assert resp.status_code == 202, resp.text
@@ -597,7 +579,7 @@ async def test_large_envelope_becomes_job_and_worker_applies_it(
     assert body["params"] == {"initiative_id": a.initiative.id}
     # The row holds options only — the envelope content is staged in storage,
     # and the storage key itself is not exposed through the API.
-    assert "counters" not in json.dumps(body)
+    assert "Page 0" not in json.dumps(body)
     assert "file_ref" not in body
 
     await _run_import_worker(monkeypatch, role_session)
@@ -605,8 +587,8 @@ async def test_large_envelope_becomes_job_and_worker_applies_it(
     status_resp = await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)
     job = status_resp.json()
     assert job["status"] == DataJobStatus.done.value, job.get("error")
-    assert job["result"]["created"]["counter_groups"] == 1
-    assert job["result"]["created"]["counters"] == 3
+    assert job["result"]["created"]["wikis"] == 1
+    assert job["result"]["created"]["pages"] == 3
 
     # The staged payload was deleted on the terminal transition.
     from app.testing import route_session_to_guild
@@ -615,9 +597,7 @@ async def test_large_envelope_becomes_job_and_worker_applies_it(
     row = await session.get(DataJob, job_id)
     assert row is not None and row.file_ref is None
 
-    imported = (
-        await session.exec(select(CounterGroup).where(CounterGroup.name == "Big Tally"))
-    ).one()
+    imported = (await session.exec(select(Wiki).where(Wiki.name == "Big Lore"))).one()
     assert imported.created_by == a.user.id  # applied AS the creator
 
     await drain_notices()
@@ -639,18 +619,18 @@ async def test_worker_fails_closed_on_revoked_permission(
     from sqlalchemy import delete as sa_delete
     from sqlmodel import select
 
-    from app.models.tenant.counter import CounterGroup
     from app.models.tenant.initiative import InitiativeMember
+    from app.models.tenant.wiki import Wiki
 
     monkeypatch.setattr(import_limits, "IMPORT_INLINE_MAX_ROWS", 0)
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     envelope = {
-        "type": "initiative-counter-group",
+        "type": "initiative-wiki",
         "schema_version": 1,
-        "name": "Doomed Tally",
-        "counters": [],
+        "name": "Doomed Lore",
+        "pages": [],
     }
     resp = await _import_envelope(client, a, envelope, a.initiative.id)
     assert resp.status_code == 202
@@ -672,9 +652,7 @@ async def test_worker_fails_closed_on_revoked_permission(
     # permission check refuses — both fail closed.
     assert job["error"] in ("IMPORT_PERMISSION_REQUIRED", "IMPORT_INVALID_PARAMS")
     assert (
-        await session.exec(
-            select(CounterGroup).where(CounterGroup.name == "Doomed Tally")
-        )
+        await session.exec(select(Wiki).where(Wiki.name == "Doomed Lore"))
     ).one_or_none() is None
 
 
@@ -694,7 +672,7 @@ async def test_stale_running_import_fails_closed_not_reapplied(
         session,
         a.guild,
         a.user,
-        source="initiative-counter-group",
+        source="initiative-wiki",
         params={"initiative_id": a.initiative.id},
         file_ref="imports/gone.json",
         status=DataJobStatus.running,
@@ -716,10 +694,10 @@ async def test_import_job_cap_and_cancel(client, acting_user, session, monkeypat
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     envelope = {
-        "type": "initiative-counter-group",
+        "type": "initiative-wiki",
         "schema_version": 1,
         "name": "Q",
-        "counters": [],
+        "pages": [],
     }
     first = await _import_envelope(client, a, envelope, a.initiative.id)
     assert first.status_code == 202
@@ -751,10 +729,10 @@ async def test_import_jobs_are_own_row_isolated(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     envelope = {
-        "type": "initiative-counter-group",
+        "type": "initiative-wiki",
         "schema_version": 1,
         "name": "Mine",
-        "counters": [],
+        "pages": [],
     }
     resp = await _import_envelope(client, a, envelope, a.initiative.id)
     job_id = resp.json()["id"]
@@ -785,10 +763,10 @@ async def test_envelope_byte_bound_enforced_before_body_is_read(
         {
             "initiative_id": a.initiative.id,
             "envelope": {
-                "type": "initiative-counter-group",
+                "type": "initiative-wiki",
                 "schema_version": 1,
                 "name": "Q",
-                "counters": [],
+                "pages": [],
                 "padding": "x" * 4096,
             },
         }
@@ -822,10 +800,10 @@ async def test_envelope_byte_bound_enforced_before_body_is_read(
         client,
         a,
         {
-            "type": "initiative-counter-group",
+            "type": "initiative-wiki",
             "schema_version": 1,
             "name": "Q",
-            "counters": [],
+            "pages": [],
         },
         a.initiative.id,
     )
@@ -865,7 +843,7 @@ def _minimal_manifest(initiative_id=1, name="Restored", entries=None, assets=Non
                 "tools": {
                     "project": "included",
                     "file": "included",
-                    "counter_group": "included",
+                    "wiki": "included",
                     "dashboard": "disabled",
                     "calendar_event": "included",
                 },
@@ -878,23 +856,20 @@ def _minimal_manifest(initiative_id=1, name="Restored", entries=None, assets=Non
     }
 
 
-def _counter_group_entry(initiative_id=1):
+def _wiki_entry(initiative_id=1):
     envelope = {
-        "type": "initiative-counter-group",
+        "type": "initiative-wiki",
         "schema_version": 1,
-        "name": "Restored Tally",
-        "counters": [{"name": "Aria", "position": 1.0}],
+        "name": "Restored Lore",
+        "pages": [{"title": "Aria", "slug": "aria", "position": 1}],
     }
     entry = {
-        "path": (
-            "initiatives/1-restored/counter_groups/"
-            "1-restored-tally.initiative-counter-group.json"
-        ),
-        "tool": "counter_group",
-        "type": "initiative-counter-group",
+        "path": "initiatives/1-restored/wikis/1-restored-lore.initiative-wiki.json",
+        "tool": "wiki",
+        "type": "initiative-wiki",
         "schema_version": 1,
         "entity_id": 1,
-        "title": "Restored Tally",
+        "title": "Restored Lore",
         "initiative_id": initiative_id,
         "tags": [],
         "properties": [],
@@ -978,9 +953,9 @@ async def test_backup_import_end_to_end_with_assets(
     (deduped here — same guild, key already exists) and quota-checked."""
     from sqlmodel import select
 
-    from app.models.tenant.counter import CounterGroup
     from app.models.tenant.file import File
     from app.models.tenant.initiative import Initiative, InitiativeMember
+    from app.models.tenant.wiki import Wiki
     from app.testing.factories import create_upload
 
     a = await acting_user(
@@ -1001,7 +976,7 @@ async def test_backup_import_end_to_end_with_assets(
         content_type="application/pdf",
     )
 
-    entry, envelope = _counter_group_entry()
+    entry, envelope = _wiki_entry()
     file_entry = _file_entry("restore-me.pdf", entity_id=2, tags=["restored"])
     manifest = _minimal_manifest(
         entries=[entry, file_entry],
@@ -1030,7 +1005,7 @@ async def test_backup_import_end_to_end_with_assets(
     plan = body["plan"]
     assert plan["source_community_name"] == "Source Guild"
     assert plan["initiatives"][0]["proposed_name"] == "Restored"
-    assert plan["initiatives"][0]["entry_counts"] == {"counter_group": 1, "file": 1}
+    assert plan["initiatives"][0]["entry_counts"] == {"wiki": 1, "file": 1}
     assert plan["asset_count"] == 1
     assert plan["asset_bytes"] == len(payload)
 
@@ -1045,7 +1020,7 @@ async def test_backup_import_end_to_end_with_assets(
     job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
     assert job["status"] == DataJobStatus.done.value, job.get("error")
     result = job["result"]
-    assert result["per_tool"]["counter_group"]["created"] == 1
+    assert result["per_tool"]["wiki"]["created"] == 1
     assert result["per_tool"]["file"]["created"] == 1
     # Same guild: the storage key already existed, so the blob deduped.
     assert result["assets_deduped"] == 1
@@ -1055,7 +1030,7 @@ async def test_backup_import_end_to_end_with_assets(
         await session.exec(select(Initiative).where(Initiative.name == "Restored"))
     ).one()
     assert restored.description == "from backup"
-    assert own_switch(restored, Tool.counter_group) is True
+    assert own_switch(restored, Tool.wiki) is True
     assert own_switch(restored, Tool.dashboard) is False  # "disabled" in manifest
     member = (
         await session.exec(
@@ -1067,11 +1042,9 @@ async def test_backup_import_end_to_end_with_assets(
     assert member.user_id == a.user.id
 
     group = (
-        await session.exec(
-            select(CounterGroup).where(CounterGroup.initiative_id == restored.id)
-        )
+        await session.exec(select(Wiki).where(Wiki.initiative_id == restored.id))
     ).one()
-    assert group.name == "Restored Tally"
+    assert group.name == "Restored Lore"
     file_doc = (
         await session.exec(
             select(File).where(
@@ -1122,7 +1095,7 @@ async def test_backup_rejects_invalid_and_bomb_zips(
 
     # A backup is held to the bundle bounds.
     monkeypatch.setattr(import_limits, "IMPORT_MAX_BUNDLE_MEMBERS", 1)
-    entry, envelope = _counter_group_entry()
+    entry, envelope = _wiki_entry()
     bomb = _make_backup_zip(
         _minimal_manifest(entries=[entry]),
         {entry["path"]: json.dumps(envelope).encode()},
@@ -1256,7 +1229,7 @@ async def test_backup_confirm_include_map_skips_tools(
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
-    entry, envelope = _counter_group_entry()
+    entry, envelope = _wiki_entry()
     zip_bytes = _make_backup_zip(
         _minimal_manifest(entries=[entry]),
         {entry["path"]: json.dumps(envelope).encode()},
@@ -1266,15 +1239,15 @@ async def test_backup_confirm_include_map_skips_tools(
     confirmed = await client.post(
         a.g(f"/imports/jobs/{job_id}/confirm"),
         headers=a.headers,
-        json={"include": {"counter_group": False}},
+        json={"include": {"wiki": False}},
     )
     assert confirmed.status_code == 200
 
     await _run_import_worker(monkeypatch, role_session)
     job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
     assert job["status"] == DataJobStatus.done.value, job.get("error")
-    assert job["result"]["per_tool"]["counter_group"]["skipped"] == 1
-    assert job["result"]["per_tool"]["counter_group"]["created"] == 0
+    assert job["result"]["per_tool"]["wiki"]["skipped"] == 1
+    assert job["result"]["per_tool"]["wiki"]["created"] == 0
 
 
 async def test_an_archive_from_before_the_floor_is_refused(client, acting_user):
@@ -1552,12 +1525,10 @@ async def test_backup_corrupt_entry_fails_alone(
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
-    good_entry, good_envelope = _counter_group_entry()
+    good_entry, good_envelope = _wiki_entry()
     bad_entry = dict(good_entry)
-    bad_entry["path"] = (
-        "initiatives/1-restored/counter_groups/2-bad.initiative-counter-group.json"
-    )
-    bad_entry["title"] = "Bad Tally"
+    bad_entry["path"] = "initiatives/1-restored/wikis/2-bad.initiative-wiki.json"
+    bad_entry["title"] = "Bad Lore"
     bad_entry["entity_id"] = 2
     zip_bytes = _make_backup_zip(
         _minimal_manifest(entries=[good_entry, bad_entry]),
@@ -1576,13 +1547,13 @@ async def test_backup_corrupt_entry_fails_alone(
 
     job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
     assert job["status"] == DataJobStatus.done.value, job.get("error")
-    assert job["result"]["per_tool"]["counter_group"] == {
+    assert job["result"]["per_tool"]["wiki"] == {
         "created": 1,
         "failed": 1,
         "skipped": 0,
     }
     statuses = {e["title"]: e["status"] for e in job["result"]["entries"]}
-    assert statuses == {"Restored Tally": "created", "Bad Tally": "failed"}
+    assert statuses == {"Restored Lore": "created", "Bad Lore": "failed"}
 
 
 async def test_backup_seat_vacated_before_apply_fails_closed(
@@ -1591,7 +1562,7 @@ async def test_backup_seat_vacated_before_apply_fails_closed(
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
-    entry, envelope = _counter_group_entry()
+    entry, envelope = _wiki_entry()
     zip_bytes = _make_backup_zip(
         _minimal_manifest(entries=[entry]),
         {entry["path"]: json.dumps(envelope).encode()},
@@ -2089,18 +2060,18 @@ async def test_backup_entry_past_the_json_cap_fails_alone(
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
-    good_entry, good_envelope = _counter_group_entry()
+    good_entry, good_envelope = _wiki_entry()
     big_entry = {
         **good_entry,
-        "path": "initiatives/1-restored/counter_groups/2-big.initiative-counter-group.json",
-        "title": "Big Tally",
+        "path": "initiatives/1-restored/wikis/2-big.initiative-wiki.json",
+        "title": "Big Lore",
         "entity_id": 2,
     }
     big_envelope = {
         **good_envelope,
-        "name": "Big Tally",
-        "counters": [
-            {"name": f"Member {index}", "position": float(index)}
+        "name": "Big Lore",
+        "pages": [
+            {"title": f"Member {index}", "slug": f"member-{index}", "position": index}
             for index in range(400)
         ],
     }
@@ -2119,8 +2090,8 @@ async def test_backup_entry_past_the_json_cap_fails_alone(
     )
     assert job["status"] == DataJobStatus.done.value, job.get("error")
     entries = {entry["title"]: entry for entry in job["result"]["entries"]}
-    assert entries["Restored Tally"]["status"] == "created"
-    assert (entries["Big Tally"]["status"], entries["Big Tally"]["error"]) == (
+    assert entries["Restored Lore"]["status"] == "created"
+    assert (entries["Big Lore"]["status"], entries["Big Lore"]["error"]) == (
         "failed",
         "IMPORT_TOO_LARGE",
     )
@@ -2491,8 +2462,8 @@ async def test_backup_applies_into_an_existing_initiative(
     """
     from sqlmodel import select
 
-    from app.models.tenant.counter import CounterGroup
     from app.models.tenant.initiative import Initiative
+    from app.models.tenant.wiki import Wiki
 
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
@@ -2500,7 +2471,7 @@ async def test_backup_applies_into_an_existing_initiative(
     target = await _second_initiative(session, a)
     before = len((await session.exec(select(Initiative.id))).all())
 
-    entry, envelope = _counter_group_entry()
+    entry, envelope = _wiki_entry()
     manifest = _minimal_manifest(entries=[entry])
     manifest["initiatives"][0]["target_initiative_id"] = target.id
     zip_bytes = _make_backup_zip(
@@ -2525,11 +2496,9 @@ async def test_backup_applies_into_an_existing_initiative(
     ).one_or_none() is None
 
     group = (
-        await session.exec(
-            select(CounterGroup).where(CounterGroup.initiative_id == target.id)
-        )
+        await session.exec(select(Wiki).where(Wiki.initiative_id == target.id))
     ).one()
-    assert group.name == "Restored Tally"
+    assert group.name == "Restored Lore"
 
 
 async def test_backup_into_an_unreachable_initiative_fails_the_job(
@@ -2541,7 +2510,7 @@ async def test_backup_into_an_unreachable_initiative_fails_the_job(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
 
-    entry, envelope = _counter_group_entry()
+    entry, envelope = _wiki_entry()
     manifest = _minimal_manifest(entries=[entry])
     manifest["initiatives"][0]["target_initiative_id"] = 10_000_000
     zip_bytes = _make_backup_zip(
@@ -3242,7 +3211,7 @@ async def test_the_plan_lists_the_people_and_suggests_the_exact_matches(
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
-    entry, envelope = _counter_group_entry()
+    entry, envelope = _wiki_entry()
     manifest = _minimal_manifest(entries=[entry])
     manifest["people"] = [
         {"handle": handle_of(a.user), "name": "The Importer", "comment_count": 4},
@@ -3586,12 +3555,11 @@ def _chip_node(chip_kind: str, entity_id: int, text: str) -> dict:
 async def _referencing_initiative(session, a) -> dict:
     """An initiative whose bodies name each other: a task naming a task, a
     file and a file in another initiative; a comment naming a wiki
-    page; a file naming a task, its status, a counter's value and another
+    page; a file naming a task, its status, the project's progress and another
     file; a post naming the project; a page naming the post."""
     from app.api.v1.tenant_endpoints.exports_test import _all_tools_enabled
     from app.testing.factories import (
         create_comment,
-        create_counter,
         create_post,
         create_wiki,
         create_wiki_page,
@@ -3603,8 +3571,6 @@ async def _referencing_initiative(session, a) -> dict:
 
     fix = await create_task(session, a.project, title="Fix the bug")
     spec = await create_file(session, a.initiative, a.user, name="Spec")
-    group = await create_counter_group(session, a.initiative, a.user, name="Tally")
-    counter = await create_counter(session, group, name="Wins")
     post = await create_post(
         session,
         a.initiative,
@@ -3628,7 +3594,7 @@ async def _referencing_initiative(session, a) -> dict:
         content=_editor_state(
             _reference_node("task", fix.id, "Fix the bug"),
             _chip_node("task:status", fix.id, "To do"),
-            _chip_node("counter:value", counter.id, "3"),
+            _chip_node("project:progress", a.project.id, "0 / 2"),
             _reference_node("file", spec.id, "Spec"),
         ),
     )
@@ -3679,7 +3645,6 @@ async def _restored(session, initiative_id: int) -> dict:
     from sqlmodel import select
 
     from app.models.tenant.comment import Comment
-    from app.models.tenant.counter import Counter, CounterGroup
     from app.models.tenant.file import File
     from app.models.tenant.post import Post
     from app.models.tenant.project import Project
@@ -3710,19 +3675,11 @@ async def _restored(session, initiative_id: int) -> dict:
     wiki = (
         await session.exec(select(Wiki).where(Wiki.initiative_id == initiative_id))
     ).one()
-    counter = (
-        await session.exec(
-            select(Counter)
-            .join(CounterGroup, CounterGroup.id == Counter.counter_group_id)
-            .where(CounterGroup.initiative_id == initiative_id)
-        )
-    ).one()
     return {
         "project": project,
         "tasks": tasks,
         "layouts": [],
         "files": files,
-        "counter": counter,
         "post": (
             await session.exec(select(Post).where(Post.initiative_id == initiative_id))
         ).one(),
@@ -3789,10 +3746,10 @@ async def test_a_restored_reference_points_at_the_restored_copy(
         f"and #file[Elsewhere]({outside.id})"
     )
     assert r["comment"].content == f"Written up in #wiki-page[Start]({r['page'].id})"
-    mention, status, value, link = _nodes(plan.content)
+    mention, status, progress, link = _nodes(plan.content)
     assert mention["entityId"] == fix.id
     assert status["entityId"] == fix.id
-    assert value["entityId"] == r["counter"].id
+    assert progress["entityId"] == r["project"].id
     assert link["entityId"] == spec.id
     [project_mention] = _nodes(r["post"].body)
     assert project_mention["entityId"] == r["project"].id
@@ -3816,7 +3773,7 @@ async def test_a_restored_reference_points_at_the_restored_copy(
     # a task's come from its description and from what is said on it.
     assert await references(Endpoint(SearchEntityType.file, plan.id)) == {
         ("task", fix.id),
-        ("counter", r["counter"].id),
+        ("project", r["project"].id),
         ("file", spec.id),
     }
     assert await references(Endpoint(SearchEntityType.task, ship.id)) == {
@@ -4006,11 +3963,11 @@ async def test_a_zip_is_refused_from_the_wrong_tool_or_without_an_export(
                 archive.writestr(name, content)
         return buffer.getvalue()
 
-    group = json.dumps(
-        {"type": "initiative-counter-group", "schema_version": 1, "name": "Q"}
+    contact = json.dumps(
+        {"type": "initiative-contact", "schema_version": 1, "name": "Q"}
     )
     wrong = await _import_archive(
-        client, a, zipped(**{"q.json": group}), a.initiative.id, "initiative-wiki"
+        client, a, zipped(**{"q.json": contact}), a.initiative.id, "initiative-wiki"
     )
     assert wrong.status_code == 400
     assert wrong.json()["detail"] == "IMPORT_WRONG_TOOL"
@@ -4129,7 +4086,7 @@ async def test_confirm_refuses_a_malformed_people_map(client, acting_user, sessi
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
-    entry, envelope = _counter_group_entry()
+    entry, envelope = _wiki_entry()
     zip_bytes = _make_backup_zip(
         _minimal_manifest(entries=[entry]),
         {entry["path"]: json.dumps(envelope).encode()},
@@ -6369,7 +6326,7 @@ async def test_an_apply_touches_its_row_as_it_goes(
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
-    entry, envelope = _counter_group_entry()
+    entry, envelope = _wiki_entry()
     zip_bytes = _make_backup_zip(
         _minimal_manifest(entries=[entry]),
         {entry["path"]: json.dumps(envelope).encode()},
@@ -6384,17 +6341,17 @@ async def test_an_apply_touches_its_row_as_it_goes(
 # --- running imports side by side -------------------------------------------
 
 
-_COUNTER_GROUP_ENVELOPE = {
-    "type": "initiative-counter-group",
+_WIKI_ENVELOPE = {
+    "type": "initiative-wiki",
     "schema_version": 1,
     "name": "Side by side",
-    "counters": [{"name": "Aria", "position": 1.0}],
+    "pages": [{"title": "Aria", "slug": "aria", "position": 1}],
 }
 
 
 async def _queued(client, actor) -> int:
     response = await _import_envelope(
-        client, actor, _COUNTER_GROUP_ENVELOPE, actor.initiative.id
+        client, actor, _WIKI_ENVELOPE, actor.initiative.id
     )
     assert response.status_code == 202, response.text
     return response.json()["id"]
@@ -6502,7 +6459,7 @@ async def test_the_sweep_leaves_a_job_this_process_is_running(
         session,
         a.guild,
         a.user,
-        source="initiative-counter-group",
+        source="initiative-wiki",
         params={"initiative_id": a.initiative.id},
         file_ref="imports/elsewhere.json",
         status=DataJobStatus.running,

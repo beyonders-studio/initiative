@@ -272,7 +272,7 @@ def test_a_cookie_whose_name_merely_ends_in_the_session_name_is_not_a_session(cl
 #
 # WebSockets carry the session cookie and are not bound by the same-origin
 # policy, and five routes fall back to that cookie when the first message
-# supplies no token (collaboration, counters, events, queues, notifications).
+# supplies no token (collaboration, tool rows, events, queues, notifications).
 # The HTTP rule above does not reach them: the middleware returned early on any
 # non-HTTP scope.
 

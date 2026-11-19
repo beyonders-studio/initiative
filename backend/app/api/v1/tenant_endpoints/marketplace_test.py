@@ -776,57 +776,55 @@ class TestOneListingsPage:
         assert body["latest_version"]["compatible"] is False
 
 
-#: A counter group a publisher shares: the blank template installs empty, the
-#: example the way they filled it in.
-COUNTERS_UID = "C0VNTERS000001"
+#: A wiki a publisher shares: the blank template installs with its one page,
+#: the example the way they filled it in.
+WIKI_UID = "WHANDB00K00001"
 
 
-def _counter_envelope(*counts: float) -> dict:
+def _wiki_envelope(*titles: str) -> dict:
     return {
-        "type": "initiative-counter-group",
+        "type": "initiative-wiki",
         "name": "Whatever the file called it",
-        "description": "Tally of the party's resources.",
-        "counters": [
-            {"name": name, "count": count}
-            for name, count in zip(("Hit points", "Spell slots"), counts)
+        "description": "Rules of the party.",
+        "pages": [
+            {"title": title, "slug": title.lower().replace(" ", "-"), "position": i}
+            for i, title in enumerate(titles)
         ],
     }
 
 
-async def _counter_listing(session, *, example: bool = True):
+async def _wiki_listing(session, *, example: bool = True):
     return await create_marketplace_listing(
         session,
-        uid=COUNTERS_UID,
-        public_id="tests.party-tally",
-        kind="counter_group",
-        name="Party tally",
-        definition=_counter_envelope(0, 0),
-        example=_counter_envelope(27, 3) if example else None,
+        uid=WIKI_UID,
+        public_id="tests.party-handbook",
+        kind="wiki",
+        name="Party handbook",
+        definition=_wiki_envelope("Rules"),
+        example=_wiki_envelope("Rules", "Spell slots") if example else None,
     )
 
 
-async def _counters_on(session, initiative):
-    await switch_tools(session, initiative, {Tool.counter_group: True})
+async def _wikis_on(session, initiative):
+    await switch_tools(session, initiative, {Tool.wiki: True})
 
 
-async def _read_group(session, guild_id: int, group_id: int):
+async def _read_wiki(session, guild_id: int, wiki_id: int):
     from sqlmodel import select
 
-    from app.models.tenant.counter import Counter, CounterGroup
+    from app.models.tenant.wiki import Wiki, WikiPage
     from app.testing import route_session_to_guild
 
     await route_session_to_guild(session, guild_id)
-    group = (
-        await session.exec(select(CounterGroup).where(CounterGroup.id == group_id))
-    ).one()
-    counts = sorted(
+    wiki = (await session.exec(select(Wiki).where(Wiki.id == wiki_id))).one()
+    titles = sorted(
         (
             await session.exec(
-                select(Counter.count).where(Counter.counter_group_id == group_id)
+                select(WikiPage.title).where(WikiPage.wiki_id == wiki_id)
             )
         ).all()
     )
-    return group, counts
+    return wiki, titles
 
 
 class TestInstallingAToolListing:
@@ -836,55 +834,55 @@ class TestInstallingAToolListing:
         self, client, acting_user, session
     ):
         # A guild member, not an admin: what lets them is the initiative
-        # role's permission to create counter groups.
+        # role's permission to create wikis.
         member = await acting_user(guild_role=CommunityRole.member, initiative=True)
-        await _counters_on(session, member.initiative)
-        await _counter_listing(session)
+        await _wikis_on(session, member.initiative)
+        await _wiki_listing(session)
 
         response = await client.post(
-            member.g(f"/marketplace/listings/by-uid/{COUNTERS_UID}/install"),
+            member.g(f"/marketplace/listings/by-uid/{WIKI_UID}/install"),
             json={"initiative_id": member.initiative.id},
             headers=member.headers,
         )
 
         assert response.status_code == 201, response.text
         body = response.json()
-        assert body["kind"] == "counter_group"
+        assert body["kind"] == "wiki"
         assert body["listing_version"] == "1.0.0"
-        group, counts = await _read_group(
+        wiki, titles = await _read_wiki(
             session, member.guild.id, body["result"]["entity_id"]
         )
         # Called what the listing is called, and it remembers where it came from.
-        assert group.name == "Party tally"
-        assert (group.listing_uid, group.listing_version) == (COUNTERS_UID, "1.0.0")
-        assert counts == [0, 0]
+        assert wiki.name == "Party handbook"
+        assert (wiki.listing_uid, wiki.listing_version) == (WIKI_UID, "1.0.0")
+        assert titles == ["Rules"]
 
     async def test_it_may_start_from_the_example(self, client, acting_user, session):
         actor = await acting_user(guild_role=CommunityRole.member, initiative=True)
-        await _counters_on(session, actor.initiative)
-        await _counter_listing(session)
+        await _wikis_on(session, actor.initiative)
+        await _wiki_listing(session)
 
         response = await client.post(
-            actor.g(f"/marketplace/listings/by-uid/{COUNTERS_UID}/install"),
+            actor.g(f"/marketplace/listings/by-uid/{WIKI_UID}/install"),
             json={"initiative_id": actor.initiative.id, "start_from": "example"},
             headers=actor.headers,
         )
 
         assert response.status_code == 201, response.text
-        _, counts = await _read_group(
+        _, titles = await _read_wiki(
             session, actor.guild.id, response.json()["result"]["entity_id"]
         )
-        assert counts == [3, 27]
+        assert titles == ["Rules", "Spell slots"]
 
     async def test_there_is_no_example_to_start_from_unless_it_has_one(
         self, client, acting_user, session
     ):
         actor = await acting_user(guild_role=CommunityRole.member, initiative=True)
-        await _counters_on(session, actor.initiative)
-        await _counter_listing(session, example=False)
+        await _wikis_on(session, actor.initiative)
+        await _wiki_listing(session, example=False)
 
         response = await client.post(
-            actor.g(f"/marketplace/listings/by-uid/{COUNTERS_UID}/install"),
+            actor.g(f"/marketplace/listings/by-uid/{WIKI_UID}/install"),
             json={"initiative_id": actor.initiative.id, "start_from": "example"},
             headers=actor.headers,
         )
@@ -896,27 +894,30 @@ class TestInstallingAToolListing:
         self, client, acting_user, session
     ):
         actor = await acting_user(guild_role=CommunityRole.member)
-        await _counter_listing(session)
+        await _wiki_listing(session)
 
         response = await client.get(
-            actor.g(f"/marketplace/listings/by-uid/{COUNTERS_UID}"),
+            actor.g(f"/marketplace/listings/by-uid/{WIKI_UID}"),
             headers=actor.headers,
         )
 
         assert response.status_code == 200, response.text
         body = response.json()
-        assert body["kind"] == "counter_group"
-        assert [c["count"] for c in body["example"]["counters"]] == [27, 3]
+        assert body["kind"] == "wiki"
+        assert [p["title"] for p in body["example"]["pages"]] == [
+            "Rules",
+            "Spell slots",
+        ]
 
     async def test_a_tool_switched_off_takes_no_install(
         self, client, acting_user, session
     ):
         actor = await acting_user(guild_role=CommunityRole.member, initiative=True)
-        await switch_tools(session, actor.initiative, {Tool.counter_group: False})
-        await _counter_listing(session)
+        await switch_tools(session, actor.initiative, {Tool.wiki: False})
+        await _wiki_listing(session)
 
         response = await client.post(
-            actor.g(f"/marketplace/listings/by-uid/{COUNTERS_UID}/install"),
+            actor.g(f"/marketplace/listings/by-uid/{WIKI_UID}/install"),
             json={"initiative_id": actor.initiative.id},
             headers=actor.headers,
         )
@@ -928,12 +929,12 @@ class TestInstallingAToolListing:
         self, client, acting_user, session
     ):
         owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-        await _counters_on(session, owner.initiative)
+        await _wikis_on(session, owner.initiative)
         outsider = await acting_user(guild_role=CommunityRole.member, guild=owner.guild)
-        await _counter_listing(session)
+        await _wiki_listing(session)
 
         response = await client.post(
-            outsider.g(f"/marketplace/listings/by-uid/{COUNTERS_UID}/install"),
+            outsider.g(f"/marketplace/listings/by-uid/{WIKI_UID}/install"),
             json={"initiative_id": owner.initiative.id},
             headers=outsider.headers,
         )

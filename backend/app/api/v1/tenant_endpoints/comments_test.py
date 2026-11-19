@@ -184,14 +184,14 @@ class TestToolComments:
 
     async def test_a_reply_must_share_the_parent(self, client, session, acting_user):
         a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-        group = await _tool_entity(session, Tool.counter_group, a.initiative, a.user)
-        other = await _tool_entity(session, Tool.counter_group, a.initiative, a.user)
+        group = await _tool_entity(session, Tool.calendar, a.initiative, a.user)
+        other = await _tool_entity(session, Tool.calendar, a.initiative, a.user)
 
         root = await client.post(
             a.g("/comments/"),
             headers=a.headers,
             json={
-                "subject_type": "counter_group",
+                "subject_type": "calendar",
                 "subject_id": group.id,
                 "content": "Root",
             },
@@ -202,7 +202,7 @@ class TestToolComments:
             a.g("/comments/"),
             headers=a.headers,
             json={
-                "subject_type": "counter_group",
+                "subject_type": "calendar",
                 "subject_id": other.id,
                 "content": "Reply",
                 "parent_comment_id": root.json()["id"],
@@ -215,7 +215,7 @@ class TestToolComments:
             a.g("/comments/"),
             headers=a.headers,
             json={
-                "subject_type": "counter_group",
+                "subject_type": "calendar",
                 "subject_id": group.id,
                 "content": "Reply",
                 "parent_comment_id": root.json()["id"],
@@ -273,11 +273,11 @@ class TestToolComments:
         a = await acting_user(
             guild_role=CommunityRole.member, initiative=True, project=True
         )
-        group = await _tool_entity(session, Tool.counter_group, a.initiative, a.user)
+        group = await _tool_entity(session, Tool.calendar, a.initiative, a.user)
         task = await create_task(session, a.project)
 
         for kind, subject_id, content in (
-            ("counter_group", group.id, "On the counter group"),
+            ("calendar", group.id, "On the calendar"),
             ("task", task.id, "On the task"),
         ):
             posted = await client.post(
@@ -294,9 +294,9 @@ class TestToolComments:
         recent = await client.get(a.g("/comments/recent"), headers=a.headers)
         assert recent.status_code == 200, recent.text
         by_type = {e["entity_type"]: e for e in recent.json()}
-        assert by_type["counter_group"]["entity_id"] == group.id
-        assert by_type["counter_group"]["entity_name"] == group.name
-        assert by_type["counter_group"]["initiative_id"] == a.initiative.id
+        assert by_type["calendar"]["entity_id"] == group.id
+        assert by_type["calendar"]["entity_name"] == group.name
+        assert by_type["calendar"]["initiative_id"] == a.initiative.id
         assert by_type["task"]["entity_id"] == task.id
         assert by_type["task"]["project_id"] == a.project.id
 
@@ -476,27 +476,27 @@ async def test_recent_drops_comments_of_a_disabled_tool(client, session, acting_
     """Switching a tool off takes its threads out of the recent feed, exactly
     as it takes the threads themselves away."""
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    group = await _tool_entity(session, Tool.counter_group, a.initiative, a.user)
+    group = await _tool_entity(session, Tool.calendar, a.initiative, a.user)
 
     posted = await client.post(
         a.g("/comments/"),
         headers=a.headers,
         json={
-            "subject_type": "counter_group",
+            "subject_type": "calendar",
             "subject_id": group.id,
-            "content": "Counter talk",
+            "content": "Calendar talk",
         },
     )
     assert posted.status_code == 201, posted.text
 
     recent = await client.get(a.g("/comments/recent"), headers=a.headers)
-    assert any(e["entity_type"] == "counter_group" for e in recent.json())
+    assert any(e["entity_type"] == "calendar" for e in recent.json())
 
-    await switch_tools(session, a.initiative, {Tool.counter_group: False})
+    await switch_tools(session, a.initiative, {Tool.calendar: False})
 
     recent = await client.get(a.g("/comments/recent"), headers=a.headers)
     assert recent.status_code == 200
-    assert not any(e["entity_type"] == "counter_group" for e in recent.json())
+    assert not any(e["entity_type"] == "calendar" for e in recent.json())
 
 
 def _detail_path(tool: Tool, entity_id: int) -> str:

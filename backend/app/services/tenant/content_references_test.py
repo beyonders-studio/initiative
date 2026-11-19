@@ -45,10 +45,10 @@ def test_a_hash_reference_is_a_reference():
 def test_a_reference_to_something_that_is_not_a_file_counts_too():
     """The whole of what this phase adds: a page about a task refers to that
     task, and until now only the files were kept."""
-    content = _doc(_reference("task", 12), _reference("counter_group", 4))
+    content = _doc(_reference("task", 12), _reference("calendar_event", 4))
     assert references_in_body(content) == {
         (TASK, 12),
-        (SearchEntityType.counter_group, 4),
+        (SearchEntityType.calendar_event, 4),
     }
 
 
@@ -61,9 +61,9 @@ def test_a_chip_refers_to_the_thing_it_reads():
 
 def test_an_embed_refers_to_the_thing_it_shows():
     content = _doc(
-        {"type": "reference-embed", "entityType": "counter_group", "entityId": 4}
+        {"type": "reference-embed", "entityType": "calendar_event", "entityId": 4}
     )
-    assert references_in_body(content) == {(SearchEntityType.counter_group, 4)}
+    assert references_in_body(content) == {(SearchEntityType.calendar_event, 4)}
 
 
 def test_references_are_found_however_deep_they_sit():
@@ -96,10 +96,10 @@ def test_a_hash_reads_every_spelling_the_composer_writes():
     """The composer kebabs a kind after ``#``, which names the same things the
     kind's own spelling does."""
     assert references_in_text(
-        "#wiki-page[Start](3) #counter-group[Tally](4) #file[Spec](5) #wiki_page[A](6)"
+        "#wiki-page[Start](3) #calendar-event[Tally](4) #file[Spec](5) #wiki_page[A](6)"
     ) == {
         (SearchEntityType.wiki_page, 3),
-        (SearchEntityType.counter_group, 4),
+        (SearchEntityType.calendar_event, 4),
         (SearchEntityType.file, 5),
         (SearchEntityType.wiki_page, 6),
     }

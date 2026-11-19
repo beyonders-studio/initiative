@@ -15,7 +15,6 @@ import zipfile
 import zlib
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
 from typing import Any
 
 import docx
@@ -63,8 +62,6 @@ from app.testing.factories import (
     create_calendar,
     create_calendar_event,
     create_comment,
-    create_counter,
-    create_counter_group,
     create_dashboard,
     create_export_job,
     create_file,
@@ -80,6 +77,8 @@ from app.testing.factories import (
     create_task,
     create_tool_entity,
     create_upload,
+    create_wiki,
+    create_wiki_page,
     enable_all_tools,
 )
 
@@ -1495,93 +1494,6 @@ async def test_an_artifact_past_its_expiry_is_not_served(
 
 
 # ---------------------------------------------------------------------------
-# Counter-group exports
-# ---------------------------------------------------------------------------
-
-
-async def _counter_group_with_counters(acting_user, session):
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    group = await create_counter_group(
-        session, a.initiative, a.user, name="Party Resources", description="Session 12"
-    )
-    await create_counter(
-        session,
-        group,
-        name="Torches",
-        count=Decimal("5.0000000000"),
-        min=Decimal(0),
-        max=Decimal(10),
-        position=Decimal(1),
-    )
-    await create_counter(
-        session,
-        group,
-        name="Rations",
-        count=Decimal("2.5"),
-        step=Decimal("0.5"),
-        position=Decimal(2),
-    )
-    return a, group
-
-
-async def test_counter_group_export_json_envelope(
-    client: AsyncClient, acting_user, session
-):
-    a, group = await _counter_group_with_counters(acting_user, session)
-    resp = await _export(client, a, "counter_group", ids=[group.id], format="json")
-    envelope = json.loads(
-        _assert_export(resp, "json", disposition=(".initiative-counter-group.json",))
-    )
-    assert envelope["type"] == "initiative-counter-group"
-    assert envelope["schema_version"] == 1
-    assert envelope["name"] == "Party Resources"
-
-    by_name = {c["name"]: c for c in envelope["counters"]}
-    # NUMERIC(20,10) scale must not leak: integral Decimals become plain ints.
-    assert by_name["Torches"]["count"] == 5
-    assert isinstance(by_name["Torches"]["count"], int)
-    assert by_name["Torches"]["min"] == 0 and by_name["Torches"]["max"] == 10
-    assert by_name["Rations"]["count"] == 2.5
-    assert by_name["Rations"]["step"] == 0.5
-    assert by_name["Rations"]["min"] is None
-    assert by_name["Torches"]["view_mode"] == "number"
-
-
-def _workbook_keeps_counts_numeric(resp: Response, subject: Any) -> None:
-    sheet = _sheet(resp)
-    assert [c.value for c in sheet[1]] == ["Counter", "Count", "Min", "Max", "Step"]
-    assert sheet.cell(row=2, column=2).value == 5
-    assert sheet.cell(row=2, column=2).data_type == "n"  # counts stay numeric
-    assert sheet.cell(row=3, column=2).value == 2.5
-
-
-_COUNTER_REPORTS: dict[str, dict[str, Any]] = {
-    "csv": {
-        "present": (
-            "Counter,Count,Min,Max,Step",
-            "Torches,5,0,10,1",
-            "Rations,2.5,,,0.5",  # unbounded min/max stay empty
-        )
-    },
-    "xlsx": {"extra": _workbook_keeps_counts_numeric},
-    "pdf": {"present": ("Party Resources", "Torches", "Rations")},
-}
-
-
-@pytest.mark.parametrize("fmt", list(_COUNTER_REPORTS))
-async def test_counter_group_report_formats_render_every_counter(
-    client: AsyncClient, acting_user, session, fmt
-):
-    """The counter report lists every counter with its bounds in each format it
-    offers."""
-    a, group = await _counter_group_with_counters(acting_user, session)
-    resp = await _export(client, a, "counter_group", ids=[group.id], format=fmt)
-    _assert_export(resp, fmt, **_COUNTER_REPORTS[fmt])
-
-
-# ---------------------------------------------------------------------------
 # The initiative gate
 # ---------------------------------------------------------------------------
 
@@ -1687,7 +1599,6 @@ async def _wiki_with_filed_files(session, a, acting_user):
     """A wiki whose pages nest, one draft, and four files filed in it: a
     text document, a spreadsheet and an upload the exporter owns — the upload
     filed under the first page — and one they can only read."""
-    from app.testing.factories import create_wiki, create_wiki_page
 
     await enable_all_tools(session, a.initiative)
     wiki = await create_wiki(session, a.initiative, a.user, name="Handbook")
@@ -2072,29 +1983,29 @@ async def test_bulk_file_selection_rejects_format_not_shared_by_all(
     assert denied.status_code == 404
 
 
-async def test_bulk_counter_group_selection_exports_envelope_zip(
+async def test_bulk_wiki_selection_exports_envelope_zip(
     client: AsyncClient, acting_user, session
 ):
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    g1 = await create_counter_group(session, a.initiative, a.user, name="Alpha Tally")
-    g2 = await create_counter_group(session, a.initiative, a.user, name="Beta Tally")
+    w1 = await create_wiki(session, a.initiative, a.user, name="Alpha Lore")
+    w2 = await create_wiki(session, a.initiative, a.user, name="Beta Lore")
 
-    resp = await _export(client, a, "counter_group", ids=[g1.id, g2.id], format="json")
+    resp = await _export(client, a, "wiki", ids=[w1.id, w2.id], format="json")
     assert resp.status_code == 200
     names = _zip_names(resp)
     assert len(names) == 2
-    assert all(n.endswith(".initiative-counter-group.json") for n in names)
-    assert {e["name"] for e in _zip_json(resp)} == {"Alpha Tally", "Beta Tally"}
+    assert all(n.endswith(".initiative-wiki.json") for n in names)
+    assert {e["name"] for e in _zip_json(resp)} == {"Alpha Lore", "Beta Lore"}
 
     # Single-id selection stays a plain (unzipped) file.
-    single = await _export(client, a, "counter_group", ids=[g1.id], format="json")
+    single = await _export(client, a, "wiki", ids=[w1.id], format="json")
     assert single.status_code == 200
     assert single.headers["content-type"] == "application/json"
 
 
-async def test_bulk_counter_group_pdf_zip_through_job_path(
+async def test_bulk_wiki_pdf_zip_through_job_path(
     client: AsyncClient, acting_user, session, monkeypatch, role_session
 ):
     """A bulk selection over the inline threshold becomes a job; the worker
@@ -2103,18 +2014,18 @@ async def test_bulk_counter_group_pdf_zip_through_job_path(
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    g1 = await create_counter_group(session, a.initiative, a.user, name="Party")
-    g2 = await create_counter_group(session, a.initiative, a.user, name="Villains")
-    await create_counter(session, g1, name="HP")
-    await create_counter(session, g2, name="Minions")
+    w1 = await create_wiki(session, a.initiative, a.user, name="Party")
+    w2 = await create_wiki(session, a.initiative, a.user, name="Villains")
+    await create_wiki_page(session, w1, a.user, title="HP")
+    await create_wiki_page(session, w2, a.user, title="Minions")
 
-    queued = await _export(client, a, "counter_group", ids=[g1.id, g2.id], format="pdf")
+    queued = await _export(client, a, "wiki", ids=[w1.id, w2.id], format="pdf")
     assert queued.status_code == 202
 
     await _run_worker()
 
     dl = await _download(client, a, queued.json()["id"])
-    _assert_export(dl, "zip", disposition=("counter-group-",))
+    _assert_export(dl, "zip", disposition=("wiki-",))
     archive = _zip(dl)
     assert len(archive.namelist()) == 2
     for name in archive.namelist():
@@ -2528,7 +2439,6 @@ async def _populate_initiative(session, a, initiative):
     project = await create_project(session, initiative, a.user, name="Main Arc")
     await create_task(session, project, title="Fell the tower")
     await create_file(session, initiative, a.user, name="Campaign Notes")
-    await create_counter_group(session, initiative, a.user, name="Party Gold")
     calendar = await create_calendar(session, initiative, a.user, name="Raid Nights")
     await create_calendar_event(session, calendar, a.user, title="Session Zero")
     await create_post(session, initiative, a.user, name="Session moved")
@@ -2575,7 +2485,6 @@ async def test_initiative_backup_zip_layout_and_manifest(
     assert set(by_type) == {
         "initiative-project",
         "initiative-file",
-        "initiative-counter-group",
         "initiative-calendar",
         "initiative-post",
         # The initiative's own shape rides as an entry too: it is applied by
@@ -2716,7 +2625,6 @@ async def test_aggregate_export_hides_dac_invisible_rows(
         initiative_role="member",
     )
     await create_file(session, a.initiative, other.user, name="Their Secret")
-    await create_counter_group(session, a.initiative, other.user, name="Their Tally")
     await create_file(session, a.initiative, a.user, name="My Notes")
 
     resp = await _export(client, a, "initiative", initiative_id=a.initiative.id)
@@ -2724,10 +2632,10 @@ async def test_aggregate_export_hides_dac_invisible_rows(
     manifest = json.loads(archive.read("manifest.json"))
     titles = {e["title"] for e in manifest["entries"]}
     assert "My Notes" in titles and a.project.name in titles
-    assert "Their Secret" not in titles and "Their Tally" not in titles
+    assert "Their Secret" not in titles
     assert manifest["skipped"] == []  # invisible != skipped
     dumped = json.dumps(manifest)
-    assert "Their Secret" not in dumped and "Their Tally" not in dumped
+    assert "Their Secret" not in dumped
 
 
 async def test_guild_export_belongs_to_the_seat(
@@ -2937,7 +2845,6 @@ async def test_report_mode_mixed_formats_zip(
         formats=json.dumps(
             {
                 "project": "pdf",
-                "counter_group": "xlsx",
                 "calendar": "ics",
                 "file": {"lexical": "md"},
             }
@@ -2946,7 +2853,7 @@ async def test_report_mode_mixed_formats_zip(
     archive = await _rendered_zip(client, a, monkeypatch, role_session, resp)
     names = archive.namelist()
     assert "manifest.json" not in names
-    assert {n.rsplit(".", 1)[-1] for n in names} == {"pdf", "xlsx", "ics", "md"}
+    assert {n.rsplit(".", 1)[-1] for n in names} == {"pdf", "ics", "md"}
     pdf_name = next(n for n in names if n.endswith(".pdf"))
     assert archive.read(pdf_name).startswith(b"%PDF")
     ics_name = next(n for n in names if n.endswith(".ics"))
@@ -2961,7 +2868,7 @@ async def test_report_mode_mixed_formats_zip(
 _INVALID_SELECTORS: list[tuple[dict[str, Any], str]] = [
     ({"include": "not json"}, "EXPORT_INVALID_PARAMS"),
     (
-        {"mode": "report", "formats": '{"counter_group": "wav"}'},
+        {"mode": "report", "formats": '{"calendar": "wav"}'},
         "EXPORT_INVALID_FORMAT",
     ),
     (
@@ -2972,7 +2879,7 @@ _INVALID_SELECTORS: list[tuple[dict[str, Any], str]] = [
     ({"include": '{"project": "yes"}'}, "EXPORT_INVALID_PARAMS"),
     ({"filters": '{"wands": {}}'}, "EXPORT_INVALID_PARAMS"),
     # Paging is the export's own business, not a filter.
-    ({"filters": '{"counter_group": {"page": 2}}'}, "EXPORT_INVALID_PARAMS"),
+    ({"filters": '{"wiki": {"page": 2}}'}, "EXPORT_INVALID_PARAMS"),
     (
         {"filters": '{"calendar": {"events": {"start_after": "soon"}}}'},
         "EXPORT_INVALID_PARAMS",
@@ -3058,7 +2965,6 @@ async def test_estimate_reports_counts_uploads_and_ceilings(
     assert counts == {tool.value: 0 for tool in Tool} | {
         "project": 2,  # the actor fixture's project + Main Arc
         "file": 2,  # Campaign Notes + the file doc
-        "counter_group": 1,
         "calendar": 1,
         "post": 1,
     }
@@ -3066,8 +2972,8 @@ async def test_estimate_reports_counts_uploads_and_ceilings(
     assert body["uploads_count"] == 1
     assert body["uploads_bytes"] == len(payload)
     assert body["uploads_approximate"] is True
-    # entities (7) + tasks (1) + uploads MiB (0)
-    assert body["estimated_rows"] == 8
+    # entities (6) + tasks (1) + uploads MiB (0)
+    assert body["estimated_rows"] == 7
     assert body["max_rows"] == export_limits.EXPORT_MAX_BACKUP_ROWS
     assert body["max_upload_bytes"] == export_limits.EXPORT_MAX_BACKUP_UPLOAD_BYTES
 
@@ -3085,7 +2991,7 @@ async def test_estimate_reports_counts_uploads_and_ceilings(
 async def test_backup_filters_narrow_each_tool_and_are_not_kept(
     client: AsyncClient, acting_user, session, monkeypatch, role_session
 ):
-    """Each tool's filters are its list's: a tag keeps the counter groups
+    """Each tool's filters are its list's: a tag keeps the wikis
     carrying it, archived ones too unless the archive is asked about, templates
     too unless templates are asked about, a calendar keeps the events in its
     range, and a project the tasks its task list would show. The estimate
@@ -3095,17 +3001,17 @@ async def test_backup_filters_narrow_each_tool_and_are_not_kept(
     )
     await enable_all_tools(session, a.initiative)
     tag = await create_tag(session, a.guild, name="raid")
-    tagged = await create_counter_group(session, a.initiative, a.user, name="Tagged")
-    shelved = await create_counter_group(
+    tagged = await create_wiki(session, a.initiative, a.user, name="Tagged")
+    shelved = await create_wiki(
         session,
         a.initiative,
         a.user,
         name="Shelved",
         archived_at=datetime.now(UTC),
     )
-    await create_counter_group(session, a.initiative, a.user, name="Plain")
-    for group in (tagged, shelved):
-        await assign_tag(session, group, tag)
+    await create_wiki(session, a.initiative, a.user, name="Plain")
+    for wiki in (tagged, shelved):
+        await assign_tag(session, wiki, tag)
     calendar = await create_calendar(session, a.initiative, a.user, name="Raids")
     for title, month in (("Spring", 3), ("Summer", 7)):
         start = datetime(2026, month, 10, 18, tzinfo=UTC)
@@ -3142,7 +3048,7 @@ async def test_backup_filters_narrow_each_tool_and_are_not_kept(
     def filters(**group: Any) -> str:
         return json.dumps(
             {
-                "counter_group": {"tag_ids": [tag.id], **group},
+                "wiki": {"tag_ids": [tag.id], **group},
                 "calendar": {"events": _SUMMER},
                 "project": {"archived": False, **open_tasks},
             }
@@ -3158,7 +3064,7 @@ async def test_backup_filters_narrow_each_tool_and_are_not_kept(
             filters=filters(**group),
         )
         assert resp.status_code == 200, resp.text
-        return resp.json()["tools"]["counter_group"]["count"]
+        return resp.json()["tools"]["wiki"]["count"]
 
     assert (await groups(), await groups(archived=False)) == (2, 1)
 
@@ -3175,7 +3081,7 @@ async def test_backup_filters_narrow_each_tool_and_are_not_kept(
             if e["type"] == kind
         ]
 
-    assert {g["name"] for g in envelopes("initiative-counter-group")} == {
+    assert {g["name"] for g in envelopes("initiative-wiki")} == {
         "Tagged",
         "Shelved",
     }
@@ -3246,7 +3152,7 @@ async def test_empty_initiative_backup_is_manifest_only_zip(
     await switch_tools(
         session,
         a.initiative,
-        {Tool.counter_group: False, Tool.calendar: False, Tool.project: False},
+        {Tool.wiki: False, Tool.calendar: False, Tool.project: False},
     )
 
     resp = await _export(client, a, "initiative", initiative_id=a.initiative.id)
@@ -3257,9 +3163,7 @@ async def test_empty_initiative_backup_is_manifest_only_zip(
     # No CONTENT, so every entry is the initiative's own shape.
     assert {e["type"] for e in manifest["entries"]} == {"initiative-structure"}
     tools = manifest["initiatives"][0]["tools"]
-    assert (tools["project"], tools["counter_group"], tools["calendar"]) == (
-        "disabled",
-    ) * 3
+    assert (tools["project"], tools["wiki"], tools["calendar"]) == ("disabled",) * 3
     assert tools["file"] == "included"
 
 
@@ -3868,7 +3772,6 @@ async def test_a_backup_says_which_wiki_page_a_file_is_filed_under(
     from app.core.search import SearchEntityType
     from app.services.tenant import relationships as relationships_service
     from app.services.tenant.wikis import place_file
-    from app.testing.factories import create_wiki, create_wiki_page
 
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
     await switch_tools(session, a.initiative, {Tool.wiki: True})

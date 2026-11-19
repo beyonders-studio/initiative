@@ -64,8 +64,6 @@ def test_every_tool_has_one_record():
 _ASSIGNED_CODES = {
     "calendar": 1,
     "calendar_event": 2,
-    "counter": 3,
-    "counter_group": 4,
     "dashboard": 5,
     "file": 6,
     "post": 9,
@@ -79,8 +77,10 @@ _ASSIGNED_CODES = {
     "contact": 19,
 }
 
-#: Codes whose kinds were removed: 7 and 8 the libraries', 11 and 12 the queues'.
-_RETIRED_CODES = frozenset({7, 8, 11, 12})
+#: Codes whose kinds were removed: 7 and 8 the libraries', 11 and 12 the queues',
+#: 3 and 4 the counter's and the counter group's, which the Counters tool
+#: plug-in's kinds keep.
+_RETIRED_CODES = frozenset({3, 4, 7, 8, 11, 12})
 
 
 def test_no_kind_code_ever_moves_or_is_reused():
@@ -521,7 +521,7 @@ def test_importers_cover_exactly_the_portable_tools():
     from app.services.import_engine.importers import IMPORTERS
 
     derived = {tool_envelope_type(tool) for tool in BULK_EXPORT_TOOLS}
-    assert tool_envelope_type(Tool.counter_group) == "initiative-counter-group"
+    assert tool_envelope_type(Tool.wiki) == "initiative-wiki"
     assert set(IMPORTERS) == derived, (
         f"missing importers for {sorted(derived - set(IMPORTERS))}; "
         f"unregistered importer types {sorted(set(IMPORTERS) - derived)}"

@@ -14,7 +14,7 @@ from app.core.tools import Tool
 from app.main import app
 from app.models.platform.guild import CommunityRole
 from app.schemas.tenant.archive import ArchivableType
-from app.testing import create_counter_group, create_file
+from app.testing import create_file, create_wiki
 
 #: The wire name of every archivable tool (and the collection, a sub-tool with
 #: a list of its own), paired with the list route that has to be able to show
@@ -56,17 +56,15 @@ async def test_an_archived_tool_is_off_the_list_and_on_the_archived_one(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    group = await create_counter_group(session, a.initiative, a.user)
+    wiki = await create_wiki(session, a.initiative, a.user)
 
-    await client.post(a.g(f"/archive/counter_group/{group.id}"), headers=a.headers)
+    await client.post(a.g(f"/archive/wiki/{wiki.id}"), headers=a.headers)
 
-    live = await client.get(a.g("/counter-groups/"), headers=a.headers)
+    live = await client.get(a.g("/wikis/"), headers=a.headers)
     assert [g["id"] for g in live.json()["items"]] == []
 
-    archived = await client.get(
-        a.g("/counter-groups/?archived=true"), headers=a.headers
-    )
-    assert [g["id"] for g in archived.json()["items"]] == [group.id]
+    archived = await client.get(a.g("/wikis/?archived=true"), headers=a.headers)
+    assert [g["id"] for g in archived.json()["items"]] == [wiki.id]
 
 
 async def test_an_archived_tool_says_it_can_be_taken_back(
@@ -137,10 +135,10 @@ async def test_something_archived_with_its_initiative_comes_back_with_it(
     """Its stamp is the initiative's, so the button belongs on the initiative.
     Offering it here would be offering a write the database refuses."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    group = await create_counter_group(session, a.initiative, a.user)
+    wiki = await create_wiki(session, a.initiative, a.user)
 
     await client.post(a.g(f"/archive/initiative/{a.initiative.id}"), headers=a.headers)
-    read = await client.get(a.g(f"/counter-groups/{group.id}"), headers=a.headers)
+    read = await client.get(a.g(f"/wikis/{wiki.id}"), headers=a.headers)
 
     body = read.json()
     assert body["archived_at"] is not None
@@ -153,12 +151,12 @@ async def test_the_archived_list_agrees_with_the_detail_about_the_way_back(
     """A list row and its own page have to answer the same, or the button is
     offered in one place and refused from the other."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    group = await create_counter_group(session, a.initiative, a.user)
+    wiki = await create_wiki(session, a.initiative, a.user)
     await client.post(a.g(f"/archive/initiative/{a.initiative.id}"), headers=a.headers)
 
-    listed = await client.get(a.g("/counter-groups/?archived=true"), headers=a.headers)
-    row = next(g for g in listed.json()["items"] if g["id"] == group.id)
-    detail = await client.get(a.g(f"/counter-groups/{group.id}"), headers=a.headers)
+    listed = await client.get(a.g("/wikis/?archived=true"), headers=a.headers)
+    row = next(g for g in listed.json()["items"] if g["id"] == wiki.id)
+    detail = await client.get(a.g(f"/wikis/{wiki.id}"), headers=a.headers)
 
     assert row["can"]["unarchive"] == detail.json()["can"]["unarchive"]
     assert row["can"]["unarchive"] is False

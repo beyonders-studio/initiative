@@ -55,7 +55,7 @@ def test_plural_and_interpolation_variants_present_in_every_locale():
     carry both variants or a count would fall back to English mid-sentence."""
     for locale in _LOCALES:
         keys = _flatten(_catalog(locale))
-        for base in ("summary.tasks", "summary.items", "summary.counters"):
+        for base in ("summary.tasks", "summary.items"):
             assert f"{base}_one" in keys and f"{base}_other" in keys
 
 
@@ -68,7 +68,7 @@ def test_et_translates_and_interpolates():
 def test_et_selects_plural_by_count():
     assert et("summary.tasks", "en", count=1) == "1 task"
     assert et("summary.tasks", "en", count=3) == "3 tasks"
-    assert et("summary.counters", "fr", count=2) == "2 compteurs"
+    assert et("summary.items", "fr", count=2) == "2 éléments"
 
 
 def test_et_falls_back_to_english_for_unknown_locale():

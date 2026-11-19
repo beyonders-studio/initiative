@@ -215,17 +215,13 @@ IDEAS_POLICY_READS: dict[str, tuple[str, ...]] = {
             "calendar_events",
             "collections",
             "contacts",
-            "counters",
             "dashboards",
             "files",
             "posts",
             "wiki_pages",
         )
     },
-    **{
-        table: ("id", "initiative_id")
-        for table in ("calendars", "counter_groups", "wikis")
-    },
+    **{table: ("id", "initiative_id") for table in ("calendars", "wikis")},
 }
 
 

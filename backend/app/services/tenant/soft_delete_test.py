@@ -732,22 +732,23 @@ async def test_hard_purge_unlinks_references_in_trashed_linking_files(
 # ---------------------------------------------------------------------------
 
 
-async def test_restore_initiative_brings_back_an_archived_counter_groups_counters(
+async def test_restore_initiative_brings_back_an_archived_calendars_events(
     session: AsyncSession,
 ):
-    """A counter carries no ``archived_at``: inside an archived counter group
-    it is simply live, because that is the only state it has. Restoring the
+    """An event carries no ``archived_at``: inside an archived calendar it is
+    simply live, because that is the only state it has. Restoring the
     initiative has to put it back in exactly that state."""
-    from app.models.tenant.counter import Counter, CounterGroup
+    from app.models.tenant.calendar import Calendar
+    from app.models.tenant.calendar_event import CalendarEvent
     from app.services.tenant.archive import archive_entity
-    from app.testing.factories import create_counter, create_counter_group
+    from app.testing.factories import create_calendar, create_calendar_event
 
     user = await create_user(session)
     guild = await create_guild(session, creator=user)
     initiative = await create_initiative(session, guild, user)
-    group = await create_counter_group(session, initiative, user)
-    counter = await create_counter(session, group)
-    await archive_entity(session, group)
+    calendar = await create_calendar(session, initiative, user)
+    event = await create_calendar_event(session, calendar, user)
+    await archive_entity(session, calendar)
     await session.commit()
 
     await soft_delete_entity(
@@ -760,17 +761,17 @@ async def test_restore_initiative_brings_back_an_archived_counter_groups_counter
 
     refreshed = (
         await session.exec(
-            select_including_deleted(Counter).where(Counter.id == counter.id)
+            select_including_deleted(CalendarEvent).where(CalendarEvent.id == event.id)
         )
     ).one()
     assert refreshed.deleted_at is None
-    refreshed_group = (
+    refreshed_calendar = (
         await session.exec(
-            select_including_deleted(CounterGroup).where(CounterGroup.id == group.id)
+            select_including_deleted(Calendar).where(Calendar.id == calendar.id)
         )
     ).one()
-    assert refreshed_group.deleted_at is None
-    assert refreshed_group.archived_at is not None
+    assert refreshed_calendar.deleted_at is None
+    assert refreshed_calendar.archived_at is not None
 
 
 async def test_restore_initiative_brings_back_an_archived_files_comments(
@@ -943,14 +944,12 @@ async def _file(
     from app.models.tenant.calendar_event import CalendarEvent
     from app.models.tenant.collection import Collection
     from app.models.tenant.comment import Comment
-    from app.models.tenant.counter import Counter
     from app.models.tenant.wiki import Wiki, WikiPage
     from app.testing.factories import (
         TOOL_FACTORIES,
         create_calendar_event,
         create_collection,
         create_comment,
-        create_counter,
         create_task,
         create_wiki_page,
     )
@@ -961,8 +960,6 @@ async def _file(
         return await TOOL_FACTORIES[tool](session, parent, user)
     if model is Task:
         return await create_task(session, parent)
-    if model is Counter:
-        return await create_counter(session, parent)
     if model is CalendarEvent:
         if edge.column != "calendar_id":
             # An occurrence of a series, in the series' calendar.

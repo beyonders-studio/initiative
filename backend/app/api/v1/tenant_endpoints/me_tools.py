@@ -158,13 +158,6 @@ MY_TOOL_LISTS: dict[Tool, MyToolList] = {
             "``created_by_me`` to the ones the caller wrote."
         ),
     ),
-    Tool.counter_group: MyToolList(
-        default_key=lambda model: model.updated_at,
-        page_size=page_size_param(20, ge=0, le=100),
-        list_doc=(
-            "Counter groups that reach the caller across every guild they belong to."
-        ),
-    ),
     Tool.calendar: MyToolList(
         # By name, like the calendar list inside a guild: this one backs a
         # grouping panel, which is read down rather than scanned for what moved.

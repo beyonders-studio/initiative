@@ -7,8 +7,8 @@ authentication and the six RLS gates apply by reuse — never re-implemented.
 The surface is curated and default-deny, so a newly added route can't silently
 become a tool:
   * **Reads** — every ``GET`` route for initiatives and for the tools they hold
-    (projects and tasks, files, counters, calendars and their events, wikis
-    and their pages, notices, dashboards), plus the two comment reads that
+    (projects and tasks, files, calendars and their events, wikis and their
+    pages, notices, dashboards, and every tool plug-in's tool), plus the two comment reads that
     pair with the comment write (a parent's thread and a single comment by
     id), plus the one relationships read, which answers what a thing is
     linked to, plus the guild's general search, which finds a thing by name,
@@ -16,10 +16,11 @@ become a tool:
     every other tool takes. A handful are carved back out: file downloads, who
     voted and who has read, and the dashboard editor's own palette.
   * **Writes** — an explicit allow-list, matched by path shape: create and edit
-    every tool (projects, files, counters, calendars, wikis, notices,
-    dashboards) and the things they hold (tasks, counters, calendar events,
-    wiki pages, comments), plus the two writes that shape alone doesn't
-    reach — moving a task, and moving a counter's count — plus drawing
+    every tool (projects, files, calendars, wikis, notices, dashboards, and
+    every tool plug-in's) and the things they hold (tasks, calendar events,
+    wiki pages, a tool plug-in's items, comments), plus the three writes that
+    shape alone doesn't reach — moving a task, ticking one checklist item, and
+    stepping a tool plug-in's counter field — plus drawing
     one relationship between two of them. Each is gated client-side by Claude Code's
     per-write permission prompt. Destructive (delete, archive, reset), bulk
     (reorder, batch, archive-all, replacing a thing's links wholesale),
@@ -43,7 +44,6 @@ from fastmcp.server.providers.openapi import MCPType, RouteMap
 from fastmcp.tools.base import ToolResult
 from fastmcp.utilities.openapi.models import HTTPRoute
 
-from app.api.v1.tenant_endpoints.tool_lists import TOOL_LISTS
 from app.core.config import PROJECT_NAME
 from app.core.tools import Tool
 from app.mcp_descriptions import describe as describe_tool
@@ -64,13 +64,13 @@ if TYPE_CHECKING:
 # Every tool an initiative holds is readable, not only the two it starts with.
 # An agent asked "how is this going" was previously answering from tasks alone,
 # which is the shape of the question rather than the shape of the work: the
-# write-up is a file, the numbers are counters, and what somebody would
+# write-up is a file, the plan is a project, and what somebody would
 # actually look at first is a dashboard. The write surface in
 # ``_WRITE_ROUTE_MAPS`` covers the same set, so what an agent can read it can
 # also author and edit.
 READ_TAGS = (
     # Every tool's own tag, as its list is published under.
-    *(TOOL_LISTS[tool].tag or tool.plural for tool in Tool),
+    *(tool.plural for tool in Tool),
     "tasks",
     "initiatives",
     "task-statuses",
@@ -95,9 +95,8 @@ READ_TAGS = (
 # uploads and imports are all outside it.
 #
 # The tool half is derived from the ``Tool`` enum rather than listed, for the
-# same reason the read surface is: an eighth tool should arrive writable rather
-# than wait for somebody to remember this list. ``counter_group`` is the only
-# member whose path segment isn't already its plural spelling.
+# same reason the read surface is: a new tool should arrive writable rather
+# than wait for somebody to remember this list.
 _ID = r"\{[^}]+\}"
 
 
@@ -127,13 +126,12 @@ _WRITABLE_SEGMENTS = (
     # Every tool an initiative holds, addressed by its own path segment.
     *((tool.route_segment, tool.route_segment) for tool in Tool),
     # And what those tools hold in turn: a project's tasks, a calendar's
-    # events, a counter group's counters, a wiki's pages. Not derivable from
+    # events, a wiki's pages. Not derivable from
     # the enum — each names its parent differently — so each is spelled out.
-    # Tasks and events name their parent in the body; the other two are added
-    # under it, and edited at their own id like the rest.
+    # Tasks and events name their parent in the body; a page is added under
+    # its wiki, and edited at its own id like the rest.
     ("tasks", "tasks"),
     ("calendar-events", "calendar-events"),
-    ("counter-groups/" + _ID + "/counters", "counters"),
     ("wikis/" + _ID + "/pages", "wiki-pages"),
     # The comment surface every tool shares.
     ("comments", "comments"),
@@ -145,14 +143,9 @@ _WRITABLE_SEGMENTS = (
 #
 #   * Moving a task to another status or project is its own route because it is
 #     its own action, taking a destination rather than a field.
-#   * A counter's count is the one thing about it ``PATCH`` cannot set — the
-#     update schema shapes the counter (name, bounds, step, initial count) and
-#     the count itself moves through these two. Without them, writing a
-#     counter would mean renaming it. ``reset`` and ``reset-all`` are not here:
-#     they discard counts rather than record one.
-#   * A tool plug-in's counter field moves the same way, through its row's
-#     ``step``: its ``PATCH`` sets a count outright, and two of those landing
-#     together lose one, where two steps each count.
+#   * A tool plug-in's counter field's count, through its row's ``step``:
+#     its ``PATCH`` sets a count outright, and two of those landing together
+#     lose one, where two steps each count.
 #   * Ticking one checklist item. ``PATCH /tasks/{id}`` rewrites the list's
 #     lines but deliberately never its ``done`` flags, so without this an agent
 #     that finished a piece of a task could say so only in a comment. It names
@@ -166,14 +159,6 @@ _EXTRA_WRITE_ROUTE_MAPS = [
         methods=["PATCH"],
         pattern=r".*/tasks/" + _ID + "/checklist/" + _ID + "$",
         mcp_type=MCPType.TOOL,
-    ),
-    *(
-        RouteMap(
-            methods=["POST"],
-            pattern=r".*/counters/" + _ID + "/" + verb + "$",
-            mcp_type=MCPType.TOOL,
-        )
-        for verb in ("set", "step")
     ),
     RouteMap(
         methods=["POST"],
@@ -197,7 +182,7 @@ _WRITE_ROUTE_MAPS = [
 # The other two stay behind the default-deny catch-all. ``GET /comments/recent``
 # is a guild-wide activity feed rather than a working surface — the same reason
 # ``join-requests`` is carved out of the ``initiatives`` tag — and it reaches
-# comments on parents (files, counters, calendars, dashboards) that
+# comments on parents (files, calendars, dashboards) that
 # the tool surface otherwise doesn't cover, undirected by any task at hand.
 # ``GET /comments/mentions/search`` backs the editor's @-mention picker; the
 # member and task lookups an agent needs are already tools of their own.

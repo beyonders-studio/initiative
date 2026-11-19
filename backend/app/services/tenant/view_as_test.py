@@ -11,7 +11,7 @@ from app.core.messages import DashboardMessages
 from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserStatus
-from app.testing import create_counter_group, create_project, create_task, switch_tools
+from app.testing import create_project, create_task, create_wiki, switch_tools
 
 COUNT_TASKS = "SELECT count(*) AS n FROM tasks"
 
@@ -176,11 +176,11 @@ class TestWhatAReaderSees:
         """Full read means every tool the initiative has switched on, not only
         those the reader's own role may open."""
         admin, reader = await two_people(session, acting_user)
-        await switch_tools(session, admin.initiative, {Tool.counter_group: True})
-        await create_counter_group(session, admin.initiative, admin.user)
+        await switch_tools(session, admin.initiative, {Tool.wiki: True})
+        await create_wiki(session, admin.initiative, admin.user)
 
         dashboard_id = await make_dashboard(
-            client, admin, "SELECT count(*) AS n FROM counter_groups"
+            client, admin, "SELECT count(*) AS n FROM wikis"
         )
         assert await widget_rows(client, reader, dashboard_id) == [[0]]
         await set_mode(client, admin, dashboard_id, "initiative")

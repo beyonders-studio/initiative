@@ -36,7 +36,6 @@ from app.models.tenant._mixins import (
 if TYPE_CHECKING:  # pragma: no cover
     from app.core.tool_set import ToolSet
     from app.models.tenant.calendar import Calendar
-    from app.models.tenant.counter import CounterGroup
     from app.models.tenant.file import File
     from app.models.tenant.project import Project
 
@@ -532,10 +531,6 @@ class Initiative(
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
     calendars: list["Calendar"] = Relationship(
-        back_populates="initiative",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
-    )
-    counter_groups: list["CounterGroup"] = Relationship(
         back_populates="initiative",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )

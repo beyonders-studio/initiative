@@ -30,7 +30,7 @@ def kind_refusal(kind: str, code: str, status_code: int) -> CodedError:
 
 def plural_of(stem: str) -> str:
     """The plural spelling of a tool stem — ``post`` → ``posts``,
-    ``counter_group`` → ``counter_groups``. The frontend's ``toolPlural``
+    ``calendar_event`` → ``calendar_events``. The frontend's ``toolPlural``
     applies the same rule."""
     if len(stem) > 1 and stem.endswith("y") and stem[-2] not in "aeiou":
         return stem[:-1] + "ies"
@@ -84,7 +84,6 @@ class ToolRefusals:
 class Tool(ToolRefusals, str, Enum):
     project = "project"
     file = "file"
-    counter_group = "counter_group"
     calendar = "calendar"
     dashboard = "dashboard"
     post = "post"
@@ -94,7 +93,7 @@ class Tool(ToolRefusals, str, Enum):
     @property
     def plural(self) -> str:
         """Pluralized stem — the table-ish spelling every derived name uses
-        (``counter_group`` → ``counter_groups``).
+        (``wiki`` → ``wikis``).
 
         One rule, mirrored by the frontend's ``toolPlural``: a trailing ``y``
         after a consonant becomes ``ies``, and everything else takes an ``s``.
@@ -115,7 +114,7 @@ class Tool(ToolRefusals, str, Enum):
     @property
     def route_segment(self) -> str:
         """The kebab plural every route for this tool is served under
-        (``counter_group`` → ``counter-groups``). The frontend's
+        (``wiki`` → ``wikis``). The frontend's
         ``toolRouteSegment`` applies the same rule."""
         return self.plural.replace("_", "-")
 
@@ -136,10 +135,9 @@ class Tool(ToolRefusals, str, Enum):
 class Layouts:
     """How a tool lays out what it holds (``tool_layouts``)."""
 
-    #: Each instance keeps layouts of its own (a project's, a counter
-    #: group's). Otherwise the tool is one page per initiative (its calendar,
-    #: its posts feed), so its layouts are the initiative's and name no
-    #: instance.
+    #: Each instance keeps layouts of its own (a project's). Otherwise the
+    #: tool is one page per initiative (its calendar, its posts feed), so its
+    #: layouts are the initiative's and name no instance.
     per_instance: bool
     #: How it lists what it holds, in the order offered.
     lists: tuple[str, ...] = ()
@@ -237,13 +235,6 @@ TOOL_SPECS: dict[Tool, ToolSpec] = {
         },
         item_tables=("file_versions",),
     ),
-    Tool.counter_group: ToolSpec(
-        code=4,
-        export_formats=("pdf", "csv", "xlsx", "md", "json"),
-        report_formats=("pdf", "csv", "xlsx", "md"),
-        layouts=Layouts(per_instance=True, detail="counter"),
-        item_tables=("counters",),
-    ),
     Tool.calendar: ToolSpec(
         code=1,
         export_formats=("ics", "json"),
@@ -334,7 +325,9 @@ class Kind:
 
 #: Every kind, keyed by its wire name. Append-only: a new kind takes the next
 #: unused code, and no existing code ever moves. 7 and 8 were the libraries',
-#: 11 and 12 were the queues', and all four stay retired. 18 is the person's
+#: 11 and 12 were the queues', and all four stay retired. 3 and 4 were the
+#: counter's and the counter group's, which the Counters tool plug-in's kinds
+#: keep (``plugin_kind_codes``), so no built-in kind takes them. 18 is the person's
 #: (``app.core.relationships.PERSON``), an edge end that is not a kind, and is
 #: never reused. Boot writes the codes into ``public.relationship_kind_code``
 #: (``app.db.kind_codes``), so a new kind needs no migration to restate that
@@ -349,7 +342,6 @@ KINDS: dict[str, Kind] = {
         *(Kind(tool.value, tool.spec.code) for tool in Tool),
         Kind("task", 14, parent=Tool.project, commentable=True, archivable=True),
         Kind("calendar_event", 2, parent=Tool.calendar),
-        Kind("counter", 3, parent=Tool.counter_group),
         Kind("wiki_page", 16, parent=Tool.wiki, commentable=True),
         Kind(
             "collection",
@@ -377,7 +369,7 @@ CONTENT_KINDS: tuple[str, ...] = tuple(t.value for t in Tool) + CHILD_KINDS
 # Tools with an export-engine source (single-entity + bulk selection export),
 # all served by ``GET /exports/{tool}``: every tool whose record does not say it
 # exports nothing. The engine's source name is the KEBAB SINGULAR of the tool
-# ("counter_group" -> "counter-group").
+# ("calendar_event" -> "calendar-event").
 BULK_EXPORT_TOOLS = tuple(t for t in Tool if t.spec.export_formats != ())
 
 
@@ -403,11 +395,11 @@ COMMENT_TARGETS: tuple[str, ...] = tuple(
 
 
 # Tag-assignment surfaces: EVERY tool is taggable, plus everything that lives
-# inside one but a counter. The assignment registry
+# inside one. The assignment registry
 # (app.services.tenant.tags.tag_links) and the bulk endpoint's check derive
 # from TAG_TARGETS, so a new Tool is taggable across every surface with no
 # per-surface edit; tags_test.py fails if any surface drifts.
-TAGGABLE_EXTRAS: tuple[str, ...] = tuple(k for k in CHILD_KINDS if k != "counter")
+TAGGABLE_EXTRAS: tuple[str, ...] = CHILD_KINDS
 TAG_TARGETS: tuple[str, ...] = tuple(t.value for t in Tool) + TAGGABLE_EXTRAS
 
 

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
 
 import pytest
 from sqlmodel import select
@@ -28,9 +27,8 @@ from app.testing import (
     create_calendar,
     create_calendar_event,
     create_comment,
-    create_counter,
-    create_counter_group,
     create_file,
+    create_project,
     create_resource_grant,
     create_task,
     create_task_status,
@@ -237,27 +235,27 @@ async def test_a_checkbox_is_offered_only_to_whoever_may_tick_it(
 async def test_an_embed_shows_the_name_and_the_description(
     client, session, acting_user: ActingUser
 ) -> None:
-    """A kind without a description column embeds as its name alone, and
-    something that is not there is absent, as it is for a chip."""
+    """Something with no description embeds as its name alone, and something
+    that is not there is absent, as it is for a chip."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     task = await create_task(
         session, a.project, title="Roll call", description="Bring the **sheet**."
     )
-    group = await create_counter_group(session, a.initiative, a.user)
-    counter = await create_counter(session, group, name="Signups")
+    calendar = await create_calendar(session, a.initiative, a.user)
+    event = await create_calendar_event(session, calendar, a.user, title="Signups")
     missing = f"task:{task.id + 999}"
 
     response = await client.post(
         a.g("/smart-chips/embeds"),
         headers=a.headers,
-        json={"refs": [f"task:{task.id}", f"counter:{counter.id}", missing]},
+        json={"refs": [f"task:{task.id}", f"calendar_event:{event.id}", missing]},
     )
     assert response.status_code == 200, response.text
     body = {item["ref"]: item for item in response.json()["items"]}
     assert body[f"task:{task.id}"]["title"] == "Roll call"
     assert body[f"task:{task.id}"]["description"] == "Bring the **sheet**."
-    assert body[f"counter:{counter.id}"]["title"] == "Signups"
-    assert body[f"counter:{counter.id}"]["description"] is None
+    assert body[f"calendar_event:{event.id}"]["title"] == "Signups"
+    assert body[f"calendar_event:{event.id}"]["description"] is None
     assert missing not in body
 
 
@@ -360,24 +358,6 @@ async def test_an_embedded_wiki_page_shows_its_body_but_not_a_draft(
     assert written[f"wiki_page:{draft.id}"]["body"] == _prose("Secret.")
 
 
-async def test_a_counter_reads_its_number_and_its_ceiling(
-    client, session, acting_user: ActingUser
-) -> None:
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    group = await create_counter_group(session, a.initiative, a.user)
-    counter = await create_counter(session, group)
-    counter.count = Decimal(7)
-    counter.max = Decimal(10)
-    session.add(counter)
-    await session.commit()
-
-    body = await _chips(client, a, f"counter:{counter.id}:value")
-    state = body[f"counter:{counter.id}:value"]
-    # Trailing zeros are storage, not something to read.
-    assert state["text"] == "7 / 10"
-    assert state["tone"] == "neutral"
-
-
 async def test_a_project_reads_how_much_of_its_work_is_done(
     client, session, acting_user: ActingUser
 ) -> None:
@@ -415,21 +395,6 @@ async def test_a_project_with_no_work_in_it_does_not_read_as_finished(
     state = body[f"project:{a.project.id}:progress"]
     assert state["text"] == "0 / 0"
     assert state["tone"] == "muted"
-
-
-async def test_a_counter_at_its_ceiling_reads_as_arrived(
-    client, session, acting_user: ActingUser
-) -> None:
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    group = await create_counter_group(session, a.initiative, a.user)
-    counter = await create_counter(session, group)
-    counter.count = Decimal(10)
-    counter.max = Decimal(10)
-    session.add(counter)
-    await session.commit()
-
-    body = await _chips(client, a, f"counter:{counter.id}:value")
-    assert body[f"counter:{counter.id}:value"]["tone"] == "good"
 
 
 async def test_an_event_dims_once_it_has_happened(
@@ -487,15 +452,13 @@ async def test_a_page_of_chips_is_read_together(
     """Two aspects of one task, and a second thing entirely, in one request."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     task = await create_task(session, a.project, title="Ship it")
-    group = await create_counter_group(session, a.initiative, a.user)
-    counter = await create_counter(session, group)
 
     body = await _chips(
         client,
         a,
         f"task:{task.id}:status",
         f"task:{task.id}:priority",
-        f"counter:{counter.id}:value",
+        f"project:{a.project.id}:progress",
     )
     assert len(body) == 3
 
@@ -621,14 +584,13 @@ async def test_a_chip_follows_the_thing_own_sharing_either_way(
     """The gate is the resource's own sharing, not a rule chips invented.
 
     Both of these are made by a factory, which shares a calendar with the
-    initiative and leaves a counter group to its owner. Whichever way the
+    initiative and leaves a project to its owner. Whichever way the
     sharing goes, the chip follows it — which is the thing being asserted. (The
     create endpoints both default to Viewer for the initiative; the factories
     are not trying to mirror them.)
     """
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    group = await create_counter_group(session, a.initiative, a.user)
-    counter = await create_counter(session, group)
+    project = await create_project(session, a.initiative, a.user)
     calendar = await create_calendar(session, a.initiative, a.user)
     event = await create_calendar_event(session, calendar, a.user)
 
@@ -641,10 +603,10 @@ async def test_a_chip_follows_the_thing_own_sharing_either_way(
     body = await _chips(
         client,
         b,
-        f"counter:{counter.id}:value",
+        f"project:{project.id}:progress",
         f"calendar_event:{event.id}:when",
     )
-    assert f"counter:{counter.id}:value" not in body
+    assert f"project:{project.id}:progress" not in body
     assert f"calendar_event:{event.id}:when" in body
 
 
@@ -725,25 +687,25 @@ async def test_a_reference_reads_the_current_name(
 async def test_every_kind_answers_with_whatever_it_calls_its_name(
     client, session, acting_user: ActingUser
 ) -> None:
-    """A task has a title, a project and a counter a name. The column is
+    """A task has a title, a project and a calendar a name. The column is
     derived from the search registry, so none of them is written down twice."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     task = await create_task(session, a.project, title="A task")
-    group = await create_counter_group(session, a.initiative, a.user)
-    counter = await create_counter(session, group, name="A counter")
+    calendar = await create_calendar(session, a.initiative, a.user)
+    event = await create_calendar_event(session, calendar, a.user, title="An event")
 
     body = await _chips(
         client,
         a,
         f"task:{task.id}",
         f"project:{a.project.id}",
-        f"counter_group:{group.id}",
-        f"counter:{counter.id}",
+        f"calendar:{calendar.id}",
+        f"calendar_event:{event.id}",
     )
     assert body[f"task:{task.id}"]["text"] == "A task"
     assert body[f"project:{a.project.id}"]["text"] == a.project.name
-    assert body[f"counter_group:{group.id}"]["text"] == group.name
-    assert body[f"counter:{counter.id}"]["text"] == "A counter"
+    assert body[f"calendar:{calendar.id}"]["text"] == calendar.name
+    assert body[f"calendar_event:{event.id}"]["text"] == "An event"
 
 
 async def test_a_title_stops_at_the_same_gate_a_chip_does(

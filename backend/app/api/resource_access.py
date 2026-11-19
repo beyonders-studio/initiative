@@ -46,7 +46,6 @@ from app.models.platform.notification import NotificationType
 from app.models.platform.user import User
 from app.models.tenant.calendar_event import CalendarEvent
 from app.models.tenant.collection import Collection
-from app.models.tenant.counter import Counter
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.models.tenant.task import Task
@@ -61,7 +60,6 @@ from app.services.tenant import calendar_events as events_service
 from app.services.tenant import calendars as calendars_service
 from app.services.tenant import collections as collections_service
 from app.services.tenant import contacts as contacts_service
-from app.services.tenant import counters as counters_service
 from app.services.tenant import dashboards as dashboards_service
 from app.services.tenant import files as files_service
 from app.services.tenant import initiatives as initiatives_service
@@ -100,13 +98,11 @@ class ResourceAccessConfig:
     #: count, a project's statuses, a file's body — has one, so a gate
     #: check does not cost every caller the queries none of them reads.
     hydrated_loader: Callable[..., Awaitable[Any]] | None = None
-    #: A path parameter that differs from ``<tool>_id``.
-    id_param: str | None = None
 
     @property
     def path_param(self) -> str:
         """The path parameter a row is addressed by."""
-        return self.id_param or f"{self.tool.value}_id"
+        return f"{self.tool.value}_id"
 
     @property
     def dac_kind(self) -> Tool:
@@ -124,10 +120,6 @@ RESOURCE_ACCESS: dict[Tool, ResourceAccessConfig] = {
         Tool.file,
         files_service.get_file_for_grants,
         hydrated_loader=files_service.get_file_hydrated,
-    ),
-    # Counter group routes name their row ``group_id``.
-    Tool.counter_group: ResourceAccessConfig(
-        Tool.counter_group, counters_service.get_counter_group, id_param="group_id"
     ),
     Tool.calendar: ResourceAccessConfig(Tool.calendar, calendars_service.get_calendar),
     Tool.dashboard: ResourceAccessConfig(
@@ -484,7 +476,6 @@ class SubTool:
 SUB_TOOLS: dict[type, SubTool] = {
     Task: SubTool(task_queries.load_for_change),
     CalendarEvent: SubTool(events_service.get_event),
-    Counter: SubTool(counters_service.get_counter, name="name"),
     WikiPage: SubTool(
         wikis_service.get_page,
         copy_resets={"yjs_state": None, "yjs_updated_at": None},

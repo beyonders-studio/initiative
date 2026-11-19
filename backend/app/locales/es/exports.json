@@ -4,16 +4,13 @@
   },
   "footer": {
     "tasks": "Exportación de tareas",
-    "project": "{{name}} — informe del proyecto",
-    "counters": "{{name}} — exportación de contadores"
+    "project": "{{name}} — informe del proyecto"
   },
   "summary": {
     "tasks_one": "{{count}} tarea",
     "tasks_other": "{{count}} tareas",
     "items_one": "{{count}} elemento",
-    "items_other": "{{count}} elementos",
-    "counters_one": "{{count}} contador",
-    "counters_other": "{{count}} contadores"
+    "items_other": "{{count}} elementos"
   },
   "round": "ronda {{round}}",
   "pageOf": "de",
@@ -68,12 +65,7 @@
     "user_id": "Miembro",
     "notes": "Notas",
     "order": "N.º",
-    "status": "Estado",
-    "name": "Contador",
-    "count": "Valor",
-    "min": "Mín",
-    "max": "Máx",
-    "step": "Paso"
+    "status": "Estado"
   },
   "groups": {
     "empty": {

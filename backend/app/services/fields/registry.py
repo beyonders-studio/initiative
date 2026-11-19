@@ -48,8 +48,6 @@ _BUILDERS: dict[str, Callable[[], Dataset]] = {
     "tasks": tasks_dataset.build,
     "projects": projects_dataset.build,
     "calendar_events": calendar_events_dataset.build,
-    "counter_groups": tool_datasets.build_counter_groups,
-    "counters": tool_datasets.build_counters,
     "task_statuses": task_statuses_dataset.build,
     "task_types": task_types_dataset.build,
     "task_assignees": task_assignees_dataset.build,

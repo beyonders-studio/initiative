@@ -24,7 +24,6 @@ from app.db.plugin_tools import DECLARED
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.collection import Collection
 from app.models.tenant.contact import Contact
-from app.models.tenant.counter import Counter, CounterGroup
 from app.models.tenant.dashboard import Dashboard
 from app.models.tenant.file import File, FileVersion
 from app.models.tenant.post import Post
@@ -66,34 +65,6 @@ def build_file_versions() -> Dataset:
         tool=Tool.file,
         name_override="file_versions",
         fields=derive_fields(FileVersion),
-    )
-
-
-def build_counter_groups() -> Dataset:
-    return Dataset(
-        model=CounterGroup,
-        tool=Tool.counter_group,
-        fields=derive_fields(CounterGroup),
-    )
-
-
-def build_counters() -> Dataset:
-    """One counter in a group. Its own dataset because what one counter reads
-    is a question about the counters, and the group is what they are grouped
-    by."""
-    return Dataset(
-        model=Counter,
-        tool=Tool.counter_group,
-        name_override="counters",
-        fields=derive_fields(Counter),
-        relations=(
-            Relation(
-                name="counter_group",
-                hops=(
-                    Hop(dataset="counter_groups", left="counter_group_id", right="id"),
-                ),
-            ),
-        ),
     )
 
 
@@ -139,10 +110,10 @@ def build_contacts() -> Dataset:
 
 
 def build_wiki_pages() -> Dataset:
-    """One page of a wiki. Its own dataset for the reason counters have one:
-    what somebody asks about a wiki — how many pages are still drafts,
-    what has not been touched since spring — is a question about the pages,
-    and the wiki is what they are grouped by.
+    """One page of a wiki. Its own dataset because what somebody asks about a
+    wiki — how many pages are still drafts, what has not been touched since
+    spring — is a question about the pages, and the wiki is what they are
+    grouped by.
 
     A page's body and the Yjs state beside it are dropped: one is a structured
     blob and the other is a room's working copy of it, and neither is a value a
@@ -168,7 +139,7 @@ def build_wiki_pages() -> Dataset:
 def build_installed(tools: ToolSet) -> dict[str, Dataset]:
     """The datasets of every tool in ``tools`` an installed tool plug-in
     brings, by table: the tool's own, and each item table's, which reaches
-    the table it sits under as a counter reaches its group, each tagged as
+    the table it sits under as a wiki's page reaches its wiki, each tagged as
     its kind is."""
     from app.services.tenant.tags import tag_links
 

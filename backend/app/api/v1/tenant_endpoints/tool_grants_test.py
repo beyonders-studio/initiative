@@ -169,7 +169,7 @@ async def test_sharing_does_not_reach_past_the_role_gate(
     endpoint behind it says so rather than accepting a grant that would do
     nothing — which is what a caller not going through the picker needs to
     hear."""
-    tool = Tool.counter_group
+    tool = Tool.wiki
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     entity = await _entity(session, a, tool)
     b = await acting_user(
@@ -191,7 +191,7 @@ async def test_sharing_does_not_reach_past_the_role_gate(
     assert response.status_code == 422, response.text
     assert response.json() == tool.grantee_lacks_access().body
 
-    # Nothing was written, and the counter group is still not theirs to open.
+    # Nothing was written, and the wiki is still not theirs to open.
     seen = await client.get(
         b.g(f"/{tool.route_segment}/{entity.id}"), headers=b.headers
     )

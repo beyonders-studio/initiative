@@ -60,7 +60,6 @@ from app.api.deps import (
 )
 from app.api.v1.tenant_endpoints import calendars as calendars_endpoints
 from app.api.v1.tenant_endpoints import contacts as contacts_endpoints
-from app.api.v1.tenant_endpoints import counters as counters_endpoints
 from app.api.v1.tenant_endpoints import dashboards as dashboards_endpoints
 from app.api.v1.tenant_endpoints import files as files_endpoints
 from app.api.v1.tenant_endpoints import posts as posts_endpoints
@@ -76,7 +75,6 @@ from app.models.platform.user import User
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.collection import Collection, CollectionFile
 from app.models.tenant.contact import Contact
-from app.models.tenant.counter import CounterGroup
 from app.models.tenant.dashboard import Dashboard
 from app.models.tenant.file import File
 from app.models.tenant.personal_item import PersonalItem
@@ -98,11 +96,6 @@ from app.schemas.tenant.contact import (
     ContactOrganization,
     ContactRead,
     ContactSummary,
-)
-from app.schemas.tenant.counter import (
-    CounterGroupListResponse,
-    CounterGroupRead,
-    CounterGroupSummary,
 )
 from app.schemas.tenant.dashboard import (
     DashboardListResponse,
@@ -133,7 +126,6 @@ from app.services.tenant import calendars as calendars_service
 from app.services.tenant import collections as collections_service
 from app.services.tenant import comments as comments_service
 from app.services.tenant import contacts as contacts_service
-from app.services.tenant import counters as counters_service
 from app.services.tenant import dashboards as dashboards_service
 from app.services.tenant import files as files_service
 from app.services.tenant import metadata as metadata_service
@@ -416,8 +408,6 @@ class ToolListSpec:
         default_factory=lambda: dict(DEFAULT_VIEWS)
     )
     list_doc: str | None = None
-    #: The OpenAPI tag, where it is not the tool's own plural.
-    tag: str | None = None
     #: Whether an installed plug-in may list this tool, under its read scope.
     serves_plugins: bool = True
 
@@ -819,36 +809,6 @@ TOOL_LISTS: dict[Tool, ToolListSpec] = {
             "list_my_files)."
         ),
     ),
-    Tool.counter_group: ToolListSpec(
-        tool=Tool.counter_group,
-        read_model=CounterGroupRead,
-        read_row=counters_endpoints.read_after_write,
-        model=CounterGroup,
-        response_model=CounterGroupListResponse,
-        loader_options=_loads(counters_service.list_loader_options),
-        default_order=_order(CounterGroup.updated_at.desc(), CounterGroup.id.desc()),
-        serialize=_summaries(
-            CounterGroupSummary,
-            preview=lambda session, _guild_id, rows: counters_service.list_previews(
-                session, rows
-            ),
-        ),
-        # The counters router carries the wider "counters" tag, which the
-        # individual counters underneath these groups share.
-        tag="counters",
-        params=(
-            _initiative_id(),
-            search_param(),
-            sort_by_param(),
-            sort_dir_param(),
-            _tag_ids(Tool.counter_group),
-            _property_filters(),
-            _archived(),
-            _include_preview(),
-            page_param(),
-            page_size_param(20, ge=1, le=100),
-        ),
-    ),
     Tool.calendar: ToolListSpec(
         tool=Tool.calendar,
         read_model=CalendarRead,
@@ -1142,7 +1102,7 @@ def counted_lists(tools: ToolSet) -> dict[str, CountedList]:
 
 
 def _tags(spec: ToolListSpec) -> list[str | Enum]:
-    return [spec.tag or spec.tool.plural]
+    return [spec.tool.plural]
 
 
 _CONTEXT_PARAMS: tuple[tuple[str, Any], ...] = (

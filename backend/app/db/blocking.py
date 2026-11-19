@@ -76,13 +76,6 @@ OPEN_WHEN: dict[str, Callable[[Table], ColumnElement]] = {
         (t.c["recurrence"].isnot(None), null()),
         else_=t.c["end_at"] > func.now(),
     ),
-    # A counter blocks until it reaches what it was counting to. One with no
-    # ``max`` has no finish line, so it has no answer either — NULL, not false,
-    # which SQL would otherwise fold ``max IS NOT NULL AND …`` down to.
-    "counters": lambda t: case(
-        (t.c["max"].is_(None), null()),
-        else_=t.c["count"] < t.c["max"],
-    ),
     # A project finishes when the work in it does — see the function.
     "projects": _project_has_work_left,
 }

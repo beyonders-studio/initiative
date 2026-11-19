@@ -66,7 +66,6 @@ from app.core.tools import Kind, ToolSpec
 from app.db.base import MODELS_BY_TABLE
 from app.db.names import object_name
 from app.models.tenant import _mixins
-from app.models.tenant.counter import COUNTER_NUMBER
 from app.services.marketplace import contract
 from app.services.marketplace.tool_plugins import (
     COMPARISONS,
@@ -146,6 +145,10 @@ _OPTION_CHARS = frozenset(string.ascii_letters + string.digits + "_-")
 _MAX_OPTION_LENGTH = contract.cap("optionValueLength")
 
 _DIALECT = postgresql.dialect()
+
+#: How a number or counter field and a row's position are stored: twenty
+#: digits, ten after the point, as every position is.
+_NUMBER = sa.Numeric(20, 10)
 
 #: The ``info`` key marking a select field's CHECK of its options, which a
 #: later version of the tool may widen.
@@ -314,8 +317,8 @@ _FIELD_TYPES: dict[str, Any] = {
     "url": sa.Text,
     "color": sa.Text,
     "select": sa.Text,
-    "number": lambda: COUNTER_NUMBER,
-    "counter": lambda: COUNTER_NUMBER,
+    "number": lambda: _NUMBER,
+    "counter": lambda: _NUMBER,
     "currency": sa.Numeric,
     "scale": sa.Integer,
     "user_reference": sa.Integer,
@@ -472,7 +475,7 @@ def _table(
         sa.Column("id", sa.Integer, primary_key=True),
         anchor,
         sa.Column("name", sa.String(255), nullable=False),
-        sa.Column("position", COUNTER_NUMBER, nullable=False, server_default="0"),
+        sa.Column("position", _NUMBER, nullable=False, server_default="0"),
         *columns,
         *universal,
         sa.Column(
@@ -494,7 +497,7 @@ def _table(
             declared.get("checks", []),
         ),
         # A tool row is read back by no RETURNING clause, as a built-in
-        # tool's is (``CounterGroup``): nothing is shared with anyone yet.
+        # tool's is (``Wiki``): nothing is shared with anyone yet.
         implicit_returning=parent is not None,
         info={DECLARED: declared},
     )

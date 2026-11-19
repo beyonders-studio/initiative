@@ -69,8 +69,6 @@ _SAFE_WRITES = {
     "update_project",
     "create_file",
     "update_file",
-    "create_counter_group",
-    "update_counter_group",
     "create_calendar",
     "update_calendar",
     "create_dashboard",
@@ -81,16 +79,14 @@ _SAFE_WRITES = {
     "update_wiki",
     "create_contact",
     "update_contact",
-    # And what those tools hold: a project's tasks, a counter group's counters,
-    # a calendar's events, a wiki's pages, and the comments on any of them.
+    # And what those tools hold: a project's tasks, a calendar's events, a
+    # wiki's pages, and the comments on any of them.
     "create_task",
     "update_task",
     "move_task",
     # One checklist tick. The task update rewrites the list's lines but never
     # its done flags, so this is the only way to mark a piece of a task done.
     "toggle_checklist_item",
-    "add_counter",
-    "update_counter",
     "create_calendar_event",
     "update_calendar_event",
     # A page is authored and edited, not dragged: where it sits in the tree is
@@ -99,9 +95,6 @@ _SAFE_WRITES = {
     "update_wiki_page",
     "create_comment",
     "update_comment",
-    # A counter's count, which its update schema doesn't carry.
-    "set_counter_count",
-    "step_counter",
     # One edge between two of them. No ``update_`` pair: an edge has no fields
     # to edit, only ends and a type, which are what it is.
     "create_relationship",
@@ -130,14 +123,13 @@ async def test_mcp_tools_are_curated():
         "initiative",
         "comment",
         # The things a tool holds, which the enum names only their parent of:
-        # a task belongs to a project, a counter to a counter group.
+        # a task belongs to a project.
         "task",
         # A task's checklist, ticked one item at a time.
         "checklist",
         # How full each of a project's status columns is, where a move into a
         # full one is refused.
         "column_limits",
-        "counter",
         # A collection in Files, read through the files tag.
         "collection",
         "backlink",
@@ -167,7 +159,7 @@ async def test_mcp_tools_are_curated():
             f"no MCP tool reads {tool.value}"
         )
     # And what those tools hold reads back by its own id.
-    assert {"read_counter", "read_wiki_page"} <= set(names)
+    assert {"read_calendar_event", "read_wiki_page"} <= set(names)
 
     # Join requests sit on the initiatives router and would otherwise ride in on
     # its tag, but they name who asked to be let in and quote their note — a
@@ -272,7 +264,7 @@ async def test_the_tool_writes_stop_short_of_these():
     names = [t.name.lower() for t in await build_mcp_server(app).list_tools()]
     writes = {n for n in names if n.startswith(_WRITE_PREFIXES)}
 
-    # Nothing that removes or empties: delete, trash, archive, reset a counter,
+    # Nothing that removes or empties: delete, trash, archive, reset,
     # discard the done column.
     assert not [w for w in writes if w.startswith(("delete_", "archive_", "reset_"))]
     # Nothing that acts on a whole collection at once.

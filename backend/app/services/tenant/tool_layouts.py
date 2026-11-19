@@ -54,7 +54,6 @@ from app.schemas.tenant.tool_layout import (
     TOOL_FIELDS,
     CalendarFilterSpec,
     CardPart,
-    CounterDetailFieldId,
     DetailFieldPart,
     DetailLayoutDefinition,
     DetailLayoutRead,
@@ -108,7 +107,6 @@ DETAIL_PARTS: dict[str, frozenset[str]] = {
     },
     "calendar_event": _LAYOUT_PARTS
     | {"plugin", "dates", "rsvp", "actions", "relations"},
-    "counter": _LAYOUT_PARTS | {"plugin", "actions", "relations", "count"},
     "post": _LAYOUT_PARTS
     | {
         "plugin",
@@ -129,7 +127,6 @@ DETAIL_PARTS: dict[str, frozenset[str]] = {
 DETAIL_FIELDS: dict[str, frozenset[str]] = {
     "task": frozenset(field.value for field in TaskDetailFieldId),
     "calendar_event": frozenset(field.value for field in EventDetailFieldId),
-    "counter": frozenset(field.value for field in CounterDetailFieldId),
     "post": frozenset(field.value for field in PostDetailFieldId),
     "file": frozenset(field.value for field in FileFieldId),
 }

@@ -218,21 +218,6 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
         "and the file should be read again."
     ),
     "list_file_versions": "The stored versions of an uploaded file, newest first.",
-    # --- Counters -----------------------------------------------------------
-    "add_counter": (
-        "Add a counter to a counter group. `min`, `max` and `step` bound and "
-        "size its moves; `count` is where it starts."
-    ),
-    "read_counter": "Read one counter by id, with its count.",
-    "update_counter": (
-        "Change a counter's name, bounds, step or look. Only the fields sent "
-        "change. Its count moves with `set_counter_count` and `step_counter`."
-    ),
-    "set_counter_count": "Put a counter at a number, held within its bounds.",
-    "step_counter": (
-        "Move a counter `up` or `down` by `amount`, or by its own step, held "
-        "within its bounds."
-    ),
     # --- Calendars ----------------------------------------------------------
     "create_calendar": (
         "Create a calendar in an initiative (`initiative_id`). Without one it "

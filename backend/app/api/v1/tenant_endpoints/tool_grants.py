@@ -139,7 +139,7 @@ def _mount(
                 session, entity_id, grants, current_user, guild_context, note
             )
 
-    tags: list[str | Enum] = [spec.tag or tool.plural]
+    tags: list[str | Enum] = [tool.plural]
     router.add_api_route(
         f"/{tool.route_segment}/{{{cfg.path_param}}}/grants",
         set_grants,

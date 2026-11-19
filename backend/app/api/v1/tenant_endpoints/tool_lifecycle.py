@@ -85,7 +85,7 @@ def _mount(tool: Tool, cfg: resource_access.ResourceAccessConfig) -> None:
         await session.commit()
         sockets.signal(guild_context.guild_id, tool, entity_id, "deleted")
 
-    tags: list[str | Enum] = [TOOL_LISTS[tool].tag or tool.plural]
+    tags: list[str | Enum] = [tool.plural]
     router.add_api_route(
         f"/{tool.route_segment}/{{{cfg.path_param}}}",
         delete,
@@ -173,7 +173,7 @@ def _mount_duplicate(
         ):
             return await copy(session, entity_id, body, current_user, guild_context)
 
-    tags: list[str | Enum] = [spec.tag or tool.plural]
+    tags: list[str | Enum] = [tool.plural]
     router.add_api_route(
         f"/{tool.route_segment}/{{{cfg.path_param}}}/duplicate",
         duplicate,

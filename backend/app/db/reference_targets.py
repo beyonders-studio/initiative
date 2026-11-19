@@ -112,7 +112,8 @@ class Visual:
 
 
 #: Keyed by table, the way :data:`~app.db.search_index.SEARCH_SOURCES` is. A
-#: table with no entry has no look of its own, which is most of them.
+#: table with no entry has no look of its own, which is most of them, but for
+#: a tool plug-in's table with a colour field, which takes its first one.
 VISUALS: dict[str, Visual] = {
     "files": Visual(
         image=("featured_image_url",),
@@ -123,7 +124,6 @@ VISUALS: dict[str, Visual] = {
     ),
     "projects": Visual(icon="icon"),
     "calendars": Visual(color="color"),
-    "counters": Visual(color="color"),
     "tags": Visual(color="color"),
 }
 
@@ -256,7 +256,12 @@ def _visual_exprs(table_name: str, table: Table):
     A kind declaring nothing selects NULLs rather than being special-cased by the
     caller, so the shape of the row is the same whatever is asked for.
     """
-    visual = VISUALS.get(table_name, Visual())
+    visual = VISUALS.get(table_name) or Visual(
+        color=next(
+            (column.name for column in table.c if column.info.get("field") == "color"),
+            None,
+        )
+    )
 
     if visual.image:
         # A row with no picture reports no pictures, not one that is null.

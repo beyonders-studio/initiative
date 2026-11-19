@@ -15,13 +15,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.models.platform.guild import CommunityRole
 from app.testing import COUNTERS_UID, add_counter, install_tool_plugin
 from app.testing.factories import (
-    create_counter_group,
     create_guild,
     create_guild_membership,
     create_initiative,
     create_initiative_member,
     create_project,
     create_user,
+    create_wiki,
     get_auth_headers,
 )
 
@@ -84,7 +84,7 @@ async def test_bulk_applies_grants_across_many_projects(
 async def test_bulk_dispatches_across_resource_types(
     client: AsyncClient, session: AsyncSession
 ):
-    """One request mixing a project and a counter group routes each to the
+    """One request mixing a project and a wiki routes each to the
     right adapter."""
     owner = await create_user(session, email="owner@example.com")
     member = await create_user(session, email="member@example.com")
@@ -94,7 +94,7 @@ async def test_bulk_dispatches_across_resource_types(
     initiative = await create_initiative(session, guild, owner)
     await create_initiative_member(session, initiative, member, role_name="member")
     project = await create_project(session, initiative, owner)
-    group = await create_counter_group(session, initiative, owner)
+    wiki = await create_wiki(session, initiative, owner)
     headers = get_auth_headers(owner)
 
     resp = await client.put(
@@ -108,8 +108,8 @@ async def test_bulk_dispatches_across_resource_types(
                     "grants": [{"user_id": member.id, "level": "read"}],
                 },
                 {
-                    "resource_type": "counter_group",
-                    "resource_id": group.id,
+                    "resource_type": "wiki",
+                    "resource_id": wiki.id,
                     "grants": [{"all_initiative_members": True, "level": "write"}],
                 },
             ]
@@ -121,7 +121,7 @@ async def test_bulk_dispatches_across_resource_types(
         for r in resp.json()["results"]
     }
     assert statuses[("project", project.id)] == "ok"
-    assert statuses[("counter_group", group.id)] == "ok"
+    assert statuses[("wiki", wiki.id)] == "ok"
 
 
 async def test_bulk_is_best_effort_per_item(client: AsyncClient, session: AsyncSession):

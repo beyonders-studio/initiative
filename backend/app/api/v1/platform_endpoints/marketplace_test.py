@@ -164,26 +164,26 @@ class TestOperatorRescan:
 UPLOAD_URL = "/api/v1/marketplace/local/upload"
 
 
-def _counter_manifest(**overrides) -> dict:
+def _wiki_manifest(**overrides) -> dict:
     return {
         "uid": "VPR0AD00000001",
-        "public_id": "ours.party-tally",
-        "kind": "counter_group",
-        "name": "Party tally",
+        "public_id": "ours.party-handbook",
+        "kind": "wiki",
+        "name": "Party handbook",
         "publisher": "Our deployment",
-        "description": "Keep score.",
+        "description": "Keep the rules.",
         "version": "1.0.0",
         "definition": {
-            "type": "initiative-counter-group",
-            "name": "Tally",
-            "counters": [{"name": "Hit points", "count": 0}],
+            "type": "initiative-wiki",
+            "name": "Handbook",
+            "pages": [],
         },
         **overrides,
     }
 
 
 def _plugin_manifest(**overrides) -> dict:
-    return _counter_manifest(
+    return _wiki_manifest(
         uid="VPR0ADAPP00001",
         public_id="ours.tracker",
         kind="plugin",
@@ -200,14 +200,14 @@ class TestUploadingAListingFile:
         owner = await acting_user("owner", guild_role=CommunityRole.member)
 
         response = await client.post(
-            UPLOAD_URL, json={"manifest": _counter_manifest()}, headers=owner.headers
+            UPLOAD_URL, json={"manifest": _wiki_manifest()}, headers=owner.headers
         )
 
         assert response.status_code == 201, response.text
         assert response.json()["version"] == "1.0.0"
         shelf = await client.get(
             owner.g("/marketplace/listings"),
-            params={"kind": "counter_group"},
+            params={"kind": "wiki"},
             headers=owner.headers,
         )
         [card] = [
@@ -220,13 +220,13 @@ class TestUploadingAListingFile:
 
         response = await client.post(
             UPLOAD_URL,
-            json={"manifest": _counter_manifest(definition={"type": "nope"})},
+            json={"manifest": _wiki_manifest(definition={"type": "nope"})},
             headers=owner.headers,
         )
 
         assert response.status_code == 422
         assert response.json()["detail"] == MarketplaceMessages.LISTING_UPLOAD_INVALID
-        assert "initiative-counter-group" in response.json()["problem"]
+        assert "initiative-wiki" in response.json()["problem"]
 
     async def test_a_uid_another_catalogue_publishes_is_not_taken_over(
         self, client, acting_user, session
@@ -239,7 +239,7 @@ class TestUploadingAListingFile:
         owner = await acting_user("owner")
 
         response = await client.post(
-            UPLOAD_URL, json={"manifest": _counter_manifest()}, headers=owner.headers
+            UPLOAD_URL, json={"manifest": _wiki_manifest()}, headers=owner.headers
         )
 
         assert response.status_code == 422
@@ -276,7 +276,7 @@ class TestUploadingAListingFile:
         actor = await acting_user(tier)
 
         response = await client.post(
-            UPLOAD_URL, json={"manifest": _counter_manifest()}, headers=actor.headers
+            UPLOAD_URL, json={"manifest": _wiki_manifest()}, headers=actor.headers
         )
 
         assert response.status_code == 403
@@ -286,7 +286,7 @@ class TestUploadingAListingFile:
     ):
         owner = await acting_user("owner")
         await client.post(
-            UPLOAD_URL, json={"manifest": _counter_manifest()}, headers=owner.headers
+            UPLOAD_URL, json={"manifest": _wiki_manifest()}, headers=owner.headers
         )
 
         scan = await client.post(RESCAN_URL, headers=owner.headers)
