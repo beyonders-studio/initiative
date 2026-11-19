@@ -182,9 +182,10 @@ def serialize_grants(row: Any, *, context: ActorContext | None) -> list:
 
 
 async def audience(
-    session: Any, tool: Tool, rows: Iterable[Any]
+    session: Any, tool: Tool | ToolRecord, rows: Iterable[Any]
 ) -> dict[int, set[int]]:
-    """Who each of ``rows`` (``tool`` rows) is shared with and can open now, by
+    """Who each of ``rows`` (``tool`` rows, a built-in tool's or an installed
+    one's) is shared with and can open now, by
     id: the schema's ``resource_audience``, narrowed to
     :func:`named_people.readers_of`. The people a notification goes to and a
     notice is read by. Rows that reach nobody are absent.

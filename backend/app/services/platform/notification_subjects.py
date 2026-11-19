@@ -16,12 +16,15 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tool_set import ToolSet
 from app.core.tools import CONTENT_KINDS, plural_of
+from app.db.session import routed_tools
+from app.db.tool_rows import locate
 from app.models.platform.notification import Notification
 from app.models.tenant._mixins import tool_models
 from app.models.tenant.calendar_event import CalendarEvent
@@ -77,10 +80,11 @@ def _as_int(value: object) -> int | None:
         return None
 
 
-#: One line's needs, flattened: the key to fill and the row that fills it.
-#: Read off the notification BEFORE any routing happens, because routing
-#: detaches the rows this was read from.
-_Need = tuple[str, type[Any], str, int]
+#: One line's needs, flattened: the key to fill, where its title lives (a
+#: model and its column, or a kind the community's tool set names, with no
+#: column) and the row that fills it. Read off the notification BEFORE any
+#: routing happens, because routing detaches the rows this was read from.
+_Need = tuple[str, type[Any] | str, str | None, int]
 
 
 def _needs(line: Notification) -> list[_Need]:
@@ -91,23 +95,37 @@ def _needs(line: Notification) -> list[_Need]:
         if row_id is not None:
             out.append((subject.key, subject.model, subject.column, row_id))
     for key, id_key, type_key in _ENTITY_KEYS:
-        spec = _entity_spec(data.get(type_key))
+        entity_type = data.get(type_key)
         row_id = _as_int(data.get(id_key))
-        if spec is not None and row_id is not None:
-            out.append((key, spec[0], spec[1], row_id))
+        if isinstance(entity_type, str) and row_id is not None:
+            out.append((key, entity_type, None, row_id))
     return out
 
 
-def _entity_spec(entity_type: object) -> tuple[type[Any], str] | None:
-    """The polymorphic ones: a comment names whatever it is on, and a
-    subscription notice whatever changed — any tool, or anything inside one —
-    in ``entity_type``, with the id beside it. Its model is the table that
-    kind's plural names, labelled by the model's own display column, so every
-    kind is named without a list of them here."""
-    if not isinstance(entity_type, str) or entity_type not in CONTENT_KINDS:
-        return None
-    model = tool_models()[plural_of(entity_type)]
-    return model, model.display_field()
+def _titles(
+    tools: ToolSet, source: type[Any] | str, column: str | None, ids: set[int]
+) -> Any | None:
+    """The ids and titles of these rows: a fixed subject's, by its model and
+    column; or a polymorphic one's — a comment names whatever it is on, and a
+    subscription notice whatever changed, any tool or anything inside one, a
+    tool plug-in's among them, in ``entity_type`` — by the table the
+    community's tool set keeps that kind in, labelled by a model's own display
+    column or a tool plug-in's ``name``. None for a kind the community does
+    not have."""
+    if isinstance(source, str):
+        located = locate(tools, source)
+        if located is not None:
+            table = located.table
+            return select(table.c.id, table.c.name).where(
+                table.c.id.in_(ids), table.c.deleted_at.is_(None)
+            )
+        if source not in CONTENT_KINDS:
+            return None
+        source = tool_models()[plural_of(source)]
+        column = source.display_field()
+    return select(source.id, getattr(source, cast(str, column))).where(
+        source.id.in_(ids)
+    )
 
 
 async def resolve_subjects(
@@ -125,7 +143,7 @@ async def resolve_subjects(
     # Snapshot first: gathering routes the session into each schema in turn and
     # detaches what was read on the way in.
     plan: list[tuple[int, int, list[_Need]]] = []
-    wanted: dict[int, dict[tuple[type[Any], str], set[int]]] = {}
+    wanted: dict[int, dict[tuple[type[Any] | str, str | None], set[int]]] = {}
     for line in notifications:
         if line.id is None or line.guild_id is None:
             continue
@@ -134,22 +152,23 @@ async def resolve_subjects(
             continue
         plan.append((line.id, line.guild_id, needs))
         per_guild = wanted.setdefault(line.guild_id, {})
-        for _key, model, column, row_id in needs:
-            per_guild.setdefault((model, column), set()).add(row_id)
+        for _key, source, column, row_id in needs:
+            per_guild.setdefault((source, column), set()).add(row_id)
     if not wanted:
         return {}
 
     async def _fetch(
         guild_session: AsyncSession, guild_id: int
-    ) -> list[tuple[tuple[int, type[Any], str, int], str]]:
-        found: list[tuple[tuple[int, type[Any], str, int], str]] = []
-        for (model, column), ids in wanted.get(guild_id, {}).items():
-            rows = await guild_session.exec(
-                select(model.id, getattr(model, column)).where(model.id.in_(ids))
-            )
-            for row_id, value in rows:
+    ) -> list[tuple[tuple[int, type[Any] | str, str | None, int], str]]:
+        found: list[tuple[tuple[int, type[Any] | str, str | None, int], str]] = []
+        tools = routed_tools(guild_session)
+        for (source, column), ids in wanted.get(guild_id, {}).items():
+            statement = _titles(tools, source, column, ids)
+            if statement is None:
+                continue
+            for row_id, value in await guild_session.exec(statement):
                 if isinstance(value, str) and value:
-                    found.append(((guild_id, model, column, row_id), value))
+                    found.append(((guild_id, source, column, row_id), value))
         return found
 
     titles = dict(
@@ -159,9 +178,9 @@ async def resolve_subjects(
     resolved: dict[int, dict[str, str]] = {}
     for notification_id, guild_id, needs in plan:
         found = {
-            key: titles[(guild_id, model, column, row_id)]
-            for key, model, column, row_id in needs
-            if (guild_id, model, column, row_id) in titles
+            key: titles[(guild_id, source, column, row_id)]
+            for key, source, column, row_id in needs
+            if (guild_id, source, column, row_id) in titles
         }
         if found:
             resolved[notification_id] = found

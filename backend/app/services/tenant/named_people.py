@@ -49,6 +49,7 @@ from app.db.session import (
     guild_context,
     install_context,
     routed_guild_id,
+    session_tools,
     set_rls_context,
 )
 from app.models.platform.guild import GUILD_LADDER, CommunityRole, GuildMembership
@@ -112,24 +113,25 @@ class Governing:
 
 async def governing_of(
     session: AsyncSession, ref: tuple[str, int]
-) -> tuple[Tool, Any] | None:
-    """The tool, and its row, that governs ``ref`` (a task's project, a page's
-    wiki, a tool itself), read on ``session``, or ``None`` where the session
-    cannot reach it. The hops come from ``governing_path``, so no caller names
-    a tool."""
+) -> tuple[Tool | ToolRecord, Any] | None:
+    """The tool, and its row's ``id`` and ``initiative_id``, that governs
+    ``ref`` (a task's project, a page's wiki, a tool itself, a tool plug-in's
+    item's tool), read on ``session``, or ``None`` where the session cannot
+    reach it or the tool's row is in the trash. The hops come from the community's tool set, so no caller names
+    a tool. A built-in tool is named by its ``Tool``, an installed one by its
+    record."""
     from sqlalchemy import column as sa_column
     from sqlalchemy import table as sa_table
 
-    from app.core.tool_set import BUILTIN_TOOLS
-    from app.db.initiative_rls import entity_tables, governing_path
-    from app.models.tenant._mixins import tool_models
+    from app.db.initiative_rls import entity_tables, governing_walk, paths_for
 
+    tools = await session_tools(session)
     kind, entity_id = ref
-    table = entity_tables(BUILTIN_TOOLS)[kind]
-    walk = governing_path(table)
+    table = entity_tables(tools)[kind]
+    walk = governing_walk(table, paths_for(tools))
     if walk is None:
         raise ValueError(f"no tool governs {kind!r}")
-    tool, hops = walk
+    record, hops = walk
     row_id: int | None = entity_id
     for column, parent in hops:
         step = sa_table(table, sa_column("id"), sa_column(column))
@@ -139,11 +141,17 @@ async def governing_of(
         if row_id is None:
             return None
         table = parent
-    model = tool_models()[tool.plural]
+    own = record.table
     row = (
-        await session.exec(select(model).where(model.id == row_id))  # type: ignore[attr-defined]
+        await session.exec(
+            sa_select(own.c.id, own.c.initiative_id).where(
+                own.c.id == row_id, own.c.deleted_at.is_(None)
+            )
+        )
     ).one_or_none()
-    return None if row is None else (tool, row)
+    if row is None:
+        return None
+    return (record if record.installed else Tool(record.kind)), row
 
 
 def _grant_reaches(
