@@ -10,7 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildCommunity } from "@/__tests__/factories";
-import { renderWithProviders } from "@/__tests__/helpers/render";
+import { renderPage } from "@/__tests__/helpers/render";
 import type { CommunityPluginDetail } from "@/api/generated/initiativeAPI.schemas";
 
 import { PluginSettingsDialog } from "./PluginSettingsDialog";
@@ -81,28 +81,29 @@ vi.mock("./PluginMembersPanel", () => ({ PluginMembersPanel: () => null }));
 
 const renderAs = (role: "superadmin" | "admin") => {
   const community = buildCommunity({ role });
-  renderWithProviders(
-    <PluginSettingsDialog pluginId={3} isCommunityAdmin open onOpenChange={() => {}} />,
-    {
-      communities: {
-        communities: [community],
-        activeCommunityId: community.id,
-        activeCommunity: community,
-      },
-    }
-  );
+  renderPage(() => <PluginSettingsDialog pluginId={3} open onOpenChange={() => {}} />, {
+    communities: {
+      communities: [community],
+      activeCommunityId: community.id,
+      activeCommunity: community,
+    },
+  });
 };
 
 describe("PluginSettingsDialog", () => {
-  it("gives the seat the community credential's form", async () => {
+  it("gives the seat the community credential's form, and a way to its settings", async () => {
     renderAs("superadmin");
     expect(await screen.findByLabelText("Shop domain")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Community settings for this plug-in" })
+    ).toHaveAttribute("href", expect.stringContaining("/settings/integrations?plugin=3"));
   });
 
   it("tells an admin below the seat whether it is set", async () => {
     renderAs("admin");
     expect(await screen.findByText(/community admin has set this up/i)).toBeInTheDocument();
     expect(screen.queryByLabelText("Shop domain")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Community settings for this plug-in" })).toBeNull();
   });
 });
 

@@ -12,7 +12,6 @@
     "disabled": "Désactivé",
     "enable": "Activer",
     "disable": "Désactiver",
-    "rename": "Renommer",
     "remove": "Retirer",
     "removeTitle": "Retirer {{name}} ?",
     "removeBody": "Ce qu'il a créé part à la corbeille, d'où cela peut encore être restauré. Tous les identifiants qu'il détenait — ceux de la communauté et ceux de chaque membre — sont supprimés, et le plug-in est prié de cesser de s'en servir.",
@@ -25,7 +24,6 @@
     "saved": "Enregistré.",
     "needsConfig": "Configuration à faire",
     "configInvalid": "Problème de configuration",
-    "provided": "Fourni avec Initiative",
     "unavailable": "Non configuré sur ce serveur",
     "readOnly": "Lecture seule",
     "configure": "Ouvrir les paramètres",
@@ -61,8 +59,9 @@
   },
   "install": {
     "title": "Ajouter {{name}}",
-    "description": "Cela ajoute quelque chose pour toute la communauté. Vous pourrez le renommer maintenant ou plus tard.",
-    "name": "Nom",
+    "description": "Cela ajoute quelque chose pour toute la communauté.",
+    "connectTitle": "Connecter {{name}}",
+    "connectDescription": "Connectez maintenant ce avec quoi il fonctionne, ou plus tard depuis Intégrations dans les paramètres de la communauté.",
     "action": "Ajouter à la communauté",
     "done": "{{name}} ajouté.",
     "adminOnly": "Demandez au superadmin de votre communauté d'ajouter ce plug-in.",
@@ -99,8 +98,6 @@
     "personalScope": "Votre compte",
     "set": "Renseigné",
     "notSet": "Non renseigné",
-    "accessHint": "Utilise {{api}} — {{scopes}}",
-    "noScopes": "aucune permission indiquée",
     "secretSet": "Déjà renseigné — saisissez pour le remplacer",
     "empty": "Non renseigné",
     "choose": "Choisissez",
@@ -197,8 +194,7 @@
   "settings": {
     "description": "Configurez la connexion de ce plug-in.",
     "open": "Paramètres de {{name}}",
-    "adminTitle": "Paramètres de la communauté",
-    "adminDescription": "Ce que la communauté gère pour ce plug-in. Visible uniquement par le superadmin."
+    "communitySettings": "Paramètres de la communauté pour ce plug-in"
   },
   "page": {
     "connecting": "Connexion…",

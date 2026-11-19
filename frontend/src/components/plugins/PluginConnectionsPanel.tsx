@@ -48,7 +48,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/ui/switch";
 
 /** One typed input in a connection's form, as the pinned definition declares
- *  it. The read carries fields and the access hint untyped, because their shape
+ *  it. The read carries fields untyped, because their shape
  *  is the manifest's rather than the API's. */
 interface PluginConnectionField {
   key: string;
@@ -103,7 +103,7 @@ export function PluginConnectionsPanel({
   );
 }
 
-/** The shared frame: name, what it wants access to, and whether it is set. */
+/** The shared frame: name and whether it is set. */
 function ConnectionShell({
   connection,
   icon,
@@ -117,7 +117,6 @@ function ConnectionShell({
 }) {
   const { t, i18n } = useTranslation(["plugins"]);
   const name = localized(connection.label, i18n.language) ?? connection.id;
-  const hint = connection.access_hint as { api?: string; scopes?: string[] } | null;
 
   return (
     <section className="space-y-3 rounded-lg border p-4">
@@ -131,19 +130,6 @@ function ConnectionShell({
           <Badge variant="outline">{t("plugins:connections.notSet")}</Badge>
         )}
       </header>
-
-      {/* Truth in advertising: the API and permissions this asks for, so an
-          admin can mint the smallest credential that works. */}
-      {hint?.api || hint?.scopes?.length ? (
-        <p className="text-muted-foreground text-xs">
-          {t("plugins:connections.accessHint", {
-            api: hint.api ?? "—",
-            scopes: hint.scopes?.length
-              ? hint.scopes.join(", ")
-              : t("plugins:connections.noScopes"),
-          })}
-        </p>
-      ) : null}
 
       {children}
     </section>

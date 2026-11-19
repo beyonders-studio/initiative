@@ -16,18 +16,31 @@ import { buildMarketplaceListingDetail } from "@/__tests__/factories";
 import { renderPage } from "@/__tests__/helpers/render";
 import type {
   CommunityPluginInstall,
+  CommunityPluginRead,
   MarketplaceListingDetail,
 } from "@/api/generated/initiativeAPI.schemas";
 
 import { InstallPluginDialog } from "./InstallPluginDialog";
 
 const sent: CommunityPluginInstall[] = [];
+/** What the server answers, when a test goes past the install. */
+let installed: Partial<CommunityPluginRead> | null = null;
 
 vi.mock("@/hooks/useCommunityPlugins", () => ({
   useInstallCommunityPlugin: () => ({
     isPending: false,
-    mutate: (body: CommunityPluginInstall) => sent.push(body),
+    mutate: (
+      body: CommunityPluginInstall,
+      options?: { onSuccess?: (plugin: Partial<CommunityPluginRead>) => void }
+    ) => {
+      sent.push(body);
+      if (installed) options?.onSuccess?.(installed);
+    },
   }),
+}));
+
+vi.mock("@/components/plugins/PluginSettingsDialog", () => ({
+  PluginConnectBody: ({ pluginId }: { pluginId: number }) => <p>Connections of {pluginId}</p>,
 }));
 
 vi.mock("@/hooks/useInitiatives", () => ({
@@ -64,6 +77,7 @@ const install = async () => {
 
 beforeEach(() => {
   sent.length = 0;
+  installed = null;
 });
 
 describe("InstallPluginDialog", () => {
@@ -75,7 +89,6 @@ describe("InstallPluginDialog", () => {
 
     expect(await install()).toEqual({
       listing_uid: "WIDGETCO000001",
-      name: "WidgetCo",
       granted_scopes: ["projects:read", "members:read"],
       placements: "all",
       callers: [],
@@ -206,6 +219,20 @@ describe("InstallPluginDialog", () => {
 
     const use = await screen.findByLabelText("Use acme.github in this community");
     expect(use).toBeDisabled();
+  });
+
+  it("asks for what it connects to once it is added", async () => {
+    installed = {
+      id: 8,
+      name: "WidgetCo",
+      definition: { connections: [{ id: "org", scope: "static" }] },
+    };
+    open();
+
+    await install();
+    expect(await screen.findByText("Connect WidgetCo")).toBeInTheDocument();
+    expect(screen.getByText("Connections of 8")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Done" })).toBeInTheDocument();
   });
 
   it("asks nothing about placement for a plug-in with no page and no access", async () => {

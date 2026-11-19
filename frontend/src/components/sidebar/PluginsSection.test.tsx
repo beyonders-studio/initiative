@@ -12,13 +12,16 @@
  * is: it has no sharing to widen, so the entry would refuse everyone who clicked
  * it. The server says which plug-ins those are; this only honors the answer.
  *
- * And every visible entry leads somewhere: a plug-in with a surface opens it, an
- * plug-in with a credential to supply opens that form, and a plug-in with neither
- * waits under "show more" rather than spending a row on a dead click.
+ * And every visible entry leads somewhere: a plug-in with a surface opens it, a
+ * plug-in that asks each member for an account opens that, and a plug-in with
+ * neither waits under "show more" rather than spending a row on a dead click.
+ * The gear is there only when it opens something: the member's own account, or
+ * for the seat, the plug-in's community settings.
  */
 import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { buildCommunity } from "@/__tests__/factories";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { CommunityPluginRead } from "@/api/generated/initiativeAPI.schemas";
 import { SidebarProvider } from "@/components/sidebar/sidebar";
@@ -45,14 +48,27 @@ const plugin = (overrides: Partial<CommunityPluginRead> = {}) =>
 
 // The section is built from sidebar primitives, so it needs the providers it
 // would have in the real shell.
-const render = (isCommunityAdmin: boolean) =>
-  renderPage(() => (
-    <TooltipProvider>
-      <SidebarProvider>
-        <PluginsSection isCommunityAdmin={isCommunityAdmin} open onOpenChange={() => {}} />
-      </SidebarProvider>
-    </TooltipProvider>
-  ));
+const render = (isCommunityAdmin: boolean, role?: "superadmin") => {
+  const community = role ? buildCommunity({ role }) : undefined;
+  return renderPage(
+    () => (
+      <TooltipProvider>
+        <SidebarProvider>
+          <PluginsSection isCommunityAdmin={isCommunityAdmin} open onOpenChange={() => {}} />
+        </SidebarProvider>
+      </TooltipProvider>
+    ),
+    community
+      ? {
+          communities: {
+            communities: [community],
+            activeCommunityId: community.id,
+            activeCommunity: community,
+          },
+        }
+      : {}
+  );
+};
 
 beforeEach(() => {
   plugins = [];
@@ -187,10 +203,7 @@ describe("PluginsSection", () => {
     expect(screen.queryByText("1 more")).toBeNull();
   });
 
-  it("gives every plug-in a settings gear, whatever else its entry does", async () => {
-    // Three shapes of entry — a page, a credential form, nothing at all — and
-    // the gear is on all of them, because every plug-in has something a person may
-    // want to check or take back.
+  it("gives a member the gear only where they have an account to connect", async () => {
     plugins = [
       plugin(),
       plugin({
@@ -203,14 +216,26 @@ describe("PluginsSection", () => {
     ];
     render(false);
     await screen.findByText("Community calendar");
-    expect(screen.getByLabelText("Community calendar settings")).toBeInTheDocument();
-    expect(screen.getByLabelText("GitHub settings")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Community calendar settings")).toBeNull();
+    expect(screen.getByRole("button", { name: "GitHub settings" })).toBeInTheDocument();
   });
 
-  it("gives the gear to a plug-in with nothing to open, once it is shown", async () => {
+  it("leaves a plug-in with nothing to open, and nothing of the member's, inert", async () => {
     plugins = [plugin({ name: "Widgets only", tool: null, artifacts: [] })];
     render(false);
     (await screen.findByText("1 more")).click();
-    expect(await screen.findByLabelText("Widgets only settings")).toBeInTheDocument();
+    expect(await screen.findByText("Widgets only")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Widgets only/ })).toBeNull();
+    expect(screen.queryByLabelText("Widgets only settings")).toBeNull();
+  });
+
+  it("sends the seat's gear straight to the plug-in's community settings", async () => {
+    plugins = [plugin({ id: 5, name: "Widgets only", tool: null, artifacts: [] })];
+    render(true, "superadmin");
+    (await screen.findByText("1 more")).click();
+    expect(await screen.findByRole("link", { name: "Widgets only settings" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("/settings/integrations?plugin=5")
+    );
   });
 });
