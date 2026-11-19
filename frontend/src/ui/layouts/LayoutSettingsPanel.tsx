@@ -98,6 +98,7 @@ export const ListLayoutSettings = ({
   const drawnType = selectedField !== null ? fields.get(selectedField)?.property?.type : undefined;
   const drawn =
     drawnType === MetadataType.scale || drawnType === MetadataType.counter ? drawnType : null;
+  const shownLook = selectedField !== null ? layout.definition.displays?.[selectedField] : null;
   return (
     // Disabled as one, so a save under way leaves every control as it was.
     <fieldset disabled={locked} className="min-w-0">
@@ -152,8 +153,11 @@ export const ListLayoutSettings = ({
         <DisplaySetting
           type={drawn}
           value={
-            layout.definition.displays?.[selectedField] ??
-            counterSettings(fields.get(selectedField)?.property?.counter).look
+            // A look each row reads off its own select field shows as the
+            // field's own, and choosing one draws every row in it.
+            typeof shownLook === "string"
+              ? shownLook
+              : counterSettings(fields.get(selectedField)?.property?.counter).look
           }
           onChange={(display) => edits.changeDisplay(selectedField, display)}
         />

@@ -4,8 +4,8 @@ import {
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { ToolCard } from "@/components/tools/ToolCard";
-import { getContrastingTextColor } from "@/lib/counter-color";
 import { toolDetailRoute } from "@/lib/tools";
+import { getContrastingTextColor } from "@/ui/lib/contrast";
 import { numberFormat } from "@/ui/lib/intl";
 
 /** The group's first counters and where they stand, as the list sent them,

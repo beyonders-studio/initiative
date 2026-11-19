@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { ListLayoutReadKind, SortField } from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/ui/button";
@@ -75,6 +76,7 @@ export const LayoutPresets = ({
   fields: ReadonlyMap<string, FieldDef>;
   edits: LayoutEdits;
 }) => {
+  const { i18n } = useTranslation();
   const presets = presetsOf(layout.definition, of.kind);
   // The preset open in the dialog, by its place; null adds one.
   const [open, setOpen] = useState<{ index: number | null } | null>(null);
@@ -99,7 +101,7 @@ export const LayoutPresets = ({
       ) : (
         <ul className="space-y-1">
           {presets.map((preset, index) => {
-            const name = presetName(preset, t);
+            const name = presetName(preset, t, i18n.language);
             return (
               <li key={preset.slug} className="flex items-center gap-1">
                 <span className="min-w-0 flex-1 truncate text-sm">{name}</span>
@@ -185,11 +187,12 @@ export const LayoutPresets = ({
               // A rename keeps the slug, so links to it still open it. A shipped
               // one keeps being named in each reader's words until renamed.
               const was = next[open.index];
-              const renamed = name !== presetName(was, t);
+              const renamed = name !== presetName(was, t, i18n.language);
               next[open.index] = {
                 ...was,
                 name,
                 nameKey: renamed ? undefined : was.nameKey,
+                names: renamed ? undefined : was.names,
                 filters,
                 sorting,
               };
@@ -223,7 +226,8 @@ const PresetDialog = ({
   onClose: () => void;
   onSubmit: (name: string, filters: unknown, sorting: Preset<unknown>["sorting"]) => void;
 }) => {
-  const [name, setName] = useState(preset ? presetName(preset, t) : "");
+  const { i18n } = useTranslation();
+  const [name, setName] = useState(preset ? presetName(preset, t, i18n.language) : "");
   const [filters, setFilters] = useState(preset ? preset.filters : of.empty);
   const [sort, setSort] = useState<SortField | null>(
     of.kind.sorting?.stored(preset?.sorting ?? [])[0] ?? null

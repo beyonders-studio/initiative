@@ -1,7 +1,11 @@
 import type { LucideIcon } from "lucide-react";
 import { type ComponentType, type FunctionComponent, memo, type ReactNode } from "react";
 
-import { MetadataType, type PropertySummary } from "@/api/generated/initiativeAPI.schemas";
+import {
+  type DisplayFrom,
+  MetadataType,
+  type PropertySummary,
+} from "@/api/generated/initiativeAPI.schemas";
 import { Badge } from "@/ui/badge";
 import { DateCell } from "@/ui/date-cell";
 import { host } from "@/ui/host";
@@ -116,6 +120,9 @@ export type FieldDef<I = unknown> = {
   property?: PropertyDefinition;
   /** How a scale or a counter is drawn where the list showing it says. */
   display?: FieldDisplay;
+  /** How it is drawn on one item, where the list reads the look off the
+   *  item's own select field; one it does not name draws as `display`. */
+  displayOf?(item: I): FieldDisplay | undefined;
   /** A property drawn on a card as its value alone, not named: a card under
    *  a picture, which reads as a caption or a price rather than a row of
    *  labelled chips. */
@@ -158,6 +165,18 @@ export type LayoutEnv<I = unknown> = {
   /** What its property editors read and change through: a detail's. Left
    *  out, its properties are read, not changed. */
   properties?: PropertyEnv<PropertyDefinition>;
+  /** The first `limit` of an item's items in one of its item tables (`table`,
+   *  by its key), in their own order: what an `items` part previews. Left
+   *  out, or answering null, it previews none. */
+  itemPreview?(item: I, table: string, limit: number): ItemPreview | null;
+};
+
+/** Items an `items` part previews, with their table's fields, as its first
+ *  list draws them, and what they are read and linked with. */
+export type ItemPreview = {
+  items: readonly unknown[];
+  fields: ReadonlyMap<string, FieldDef>;
+  env: LayoutEnv;
 };
 
 export type FieldRendererProps<I = unknown> = {
@@ -291,26 +310,39 @@ const PropertyField = ({ value, item, field, variant, env, oneLine }: FieldRende
     <PropertyValueCell
       summary={summary}
       variant={variant === "cell" || field.plain ? "cell" : "chip"}
-      display={field.display}
+      display={field.displayOf?.(item) ?? field.display}
       oneLine={oneLine}
       onStep={step ?? undefined}
     />
   );
 };
 
-/** `fields`, each scale or counter drawn as a list's `displays` say. */
-export const withDisplays = <F extends Pick<FieldDef, "display">>(
+/** What a field holds, its value as a property carries it read out. */
+export const plainValue = (value: unknown): unknown =>
+  value !== null && typeof value === "object" && "value" in value ? value.value : value;
+
+/** `fields`, each scale or counter drawn as a list's `displays` say: in one
+ *  look, or in the look each item's own select field names (`from`). */
+export const withDisplays = <F extends Pick<FieldDef, "display" | "displayOf" | "value">>(
   fields: ReadonlyMap<string, F>,
-  displays: Readonly<Record<string, FieldDisplay>> | null | undefined
-): ReadonlyMap<string, F> =>
-  displays && Object.keys(displays).length > 0
-    ? new Map(
-        [...fields].map(([id, field]) => [
-          id,
-          id in displays ? { ...field, display: displays[id] } : field,
-        ])
-      )
-    : fields;
+  displays: Readonly<Record<string, FieldDisplay | DisplayFrom>> | null | undefined
+): ReadonlyMap<string, F> => {
+  if (!displays || Object.keys(displays).length === 0) return fields;
+  const looked = (field: F, look: FieldDisplay | DisplayFrom): F => {
+    if (typeof look === "string") return { ...field, display: look };
+    const from = fields.get(look.from);
+    return {
+      ...field,
+      displayOf: (item: unknown) => {
+        const named = plainValue(from?.value(item));
+        return typeof named === "string" ? (named as FieldDisplay) : undefined;
+      },
+    };
+  };
+  return new Map(
+    [...fields].map(([id, field]) => [id, id in displays ? looked(field, displays[id]) : field])
+  );
+};
 
 /** One renderer per kind of field, each skipping a redraw its props don't call
  *  for. */

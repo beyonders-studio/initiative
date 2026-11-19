@@ -15,7 +15,6 @@ import {
 import { useTranslation } from "react-i18next";
 
 import type { CounterRead } from "@/api/generated/initiativeAPI.schemas";
-import { getContrastingTextColor } from "@/lib/counter-color";
 import { counterShown, isAtMax, isAtMin } from "@/lib/counter-math";
 import { Button } from "@/ui/button";
 import {
@@ -24,6 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
+import { getContrastingTextColor } from "@/ui/lib/contrast";
 import { cn } from "@/ui/lib/utils";
 import { CounterView } from "@/ui/properties/CounterView";
 
