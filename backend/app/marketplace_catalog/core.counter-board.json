@@ -5,11 +5,11 @@
   "name": "Counter board",
   "publisher": "Initiative",
   "description": "Your counters, front and center.",
-  "long_description": "Counters put where people look. One number as the headline, its progress toward the goal, and the rest of its group charted alongside — the scoreboard for whatever the initiative is tallying.\n\nAfter installing, point each widget at the counters you want: open the dashboard's configure step and it lists what this initiative has.",
+  "long_description": "Counters put where people look. One number as the headline, its progress toward the goal, and the rest of its group charted alongside — the scoreboard for whatever the initiative is tallying. It reads the Counters plug-in's counters.\n\nAfter installing, point each widget at the counters you want: open the dashboard's configure step and it lists what this initiative has.",
   "avatar_url": "/marketplace/core-counter-board.svg",
   "images": [],
-  "version": "1.0.1",
-  "release_notes": "Brings installs that had the first copy up to the board as it ships now.",
+  "version": "1.1.0",
+  "release_notes": "Reads its counters from the Counters plug-in.",
   "definition": {
     "schema_version": 1,
     "kind": "dashboard",
@@ -28,7 +28,7 @@
         },
         "binding": {
           "source": "query",
-          "sql": "SELECT name, count FROM counters ORDER BY name"
+          "sql": "SELECT name, count FROM p_tsjvtcm0s7gv2x_counter ORDER BY name"
         },
         "title": "The headline number"
       },
@@ -43,7 +43,7 @@
         },
         "binding": {
           "source": "query",
-          "sql": "SELECT name, count, max FROM counters ORDER BY name"
+          "sql": "SELECT name, count, max FROM p_tsjvtcm0s7gv2x_counter ORDER BY name"
         },
         "title": "Toward the goal"
       },
@@ -58,7 +58,7 @@
         },
         "binding": {
           "source": "query",
-          "sql": "SELECT name, count FROM counters ORDER BY count DESC"
+          "sql": "SELECT name, count FROM p_tsjvtcm0s7gv2x_counter ORDER BY count DESC"
         },
         "title": "The whole group",
         "options": {

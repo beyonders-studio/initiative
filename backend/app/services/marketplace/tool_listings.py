@@ -184,12 +184,15 @@ def _canonical_dashboard(envelope: dict[str, Any], *, what: str) -> dict[str, An
     The importer is lenient on purpose — a backup restores a dashboard it
     cannot draw as an empty one rather than losing it — but a listing is
     published to be installed, so a canvas this build cannot draw is refused
-    here, by the same validator the create endpoint runs.
+    here, by the same validator the create endpoint runs. Its queries may
+    read the datasets of a tool plug-in this build ships, as well as a
+    built-in tool's.
 
     ``config`` is dropped. It fills the binding slots a definition leaves open
     with one community's own counters and files, which a listing has none
     of: that is the installer's to fill.
     """
+    from app.services.marketplace.builtin import shipped_tools
     from app.services.tenant.dashboard_definition import (
         DashboardDefinitionError,
         normalize_dashboard_definition,
@@ -197,7 +200,7 @@ def _canonical_dashboard(envelope: dict[str, Any], *, what: str) -> dict[str, An
 
     try:
         envelope["definition"] = normalize_dashboard_definition(
-            envelope.get("definition") or {}
+            envelope.get("definition") or {}, shipped_tools()
         )
     except DashboardDefinitionError as exc:
         raise ListingDefinitionError(f"invalid dashboard {what}: {exc}") from exc
