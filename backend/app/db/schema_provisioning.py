@@ -1494,10 +1494,12 @@ async def reindex_guild_search(
 
     Returns the number of entities rewritten; zero when already current.
     """
+    from app.db.plugin_tools import provisioned_tools
     from app.db.search_index import reindex_plan, search_generation
 
     schema = guild_schema_name(guild_id)
-    generation = search_generation()
+    tools = await provisioned_tools(guild_id)
+    generation = search_generation(tools)
     conn = await session.connection()
     current = await conn.scalar(
         text("SELECT obj_description(to_regclass(:t), 'pg_class')"),
@@ -1506,10 +1508,8 @@ async def reindex_guild_search(
     if current == generation and not force:
         return 0
 
-    from app.db.plugin_tools import provisioned_tools
-
     written = 0
-    for _entity_type, statement in reindex_plan(await provisioned_tools(guild_id)):
+    for _entity_type, statement in reindex_plan(tools):
         cursor = 0
         while True:
             conn = await session.connection()
@@ -1546,27 +1546,36 @@ async def backfill_guild_search() -> int:
     fills in progressively instead of holding one transaction open across the
     whole sweep. A guild that fails is logged and the others carry on.
     """
+    from app.db.plugin_tools import provisioned_tools
     from app.db.search_index import search_generation
     from app.services.guild_sweeps import Scope, each_guild
 
     async with db_session.provisioning_engine.connect() as conn:
-        stale = (
-            (
-                await conn.execute(
-                    text(
-                        "SELECT substr(n.nspname, 7)::int FROM pg_class c"
-                        " JOIN pg_namespace n ON n.oid = c.relnamespace"
-                        " WHERE c.relname = 'search_entries'"
-                        " AND n.nspname ~ '^guild_[0-9]+$'"
-                        " AND obj_description(c.oid, 'pg_class')"
-                        " IS DISTINCT FROM :generation"
-                    ),
-                    {"generation": search_generation()},
+        rows = (
+            await conn.execute(
+                text(
+                    "SELECT substr(n.nspname, 7)::int,"
+                    " obj_description(c.oid, 'pg_class'),"
+                    " obj_description(n.oid, 'pg_namespace')"
+                    " FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace"
+                    " WHERE c.relname = 'search_entries'"
+                    " AND n.nspname ~ '^guild_[0-9]+$'"
                 )
             )
-            .scalars()
-            .all()
+        ).all()
+    # A community with tool plug-ins, which its schema's stamp names, is
+    # current by the generation of its own sources.
+    builtin = search_generation()
+    stale = [
+        guild_id
+        for guild_id, marker, stamp in rows
+        if marker
+        != (
+            builtin
+            if stamp_tools(stamp) is None
+            else search_generation(await provisioned_tools(guild_id))
         )
+    ]
     if not stale:
         return 0
     total = 0

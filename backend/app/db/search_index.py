@@ -1222,18 +1222,20 @@ def render_guild_search_ddl(opclass: str | None, tools: ToolSet) -> str:
     return _HEADER + "\n\n" + "\n\n".join(blocks) + "\n"
 
 
-def search_generation() -> str:
-    """Digest of WHAT is indexed and HOW, for deciding when to reindex.
+def search_generation(tools: ToolSet = BUILTIN_TOOLS) -> str:
+    """Digest of WHAT a community with ``tools`` indexes and HOW, for deciding
+    when to reindex it.
 
     Covers the per-source declarations and the chunking rules, so adding a
-    source or changing an extraction re-sweeps. Deliberately excludes the index
-    definition: swapping the operator class rebuilds the index, which does not
-    change a single stored row. A tool plug-in's tables are indexed from the
-    moment they are made, by the same rules, so they move nothing here.
+    source or changing an extraction re-sweeps, and a community's tool
+    plug-ins' sources move its own generation alone. Deliberately excludes the
+    index definition: swapping the operator class rebuilds the index, which
+    does not change a single stored row.
     """
+    c = _Community.of(tools) if tools.installed else _BUILTIN
     digest = hashlib.sha256()
-    for name, source in sorted(SEARCH_SOURCES.items()):
-        digest.update(_trigger_block(_BUILTIN, name, source).encode())
+    for name, source in sorted(search_sources(tools).items()):
+        digest.update(_trigger_block(c, name, source).encode())
     digest.update(WRITE_FUNCTION_SQL.encode())
     return f"search:{digest.hexdigest()[:16]}"
 
