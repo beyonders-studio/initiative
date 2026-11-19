@@ -2,6 +2,7 @@
 
 from dataclasses import replace
 
+import pytest
 from sqlalchemy import Column, ForeignKey, Integer, MetaData, Table
 from sqlmodel import SQLModel
 
@@ -11,6 +12,7 @@ from app.db.guild_ddl import render_guild_rls_ddl
 from app.db.registry_checks import check_expression, registry_checks
 
 
+@pytest.mark.always
 def test_the_builtin_tools_are_the_records():
     assert [tool.kind for tool in BUILTIN_TOOLS] == [tool.value for tool in Tool]
     for tool in BUILTIN_TOOLS:
@@ -21,6 +23,7 @@ def test_the_builtin_tools_are_the_records():
     assert BUILTIN_TOOLS.comment_targets == COMMENT_TARGETS
 
 
+@pytest.mark.always
 def test_every_registry_check_over_the_builtin_tools_is_the_models():
     """A CHECK written from the tool set says, over the built-in tools, what
     the model's own expression says."""
@@ -54,4 +57,5 @@ def test_a_tool_with_no_model_is_ruled_as_a_builtin_is():
     assert "WHEN 'widget' THEN" in ddl
     assert "'widgets_enabled'" in ddl
     assert "FROM widgets WHERE id = p_resource_id" in ddl
+    assert "WHEN 'widgets' THEN\n        SELECT * INTO fz FROM widgets" in ddl
     assert "widget" not in render_guild_rls_ddl(BUILTIN_TOOLS)

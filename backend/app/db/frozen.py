@@ -62,8 +62,8 @@ from app.db.errors import (
     dbapi_sqlstate,
 )
 from app.db.initiative_rls import (
-    COMMENT_PARENTS,
     NAMED_PEOPLE,
+    comment_parents,
     entity_tables,
     governing_walk,
     paths_for,
@@ -429,7 +429,9 @@ def _dispatch_tables(tools: ToolSet) -> tuple[str, ...]:
         if (walk := governing_walk(table, paths)) is not None and (hop := walk[1])
     }
     guild_frozen = {t for t in FROZEN_TABLES if t in paths}
-    return tuple(sorted(hops | guild_frozen | {"initiatives"}))
+    # Every tool's own table, which a grant asks about by its kind.
+    tools_own = {tool.table.name for tool in tools}
+    return tuple(sorted(hops | guild_frozen | tools_own | {"initiatives"}))
 
 
 def render_resource_frozen_fn(tools: ToolSet) -> str:
@@ -852,7 +854,7 @@ def _comments_leg(alias: str, trashed_ok: str, tools: ToolSet) -> str:
     arms = " ".join(
         f"WHEN '{kind}' THEN resource_frozen("
         f"'{parent.table}', {alias}.subject_id, {trashed_ok})"
-        for kind, parent in COMMENT_PARENTS.items()
+        for kind, parent in comment_parents(tools).items()
     )
     return f"COALESCE((CASE {alias}.subject_type {arms} ELSE false END), false)"
 
