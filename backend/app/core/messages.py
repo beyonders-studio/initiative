@@ -66,6 +66,18 @@ class KindMessages:
     GRANTEE_LACKS_ACCESS = "GRANTEE_LACKS_ACCESS"
 
 
+class ToolPluginMessages:
+    """Refusals about a tool plug-in's rows, which its declaration decides."""
+
+    #: A value its field does not take, or a field its table does not declare.
+    FIELD_INVALID = "TOOL_PLUGIN_FIELD_INVALID"
+    #: A new row says where it goes as its kind does not: a tool's row names
+    #: an initiative, and an item the row it sits under.
+    PLACEMENT_INVALID = "TOOL_PLUGIN_PLACEMENT_INVALID"
+    #: An action the row's table does not declare.
+    ACTION_NOT_FOUND = "TOOL_PLUGIN_ACTION_NOT_FOUND"
+
+
 class AuthMessages:
     #: A sign-in rule nothing the deployment permits could answer.
     AUTH_RULE_NOT_OFFERED = "AUTH_RULE_NOT_OFFERED"

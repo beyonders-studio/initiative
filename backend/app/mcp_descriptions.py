@@ -352,6 +352,28 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
         "the source is a piece of the target; `attached` and `related_to` "
         "belong together. 409 if the link is already there."
     ),
+    # --- Tool plug-ins ------------------------------------------------------
+    "list_plugin_tool_rows": (
+        "List the rows of a tool a plug-in brings, by its `kind` "
+        "(`<key>.<id>`): the tool's own rows in an initiative "
+        "(`initiative_id`), or an item's rows under the row they sit in "
+        "(`parent_id`). Each row's declared fields are in `fields`, and the "
+        "people it names in `people`."
+    ),
+    "read_plugin_tool_row": (
+        "Read one row of a tool a plug-in brings, or one of its items, by "
+        "`kind` and id."
+    ),
+    "create_plugin_tool_row": (
+        "Add a row to a tool a plug-in brings: of the tool, in an initiative "
+        "(`initiative_id`), or of an item, under the row it sits in "
+        "(`parent_id`). `fields` holds its declared fields by key, `people` "
+        "the ones naming a person."
+    ),
+    "update_plugin_tool_row": (
+        "Change a row of a tool a plug-in brings. Only the fields sent change; "
+        "a counter is kept within its bounds."
+    ),
 }
 
 

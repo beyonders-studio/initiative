@@ -17,6 +17,7 @@ gets it.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import cast
 
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -82,21 +83,40 @@ async def description_saved(
     )
     if author is None:
         return
-
     endpoint = _endpoint(row)
+    await tell_mentioned(
+        session,
+        (endpoint.kind.value, endpoint.id),
+        newly_mentioned(row.description, previous),
+        title=getattr(row, row.display_field()) or "",
+        author=author,
+    )
+
+
+async def tell_mentioned(
+    session: AsyncSession,
+    about: tuple[str, int],
+    mentioned: Iterable[int],
+    *,
+    title: str,
+    author: User,
+) -> None:
+    """Tell the people ``mentioned`` that ``author`` named them in the text of
+    ``about`` (a kind and an id), called ``title``: a description, or a tool
+    plug-in's text field. Rides the caller's transaction."""
     name = await notifications_service.actor_name(session, author)
     await notifications_service.notify(
         session,
         NotificationType.mention,
-        sorted(newly_mentioned(row.description, previous)),
-        about=(endpoint.kind.value, endpoint.id),
+        sorted(mentioned),
+        about=about,
         key="mention.description",
-        values={"actor": name, "title": getattr(row, row.display_field()) or ""},
+        values={"actor": name, "title": title},
         # The title is community content: the bell reads it back by kind and
         # id.
         data={
-            "entity_type": endpoint.kind.value,
-            "entity_id": endpoint.id,
+            "entity_type": about[0],
+            "entity_id": about[1],
             "mentioned_by_name": name,
             "mentioned_by_id": author.id,
         },

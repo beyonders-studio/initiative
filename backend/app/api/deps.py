@@ -33,11 +33,13 @@ from app.core.messages import (
     AuthMessages,
     DirectMessageMessages,
     GuildMessages,
+    KindMessages,
     PluginMessages,
     UserMessages,
 )
 from app.core.plugin_access_token import InstallAccessToken
 from app.core.plugin_scopes import (
+    PluginScopeAccess,
     UnknownPluginScope,
     parse_scope,
     validate_scopes,
@@ -47,7 +49,7 @@ from app.core.security import (
     SESSION_COOKIE_NAME,
     STEP_UP_CHALLENGE,
 )
-from app.core.tools import Tool
+from app.core.tools import Tool, kind_refusal
 from app.db import cohorts
 from app.db.guild_standing import (
     ActorContext,
@@ -1798,6 +1800,56 @@ def plugin_scope_by(
         {"by": param, "scopes": dict(sorted(scopes.items()))},
     )
     dependency.__name__ = f"plugin_scope_by_{param}"
+    dependency.__qualname__ = dependency.__name__
+    return dependency
+
+
+def plugin_tool_scope(
+    access: PluginScopeAccess,
+) -> Callable[..., Awaitable[ActorContext]]:
+    """:func:`plugin_scope` for a route that serves any tool plug-in's rows,
+    named by the path parameter ``kind``, its tool's or one of its items': an
+    installed plug-in's request needs that tool's scope at ``access``
+    (``<tool kind>:read``, ``<tool kind>:write``), which the install's standing
+    names once it is computed, and a kind its community does not have is not
+    found. A person passes through to the ordinary seam, as with
+    :func:`plugin_scope`.
+
+    Carries ``{"tool": "kind", "access": …}`` on
+    :data:`PLUGIN_SCOPE_DECLARATION_ATTRIBUTE`, and no fixed scope on
+    :data:`PLUGIN_SCOPES_ATTRIBUTE`.
+    """
+
+    async def dependency(
+        request: Request,
+        session: SessionDep,
+        guild_id: CommunityIdPath,
+        person: Annotated[User | None, Depends(get_actor_user)],
+    ) -> ActorContext:
+        if person is None:
+            from app.db.tool_rows import locate
+
+            context = await _establish_install_request(request, session, None)
+            kind = str(request.path_params.get("kind"))
+            located = locate(context.tools, kind)
+            if located is None:
+                raise kind_refusal(kind, KindMessages.NOT_FOUND, 404)
+            if not context.holds(f"{located.tool.scope}:{access.value}"):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=PluginMessages.SCOPE_REQUIRED,
+                )
+            return context
+        return await get_guild_membership(request, session, person, guild_id)
+
+    setattr(dependency, PLUGIN_SCOPE_ATTRIBUTE, f"tool of kind:{access.value}")
+    setattr(dependency, PLUGIN_SCOPES_ATTRIBUTE, frozenset())
+    setattr(
+        dependency,
+        PLUGIN_SCOPE_DECLARATION_ATTRIBUTE,
+        {"tool": "kind", "access": access.value},
+    )
+    dependency.__name__ = f"plugin_tool_scope_{access.value}"
     dependency.__qualname__ = dependency.__name__
     return dependency
 

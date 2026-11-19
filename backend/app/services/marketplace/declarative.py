@@ -871,8 +871,9 @@ async def action_change(
     write: str,
     *,
     item: Mapping[str, Any],
-    held: Mapping[str, Any],
-    installed: Mapping[str, Any],
+    held: Mapping[str, Any] | None = None,
+    installed: Mapping[str, Any] | None = None,
+    items: Mapping[str, Any] | None = None,
     result: Any = UNDEFINED,
     params: Mapping[str, Any] | None = None,
     element: str | None = None,
@@ -880,7 +881,10 @@ async def action_change(
 ) -> dict[str, Any] | None:
     """The change a declarative action's ``write`` answers, as the SDK's
     ``runAction`` reads it: the one Initiative makes to the plug-in's values
-    on the action's own item, or ``None`` when it answers nothing.
+    on the action's own item, or ``None`` when it answers nothing. A tool
+    plug-in's action is run the same way, its ``item`` the row it runs on and
+    ``items`` the item rows directly under it, by item key, and its change is
+    to their declared fields (``app.services.tenant.plugin_tool_rows``).
 
     ``write`` reads ``item`` (its ``kind``, ``id`` and ``title``), ``held``
     (the install's values on it, by key), ``result`` (the endpoint's mapped
@@ -897,11 +901,14 @@ async def action_change(
     millis, at = _clock(now or datetime.now(UTC))
     document: dict[str, Any] = {
         "item": dict(item),
-        "held": dict(held),
         "params": dict(params or {}),
-        **installed,
+        **(installed or {}),
         "now": at,
     }
+    if held is not None:
+        document["held"] = dict(held)
+    if items is not None:
+        document["items"] = dict(items)
     if result is not UNDEFINED:
         document["result"] = result
     if element is not None:

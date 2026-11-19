@@ -95,6 +95,7 @@ from app.api.v1.tenant_endpoints import (
     moderation,
     personal_items,
     plugin_data,
+    plugin_tools,
     posts,
     projects,
     property_definitions,
@@ -361,6 +362,10 @@ guild_router.include_router(posts.router, **_tool_mount(Tool.post))
 guild_router.include_router(wikis.router, **_tool_mount(Tool.wiki))
 guild_router.include_router(wikis.pages_router, tags=_tool_mount(Tool.wiki)["tags"])
 guild_router.include_router(contacts.router, **_tool_mount(Tool.contact))
+# Every tool plug-in's tool and items, by kind (tenant_endpoints/plugin_tools.py).
+guild_router.include_router(
+    plugin_tools.router, prefix="/plugin-tools", tags=["plugin-tools"]
+)
 # Plug-ins installed at guild scope. Every member reads them (the sidebar needs to
 # know what is there); installing and removing are guild-admin actions.
 #

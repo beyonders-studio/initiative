@@ -39,6 +39,7 @@ from app.core.identify import presented_credential
 from app.core.tools import Tool
 from app.db.cohorts import request_sessionmaker
 from app.db.session import require_guild_context
+from app.db.tool_rows import locate
 from app.models.platform.user import User
 from app.models.tenant._mixins import tool_models
 from app.services.content_sockets import (
@@ -51,6 +52,7 @@ from app.services.content_sockets import (
     sockets,
 )
 from app.services.platform.ws_auth import authenticate_ws_token
+from app.services.tenant import plugin_tool_rows
 
 logger = logging.getLogger(__name__)
 
@@ -221,14 +223,18 @@ async def hold_open(
         (sub.register or sockets).leave(sub.websocket)
 
 
-def tool_room(guild_id: int, tool: Tool, resource_id: int) -> RoomKey:
-    return resource_room(guild_id, tool.value, resource_id)
+def tool_room(guild_id: int, tool: Tool | str, resource_id: int) -> RoomKey:
+    return resource_room(guild_id, getattr(tool, "value", tool), resource_id)
 
 
-def tool_authorizer(guild_id: int, tool: Tool, resource_id: int) -> Authorizer:
+def tool_authorizer(guild_id: int, tool: Tool | str, resource_id: int) -> Authorizer:
     """May this reader watch one tool row: the row under RLS, the tool's switch
     on its initiative, and the sharing — ``resource_access.authorize``, the
-    check every REST read of the row makes."""
+    check every REST read of the row makes. A tool plug-in's tool, named by
+    its kind, is read as its routes read it (``plugin_tool_rows``), from the
+    community's tools as the reader's standing carries them."""
+    if not isinstance(tool, Tool):
+        return _plugin_tool_authorizer(guild_id, tool, resource_id)
     model = tool_models()[tool.plural]
 
     async def authorize(session: AsyncSession, user: User) -> frozenset[RoomKey] | None:
@@ -255,10 +261,28 @@ def tool_authorizer(guild_id: int, tool: Tool, resource_id: int) -> Authorizer:
     return authorize
 
 
+def _plugin_tool_authorizer(guild_id: int, kind: str, resource_id: int) -> Authorizer:
+    async def authorize(session: AsyncSession, user: User) -> frozenset[RoomKey] | None:
+        context = require_guild_context(session)
+        located = locate(context.tools, kind)
+        if located is None or located.table is not located.tool.table:
+            return None
+        try:
+            await plugin_tool_rows.load_authorized(
+                session, context, located, context.tools, resource_id
+            )
+        except HTTPException, CodedError:
+            return None
+        return frozenset({tool_room(guild_id, kind, resource_id)})
+
+    return authorize
+
+
 async def serve_tool_stream(
-    websocket: WebSocket, guild_id: int, tool: Tool, resource_id: int
+    websocket: WebSocket, guild_id: int, tool: Tool | str, resource_id: int
 ) -> None:
     """A tool row's change signal: ``{type, id, timestamp}`` frames, and a beat.
+    ``tool`` is a built-in tool, or a tool plug-in's tool by its kind.
 
     The frames never carry the row. The client refetches it through REST.
     """

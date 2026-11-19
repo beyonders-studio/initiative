@@ -169,7 +169,8 @@ class InstallReach:
                 read, _write = expand([scope])
             except UnknownPluginScope:
                 continue
-            readable.update(resource.value for resource in read)
+            if read:
+                readable.add(scope.rpartition(":")[0])
         return cls(
             live=bool(live),
             placed=frozenset(placed or ()),

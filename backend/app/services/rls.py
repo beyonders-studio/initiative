@@ -58,9 +58,11 @@ async def check_initiative_permission(
     *,
     initiative_id: int,
     user: User | None,
-    permission_key: PermissionKey,
+    permission_key: PermissionKey | str,
 ) -> bool:
-    """Whether ``user``'s role in the initiative permits ``permission_key``.
+    """Whether ``user``'s role in the initiative permits ``permission_key``: a
+    key :data:`PermissionKey` names, or a tool plug-in's, whose create key
+    defaults to no as a built-in tool's does.
 
     ``None`` is an installed plug-in, whose standing carries the keys its scopes
     allow in the initiatives it is placed in.
@@ -79,7 +81,7 @@ async def check_initiative_permission(
                     func.initiative_role_permits(
                         initiative_id,
                         user.id if user is not None else None,
-                        permission_key.value,
+                        getattr(permission_key, "value", permission_key),
                         default,
                         standing_arg(),
                     )
@@ -89,23 +91,27 @@ async def check_initiative_permission(
     )
 
 
-def _role_permits(permission_key: PermissionKey):
+def _role_permits(permission_key: PermissionKey | str, default: bool | None):
     """Whether a role (``InitiativeRoleModel``, outer-joined to its row for
     ``permission_key``) grants the key — the same rule as
     :func:`check_initiative_permission`: a manager holds every key, a stored
-    row decides, and the key's documented default decides when there is none."""
-    default = DEFAULT_PERMISSION_VALUES.get(permission_key, False)
+    row decides, and the key's default decides when there is none: the
+    documented one, unless ``default`` names it (a tool plug-in's key)."""
+    if default is None:
+        default = DEFAULT_PERMISSION_VALUES.get(permission_key, False)
     return or_(
         InitiativeRoleModel.is_manager,
         func.coalesce(
-            member_permission_sql(InitiativeRoleModel, permission_key.value),
+            member_permission_sql(
+                InitiativeRoleModel, getattr(permission_key, "value", permission_key)
+            ),
             InitiativeRule.enabled,
             default,
         ),
     )
 
 
-def _with_permission_row(statement, permission_key: PermissionKey):
+def _with_permission_row(statement, permission_key: PermissionKey | str):
     return statement.outerjoin(
         InitiativeRule,
         and_(
@@ -121,7 +127,8 @@ async def members_permitted(
     *,
     initiative_id: int,
     user_ids: set[int],
-    permission_key: PermissionKey,
+    permission_key: PermissionKey | str,
+    default: bool | None = None,
 ) -> set[int]:
     """Which of ``user_ids`` hold ``permission_key`` in ``initiative_id``.
 
@@ -139,7 +146,7 @@ async def members_permitted(
     ).where(
         InitiativeMember.initiative_id == initiative_id,
         InitiativeMember.user_id.in_(list(user_ids)),
-        _role_permits(permission_key),
+        _role_permits(permission_key, default),
     )
     return set((await session.exec(statement)).all())
 
@@ -149,7 +156,8 @@ async def roles_permitting(
     *,
     initiative_id: int,
     role_ids: set[int],
-    permission_key: PermissionKey,
+    permission_key: PermissionKey | str,
+    default: bool | None = None,
 ) -> set[int]:
     """Which of ``role_ids`` grant ``permission_key`` — the role-shaped form of
     :func:`members_permitted`, for sharing addressed to a role."""
@@ -160,6 +168,6 @@ async def roles_permitting(
     ).where(
         InitiativeRoleModel.initiative_id == initiative_id,
         InitiativeRoleModel.id.in_(list(role_ids)),
-        _role_permits(permission_key),
+        _role_permits(permission_key, default),
     )
     return set((await session.exec(statement)).all())

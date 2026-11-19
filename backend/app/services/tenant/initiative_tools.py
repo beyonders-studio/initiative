@@ -38,7 +38,7 @@ from app.models.tenant.initiative import (
     BUILTIN_ROLES,
     INITIATIVE_CUSTOM_ROLES,
     INITIATIVE_MEMBER_PREFIX,
-    INITIATIVE_TOOL_KEYS,
+    INITIATIVE_TOOL_PREFIX,
     Initiative,
     InitiativeRoleModel,
     InitiativeRule,
@@ -57,7 +57,7 @@ def _community(key: str):
     )
 
 
-def community_switch(context: ActorContext, tool: Tool) -> bool | None:
+def community_switch(context: ActorContext, tool: Tool | ToolRecord) -> bool | None:
     """The switch the community set for ``tool`` in every initiative, or
     ``None`` where each initiative sets its own."""
     if f"{tool.value}=on" in context.community_tools:
@@ -67,7 +67,7 @@ def community_switch(context: ActorContext, tool: Tool) -> bool | None:
     return None
 
 
-def own_switch(initiative: Any, tool: Tool) -> bool:
+def own_switch(initiative: Any, tool: Tool | ToolRecord) -> bool:
     """Whether ``initiative``'s own switch has ``tool`` on, beneath anything
     its community set."""
     return tool.view_permission in (initiative.switched_on or ())
@@ -163,7 +163,7 @@ async def forget_tool(session: AsyncSession, kinds: Sequence[str]) -> None:
     )
 
 
-def tool_on(context: ActorContext, initiative: Any, tool: Tool) -> bool:
+def tool_on(context: ActorContext, initiative: Any, tool: Tool | ToolRecord) -> bool:
     """Whether ``tool`` is on in ``initiative``, by the request's standing."""
     switch = community_switch(context, tool)
     if switch is None:
@@ -178,17 +178,17 @@ async def tool_on_in(session: AsyncSession, initiative: Any, tool: Tool) -> bool
     context = actor_context(session)
     if context is not None:
         return tool_on(context, initiative, tool)
-    row, where = _community(INITIATIVE_TOOL_KEYS[tool])
+    row, where = _community(f"{INITIATIVE_TOOL_PREFIX}{tool.value}")
     switch = await session.scalar(select(row.enabled).where(where))
     if switch is None:
         return own_switch(initiative, tool)
     return switch
 
 
-def tool_on_sql(tool: Tool) -> ColumnElement[bool]:
+def tool_on_sql(tool: Tool | ToolRecord) -> ColumnElement[bool]:
     """:func:`tool_on` over ``initiatives`` rows, for a query's filter. The
     community's row is read once for the statement."""
-    row, where = _community(INITIATIVE_TOOL_KEYS[tool])
+    row, where = _community(f"{INITIATIVE_TOOL_PREFIX}{tool.value}")
     own = aliased(InitiativeRule)
     return func.coalesce(
         select(row.enabled).where(where).scalar_subquery(),

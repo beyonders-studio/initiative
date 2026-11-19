@@ -21,6 +21,7 @@ from collections.abc import Awaitable, Callable, Collection, Iterable, Mapping, 
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from functools import partial
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import quote, urlencode
 
@@ -40,6 +41,7 @@ from app.core.notification_categories import (
     category_of,
     sample_type,
 )
+from app.core.tool_set import ToolRecord
 from app.core.tools import COMMENT_TARGETS, KINDS, Tool
 from app.core.user_display import name_here
 from app.core.user_input_validators import resolve_zone
@@ -53,6 +55,7 @@ from app.db.session import (
     install_context,
     require_guild_context,
     routed_guild_id,
+    routed_tools,
     set_rls_context,
 )
 from app.models.platform.notice_outbox import NoticeOutboxItem
@@ -236,7 +239,7 @@ class Subject:
 
     #: What the notice names, as it was asked about.
     about: Ref
-    tool: Tool
+    tool: Tool | ToolRecord
     initiative_id: int | None
     #: The row of ``tool`` that governs it: the project a task is in. None for
     #: a thing no sharing governs (a collection).
@@ -279,12 +282,29 @@ async def resolve_subject(
     alone: the session reaching it is their own policies' answer, so neither
     rule is asked.
 
-    A tool plug-in's row resolves to nothing: nothing is told about one yet.
+    A tool plug-in's row, its tool's or an item's, is governed by its tool's
+    row, read with what the request may do to it (``app.db.tool_rows``).
     """
     kind, entity_id = ref
     if kind not in KINDS:
-        return None
-    if KINDS[kind].standalone:
+        from app.db.tool_rows import load_row, locate
+
+        tools = routed_tools(session)
+        located = locate(tools, kind)
+        found = (
+            None
+            if located is None
+            else await load_row(session, located, tools, entity_id)
+        )
+        if located is None or found is None:
+            return None
+        tool = located.tool
+        row = SimpleNamespace(
+            id=found.tool["id"], initiative_id=found.tool["initiative_id"]
+        )
+        resource_id = row.id
+        governing = Governing.of(tool, row)
+    elif KINDS[kind].standalone:
         # No sharing of its own: it is opened by whoever can open one of the
         # files in it.
         from app.db.base import MODELS_BY_TABLE
@@ -305,11 +325,14 @@ async def resolve_subject(
         tool, row = governed
         resource_id = row.id
         governing = Governing.of(tool, row)
-    target_path = (
-        reference_path(kind, entity_id)
-        if kind in _ADDRESSABLE
-        else reference_path(tool, row.id)
-    )
+    if kind not in KINDS:
+        # A tool plug-in's row opens on the page every tool plug-in's rows
+        # share, its tool's or an item's, in its initiative.
+        target_path = f"/i/{row.initiative_id}/t/{kind}/{entity_id}"
+    elif kind in _ADDRESSABLE:
+        target_path = reference_path(kind, entity_id)
+    else:
+        target_path = reference_path(tool, row.id)
     if only is not None:
         return Subject(
             about=ref,

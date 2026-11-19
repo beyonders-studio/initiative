@@ -700,14 +700,8 @@ _INSTALL_STANDING: dict[gucs.Guc, _Expr] = {
       FROM community_defaults cd
       WHERE cd.key LIKE 'initiative\\_tool.%'
     ), '')""",
-    gucs.ENABLED_TOOLS: lambda tools: (
-        f"""COALESCE((
-      SELECT string_agg(DISTINCT i.id || ':' || t.tool, ',')
-      FROM initiatives i
-      JOIN placed p ON p.initiative_id = i.id
-      CROSS JOIN LATERAL {_tool_switches(tools)} AS t(tool, enabled)
-      WHERE {_TOOL_ON}
-    ), '')"""
+    gucs.ENABLED_TOOLS: lambda tools: _enabled_tools(
+        tools, "SELECT p.initiative_id FROM placed p"
     ),
     gucs.OVERRIDE_INITIATIVES: """COALESCE((
       SELECT string_agg(DISTINCT o.initiative_id::text, ',')
@@ -963,9 +957,10 @@ denied AS (
   WHERE NOT EXISTS (
     SELECT 1 FROM granted gr WHERE gr.pair = p.initiative_id || ':' || k.key
   )
-)
+){_tool_states(tools)}
 SELECT
   (SELECT EXISTS (SELECT 1 FROM install)) AS live,
+  obj_description(to_regnamespace(current_schema()), 'pg_namespace') AS schema_stamp,
 {_writes(_INSTALL_STANDING, tools)},
   (
     SELECT r.ref
@@ -1393,6 +1388,9 @@ class InstallContext:
     named_refs: tuple[tuple[str, str, int], ...] = ()
     #: The members of the community among the people those references name.
     named_members: frozenset[int] = frozenset()
+    #: The community's tools, which its rules and this standing were rendered
+    #: from, as its schema's stamp names them.
+    tools: ToolSet = BUILTIN_TOOLS
 
     @property
     def guild_auth_ok(self) -> bool:
@@ -1581,10 +1579,19 @@ def named_ref_candidates(values: Sequence[str]) -> list[str]:
     )
 
 
+@functools.lru_cache(KEPT_TOOL_SETS)
+def _community_install_standing_sql(tools: ToolSet) -> str:
+    return install_standing_sql(tools)
+
+
 async def compute_install_standing(
-    session: AsyncSession, named_refs: Sequence[str] = ()
+    session: AsyncSession,
+    named_refs: Sequence[str] = (),
+    tools: ToolSet = BUILTIN_TOOLS,
 ) -> dict[str, Any]:
-    """Run :data:`INSTALL_STANDING_SQL` and return the row it wrote.
+    """Run :data:`INSTALL_STANDING_SQL`, or the community's own where it has
+    tool plug-ins, and return the row it wrote, with its schema's stamp
+    (``schema_stamp``), which names the tools its rules were rendered from.
 
     The install and its community are read back from the routing, as
     :func:`compute_guild_standing` reads the person back. ``named_refs`` is
@@ -1593,11 +1600,14 @@ async def compute_install_standing(
     """
     from sqlalchemy import text
 
+    statement = (
+        INSTALL_STANDING_SQL
+        if not tools.installed
+        else _community_install_standing_sql(tools)
+    )
     row = (
         await session.exec(
-            text(INSTALL_STANDING_SQL).bindparams(
-                named_refs=named_ref_candidates(named_refs)
-            )
+            text(statement).bindparams(named_refs=named_ref_candidates(named_refs))
         )
     ).one()
     return dict(row._mapping)

@@ -34,7 +34,8 @@ from app.core.messages import (
     KindMessages,
     PluginMessages,
 )
-from app.core.plugin_scopes import PluginScopeAccess, scope_name, tool_resource
+from app.core.plugin_scopes import PluginScopeAccess
+from app.core.tool_set import ToolRecord
 from app.core.tools import KIND_BY_TABLE, KINDS, Tool, kind_refusal
 from app.db.frozen import ancestor_is_frozen, row_is_frozen
 from app.db.guild_standing import InstallContext
@@ -45,7 +46,7 @@ from app.models.platform.user import User
 from app.models.tenant.calendar_event import CalendarEvent
 from app.models.tenant.collection import Collection
 from app.models.tenant.counter import Counter
-from app.models.tenant.initiative import Initiative, PermissionKey
+from app.models.tenant.initiative import Initiative
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.models.tenant.task import Task
 from app.models.tenant.wiki import WikiPage
@@ -160,7 +161,9 @@ def governing_tool(table: str) -> Tool:
     return path[0]
 
 
-def require_tool_enabled(kind: Tool, initiative: Any, context: ActorContext) -> None:
+def require_tool_enabled(
+    kind: Tool | ToolRecord, initiative: Any, context: ActorContext
+) -> None:
     """Raise 403 unless ``initiative`` has ``kind``'s master switch on.
 
     Gate 3's first half at the moment of creation, where there is no row yet for
@@ -178,7 +181,7 @@ def require_tool_enabled(kind: Tool, initiative: Any, context: ActorContext) -> 
 
 async def require_create(
     session: Any,
-    kind: Tool,
+    kind: Tool | ToolRecord,
     initiative: Any,
     user: User | None,
     guild_context: ActorContext,
@@ -200,7 +203,7 @@ async def require_create(
         session,
         initiative_id=initiative.id,
         user=user,
-        permission_key=PermissionKey(kind.create_permission),
+        permission_key=kind.create_permission,
     ):
         return
     raise kind.create_denied()
@@ -208,7 +211,7 @@ async def require_create(
 
 async def prepare_create(
     session: Any,
-    kind: Tool,
+    kind: Tool | ToolRecord,
     initiative_id: int | None,
     user: User | None,
     guild_context: ActorContext,
@@ -272,7 +275,9 @@ def refuse_plugin_sharing(actor: ActorContext, payload: Any, *fields: str) -> No
     require_install_may_share(actor, None)
 
 
-def require_install_may_share(actor: ActorContext, kind: Tool | None) -> None:
+def require_install_may_share(
+    actor: ActorContext, kind: Tool | ToolRecord | None
+) -> None:
     """Raise 403 unless an installed plug-in's standing lets it change sharing:
     ``sharing:write``, the tool's write scope when ``kind`` is named, and the
     roster reads a sharing change makes. A person passes; their rung on the
@@ -287,7 +292,7 @@ def require_install_may_share(actor: ActorContext, kind: Tool | None) -> None:
         )
     needed = list(_SHARING_READS)
     if kind is not None:
-        needed.append(scope_name(tool_resource(kind), PluginScopeAccess.write))
+        needed.append(f"{kind.scope}:{PluginScopeAccess.write.value}")
     if not all(actor.holds(scope) for scope in needed):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -311,7 +316,7 @@ def refuse_install_community_share(
 async def apply_plugin_initial_sharing(
     session: Any,
     actor: ActorContext,
-    kind: Tool,
+    kind: Tool | ToolRecord,
     *,
     resource_id: int,
     initiative_id: int | None,
@@ -347,7 +352,7 @@ async def apply_plugin_initial_sharing(
 async def grant_initial_sharing(
     session: Any,
     actor: ActorContext,
-    kind: Tool,
+    kind: Tool | ToolRecord,
     *,
     user: User | None,
     resource_id: int,

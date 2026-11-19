@@ -60,7 +60,7 @@ from app.core.audit_events import AuditEventType
 from app.core.clock import utcnow
 from app.core.config import settings
 from app.core.messages import GuildMessages, PluginServiceMessages
-from app.core.plugin_scopes import ALL_SCOPES, plugin_scope_target
+from app.core.plugin_scopes import ALL_SCOPES, is_known_scope
 from app.core.security import plugin_platform_signing_enabled
 from app.db.errors import dbapi_constraint
 from app.db.query import paginated_query
@@ -1251,7 +1251,7 @@ async def read_listing_registration(
             for scope in (
                 declared_ceiling if isinstance(declared_ceiling, list) else []
             )
-            if isinstance(scope, str) and plugin_scope_target(scope) is not None
+            if isinstance(scope, str) and is_known_scope(scope)
         ),
         what=f"{public_id} ceiling",
     )

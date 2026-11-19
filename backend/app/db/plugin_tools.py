@@ -65,6 +65,7 @@ from app.services.marketplace.tool_plugins import (
     MAX_TOOL_KEY_LENGTH,
     TOOL_COLUMNS,
     TOOL_FIELD_KINDS,
+    field_start,
 )
 
 __all__ = [
@@ -76,6 +77,7 @@ __all__ = [
     "drop_ddl",
     "drop_tool_tables",
     "is_plugin_kind",
+    "kept_tool_set",
     "provisioned_tools",
     "structure_ddl",
     "tool_set",
@@ -288,12 +290,12 @@ def _field_column(field: Mapping[str, Any]) -> sa.Column:
     kind = field.get("kind")
     if kind not in TOOL_FIELD_KINDS or kind not in _FIELD_TYPES:
         raise PluginToolError(f"field {key!r}: {kind!r} is not a field kind")
-    default: Any = None
-    if kind == "counter":
-        start = (field.get("counter") or {}).get("initial")
-        default = _literal(start if isinstance(start, int | float) else 0, "number")
-    elif field.get("default") is not None:
-        default = _literal(field["default"], kind)
+    start = field_start(field)
+    default = (
+        None
+        if start is None
+        else _literal(start, "number" if kind == "counter" else kind)
+    )
     return sa.Column(
         key, _FIELD_TYPES[kind](), server_default=default, info={"field": kind}
     )
@@ -464,6 +466,7 @@ def build_tool(
         view_permission=f"{kind}:enabled",
         create_permission=f"{kind}:create",
         scope=kind,
+        declaration=block,
     )
 
 
@@ -491,7 +494,8 @@ def tools_digest(installed: Sequence[InstalledTool]) -> str | None:
 _SETS: OrderedDict[str, ToolSet] = OrderedDict()
 
 
-def _kept(digest: str) -> ToolSet | None:
+def kept_tool_set(digest: str) -> ToolSet | None:
+    """The tool set this process built for ``digest``, if it keeps one."""
     found = _SETS.get(digest)
     if found is not None:
         _SETS.move_to_end(digest)
@@ -507,7 +511,7 @@ def community_tool_set(
     digest = tools_digest(installed)
     if digest is None:
         return BUILTIN_TOOLS
-    found = _kept(digest)
+    found = kept_tool_set(digest)
     if found is None:
         metadata = sa.MetaData()
         records = (build_tool(tool, codes, metadata) for tool in _ordered(installed))
@@ -686,33 +690,46 @@ _DEFINITIONS = sa.text(
 )
 
 
+async def _installed(session: Any) -> list[InstalledTool]:
+    """The community's installed tool plug-ins, read on ``session``."""
+    return [
+        InstalledTool(row.listing_uid, row.definition)
+        for row in (await session.exec(_DEFINITIONS)).all()
+    ]
+
+
+async def _built(installed: list[InstalledTool]) -> ToolSet:
+    """The tool set of ``installed``: the one this process keeps, or one built
+    with every plug-in kind's code, read on a system connection of its own
+    (the table is the deployment's, and no community's role reads it). The
+    caller holds no other system connection while this reads, so one
+    connection is all a cold set ever takes."""
+    from app.db import session as db_session
+    from app.db.kind_codes import plugin_kind_codes
+
+    digest = tools_digest(installed)
+    found = BUILTIN_TOOLS if digest is None else kept_tool_set(digest)
+    if found is not None:
+        return found
+    async with db_session.system_engine.connect() as conn:
+        codes = await plugin_kind_codes(conn)
+    return community_tool_set(installed, codes)
+
+
 async def tool_set(session: Any, stamped: str | None | EllipsisType = ...) -> ToolSet:
     """The tool set of the community ``session`` is routed into, as its
     installs stand. ``stamped`` is the digest its schema's stamp names, where
     the caller read it (``schema_provisioning.stamp_tools``): the built-in
     tools where it names none, and the set this process keeps for it, with no
-    query. Every plug-in kind's code is read on the system engine (the table
-    is the deployment's, and no community's role reads it), and only to build
-    a set this process does not keep. While a community's provisioning lags
-    its installs, this is the set they make now."""
-    from app.db import session as db_session
-    from app.db.kind_codes import plugin_kind_codes
-
+    query. The codes are read only to build a set this process does not keep
+    (:func:`_built`). While a community's provisioning lags its installs, this
+    is the set they make now."""
     if stamped is None:
         return BUILTIN_TOOLS
-    found = None if stamped is ... else _kept(stamped)
+    found = None if stamped is ... else kept_tool_set(stamped)
     if found is not None:
         return found
-    installed = [
-        InstalledTool(row.listing_uid, row.definition)
-        for row in (await session.exec(_DEFINITIONS)).all()
-    ]
-    digest = tools_digest(installed)
-    found = BUILTIN_TOOLS if digest is None else _kept(digest)
-    if found is not None:
-        return found
-    async with db_session.system_engine.connect() as conn:
-        return community_tool_set(installed, await plugin_kind_codes(conn))
+    return await _built(await _installed(session))
 
 
 async def provisioned_tools(guild_id: int) -> ToolSet:
@@ -732,6 +749,7 @@ async def provisioned_tools(guild_id: int) -> ToolSet:
         if not exists:
             return BUILTIN_TOOLS
         await db_session.set_rls_context(session, SystemGuild(guild_id))
-        tools = await tool_set(session)
+        installed = await _installed(session)
         await session.rollback()
-    return tools
+    # Built once the community's connection is back in its pool.
+    return await _built(installed)

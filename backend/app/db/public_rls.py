@@ -2267,6 +2267,19 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
                 ),
                 # The change log's writer reads an install's state to tell it.
                 Policy("billing_log_read", SELECT, ("app_billing_log",), using=OPEN),
+                # An installed plug-in's standing reads the state of each tool
+                # plug-in installed in its community, as a member's does,
+                # through the column grant it holds on its own row.
+                Policy(
+                    "install_reads_its_communitys_tools",
+                    SELECT,
+                    ("plugin_install_base",),
+                    using=(
+                        f"guild_id = {gucs.GUILD_ID} AND listing_uid IN ("
+                        "SELECT r.listing_uid FROM public.plugin_service_registrations r"
+                        f" WHERE r.kind = '{RegistrationKind.TOOL}')"
+                    ),
+                ),
                 # A member's standing reads the state of each tool plug-in
                 # installed in their community (column grant: guild_id,
                 # install_id, status and suspended_at; migration 20261118_0617).
@@ -2376,13 +2389,14 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
                     ("plugin_install_base",),
                     using=f"public_id = {gucs.TOKEN_CLIENT_ID}",
                 ),
-                # A member's standing reads whether a tool plug-in is suspended
-                # or out of reach (column grant: listing_uid, kind,
-                # suspended_at and availability; migration 20261118_0617).
+                # A member's standing, and an installed plug-in's, reads whether
+                # a tool plug-in is suspended or out of reach (column grant:
+                # listing_uid, kind, suspended_at and availability; migration
+                # 20261118_0617, and the install's own).
                 Policy(
                     "community_reads_tool_registrations",
                     SELECT,
-                    ("app_guild_base", "app_guild_base_ro"),
+                    ("app_guild_base", "app_guild_base_ro", "plugin_install_base"),
                     using=f"kind = '{RegistrationKind.TOOL}'",
                 ),
                 # The change log's writer reads whether a plug-in is suspended

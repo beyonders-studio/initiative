@@ -83,6 +83,8 @@ READ_TAGS = (
     # How many of each a page holds, and its tag tree: counted from the lists
     # above, for every tool at once.
     "tools",
+    # Every tool plug-in's tool and items, by kind.
+    "plugin-tools",
 )
 
 # Curated writes: author and edit, across every tool.
@@ -135,6 +137,8 @@ _WRITABLE_SEGMENTS = (
     ("wikis/" + _ID + "/pages", "wiki-pages"),
     # The comment surface every tool shares.
     ("comments", "comments"),
+    # Every tool plug-in's tool and items, each addressed by its kind.
+    ("plugin-tools/" + _ID, "plugin-tools/" + _ID),
 )
 
 # Two writes that ``create``/``edit`` doesn't reach, added by hand:

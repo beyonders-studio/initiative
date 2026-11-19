@@ -7557,8 +7557,8 @@ export interface InitiativeCan {
   manage: boolean;
   moderate: boolean;
   roster: boolean;
-  view: Tool[];
-  create: Tool[];
+  view: string[];
+  create: string[];
 }
 
 /**
@@ -10424,6 +10424,101 @@ export interface PluginSummaryRead {
 
 export interface PluginSummaryListResponse {
   items?: PluginSummaryRead[];
+}
+
+export type PluginToolActionRunFields = {
+  [key: string]: string | boolean | number | string[] | null;
+};
+
+export type PluginToolActionRunPeople = { [key: string]: number | null };
+
+/**
+ * The answers to an action's ``params``, as values of the fields they
+ * name.
+ */
+export interface PluginToolActionRun {
+  fields?: PluginToolActionRunFields;
+  people?: PluginToolActionRunPeople;
+}
+
+export type PluginToolRowCreateFields = {
+  [key: string]: string | boolean | number | string[] | null;
+};
+
+export type PluginToolRowCreatePeople = { [key: string]: number | null };
+
+/**
+ * A new row: of the tool, in the initiative ``initiative_id`` names, or of
+ * an item, under the row ``parent_id`` names. A field left out starts at its
+ * default, and a counter at its start.
+ */
+export interface PluginToolRowCreate {
+  fields?: PluginToolRowCreateFields;
+  people?: PluginToolRowCreatePeople;
+  initiative_id?: number | null;
+  parent_id?: number | null;
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
+  name: string;
+  position?: number | null;
+  grants?: ResourceGrantSchema[];
+}
+
+export type PluginToolRowReadFields = {
+  [key: string]: string | boolean | number | string[] | null;
+};
+
+export type PluginToolRowReadPeople = { [key: string]: number | null };
+
+/**
+ * One row of a tool plug-in's tool or of one of its items.
+ */
+export interface PluginToolRowRead {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
+  archived_at: string | null;
+  can: ToolCan;
+  kind: string;
+  id: number;
+  community_id: number;
+  initiative_id: number;
+  parent_id: number | null;
+  name: string;
+  position: number;
+  fields: PluginToolRowReadFields;
+  people: PluginToolRowReadPeople;
+  comments_enabled: boolean;
+  grants: ResourceGrantSchema[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PluginToolRowList {
+  total_count: number;
+  page: number;
+  page_size: number;
+  has_next: boolean;
+  has_prev: boolean;
+  items: PluginToolRowRead[];
+}
+
+export type PluginToolRowUpdateFields = {
+  [key: string]: string | boolean | number | string[] | null;
+};
+
+export type PluginToolRowUpdatePeople = { [key: string]: number | null };
+
+/**
+ * A change to a row. Only what is sent changes.
+ */
+export interface PluginToolRowUpdate {
+  fields?: PluginToolRowUpdateFields;
+  people?: PluginToolRowUpdatePeople;
+  name?: string | null;
+  position?: number | null;
 }
 
 export type PluginWidgetReadMeta = { [key: string]: unknown };
@@ -14482,6 +14577,22 @@ export type GetPostTimelineParams = {
 export type ReadPostParams = {
   /** Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one. */
   include_deleted?: boolean;
+};
+
+export type ListPluginToolRowsParams = {
+  /** The initiative whose tool rows to list */
+  initiative_id?: number | null;
+  /** The row whose items to list, for an item's kind */
+  parent_id?: number | null;
+  /** List archived rows instead */
+  archived?: boolean;
+  /** @minimum 1 */
+  page?: number;
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  page_size?: number;
 };
 
 export type ReadPluginDataParams = {

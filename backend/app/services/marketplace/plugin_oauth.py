@@ -588,9 +588,9 @@ def _read_only_scopes(scopes: frozenset[str]) -> frozenset[str]:
             # its endpoints a read-only consent reaches is the hub's to decide.
             out.add(scope)
             continue
-        resource, access = parse_scope(scope)
+        _resource, access = parse_scope(scope)
         out.add(
-            f"{resource.value}:{PluginScopeAccess.read.value}"
+            f"{scope.rpartition(':')[0]}:{PluginScopeAccess.read.value}"
             if access is PluginScopeAccess.write
             else scope
         )

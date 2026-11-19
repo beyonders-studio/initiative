@@ -33,6 +33,7 @@ that serves or calls is refused rather than dropped.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
@@ -72,6 +73,7 @@ from app.services.marketplace.service_plugins import (
 from app.services.marketplace.widget_meta import MAX_TEXT_LENGTH, localized_text
 
 __all__ = [
+    "NEVER_EMPTY",
     "TOOL_COLUMNS",
     "TOOL_FIELD_KINDS",
     "TOOL_ICONS",
@@ -79,10 +81,12 @@ __all__ = [
     "TOOL_LIST_LAYOUTS",
     "TOOL_PLUGIN_TERMS",
     "ToolChanges",
+    "field_start",
     "is_tool_plugin",
     "normalize_tool_plugin_definition",
     "tool_changes",
     "tool_kinds",
+    "value_fits",
 ]
 
 #: The plug-in kind, and the one feature, of a plug-in that declares a tool.
@@ -120,8 +124,9 @@ _LOOKS: dict[str, frozenset[str]] = {
     "scale": frozenset({"number", "stars", "bar"}),
     "counter": frozenset({"number", "bar", "clock"}),
 }
-#: The kinds of field that are never empty, so a layout never requires one.
-_NEVER_EMPTY = frozenset({"counter", "checkbox"})
+#: The kinds of field that are never empty, so a layout never requires one
+#: and a row never clears one.
+NEVER_EMPTY = frozenset({"counter", "checkbox"})
 
 MAX_TOOL_KEY_LENGTH = contract.cap("toolKeyLength")
 MAX_TOOL_FIELDS = contract.cap("toolFields")
@@ -331,30 +336,55 @@ def _is_address(raw: Any) -> bool:
     return parts.scheme in ("http", "https") and bool(parts.netloc)
 
 
+def value_fits(field: dict[str, Any], raw: Any) -> bool:
+    """Whether ``raw`` is a value of ``field``'s kind, as a default is and as
+    a row's value is: a person is a row id, and a scale a whole number, as
+    its column holds them."""
+    kind = field["kind"]
+    options = {option["value"] for option in field.get("options", [])}
+    if kind == "multi_select":
+        return (
+            isinstance(raw, list)
+            and all(isinstance(value, str) and value in options for value in raw)
+            and len(set(raw)) == len(raw)
+        )
+    return {
+        "text": lambda: isinstance(raw, str) and len(raw) <= MAX_TEXT_LENGTH,
+        "url": lambda: _is_address(raw),
+        "date": lambda: _is_date(raw),
+        "datetime": lambda: _is_datetime(raw),
+        "color": lambda: _is_color(raw),
+        "number": lambda: _number(raw),
+        "counter": lambda: _number(raw),
+        "currency": lambda: _number(raw),
+        "scale": lambda: _number(raw) and 0 <= raw <= 100 and raw == int(raw),
+        "checkbox": lambda: isinstance(raw, bool),
+        "select": lambda: isinstance(raw, str) and raw in options,
+        "user_reference": lambda: type(raw) is int and raw > 0,
+    }[kind]()
+
+
+def field_start(field: Mapping[str, Any]) -> Any:
+    """What a new row's field holds when nothing is written to it: its
+    default, false for a checkbox, nothing otherwise; a counter starts at its
+    ``initial``, a number here, and one naming a field is read from the row
+    it is on."""
+    if field["kind"] == "counter":
+        start = (field.get("counter") or {}).get("initial")
+        return start if _number(start) else 0
+    if field.get("default") is not None:
+        return field["default"]
+    return False if field["kind"] == "checkbox" else None
+
+
 def _default(field: dict[str, Any], raw: Any, *, what: str) -> Any:
     """A field's default, of its kind's own shape."""
     kind = field["kind"]
-    options = {option["value"] for option in field.get("options", [])}
     if kind == "counter":
         fail(f"{what}: a counter field starts at its counter's 'initial'")
     if kind == "user_reference":
         fail(f"{what}: a person is never a default")
-    fits = {
-        "text": isinstance(raw, str) and len(raw) <= MAX_TEXT_LENGTH,
-        "url": _is_address(raw),
-        "date": _is_date(raw),
-        "datetime": _is_datetime(raw),
-        "color": _is_color(raw),
-        "number": _number(raw),
-        "currency": _number(raw),
-        "scale": _number(raw) and 0 <= raw <= 100,
-        "checkbox": isinstance(raw, bool),
-        "select": isinstance(raw, str) and raw in options,
-        "multi_select": isinstance(raw, list)
-        and all(isinstance(value, str) and value in options for value in raw)
-        and len(set(raw)) == len(raw),
-    }[kind]
-    if not fits:
+    if not value_fits(field, raw):
         fail(f"{what}: the default is not a value of a {kind} field")
     return raw
 
@@ -586,7 +616,7 @@ def _detail_layout(
             fail(f"{what}: {part.type!r} is not a part every tool's page has")
         if isinstance(part, DetailFieldPart) and part.props.required:
             field = declared.get(str(part.props.field))
-            if field is None or field["kind"] in _NEVER_EMPTY:
+            if field is None or field["kind"] in NEVER_EMPTY:
                 fail(
                     f"{what}: {part.props.field!r} is not a field it declares that a person can leave empty"
                 )

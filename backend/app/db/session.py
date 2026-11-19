@@ -562,12 +562,36 @@ async def apply_install_standing(
     The second half of the install seam, as :func:`apply_guild_standing` is of
     the person seam. ``named_refs`` are the references the request names; the
     same statement resolves them in the install's own sector.
+
+    The statement is rendered from the community's tools, which its schema's
+    stamp names and the statement reads back: it is rendered from the tools
+    the community's last install request found, and again from the stamp's
+    where they changed since. A set this process does not keep is built from
+    the community's installs as the system engine reads them, which the
+    install's own role does not.
     """
-    completed = context.with_standing(
-        await compute_install_standing(session, named_refs)
-    )
+    from app.db.plugin_tools import kept_tool_set, provisioned_tools
+    from app.db.schema_provisioning import stamp_tools
+
+    tools = _INSTALL_TOOLS.get(context.guild_id, BUILTIN_TOOLS)
+    row = await compute_install_standing(session, named_refs, tools)
+    stamped = stamp_tools(row.get("schema_stamp"))
+    if stamped != tools.digest:
+        tools = (
+            BUILTIN_TOOLS
+            if stamped is None
+            else kept_tool_set(stamped) or await provisioned_tools(context.guild_id)
+        )
+        row = await compute_install_standing(session, named_refs, tools)
+    _INSTALL_TOOLS[context.guild_id] = tools
+    completed = replace(context, tools=tools).with_standing(row)
     _record_standing(session, completed)
     return completed
+
+
+#: The tools each community's last install request rendered its standing
+#: from, by community: shared sets, so one reference each.
+_INSTALL_TOOLS: dict[int, ToolSet] = {}
 
 
 def routed_guild_id(session: AsyncSession) -> int | None:
@@ -620,9 +644,9 @@ def require_guild_context(session: AsyncSession) -> GuildContext:
 
 def routed_tools(session: AsyncSession) -> ToolSet:
     """The tools of the community this session is routed into, as its
-    standing carries them: the built-in tools for a request that is no
-    person's (an installed plug-in's, which reaches no tool plug-in's tables)."""
-    context = guild_context(session)
+    standing carries them, a person's or an installed plug-in's: the built-in
+    tools for the system's own reads."""
+    context = actor_context(session)
     return context.tools if context is not None else BUILTIN_TOOLS
 
 
