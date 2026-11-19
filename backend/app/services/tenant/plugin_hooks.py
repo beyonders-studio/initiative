@@ -197,15 +197,17 @@ async def _platform_status(
     definition: Mapping[str, Any],
     headers: Mapping[str, str],
     body: bytes,
-) -> None:
+) -> bool:
     """What a delivery for the connection the platform holds says of its
     account, mapped by the listing's current definition and kept once for
-    every community, whether or not any community has the plug-in."""
+    every community, whether or not any community has the plug-in. False
+    when the mapping may answer if asked again: the delivery is then refused,
+    so the vendor sends it again."""
     route = definition["webhooks"]["route"]
     held = registration.platform_connections.get(str(route.get("connection")))
     value = (held or {}).get(str(route.get("field")))
     if value is None or _route_value(route, headers, body) != str(value):
-        return
+        return True
     try:
         payload: Any = json.loads(body)
     except ValueError:
@@ -225,13 +227,14 @@ async def _platform_status(
             registration.public_id,
             type(exc).__name__,
         )
-        return
+        return not exc.transient
     if delivered.status is not None and delivered.status[0] == route.get("connection"):
         await platform_connections.set_state(
             registration.public_id,
             *delivered.status,
             about={str(route.get("field")): value},
         )
+    return True
 
 
 def _route_spec(route: Any) -> tuple[str, str] | None:
@@ -713,9 +716,14 @@ async def receive(public_id: str, headers: Mapping[str, str], body: bytes) -> in
     current = _route_spec(webhooks["route"])
     if current is not None:
         specs.add(current)
-    if registration.declarative and not by_connection:
+    if (
+        registration.declarative
+        and not by_connection
         # Checked under the vendor's secret above.
-        await _platform_status(registration, definition, headers, body)
+        and not await _platform_status(registration, definition, headers, body)
+    ):
+        metrics.plugin_hook_deliveries.labels(outcome="retry").inc()
+        return 503
     installs = [
         install
         for install in await _routed(

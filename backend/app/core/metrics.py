@@ -95,7 +95,8 @@ plugin_hook_deliveries = Counter(
     "initiative_plugin_hook_deliveries",
     "Vendor webhook deliveries received for plug-ins, by outcome: refused (the "
     "signature did not verify), unroutable (no community connected it), "
-    "delivered, or failed (a community's plug-in did not accept it).",
+    "delivered, failed (a community's plug-in did not accept it), or retry "
+    "(refused for the vendor to send again).",
     ("outcome",),
 )
 db_connection_communities = Histogram(

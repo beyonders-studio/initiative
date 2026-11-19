@@ -3353,11 +3353,18 @@ class TestPlatformConnection:
         assert await _events(session, seat.guild.id) == []
 
     async def test_a_removal_is_kept_with_no_community_installed(
-        self, client: AsyncClient, acting_user, session, vendor, declarative
+        self,
+        client: AsyncClient,
+        acting_user,
+        session,
+        vendor,
+        declarative,
+        monkeypatch,
     ):
         """The platform's account is marked removed though no community has
         the plug-in, and a report about another installation changes
-        nothing."""
+        nothing. A delivery whose mapping may answer if asked again is
+        refused, so the vendor sends it again."""
         await _declarative_listing(session)
         owner = await acting_user()
         vendor.api_answers = [_installations((42, "acme"))]
@@ -3366,7 +3373,7 @@ class TestPlatformConnection:
         )
         assert landing["outcome"] == "connected"
 
-        async def removed_after(serial: int, installation: int) -> bool:
+        async def removed_after(serial: int, installation: int, status=202) -> bool:
             body, headers = vendor.webhook(
                 {"action": "deleted", "installation": {"id": installation}},
                 delivery=f"delivery-{serial}",
@@ -3375,13 +3382,20 @@ class TestPlatformConnection:
             response = await client.post(
                 DECLARATIVE_HOOKS, content=body, headers=headers
             )
-            assert response.status_code == 202, response.text
+            assert response.status_code == status, response.text
             read = await client.get(
                 f"/api/v1/plugin-services/{declarative.id}", headers=owner.headers
             )
             return read.json()["platform_connections"][0]["removed"]
 
         assert await removed_after(0, 7) is False
+
+        async def busy(*args, **kwargs):
+            raise expressions.ExpressionError("no worker free", transient=True)
+
+        with monkeypatch.context() as patched:
+            patched.setattr(declarative_service, "map_delivery", busy)
+            assert await removed_after(1, 42, status=503) is False
         assert await removed_after(1, 42) is True
 
     async def test_only_an_operator_who_may_manage_plug_ins_connects_for_everyone(
