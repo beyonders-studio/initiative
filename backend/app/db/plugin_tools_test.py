@@ -361,15 +361,18 @@ async def test_a_tool_plugins_rows_are_heard_found_and_purged_on_time(
     assert gone == 0
 
 
-async def test_the_tool_is_on_in_every_initiative_then_and_later(
-    client: AsyncClient, session: AsyncSession, acting_user
+async def test_the_tool_is_there_where_it_is_placed(
+    client: AsyncClient, session: AsyncSession, acting_user, role_session
 ):
     """Switched on in every initiative there is and every one made later, by
     rows a built-in tool's are: keyed by its kind, owned by no install, each
     role holding its keys as it holds a built-in tool's. Its layouts are
-    drawn as declared, so none is stored."""
+    drawn as declared, so none is stored. It is on only where its install is
+    placed, by the standing and by the initiative's ``can``: not in an
+    initiative made after the install until placed there, and unplaced, its
+    rows stay for placing it again."""
     seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
-    await install_tool_plugin(client, session, seat)
+    install = await install_tool_plugin(client, session, seat)
     made = await client.post(
         seat.g("/initiatives/"), headers=seat.headers, json={"name": "Later"}
     )
@@ -398,6 +401,35 @@ async def test_the_tool_is_on_in_every_initiative_then_and_later(
     )
     assert not await session.scalar(
         sa.select(sa.func.count()).where(ToolLayout.tool.endswith(COUNTERS_UID.lower()))
+    )
+    await session.commit()
+
+    first = seat.initiative.id
+    path = seat.g(f"/plugins/{install['id']}")
+    for placed in (None, [first, later], [later], [first, later]):
+        if placed is not None:
+            response = await client.patch(
+                path, headers=seat.headers, json={"placed_initiative_ids": placed}
+            )
+            assert response.status_code == 200, response.text
+        reader = await role_session("app_user")
+        context = await route_as(reader, user_id=seat.user.id, guild_id=seat.guild.id)
+        await reader.rollback()
+        on = {pair for pair in context.enabled_tools if pair.endswith(_KIND)}
+        assert on == {f"{i}:{_KIND}" for i in placed or [first]} | {
+            f"*:{_KIND}",
+            f"+:{_KIND}",
+        }
+        for initiative in (first, later):
+            read = await client.get(
+                seat.g(f"/initiatives/{initiative}"), headers=seat.headers
+            )
+            assert (_KIND in read.json()["can"]["view"]) is (
+                initiative in (placed or [first])
+            )
+    await route_session_to_guild(session, seat.guild.id)
+    assert len(rows) == await session.scalar(
+        sa.select(sa.func.count()).where(InitiativeRule.key.startswith(_KIND))
     )
 
 

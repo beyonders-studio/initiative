@@ -27,6 +27,11 @@ Then each tool is switched off in A in turn, and with every tool's switch row
 gone: a moderator of A reads none of the rows of a table a switched-off tool
 governs, is refused an INSERT into it, and updates and deletes none of them.
 
+Then the tool plug-in's placement: placed in B and not in A, its rows in A
+are to A's moderator, A's member and the community's admin exactly what they
+are with its switch in A off, and A's moderator reads none of a table it
+governs; placed in A again, A's moderator reads them.
+
 Last, the tool plug-in's state: suspended, and uninstalled by its community
 with its content kept for the deletion window, its rows (and the comments on
 them) read as absent to A's moderator and to the community's admin, and every
@@ -945,11 +950,6 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
                     )
         await reader.rollback()
 
-    # A tool plug-in's state hides its tool from everyone, the community
-    # admin included, as no switch does: suspended by staff, and uninstalled
-    # by its community while its content waits out the deletion window. Read
-    # only, its rows read and refuse every write. Installed again within the
-    # window, everything is back.
     await route_session_to_guild(session, guild.id)
     await write_switches(session, initiative_a, dict.fromkeys(tools, True))
     await session.commit()
@@ -974,6 +974,85 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
         """The case's own rows in A: B holds rows of these tables by now."""
         return _matching(case.table, list(set(case.rows.values())))
 
+    def writes_in_a(case: _Case) -> dict[str, sa.Executable]:
+        """An INSERT into A, and an UPDATE and DELETE of the case's rows in A."""
+        key = next(iter(case.table.primary_key.columns))
+        return {
+            "INSERT": _insert(case, people.moderator_a),
+            "UPDATE": sa.update(case.table).where(in_a(case)).values({key.name: key}),
+            "DELETE": sa.delete(case.table).where(in_a(case)),
+        }
+
+    # A tool plug-in's placement is where its tool is there at all. Placed in
+    # B and not in A, its rows in A are to each of A's people, the community
+    # admin included, what they are with its switch in A off; placed in A
+    # again, A's moderator reads and writes them.
+    plugin_path = seat.g(f"/plugins/{install['id']}")
+    member_a = await acting_user(
+        guild=guild, initiative=admin.initiative, initiative_role="member"
+    )
+    in_a_people = {**everybody, "A's member": member_a.user.id}
+
+    async def place(*initiative_ids: int) -> None:
+        placed = await client.patch(
+            plugin_path,
+            headers=seat.headers,
+            json={"placed_initiative_ids": list(initiative_ids)},
+        )
+        assert placed.status_code == 200, placed.text
+
+    async def answers() -> dict[str, dict[str, tuple[int | str, ...]]]:
+        """What each of A's people reads of every tool plug-in row in A, and
+        what each write over them answers."""
+        found: dict[str, dict[str, tuple[int | str, ...]]] = {}
+        for who, person in in_a_people.items():
+            reader = await reading_as(person, guild.id)
+            found[who] = {
+                name: (
+                    await _count(reader, case.table, in_a(case)),
+                    *[
+                        await _attempt(reader, statement)
+                        for statement in writes_in_a(case).values()
+                    ],
+                )
+                for name, case in plugin_cases.items()
+            }
+            await reader.rollback()
+        return found
+
+    await place(initiative_b_id)
+    unplaced = await answers()
+    await place(initiative_a, initiative_b_id)
+    placed = await answers()
+    await route_session_to_guild(session, guild.id)
+    await write_switches(
+        session, initiative_a, {tool: not tool.installed for tool in tools}
+    )
+    await session.commit()
+    switched_off = await answers()
+    await route_session_to_guild(session, guild.id)
+    await write_switches(session, initiative_a, dict.fromkeys(tools, True))
+    await session.commit()
+    for who in in_a_people:
+        for name in plugin_cases:
+            if unplaced[who][name] != switched_off[who][name]:
+                failures.append(
+                    f"{name}: {who} answers {unplaced[who][name]} with it placed"
+                    f" in B alone, {switched_off[who][name]} with it off in A"
+                )
+    moderator = "A's moderator"
+    for name in plugin_cases:
+        if placed[moderator][name][0] == 0:
+            failures.append(f"{name}: A's moderator reads none of it placed in A")
+        if name in governed and unplaced[moderator][name][0] != 0:
+            failures.append(f"{name}: A's moderator reads it placed in B alone")
+
+    # A tool plug-in's state hides its tool from everyone, the community
+    # admin included, as no switch does: suspended by staff, and uninstalled
+    # by its community while its content waits out the deletion window. Read
+    # only, its rows read and refuse every write. Installed again within the
+    # window, everything is back.
+
     async def sweep_state(state: str, *, reads: bool) -> None:
         """Every row of the tool plug-in's in A reads as ``reads`` says, to A's
         moderator and the community admin, and none is written. A comment on
@@ -988,15 +1067,7 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
                     failures.append(f"{name}: {who} reads {seen} with it {state}")
                 if reads and case.table.name not in plugin_tables:
                     continue
-                key = next(iter(case.table.primary_key.columns))
-                writes = {
-                    "INSERT": _insert(case, people.moderator_a),
-                    "UPDATE": sa.update(case.table)
-                    .where(in_a(case))
-                    .values({key.name: key}),
-                    "DELETE": sa.delete(case.table).where(in_a(case)),
-                }
-                for command, statement in writes.items():
+                for command, statement in writes_in_a(case).items():
                     answer = await _attempt(reader, statement)
                     if answer not in (
                         (_REFUSED,) if command == "INSERT" else (0, _REFUSED)
@@ -1027,7 +1098,6 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
     await sweep_state("read-only", reads=True)
     await install_state(status=PluginInstallStatus.active.value)
 
-    plugin_path = seat.g(f"/plugins/{install['id']}")
     removed = await client.delete(
         plugin_path, headers=seat.headers, params={"delete_content": "true"}
     )

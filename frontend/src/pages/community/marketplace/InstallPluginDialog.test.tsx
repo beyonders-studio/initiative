@@ -136,6 +136,21 @@ describe("InstallPluginDialog", () => {
     expect((await install()).placements).toEqual("all");
   });
 
+  it("places a tool plug-in's tool in the initiatives picked", async () => {
+    open({ definition: { plugin_kind: "tool" }, requested_scopes: [], grantable_scopes: [] });
+
+    expect(
+      await screen.findByText(
+        "Its tool is there only in the initiatives you choose. In each, the initiative turns it on or off, and its roles say who uses it."
+      )
+    ).toBeInTheDocument();
+    (await screen.findByLabelText("Only the initiatives I choose")).click();
+    (await screen.findByLabelText("Garden")).click();
+    await waitFor(() => expect(screen.getByLabelText("Garden")).toBeChecked());
+
+    expect((await install()).placements).toEqual([11]);
+  });
+
   it("names each permission, whether members start with it, and where it is changed", async () => {
     open({
       definition: {

@@ -1366,7 +1366,8 @@ $function$
 
 
 def _initiative_tool_actions(tools: ToolSet) -> str:
-    """Two checks per tool, only when the initiative has the tool switched on:
+    """Two checks per tool, only when the initiative has the tool switched on
+    (and, for a tool plug-in's, its install placed there):
     ``view:<tool>`` if the reader's role allows viewing it, and
     ``create:<tool>`` if the role allows creating it, the community is not
     read-only, and the reader is not here through an access grant (those can
@@ -1380,6 +1381,14 @@ def _initiative_tool_actions(tools: ToolSet) -> str:
             f" WHEN '{tool.kind}=off' = ANY ({community}) THEN false"
             f" ELSE '{tool.view_permission}' = ANY (v_switched) END)"
         )
+        if tool.installed:
+            # A tool plug-in's tool is there only where its install is placed.
+            switch = (
+                f"({switch} AND EXISTS (SELECT 1 FROM plugin_placements pp"
+                " JOIN guild_plugins a ON a.id = pp.install_id"
+                f" WHERE a.listing_uid = '{tool.kind.partition('.')[2].upper()}'"
+                " AND pp.initiative_id = p_initiative_id))"
+            )
         # A tool's own default: viewing as its switch is, creating off.
         view_default = str(tool.spec.on_by_default).lower()
         create_default = "false"

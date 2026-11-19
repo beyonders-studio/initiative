@@ -375,7 +375,8 @@ async def _provision_tool(
     its community's rules, once the install or its new version has
     committed, then switch its tool on in every initiative: rows its
     community's rules admit once they are rendered with it. Until then a new
-    install's tool is off everywhere. ``drop`` is what a new major version
+    install's tool is off everywhere, and after, it is there only where the
+    install is placed. ``drop`` is what a new major version
     stops declaring, which the seat confirmed
     (:func:`~app.db.plugin_tools.drop_ddl`). Where any of it fails, the
     install is taken back, and the community rendered again, so no install

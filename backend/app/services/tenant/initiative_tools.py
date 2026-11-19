@@ -3,7 +3,9 @@
 Each initiative's own switch for a tool is one of its ``initiative_rules``
 rows: no role, no install, the tool's view key (``Initiative.switched_on``
 holds the keys whose row is on). A tool with no row is off. A tool plug-in's
-tool is one of the community's tools, and its rows are a built-in tool's.
+tool is one of the community's tools, and its rows are a built-in tool's;
+in an initiative its install is not placed in, it is as a tool switched off
+there, whatever its rows say.
 
 A community may set a tool's switch, and what the built-in member role may
 do, for every initiative in it (``COMMUNITY_DEFAULT_KEYS``, its
@@ -116,7 +118,9 @@ async def write_installed_tools(session: AsyncSession, tools: ToolSet) -> None:
     had they been there when it was made: each one's switch, on, and each
     role's keys for it, as ``BuiltinRole.holds`` says (a custom role's as the
     member role's). Rows already there are kept, so a switch turned off stays
-    off. Once the community's rules are rendered with ``tools``."""
+    off. Every initiative has them, placed or not, so placing the install
+    somewhere later finds them there. Once the community's rules are
+    rendered with ``tools``."""
     switches = [tool.view_permission for tool in tools.installed]
     keys = {*switches, *(tool.create_permission for tool in tools.installed)}
     holds = {role.name: role.holds(tools) for role in BUILTIN_ROLES}
