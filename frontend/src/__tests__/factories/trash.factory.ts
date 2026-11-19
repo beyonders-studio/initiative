@@ -1,9 +1,9 @@
 import {
   ActorKind,
-  type EntityType,
   type TrashItem,
   type TrashListResponse,
 } from "@/api/generated/initiativeAPI.schemas";
+import type { EntityType } from "@/hooks/useTrash";
 
 import { buildPage } from "./page.factory";
 

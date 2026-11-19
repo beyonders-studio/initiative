@@ -16,7 +16,7 @@ import type {
   PostUpdate,
   TimelineResponse,
 } from "@/api/generated/initiativeAPI.schemas";
-import { PropertyTarget, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { ContentKind, Tool } from "@/api/generated/initiativeAPI.schemas";
 import {
   deletePostPoll,
   getListPostsQueryKey,
@@ -362,7 +362,7 @@ export const POST_SAVES: FieldSaveKind<PostRead, PostUpdate> = {
   name: "post",
   readKey: (communityId, id) => getReadPostQueryKey(communityId, id),
   patch: (communityId, id, patch) => updatePost(communityId, id, patch),
-  properties: PropertyTarget.post,
+  properties: ContentKind.post,
   lists: () => q.allPosts(),
   itself: (id) => q.post(id),
 };

@@ -1,7 +1,7 @@
 import {
   ActorKind,
   type CommentRead,
-  CommentSubject,
+  ContentKind,
   type ReactionGroup,
   type RecentActivityEntry,
 } from "@/api/generated/initiativeAPI.schemas";
@@ -20,7 +20,7 @@ export function buildComment(overrides: Partial<CommentRead> = {}): CommentRead 
     created_by: 1,
     created_by_kind: ActorKind.member,
     created_by_install: null,
-    subject_type: CommentSubject.task,
+    subject_type: ContentKind.task,
     subject_id: 1,
     parent_comment_id: null,
     created_at: "2026-01-15T00:00:00.000Z",

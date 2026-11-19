@@ -21,7 +21,7 @@ import type {
   CounterSortRequest,
   CounterUpdate,
 } from "@/api/generated/initiativeAPI.schemas";
-import { PropertyTarget, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { ContentKind, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { TOOL_HOOKS } from "@/hooks/toolHooks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
@@ -400,7 +400,7 @@ export const counterSaves = (groupId: number): FieldSaveKind<CounterRead, Counte
   name: "counter",
   readKey: (communityId, id) => getReadCounterQueryKey(communityId, id),
   patch: (communityId, id, patch) => updateCounter(communityId, id, patch),
-  properties: PropertyTarget.counter,
+  properties: ContentKind.counter,
   lists: () => q.tool(Tool.counter_group, groupId),
   itself: (id) => q.counter(id),
 });

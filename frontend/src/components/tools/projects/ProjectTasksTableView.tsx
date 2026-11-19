@@ -23,7 +23,7 @@ import type {
   TaskListRead,
   TaskStatusRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { PropertyTarget } from "@/api/generated/initiativeAPI.schemas";
+import { ContentKind } from "@/api/generated/initiativeAPI.schemas";
 import { sharedTaskColumns } from "@/components/tasks/globalTaskColumns";
 import { statusTriggerStyle, TaskStatusOption } from "@/components/tasks/TaskStatusOption";
 import { type ColumnLimits, NO_COLUMN_LIMITS } from "@/hooks/useColumnLimits";
@@ -352,7 +352,7 @@ const ProjectTasksTableViewComponent = ({
   const statusDisabled = !canEditTaskDetails || taskActionsDisabled;
   const projectEnv = useProjectLayoutEnv(taskHref);
   const stepCounter = useCounterSteps(
-    PropertyTarget.task,
+    ContentKind.task,
     useCallback(() => !statusDisabled, [statusDisabled])
   );
   const env = useMemo(() => ({ ...projectEnv, stepCounter }), [projectEnv, stepCounter]);

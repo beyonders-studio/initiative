@@ -127,12 +127,12 @@ export const categoryEntityTypes = (category: SearchCategory): SearchEntityType[
 /** The icon a hit renders with — its own where it lives inside a tool, its
  *  tool's where it is one. */
 export const hitIcon = (target: SearchTarget): LucideIcon => {
-  const child = TOOL_CHILDREN[target.entity_type];
+  const child = TOOL_CHILDREN[target.entity_type as SearchEntityType];
   if (child) return child.icon;
   // A tool's own row names its tool twice — as the tool and as the kind — so a
   // caller that filled in only the kind still gets the right mark. The community's
   // vocabulary is the one thing that sits outside a tool, and falls through.
-  const tool = target.tool ?? (target.entity_type as unknown as Tool);
+  const tool = (target.tool ?? target.entity_type) as Tool;
   return TOOL_ICONS[tool] ?? Tag;
 };
 
@@ -158,14 +158,19 @@ export const FROM_FEED = { viewSource: ViewSource.feed };
  */
 export const searchHitPath = (target: SearchTarget): string | null => {
   if (target.entity_type === TAG_ENTITY_TYPE) return `/tags/${target.entity_id}`;
-  const child = TOOL_CHILDREN[target.entity_type];
+  const child = TOOL_CHILDREN[target.entity_type as SearchEntityType];
   if (child?.standalone) {
     return child.path(target.initiative_id ?? null, 0, target.entity_id, Tool.file);
   }
   if (child) {
     if (target.tool_id == null || !target.tool) return null;
-    return child.path(target.initiative_id ?? null, target.tool_id, target.entity_id, target.tool);
+    return child.path(
+      target.initiative_id ?? null,
+      target.tool_id,
+      target.entity_id,
+      target.tool as Tool
+    );
   }
   if (!target.tool) return null;
-  return toolDetailRoute(target.tool, target.initiative_id ?? null, target.entity_id);
+  return toolDetailRoute(target.tool as Tool, target.initiative_id ?? null, target.entity_id);
 };

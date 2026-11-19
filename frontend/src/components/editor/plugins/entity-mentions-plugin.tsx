@@ -10,7 +10,7 @@ import { type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
-import type { SearchSuggestion } from "@/api/generated/initiativeAPI.schemas";
+import type { SearchEntityType, SearchSuggestion } from "@/api/generated/initiativeAPI.schemas";
 import { $createEntityMentionNode } from "@/components/editor/nodes/entity-mention-node";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityPickerSuggestions } from "@/hooks/useSearch";
@@ -104,7 +104,9 @@ export function EntityMentionsPlugin({
   const shown = useMemo(
     () =>
       items
-        .filter((suggestion) => !wanted || wanted.includes(suggestion.entity_type))
+        .filter(
+          (suggestion) => !wanted || wanted.includes(suggestion.entity_type as SearchEntityType)
+        )
         .map((suggestion) => new EntityOption(suggestion)),
     [items, wanted]
   );
@@ -118,7 +120,7 @@ export function EntityMentionsPlugin({
     (option: EntityOption, nodeToReplace: TextNode | null, closeMenu: () => void) => {
       editor.update(() => {
         const node = $createEntityMentionNode(
-          option.suggestion.entity_type,
+          option.suggestion.entity_type as SearchEntityType,
           option.suggestion.entity_id,
           option.suggestion.title
         );
@@ -143,7 +145,7 @@ export function EntityMentionsPlugin({
         const type = target?.getAttribute("data-lexical-entity-mention");
         const id = Number(target?.getAttribute("data-entity-id"));
         if (!type || !Number.isFinite(id)) return false;
-        const refType = entityRefTypeFor(type as SearchSuggestion["entity_type"]);
+        const refType = entityRefTypeFor(type as SearchEntityType);
         if (!refType) return false;
         event.preventDefault();
         void navigate({ to: communityPath(communityId, entityRefRoute(refType, id)) });

@@ -58,7 +58,7 @@ export interface ToolRef {
 
 /** The tool a far end is addressed inside, where it named one. */
 const toolRefOf = (end: RelatedEnd): ToolRef | null =>
-  end.tool && end.tool_id != null ? { tool: end.tool, id: end.tool_id } : null;
+  end.tool && end.tool_id != null ? { tool: end.tool as Tool, id: end.tool_id } : null;
 
 /**
  * What changing a link invalidates: the graph, and the tool at each end of it.

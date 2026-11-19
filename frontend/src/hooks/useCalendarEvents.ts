@@ -20,11 +20,11 @@ import {
   type CalendarEventRSVPUpdate,
   type CalendarEventUpdate,
   type CalendarEventUpdateScope,
+  ContentKind,
   type ICalImportRequest,
   type ICalImportResult,
   type ICalParseRequest,
   type ICalParseResult,
-  PropertyTarget,
 } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { isRepeating, occurrenceTarget } from "@/components/calendar/eventCalendarEntry";
@@ -78,9 +78,9 @@ export const eventSaves = (
           occurrence: patch.occurrence ?? undefined,
         })
       : updateCalendarEvent(communityId, id, withZone(patch)),
-  properties: PropertyTarget.calendar_event,
+  properties: ContentKind.calendar_event,
   lists: (edit) =>
-    "patch" in edit ? q.allCalendarEvents() : q.propertyHolder(PropertyTarget.calendar_event),
+    "patch" in edit ? q.allCalendarEvents() : q.propertyHolder(ContentKind.calendar_event),
   itself: (id) => q.calendarEvent(id),
 });
 

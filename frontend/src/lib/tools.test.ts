@@ -9,12 +9,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import {
-  EntityType,
-  PermissionKey,
-  PropertyTarget,
-  Tool,
-} from "@/api/generated/initiativeAPI.schemas";
+import { ContentKind, PermissionKey, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { TOOL_SKETCHES } from "@/components/initiatives/ToolSkeletons";
 import { EXTRA_PERMISSION_KEYS } from "@/hooks/useInitiativeRoles";
 
@@ -114,14 +109,10 @@ describe("tool registry", () => {
     expect(derived.sort()).toEqual(Object.values(PermissionKey).sort());
   });
 
-  it("every tool is a trash entity type with a label", () => {
-    const trashTypes = Object.values(EntityType) as string[];
+  it("every tool has a trash label", () => {
     const labels = trash.entityType as Record<string, string>;
     for (const tool of TOOLS) {
-      expect(trashTypes, `missing EntityType for ${tool}`).toContain(tool);
-    }
-    for (const entityType of trashTypes) {
-      expect(labels[entityType], `missing trash.json entityType.${entityType}`).toBeTruthy();
+      expect(labels[tool], `missing trash.json entityType.${tool}`).toBeTruthy();
     }
   });
 });
@@ -372,25 +363,25 @@ describe("tool properties", () => {
   it("every tool and sub-tool has somewhere its properties are set", () => {
     const set = new Set<string>();
     for (const source of Object.values(componentSources)) {
-      for (const [, target] of source.matchAll(/propertySaves\[PropertyTarget\.(\w+)\]/g)) {
+      for (const [, target] of source.matchAll(/propertySaves\[ContentKind\.(\w+)\]/g)) {
         set.add(target);
       }
     }
     // An item's page saves them with the item's own save kind.
     for (const source of Object.values(hookSources)) {
-      for (const [, target] of source.matchAll(/properties: PropertyTarget\.(\w+)/g)) {
+      for (const [, target] of source.matchAll(/properties: ContentKind\.(\w+)/g)) {
         set.add(target);
       }
     }
     // A tool's are on its settings page, which every tool shares.
     if (
       componentSources["../pages/community/tools/settings/DetailsPage.tsx"].includes(
-        "propertySaves[PropertyTarget[tool]]"
+        "propertySaves[ContentKind[tool]]"
       )
     ) {
       for (const tool of TOOLS) set.add(tool);
     }
-    const missing = Object.values(PropertyTarget).filter((target) => !set.has(target));
+    const missing = Object.values(ContentKind).filter((target) => !set.has(target));
     expect(missing, `nowhere sets the properties of ${missing.join(", ")}`).toEqual([]);
   });
 });

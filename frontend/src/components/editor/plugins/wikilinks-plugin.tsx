@@ -154,7 +154,13 @@ function useWikilinkSearch(
 
   const options = useMemo(() => {
     const docOptions = results.map(
-      (hit) => new WikilinkTypeaheadOption(hit.title, hit.entity_id, false, hit.entity_type)
+      (hit) =>
+        new WikilinkTypeaheadOption(
+          hit.title,
+          hit.entity_id,
+          false,
+          hit.entity_type as SearchEntityType
+        )
     );
 
     // Add "Create new file" option if query doesn't exactly match any result

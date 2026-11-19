@@ -18,8 +18,8 @@ import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
+  ContentKind,
   PropertySummary,
-  PropertyTarget,
   PropertyValuesSetRequest,
 } from "@/api/generated/initiativeAPI.schemas";
 import { setProperties } from "@/api/generated/properties/properties";
@@ -47,7 +47,7 @@ export interface FieldSaveKind<I, P> {
   /** Sends a patch, answering with the item as the server now holds it. */
   patch: (communityId: number, id: number, patch: P) => Promise<Partial<I>>;
   /** Where its properties are set. */
-  properties: PropertyTarget;
+  properties: ContentKind;
   /** Sets its properties where they are not set as a target's: a file's
    *  values of a collection's metadata, which are the collection's. */
   setProperties?: (

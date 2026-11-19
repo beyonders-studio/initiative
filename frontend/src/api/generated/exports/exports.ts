@@ -27,7 +27,6 @@ import type {
   ExportTasksParams,
   ExportToolParams,
   HTTPValidationError,
-  Tool,
 } from "../initiativeAPI.schemas";
 
 import { apiMutator } from "../../mutator";
@@ -1013,14 +1012,15 @@ export function useDownloadExportArtifact<
 }
 
 /**
- * Export a selection of one tool's entities. Each takes the owner rung on
- * it. Small selections return the file inline; large ones return ``202`` with
- * a queued job to poll and download.
+ * Export a selection of one tool's entities: a built-in tool's, or an
+ * installed tool plug-in's, by its kind. Each takes the export action on
+ * it. Small selections return the file inline; large ones return ``202``
+ * with a queued job to poll and download.
  * @summary Export Tool
  */
 export const exportTool = (
   communityId: number,
-  tool: Tool,
+  tool: string,
   params?: ExportToolParams,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
@@ -1033,7 +1033,7 @@ export const exportTool = (
 
 export const getExportToolQueryKey = (
   communityId: number,
-  tool: Tool,
+  tool: string,
   params?: ExportToolParams
 ) => {
   return [`/api/v1/c/${communityId}/exports/${tool}`, ...(params ? [params] : [])] as const;
@@ -1044,7 +1044,7 @@ export const getExportToolQueryOptions = <
   TError = ErrorType<HTTPValidationError>,
 >(
   communityId: number,
-  tool: Tool,
+  tool: string,
   params?: ExportToolParams,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof exportTool>>, TError, TData>>;
@@ -1077,7 +1077,7 @@ export function useExportTool<
   TError = ErrorType<HTTPValidationError>,
 >(
   communityId: number,
-  tool: Tool,
+  tool: string,
   params: undefined | ExportToolParams,
   options: {
     query: Partial<UseQueryOptions<Awaited<ReturnType<typeof exportTool>>, TError, TData>> &
@@ -1098,7 +1098,7 @@ export function useExportTool<
   TError = ErrorType<HTTPValidationError>,
 >(
   communityId: number,
-  tool: Tool,
+  tool: string,
   params?: ExportToolParams,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof exportTool>>, TError, TData>> &
@@ -1119,7 +1119,7 @@ export function useExportTool<
   TError = ErrorType<HTTPValidationError>,
 >(
   communityId: number,
-  tool: Tool,
+  tool: string,
   params?: ExportToolParams,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof exportTool>>, TError, TData>>;
@@ -1136,7 +1136,7 @@ export function useExportTool<
   TError = ErrorType<HTTPValidationError>,
 >(
   communityId: number,
-  tool: Tool,
+  tool: string,
   params?: ExportToolParams,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof exportTool>>, TError, TData>>;

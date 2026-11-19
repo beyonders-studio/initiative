@@ -10,10 +10,10 @@ import { animateNodes } from "sigma/utils";
 
 import "@react-sigma/core/lib/style.css";
 
-import {
-  EndpointKind,
-  type EndpointRef,
-  type RelatedEnd,
+import type {
+  EndpointRef,
+  RelatedEnd,
+  SearchEntityType,
 } from "@/api/generated/initiativeAPI.schemas";
 import { type GraphEdge, type GraphNode, MAX_HOPS } from "@/hooks/useRelationships";
 import { useTheme } from "@/hooks/useTheme";
@@ -21,7 +21,13 @@ import { useCommunityPath } from "@/lib/communityUrl";
 import { themeColor, withAlpha } from "@/lib/cssColor";
 import { iconDataUri } from "@/lib/iconSvg";
 import { getInitials } from "@/lib/initials";
-import { groupOf, isItem, type RelationGroup, relatedTarget } from "@/lib/relationships";
+import {
+  EndpointKind,
+  groupOf,
+  isItem,
+  type RelationGroup,
+  relatedTarget,
+} from "@/lib/relationships";
 import { entityIcon, hitIcon, searchHitPath } from "@/lib/searchResults";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
 import { Button } from "@/ui/button";
@@ -381,7 +387,11 @@ export const RelationsGraph = ({
       image:
         entity.type === EndpointKind.user
           ? ""
-          : iconUri(entityIcon(entity.type), palette.centreMark, `centre:${entity.type}`),
+          : iconUri(
+              entityIcon(entity.type as SearchEntityType),
+              palette.centreMark,
+              `centre:${entity.type}`
+            ),
     });
 
     const byDepth = new Map<number, GraphNode[]>();

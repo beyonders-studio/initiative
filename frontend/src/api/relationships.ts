@@ -8,7 +8,6 @@
  */
 
 import {
-  type EndpointKind,
   type EndpointRef,
   type RelationshipCreate,
   type RelationshipRead,
@@ -19,6 +18,7 @@ import {
   removeRelationship as removeRelationshipRequest,
   replaceRelationshipSlice,
 } from "@/api/generated/relationships/relationships";
+import type { EndpointKind } from "@/lib/relationships";
 
 /** A thing, as a reference names it: `task:12`. */
 const ref = (end: EndpointRef) => `${end.type}:${end.id}`;

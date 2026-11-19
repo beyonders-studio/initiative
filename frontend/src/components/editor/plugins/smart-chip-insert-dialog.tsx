@@ -103,7 +103,7 @@ export function SmartChipInsertDialog({
   const choose = (suggestion: SearchSuggestion) => {
     if (onPickEmbed) return onPickEmbed(suggestion);
     if (chipKind) return insert(chipKind, suggestion);
-    const kinds = chipKindsFor(suggestion.entity_type);
+    const kinds = chipKindsFor(suggestion.entity_type as SearchEntityType);
     // One fact means no question to ask.
     if (kinds.length === 1) return insert(kinds[0], suggestion);
     setChosen(suggestion);
@@ -124,7 +124,7 @@ export function SmartChipInsertDialog({
         <Command ref={factsRef} shouldFilter={false} tabIndex={-1} className="border outline-none">
           <CommandList>
             <CommandGroup>
-              {chipKindsFor(chosen.entity_type).map((kind) => {
+              {chipKindsFor(chosen.entity_type as SearchEntityType).map((kind) => {
                 const entry = SMART_CHIP_MENU[kind];
                 return (
                   <CommandItem

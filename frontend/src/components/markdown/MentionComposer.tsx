@@ -11,6 +11,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
+import type { SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
 import { CommentContent } from "@/components/comments/CommentContent";
 import { CommentReferences } from "@/components/comments/CommentReferences";
 import type { MentionChoice } from "@/components/comments/MentionPopover";
@@ -223,7 +224,7 @@ export const MentionComposer = ({
         choice.user
           ? userMentionSyntax(choice.label, choice.id)
           : entityMentionSyntax(
-              choice.suggestion.entity_type,
+              choice.suggestion.entity_type as SearchEntityType,
               choice.suggestion.title,
               choice.suggestion.entity_id
             )

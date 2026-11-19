@@ -108,7 +108,7 @@ export function EmbedDialog({ activeEditor, onClose, nodeKey }: EmbedDialogProps
     // The details chosen were facts about the last kind of thing.
     if (suggestion.entity_type !== item?.entityType) setItemDisplay(CARD);
     setItem({
-      entityType: suggestion.entity_type,
+      entityType: suggestion.entity_type as SearchEntityType,
       entityId: suggestion.entity_id,
       title: suggestion.title,
     });

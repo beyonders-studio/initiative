@@ -2,9 +2,9 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
+  ContentKind,
   TagBulkEditRequest,
   TagSummary,
-  TagTarget,
 } from "@/api/generated/initiativeAPI.schemas";
 import { bulkEditTags } from "@/api/generated/tags/tags";
 import { TagPicker } from "@/components/tags/TagPicker";
@@ -30,7 +30,7 @@ interface TaggableItem {
 interface BulkEditTagsDialogProps<T extends TaggableItem> extends DialogWithSuccessProps {
   items: T[];
   /** Entity type for the server-side bulk endpoint. */
-  targetType: TagTarget;
+  targetType: ContentKind;
   communityId: number;
   /** Called after the bulk call succeeds to invalidate relevant caches. */
   onInvalidate: () => void;

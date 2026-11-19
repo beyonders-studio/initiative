@@ -23,11 +23,11 @@ import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import {
   ActorKind,
-  EndpointKind,
   type RelationshipRead,
   SearchEntityType,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
+import { EndpointKind } from "@/lib/relationships";
 
 /**
  * Sigma draws the graph to a WebGL canvas, which jsdom has none of. The renderer

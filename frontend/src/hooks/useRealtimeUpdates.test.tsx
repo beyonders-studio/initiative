@@ -18,7 +18,7 @@ import { latestSocket, MockWebSocket } from "@/__tests__/helpers/mockWebSocket";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import { setAuthToken } from "@/api/client";
-import type { CommentRead, CommentSubject } from "@/api/generated/initiativeAPI.schemas";
+import type { CommentRead, ContentKind } from "@/api/generated/initiativeAPI.schemas";
 import { setInvalidationCommunity } from "@/api/query-keys";
 import { commentThreadQueryOptions } from "@/hooks/useComments";
 import { applyChanges, useRealtimeUpdates } from "@/hooks/useRealtimeUpdates";
@@ -48,7 +48,7 @@ const seed = (key: readonly unknown[]) => {
 /** A comment thread on one parent, as `useComments` keys and holds it; open
  *  (something on screen watching it) unless `open` is false. */
 const seedThread = (
-  kind: CommentSubject,
+  kind: ContentKind,
   id: number,
   { comments = [], open = true }: { comments?: CommentRead[]; open?: boolean } = {}
 ) => {

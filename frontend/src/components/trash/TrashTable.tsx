@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { ActorKind, type EntityType, type TrashItem } from "@/api/generated/initiativeAPI.schemas";
+import { ActorKind, type TrashItem } from "@/api/generated/initiativeAPI.schemas";
 import {
+  type EntityType,
   useCommunityTrashList,
   useMyTrashList,
   usePurgeTrashEntity,
@@ -93,7 +94,7 @@ export const TrashTable = ({ variant, showPurgeAction }: TrashTableProps) => {
   const handleRestoreClick = (item: TrashItem) => {
     restoreMutation.mutate({
       communityId: item.community_id,
-      entityType: item.entity_type,
+      entityType: item.entity_type as EntityType,
       entityId: item.entity_id,
     });
   };
@@ -125,7 +126,9 @@ export const TrashTable = ({ variant, showPurgeAction }: TrashTableProps) => {
             {items.map((item) => (
               <TableRow key={`${item.entity_type}-${item.entity_id}`}>
                 <TableCell>
-                  <Badge variant="secondary">{t(`entityType.${item.entity_type}` as const)}</Badge>
+                  <Badge variant="secondary">
+                    {t(`entityType.${item.entity_type as EntityType}` as const)}
+                  </Badge>
                 </TableCell>
                 <TableCell className="font-medium">{item.name || `#${item.entity_id}`}</TableCell>
                 <TableCell className="text-muted-foreground">
@@ -161,7 +164,7 @@ export const TrashTable = ({ variant, showPurgeAction }: TrashTableProps) => {
                           setPurgeConfirm({
                             open: true,
                             communityId: item.community_id,
-                            entityType: item.entity_type,
+                            entityType: item.entity_type as EntityType,
                             entityId: item.entity_id,
                             name: item.name || `#${item.entity_id}`,
                           })
