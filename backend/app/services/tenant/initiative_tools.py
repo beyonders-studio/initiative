@@ -19,13 +19,14 @@ does not.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
-from sqlalchemy import and_, case, func, not_, or_, select
+from sqlalchemy import and_, case, delete, func, not_, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql.elements import ColumnElement
+from sqlmodel import col
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.tool_set import ToolRecord, ToolSet
@@ -42,6 +43,7 @@ from app.models.tenant.initiative import (
     InitiativeRoleModel,
     InitiativeRule,
 )
+from app.models.tenant.resource_grant import ResourceGrant
 
 
 def _community(key: str):
@@ -161,6 +163,21 @@ async def write_installed_tools(session: AsyncSession, tools: ToolSet) -> None:
             )
             .on_conflict_do_nothing(constraint="uq_initiative_rules_subject")
         )
+
+
+async def forget_tool(session: AsyncSession, kinds: Sequence[str]) -> None:
+    """Delete the rules and grants naming a tool plug-in's kinds (its own
+    first), whoever wrote them: what a later install's tables would otherwise
+    meet, and what the community's rules rendered without it refuse."""
+    await session.exec(
+        delete(ResourceGrant).where(col(ResourceGrant.resource_type).in_(kinds))
+    )
+    await session.exec(
+        delete(InitiativeRule).where(
+            col(InitiativeRule.install_id).is_(None),
+            col(InitiativeRule.key).contains(kinds[0], autoescape=True),
+        )
+    )
 
 
 def tool_on(context: ActorContext, initiative: Any, tool: Tool) -> bool:

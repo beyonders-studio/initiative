@@ -476,6 +476,44 @@ async def _publish(session: AsyncSession, version: str, change) -> None:
     )
 
 
+async def test_an_install_that_fails_once_rendered_leaves_nothing(
+    client: AsyncClient, session: AsyncSession, acting_user, monkeypatch
+):
+    """An install failing after its rules were rendered with it is taken back
+    whole: its tables and every rule naming it, another request's too, and
+    the community renders without it."""
+    from app.services.tenant import initiative_tools
+
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    initiative_id = seat.initiative.id
+
+    async def fails(*_: Any) -> None:
+        # Another request wrote the tool's switch once it was rendered.
+        await route_session_to_guild(session, seat.guild.id)
+        session.add(
+            InitiativeRule(
+                initiative_id=initiative_id, key=f"{_KIND}:enabled", enabled=True
+            )
+        )
+        await session.commit()
+        raise RuntimeError("the rows")
+
+    monkeypatch.setattr(initiative_tools, "write_installed_tools", fails)
+    with pytest.raises(AssertionError, match="TOOL_NOT_PROVISIONED"):
+        await install_tool_plugin(client, session, seat)
+    schema = guild_schema_name(seat.guild.id)
+    assert await _columns(session, schema) == {}
+    await route_session_to_guild(session, seat.guild.id)
+    assert not await session.scalar(
+        sa.select(sa.func.count()).where(InitiativeRule.key.startswith(_KIND))
+    )
+    stamp = await session.scalar(
+        sa.text("SELECT obj_description(to_regnamespace(:s), 'pg_namespace')"),
+        {"s": schema},
+    )
+    assert stamp_tools(stamp) is None
+
+
 async def test_uninstalling_keeps_the_tool_until_its_window_ends(
     client: AsyncClient, session: AsyncSession, acting_user
 ):

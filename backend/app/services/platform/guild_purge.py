@@ -60,8 +60,6 @@ from app.models.platform.plugin_install import (
     PluginInstallStatus,
 )
 from app.models.tenant.guild_plugin import GuildPlugin
-from app.models.tenant.initiative import InitiativeRule
-from app.models.tenant.resource_grant import ResourceGrant
 from app.services import audit as audit_service
 from app.services.marketplace import community_hooks, plugin_refs
 from app.services.marketplace.tool_plugins import is_tool_plugin, tool_kinds
@@ -218,9 +216,9 @@ async def _purge_tool(
     session: AsyncSession, guild_id: int, plugin: GuildPlugin
 ) -> set[str]:
     """Purge a tool plug-in's rows as the trash purges a tool's (refused
-    while the platform holds any of them), then the grants and rules naming
-    its kinds, which a later install's tables would otherwise meet. Returns
-    the stored names to delete once it commits."""
+    while the platform holds any of them), then the rules and grants naming
+    its kinds. Returns the stored names to delete once it commits."""
+    from app.services.tenant.initiative_tools import forget_tool
     from app.services.tenant.soft_delete import hard_purge_entities
 
     tools = await provisioned_tools(guild_id)
@@ -230,15 +228,7 @@ async def _purge_tool(
     released = await hard_purge_entities(
         session, [ToolRow(tool.table, {"id": row_id}) for row_id in rows], tools=tools
     )
-    await session.exec(
-        delete(ResourceGrant).where(col(ResourceGrant.resource_type).in_(kinds))
-    )
-    await session.exec(
-        delete(InitiativeRule).where(
-            col(InitiativeRule.install_id).is_(None),
-            col(InitiativeRule.key).contains(tool.kind, autoescape=True),
-        )
-    )
+    await forget_tool(session, kinds)
     return released
 
 

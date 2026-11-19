@@ -127,7 +127,7 @@ from app.services.marketplace.installs import (
     count_install,
     resolve_listing_install,
 )
-from app.services.marketplace.tool_plugins import is_tool_plugin
+from app.services.marketplace.tool_plugins import is_tool_plugin, tool_kinds
 from app.services.membership import initiative_scope_clause
 from app.services.platform import billing_ping
 from app.services.tenant import guild_plugins as guild_plugins_service
@@ -384,6 +384,7 @@ async def _provision_tool(
     were not brought up to it: once they were, a field it dropped is gone,
     so it stays."""
     guild_id, plugin_id, uid = routed_guild_id(session), plugin.id, plugin.listing_uid
+    kinds = tool_kinds(plugin.definition, listing_uid=uid)
     provisioned = False
     try:
         tools = await provision_community_tools(guild_id, drop=drop)
@@ -402,6 +403,8 @@ async def _provision_tool(
         logger.exception("tool plug-in %s: provisioning guild %s", plugin_id, guild_id)
         await session.rollback()
         if previous is None:
+            # Another request may have written rules for it once it was rendered.
+            await initiative_tools.forget_tool(session, kinds)
             await session.exec(delete(GuildPlugin).where(GuildPlugin.id == plugin_id))
         else:
             plugin.listing_version, plugin.definition = previous
