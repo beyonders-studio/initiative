@@ -34,7 +34,7 @@ def _wiki(count: int = 1, **extra) -> dict:
         "type": "initiative-wiki",
         "name": "Handbook",
         "pages": [
-            {"title": f"Page {i}", "slug": f"page-{i}", "position": i}
+            {"title": f"Page {i}", "slug": f"page-{i}", "position": i, "content": {}}
             for i in range(count)
         ],
         **extra,

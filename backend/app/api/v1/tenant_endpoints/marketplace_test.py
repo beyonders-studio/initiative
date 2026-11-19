@@ -787,7 +787,12 @@ def _wiki_envelope(*titles: str) -> dict:
         "name": "Whatever the file called it",
         "description": "Rules of the party.",
         "pages": [
-            {"title": title, "slug": title.lower().replace(" ", "-"), "position": i}
+            {
+                "title": title,
+                "slug": title.lower().replace(" ", "-"),
+                "position": i,
+                "content": {},
+            }
             for i, title in enumerate(titles)
         ],
     }
