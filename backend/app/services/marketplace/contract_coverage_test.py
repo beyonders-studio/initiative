@@ -23,9 +23,13 @@ never both, so there are two, and each object is measured across both. A field
 added to the contract and to nothing else fails here.
 """
 
+from typing import get_args
+
 import pytest
 
-from app.services.marketplace import contract, service_plugins
+from app.core.collection_shapes import FieldDisplay
+from app.schemas.tenant import tool_layout
+from app.services.marketplace import contract, service_plugins, tool_plugins
 from app.services.marketplace.definitions import normalize_listing_definition
 from app.services.tenant import metadata as metadata_service
 
@@ -447,6 +451,10 @@ def maximal_tool_manifest() -> dict:
                     "default": "plain",
                 },
             ],
+            "layouts": {
+                "list": {"kind": "table", "columns": ["name", "price"]},
+                "detail": {"main": [{"type": "field", "props": {"field": "look"}}]},
+            },
             "items": [
                 {
                     "key": "tally",
@@ -466,6 +474,59 @@ def maximal_tool_manifest() -> dict:
                         {"key": "ceiling", "name": {"en": "Ceiling"}, "kind": "number"},
                         {"key": "start", "name": {"en": "Start"}, "kind": "number"},
                     ],
+                    "layouts": {
+                        "list": {
+                            "kind": "grid",
+                            "card": {
+                                "type": "card",
+                                "children": [
+                                    {
+                                        "type": "stack",
+                                        "props": {
+                                            "direction": "row",
+                                            "gap": "xs",
+                                            "wrap": True,
+                                            "align": "start",
+                                            "tone": "muted",
+                                        },
+                                        "children": [
+                                            {
+                                                "type": "field",
+                                                "props": {"field": "count"},
+                                            },
+                                            {"type": "properties"},
+                                        ],
+                                    }
+                                ],
+                            },
+                            "displays": {"count": "clock"},
+                        },
+                        "detail": {
+                            "header": [
+                                {
+                                    "type": "stack",
+                                    "props": {"direction": "row"},
+                                    "children": [{"type": "byline"}],
+                                }
+                            ],
+                            "main": [
+                                {
+                                    "type": "section",
+                                    "props": {"title": "Bounds", "collapsed": True},
+                                    "children": [
+                                        {
+                                            "type": "field",
+                                            "props": {
+                                                "field": "ceiling",
+                                                "required": True,
+                                            },
+                                        }
+                                    ],
+                                }
+                            ],
+                            "side": [{"type": "properties"}],
+                        },
+                    },
                     "open_while": {"field": "count", "below": {"field": "ceiling"}},
                 },
                 {
@@ -475,6 +536,13 @@ def maximal_tool_manifest() -> dict:
                     "fields": [
                         {"key": "done", "name": {"en": "Done"}, "kind": "checkbox"}
                     ],
+                    "layouts": {
+                        # Every row's fields alone, as its fields change below.
+                        "list": {"kind": "table", "columns": ["name"]},
+                        "detail": {
+                            "main": [{"type": "field", "props": {"field": "name"}}]
+                        },
+                    },
                 },
             ],
             "actions": [
@@ -852,6 +920,11 @@ def _nodes(published: dict, declarative: dict, tool: dict) -> list[tuple[str, di
     price, look = declared["fields"]
     tally, mark = declared["items"]
     count = tally["fields"][0]
+    grid, page = tally["layouts"]["list"], tally["layouts"]["detail"]
+    card_stack = grid["card"]["children"][0]
+    card_field, properties = card_stack["children"]
+    page_stack, section = page["header"][0], page["main"][0]
+    page_field = section["children"][0]
     return [
         ("manifest", {**published, **declarative, **tool}),
         ("tool", declared),
@@ -860,6 +933,22 @@ def _nodes(published: dict, declarative: dict, tool: dict) -> list[tuple[str, di
         ("toolItem", {**tally, **mark}),
         ("toolOpenWhile", _open_conditions()),
         ("toolAction", declared["actions"][0]),
+        ("toolLayouts", tally["layouts"]),
+        # A table lists by its columns, a grid by its card.
+        ("toolListLayout", {**declared["layouts"]["list"], **grid}),
+        ("toolDetailLayout", page),
+        ("layoutCard", grid["card"]),
+        ("layoutCardStack", card_stack),
+        ("layoutStackProps", card_stack["props"]),
+        ("layoutCardField", card_field),
+        ("layoutFieldProps", card_field["props"]),
+        ("layoutProperties", properties),
+        ("layoutDetailStack", page_stack),
+        ("layoutSection", section),
+        ("layoutSectionProps", section["props"]),
+        ("layoutDetailField", page_field),
+        ("layoutDetailFieldProps", page_field["props"]),
+        ("layoutOwnPart", page_stack["children"][0]),
         ("connection", {**connection, **other, **workspace}),
         ("connectionField", connection["fields"][0]),
         ("connectionFlow", connection["flow"]),
@@ -1024,6 +1113,31 @@ def test_the_maximal_manifests_really_are_maximal(nodes):
         "toolItemChange",
     }
     assert set(metadata_service._ELEMENT_TERMS) == set(contract.fields("listElement"))
+
+
+def test_a_tool_s_layouts_are_the_kit_s_grammar():
+    """A tool plug-in declares its layouts in the grammar ``tool_layouts``
+    stores, so each layout object the contract mirrors has the kit model's
+    terms and values (``app.schemas.tenant.tool_layout``), and what a tool
+    plug-in may use of it is a part of what the kit draws."""
+    for name, model in (
+        ("layoutStackProps", tool_layout.StackProps),
+        ("layoutFieldProps", tool_layout.FieldProps),
+        ("layoutDetailFieldProps", tool_layout.DetailFieldProps),
+        ("layoutSectionProps", tool_layout.SectionProps),
+        ("toolDetailLayout", tool_layout.DetailLayoutDefinition),
+    ):
+        assert set(contract.fields(name)) == set(model.model_fields), name
+    stack = contract.objects()["layoutStackProps"]["properties"]
+    for prop, field in tool_layout.StackProps.model_fields.items():
+        if prop != "wrap":
+            assert set(stack[prop]["enum"]) == set(
+                get_args(get_args(field.annotation)[0])
+            )
+    assert set(contract.enum("fieldDisplay")) == set(get_args(FieldDisplay))
+    assert contract.enum("toolListKind") == set(tool_plugins.TOOL_LIST_LAYOUTS)
+    assert contract.enum("toolListKind") <= set(get_args(tool_layout.ListLayoutKind))
+    assert contract.enum("toolDetailPart") <= set(get_args(tool_layout.OwnPartType))
 
 
 def test_an_emitting_endpoint_keeps_what_describes_it(published):
