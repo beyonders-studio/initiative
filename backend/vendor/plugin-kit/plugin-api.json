@@ -5,7 +5,7 @@
     "version": "11.0.0",
     "x-initiative-source": {
       "version": "0.79.2",
-      "commit": "9e90f0dc5e36893e569376cf7cda1596982fc403"
+      "commit": "1bc0ecd714b3a152ced48061a97ca9c9a9836204"
     }
   },
   "servers": [
@@ -7417,6 +7417,580 @@
         ]
       }
     },
+    "/plugin-tools/{kind}/": {
+      "get": {
+        "tags": [
+          "plugin-tools"
+        ],
+        "summary": "List Plugin Tool Rows",
+        "description": "A page of a tool plug-in's rows: its tool's in an initiative, or an\nitem's under the row it sits in, in their order.",
+        "operationId": "list_plugin_tool_rows",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginToolRowList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": {
+          "tool": "kind",
+          "access": "read"
+        },
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "initiative_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The initiative whose tool rows to list",
+              "title": "Initiative Id"
+            },
+            "description": "The initiative whose tool rows to list"
+          },
+          {
+            "name": "parent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The row whose items to list, for an item's kind",
+              "title": "Parent Id"
+            },
+            "description": "The row whose items to list, for an item's kind"
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "List archived rows instead",
+              "default": false,
+              "title": "Archived"
+            },
+            "description": "List archived rows instead"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 0,
+              "default": 20,
+              "title": "Page Size"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "plugin-tools"
+        ],
+        "summary": "Create Plugin Tool Row",
+        "description": "Add a row: of the tool, in an initiative where its switch is on and the\ncaller's role may create it, shared as ``grants`` says; or of an item,\nunder a row of the tool the caller may change. Fields left out start at\ntheir defaults.",
+        "operationId": "create_plugin_tool_row",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginToolRowCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginToolRowRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": {
+          "tool": "kind",
+          "access": "write"
+        },
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      }
+    },
+    "/plugin-tools/{kind}/{row_id}": {
+      "get": {
+        "tags": [
+          "plugin-tools"
+        ],
+        "summary": "Read Plugin Tool Row",
+        "description": "One row of a tool plug-in's tool or of one of its items.",
+        "operationId": "read_plugin_tool_row",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginToolRowRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": {
+          "tool": "kind",
+          "access": "read"
+        },
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "row_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Row Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "plugin-tools"
+        ],
+        "summary": "Update Plugin Tool Row",
+        "description": "Change a row: its name, its place and the fields sent. A counter is\nheld to its bounds.",
+        "operationId": "update_plugin_tool_row",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginToolRowUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginToolRowRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": {
+          "tool": "kind",
+          "access": "write"
+        },
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "row_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Row Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      }
+    },
+    "/plugin-tools/{kind}/{row_id}/duplicate": {
+      "post": {
+        "tags": [
+          "plugin-tools"
+        ],
+        "summary": "Duplicate Plugin Tool Row",
+        "description": "Copy a row with every item under it, as a built-in tool's duplicate\ndoes: a tool's row into an initiative, its own unless the body names\nanother, shared as its source is while it stays there; an item beside\nitself. Beside its source the copy is called \"<name> (Copy)\" unless the\nbody names it.",
+        "operationId": "duplicate_plugin_tool_row",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ToolDuplicateRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginToolRowRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": {
+          "tool": "kind",
+          "access": "write"
+        },
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "row_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Row Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      }
+    },
+    "/plugin-tools/{kind}/{row_id}/actions/{action_id}": {
+      "post": {
+        "tags": [
+          "plugin-tools"
+        ],
+        "summary": "Run Plugin Tool Action",
+        "description": "Run one of the tool's actions on a row, with the answers to its\n``params``. Its change is made as the caller would make it by hand, all of\nit or none, and the row is answered as it now stands.",
+        "operationId": "run_plugin_tool_action",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/PluginToolActionRun"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginToolRowRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": {
+          "tool": "kind",
+          "access": "write"
+        },
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "row_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Row Id"
+            }
+          },
+          {
+            "name": "action_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Action Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      }
+    },
     "/calendar-events/{event_id}": {
       "get": {
         "tags": [
@@ -10953,7 +11527,8 @@
       "ArchiveResponse": {
         "properties": {
           "entity_type": {
-            "$ref": "#/components/schemas/ArchivableType"
+            "$ref": "#/components/schemas/ArchivableType",
+            "title": "Entity Type"
           },
           "entity_id": {
             "type": "integer",
@@ -13454,7 +14029,8 @@
             "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
           },
           "subject_type": {
-            "$ref": "#/components/schemas/CommentSubject"
+            "$ref": "#/components/schemas/CommentSubject",
+            "title": "Subject Type"
           },
           "subject_id": {
             "type": "integer",
@@ -13567,7 +14143,8 @@
             "title": "Id"
           },
           "subject_type": {
-            "$ref": "#/components/schemas/CommentSubject"
+            "$ref": "#/components/schemas/CommentSubject",
+            "title": "Subject Type"
           },
           "subject_id": {
             "type": "integer",
@@ -14988,6 +15565,16 @@
         "type": "object",
         "title": "CounterGroupUpdate"
       },
+      "CounterLook": {
+        "type": "string",
+        "enum": [
+          "number",
+          "bar",
+          "clock"
+        ],
+        "title": "CounterLook",
+        "description": "How a counter field is drawn: a number, a progress bar or a segmented\nclock. A bar and a clock need both bounds; a counter without them is\ndrawn as a number."
+      },
       "CounterPreview": {
         "properties": {
           "id": {
@@ -15189,11 +15776,15 @@
             "type": "number",
             "title": "Initial",
             "default": 0
+          },
+          "look": {
+            "$ref": "#/components/schemas/CounterLook",
+            "default": "number"
           }
         },
         "type": "object",
         "title": "CounterSettings",
-        "description": "How a counter field moves: by ``step`` a tap, never past ``min`` or\n``max``, and back to ``initial`` on a reset. A counter with no value\nholds ``initial``."
+        "description": "How a counter field moves: by ``step`` a tap, never past ``min`` or\n``max``, and back to ``initial`` on a reset. A counter with no value\nholds ``initial``. ``look`` is how it is drawn wherever a list's layout\nsays nothing else."
       },
       "CounterSettings-Output": {
         "properties": {
@@ -15229,6 +15820,10 @@
             "type": "number",
             "title": "Initial",
             "default": 0
+          },
+          "look": {
+            "$ref": "#/components/schemas/CounterLook",
+            "default": "number"
           }
         },
         "type": "object",
@@ -15236,10 +15831,11 @@
           "step",
           "min",
           "max",
-          "initial"
+          "initial",
+          "look"
         ],
         "title": "CounterSettings",
-        "description": "How a counter field moves: by ``step`` a tap, never past ``min`` or\n``max``, and back to ``initial`` on a reset. A counter with no value\nholds ``initial``."
+        "description": "How a counter field moves: by ``step`` a tap, never past ``min`` or\n``max``, and back to ``initial`` on a reset. A counter with no value\nholds ``initial``. ``look`` is how it is drawn wherever a list's layout\nsays nothing else."
       },
       "CounterSortDirection": {
         "type": "string",
@@ -16806,14 +17402,14 @@
           },
           "view": {
             "items": {
-              "$ref": "#/components/schemas/Tool"
+              "type": "string"
             },
             "type": "array",
             "title": "View"
           },
           "create": {
             "items": {
-              "$ref": "#/components/schemas/Tool"
+              "type": "string"
             },
             "type": "array",
             "title": "Create"
@@ -17194,6 +17790,451 @@
         ],
         "title": "PluginPerson",
         "type": "object"
+      },
+      "PluginToolActionRun": {
+        "properties": {
+          "fields": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "x-mentions": "markdown",
+                  "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Fields"
+          },
+          "people": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "x-identity": "person"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "People"
+          }
+        },
+        "type": "object",
+        "title": "PluginToolActionRun",
+        "description": "The answers to an action's ``params``, as values of the fields they\nname."
+      },
+      "PluginToolRowCreate": {
+        "properties": {
+          "fields": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "x-mentions": "markdown",
+                  "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Fields"
+          },
+          "people": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "x-identity": "person"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "People"
+          },
+          "initiative_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initiative Id"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          },
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceGrantSchema"
+            },
+            "type": "array",
+            "title": "Grants"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "PluginToolRowCreate",
+        "description": "A new row: of the tool, in the initiative ``initiative_id`` names, or of\nan item, under the row ``parent_id`` names. A field left out starts at its\ndefault, and a counter at its start."
+      },
+      "PluginToolRowList": {
+        "properties": {
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
+          "has_next": {
+            "type": "boolean",
+            "title": "Has Next"
+          },
+          "has_prev": {
+            "type": "boolean",
+            "title": "Has Prev"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PluginToolRowRead"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_count",
+          "page",
+          "page_size",
+          "has_next",
+          "has_prev",
+          "items"
+        ],
+        "title": "PluginToolRowList"
+      },
+      "PluginToolRowRead": {
+        "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "created_by_install": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Install"
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          },
+          "can": {
+            "$ref": "#/components/schemas/ToolCan"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "community_id": {
+            "title": "Community Id",
+            "type": "string",
+            "x-identity": "community"
+          },
+          "initiative_id": {
+            "type": "integer",
+            "title": "Initiative Id"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "position": {
+            "type": "number",
+            "title": "Position"
+          },
+          "fields": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "x-mentions": "markdown",
+                  "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Fields"
+          },
+          "people": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "x-identity": "person"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "People"
+          },
+          "comments_enabled": {
+            "type": "boolean",
+            "title": "Comments Enabled",
+            "default": true
+          },
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceGrantSchema"
+            },
+            "type": "array",
+            "title": "Grants"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "created_by",
+          "created_by_kind",
+          "created_by_install",
+          "archived_at",
+          "can",
+          "kind",
+          "id",
+          "community_id",
+          "initiative_id",
+          "parent_id",
+          "name",
+          "position",
+          "fields",
+          "people",
+          "comments_enabled",
+          "grants",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "PluginToolRowRead",
+        "description": "One row of a tool plug-in's tool or of one of its items."
+      },
+      "PluginToolRowUpdate": {
+        "properties": {
+          "fields": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "x-mentions": "markdown",
+                  "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Fields"
+          },
+          "people": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "x-identity": "person"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "People"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          }
+        },
+        "type": "object",
+        "title": "PluginToolRowUpdate",
+        "description": "A change to a row. Only what is sent changes."
       },
       "PollOptionRead": {
         "properties": {
@@ -19310,7 +20351,8 @@
       "SearchSuggestion": {
         "properties": {
           "entity_type": {
-            "$ref": "#/components/schemas/SearchEntityType"
+            "$ref": "#/components/schemas/SearchEntityType",
+            "title": "Entity Type"
           },
           "entity_id": {
             "type": "integer",
@@ -19341,7 +20383,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "title": "Tool"
           },
           "tool_id": {
             "anyOf": [
