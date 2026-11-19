@@ -937,6 +937,8 @@ def _entity_arm(table: str, paths: Mapping[str, InitiativePath]) -> str:
     would evaluate the same predicate twice on the same row, so the arm states
     only what a read does not answer: the write standing, when a flag asks
     for it, rendered with the flag decided so the planner sees a constant.
+    A tool plug-in's kind asks too, on a write, whether its tool may be
+    written (:func:`tool_present`).
 
     A kind whose own entry is folded asks it whole, for the same reason only
     when a flag is set: a comment's arm is one more call, to its parent.
@@ -956,6 +958,11 @@ def _entity_arm(table: str, paths: Mapping[str, InitiativePath]) -> str:
         )
     member = path.responding or path.predicate
     legs = [f"(NOT p_need_write OR ({member('re', True)}))"]
+    tool = path.dac.tool if path.dac is not None else None
+    if tool is not None and tool.installed:
+        # The row's own SELECT policy asks whether a tool plug-in's tool is
+        # there to read; writing about the row asks whether it may be written.
+        legs.append(f"(NOT p_need_write OR {tool_present(f"'{tool.kind}'", True)})")
     dac = _entity_dac(table, paths)
     if dac is not None:
         sharing = dac.predicate("re", "UPDATE", True)
