@@ -32,6 +32,8 @@ with its content kept for the deletion window, its rows (and the comments on
 them) read as absent to A's moderator and to the community's admin, and every
 write is refused; read-only, they read and every write is refused; installed
 again, A's moderator reads and writes its row and nobody outside A reads it.
+A custom role made after the install adds the tool's row in A once given its
+create permission, and not before.
 
 A table the seeder cannot fill fails here; it is never skipped.
 """
@@ -52,7 +54,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.tool_set import BUILTIN_TOOLS, ToolRecord, ToolSet
+from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.core.tools import Tool
 from app.db.guild_ddl import _WRITTEN_BY
 from app.db.initiative_rls import (
@@ -690,33 +692,6 @@ async def _tools_on(
     assert expected <= set(context.enabled_tools)
 
 
-async def _write_switches(
-    session: AsyncSession, initiative_id: int, switches: dict[ToolRecord, bool]
-) -> None:
-    """Each tool's own switch in the initiative: a built-in tool's row, and a
-    tool plug-in's, which is its install's."""
-    await write_switches(
-        session,
-        initiative_id,
-        {Tool(t.kind): on for t, on in switches.items() if t.install_id is None},
-    )
-    for tool, on in switches.items():
-        if tool.install_id is None:
-            continue
-        statement = pg_insert(InitiativeRule).values(
-            initiative_id=initiative_id,
-            key=tool.view_permission,
-            enabled=on,
-            install_id=tool.install_id,
-        )
-        await session.exec(
-            statement.on_conflict_do_update(
-                constraint="uq_initiative_rules_subject",
-                set_={"enabled": statement.excluded.enabled},
-            )
-        )
-
-
 async def test_nobody_outside_an_initiative_reaches_its_rows(
     session: AsyncSession,
     acting_user: Callable[..., Awaitable[Actor]],
@@ -932,7 +907,6 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
     }
     every = {tool.kind for tool in tools}
     assert {tool.kind for tool in governed.values()} == every
-    switch_keys = [tool.view_permission for tool in tools.installed]
     for off in [{tool.kind} for tool in tools] + [every]:
         await route_session_to_guild(session, guild.id)
         if off == every:
@@ -940,14 +914,11 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
                 sa.delete(InitiativeRule).where(
                     InitiativeRule.initiative_id == initiative_a,
                     InitiativeRule.initiative_role_id.is_(None),
-                    sa.or_(
-                        InitiativeRule.install_id.is_(None),
-                        InitiativeRule.key.in_(switch_keys),
-                    ),
+                    InitiativeRule.install_id.is_(None),
                 )
             )
         else:
-            await _write_switches(
+            await write_switches(
                 session, initiative_a, {tool: tool.kind not in off for tool in tools}
             )
         await session.commit()
@@ -978,7 +949,7 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
     # only, its rows read and refuse every write. Installed again within the
     # window, everything is back.
     await route_session_to_guild(session, guild.id)
-    await _write_switches(session, initiative_a, dict.fromkeys(tools, True))
+    await write_switches(session, initiative_a, dict.fromkeys(tools, True))
     await session.commit()
     plugin_kinds = {
         kind
@@ -988,7 +959,7 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
     plugin_cases = {
         name: case
         for name, case in cases.items()
-        if (name in governed and governed[name].install_id is not None)
+        if (name in governed and governed[name].installed)
         or plugin_kinds & set((case.inherit or {}).values())
     }
     assert {case.table.name for case in plugin_cases.values()} >= plugin_tables
@@ -1082,6 +1053,38 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
         for name, case in plugin_cases.items():
             if (seen := await _count(reader, case.table, in_a(case))) != 0:
                 failures.append(f"{name}: an outsider reads {seen} once reinstalled")
+        await reader.rollback()
+
+    # A custom role made after the install holds the tool plug-in's keys as a
+    # built-in tool's, written from the community's tools: its member adds
+    # the tool's row in A once the role is given its create permission, and
+    # not before.
+    tool = tools.installed[0]
+    made = await client.post(
+        admin.g(f"/initiatives/{initiative_a}/roles"),
+        headers=admin.headers,
+        json={"name": "tallier", "display_name": "Tallier"},
+    )
+    assert made.status_code == 201, made.text
+    tallier = await acting_user(
+        guild=guild, initiative=admin.initiative, initiative_role="tallier"
+    )
+    adding = sa.insert(tool.table).values(initiative_id=initiative_a, name="T").inline()
+    for given in (False, True):
+        await route_session_to_guild(session, guild.id)
+        given_it = await session.exec(
+            sa.update(InitiativeRule)
+            .where(
+                InitiativeRule.initiative_role_id == made.json()["id"],
+                InitiativeRule.key == tool.create_permission,
+            )
+            .values(enabled=given)
+        )
+        assert given_it.rowcount == 1
+        await session.commit()
+        reader = await reading_as(tallier.user.id, guild.id)
+        if (answer := await _attempt(reader, adding)) != (1 if given else _REFUSED):
+            failures.append(f"a custom role given create={given} adds: {answer}")
         await reader.rollback()
 
     assert not failures, "\n".join(failures)

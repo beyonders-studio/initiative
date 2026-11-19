@@ -14,7 +14,7 @@ resurfaces the children automatically (see ``soft_delete.py``).
 
 from __future__ import annotations
 
-from functools import cache
+from functools import lru_cache
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -40,7 +40,7 @@ from app.api.deps import (
 )
 from app.core.audit_events import AuditEventType
 from app.core.messages import TrashMessages
-from app.core.tool_set import BUILTIN_TOOLS, ToolSet
+from app.core.tool_set import BUILTIN_TOOLS, KEPT_TOOL_SETS, ToolSet
 from app.core.user_display import display_name
 from app.db.base import MODELS_BY_TABLE
 from app.db.query import build_paginated_response
@@ -74,7 +74,7 @@ from app.services.tenant.soft_delete import (
 router = APIRouter()
 
 
-@cache
+@lru_cache(KEPT_TOOL_SETS)
 def entity_registry(tools: ToolSet) -> dict[str, tuple[Table, str]]:
     """Wire name -> (table, the column that labels its rows), for every kind
     with the trash in a community with ``tools``: a model's

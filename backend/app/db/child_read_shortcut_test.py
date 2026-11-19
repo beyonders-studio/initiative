@@ -35,7 +35,7 @@ def _with_counters() -> ToolSet:
     )
     keys = ["counter_group", "counter", "tally"]
     codes = {f"{key}.{COUNTERS_UID.lower()}": 1024 + i for i, key in enumerate(keys)}
-    return community_tool_set([InstalledTool(1, COUNTERS_UID, definition)], codes)
+    return community_tool_set([InstalledTool(COUNTERS_UID, definition)], codes)
 
 
 _SETS = pytest.mark.parametrize(

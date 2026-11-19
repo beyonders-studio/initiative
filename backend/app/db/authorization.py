@@ -827,16 +827,14 @@ POLICY_SEAT = f"({IN_POLICY.this_guild} AND {gucs.GUILD_SEAT.once})"
 # in a gate.
 
 
-#: What a tool plug-in's kind is written with: a key, ``.`` and a uid.
-_PLUGIN_KIND_CHARS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789_.")
-
-
 def plugin_scope(resource: str, write: bool, legs: Legs) -> str:
     """An installed plug-in holds ``resource``'s read scope, or its write scope
     when ``write``. ``resource`` is a ``PluginScopeResource`` value, or a tool
     plug-in's kind, which names its tool's scope."""
+    from app.db.plugin_tools import is_plugin_kind
+
     value = getattr(resource, "value", resource)
-    if "." in value and set(value) <= _PLUGIN_KIND_CHARS:
+    if is_plugin_kind(value):
         name = value
     else:
         name = PluginScopeResource(value).value

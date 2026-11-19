@@ -55,7 +55,7 @@ from app.core.plugin_scopes import (
     InstallLevel,
 )
 from app.core.rules import SetBy
-from app.core.tool_set import BUILTIN_TOOLS, ToolSet
+from app.core.tool_set import BUILTIN_TOOLS, KEPT_TOOL_SETS, ToolSet
 from app.core.tools import Tool
 from app.db import gucs
 from app.db.authorization import LIVE_GRANT, live_membership, sql_values
@@ -88,11 +88,10 @@ from app.models.platform.plugin_service_registration import (
 from app.models.platform.user import UserRole, UserStatus
 from app.models.tenant.initiative import (
     BUILTIN_MEMBER_ROLE,
-    DEFAULT_PERMISSION_VALUES,
     INITIATIVE_CUSTOM_ROLES,
     INITIATIVE_MEMBER_PREFIX,
     INITIATIVE_TOOL_PREFIX,
-    PermissionKey,
+    permission_defaults,
 )
 from app.models.tenant.plugin_member_consent import ConsentAccess
 
@@ -145,22 +144,8 @@ def _tool_switches(tools: ToolSet) -> str:
         FROM (VALUES {keys}) AS k(tool, key)
         LEFT JOIN initiative_rules sw
           ON sw.initiative_id = i.id AND sw.key = k.key
-         AND sw.initiative_role_id IS NULL AND {_tool_rows(tools, "sw")}
+         AND sw.initiative_role_id IS NULL AND sw.install_id IS NULL
       )"""
-
-
-def _tool_rows(tools: ToolSet, alias: str) -> str:
-    """Which of ``alias``'s rule rows a tool's keys are read from: a built-in
-    tool's carry no install, and an installed tool plug-in's are its
-    install's."""
-    if not tools.installed:
-        return f"{alias}.install_id IS NULL"
-    owned = ", ".join(
-        f"({record.install_id}, '{key}')"
-        for record in tools.installed
-        for key in (record.view_permission, record.create_permission)
-    )
-    return f"({alias}.install_id IS NULL OR ({alias}.install_id, {alias}.key) IN ({owned}))"
 
 
 #: A key's expression, or how one reads the community's tools.
@@ -276,7 +261,7 @@ my_role_permissions AS MATERIALIZED (
   FROM my_initiatives m
   JOIN initiative_rules rp
     ON rp.initiative_id = m.initiative_id AND rp.initiative_role_id = m.role_id
-   AND {_tool_rows(tools, "rp")}
+   AND rp.install_id IS NULL
   LEFT JOIN community_defaults cd
     ON {_HELD_FOR_MEMBERS} AND cd.key = '{INITIATIVE_MEMBER_PREFIX}' || rp.key
 ),
@@ -323,7 +308,8 @@ def _tool_states(tools: ToolSet) -> str:
     if not tools.installed:
         return ""
     installs = ", ".join(
-        f"({record.install_id}, '{record.kind}')" for record in tools.installed
+        f"('{record.kind.partition('.')[2].upper()}', '{record.kind}')"
+        for record in tools.installed
     )
     hidden = sql_values(
         status.value
@@ -333,10 +319,10 @@ def _tool_states(tools: ToolSet) -> str:
 tool_states AS MATERIALIZED (
   SELECT t.kind, s.opens, s.opens AND s.status <> '{PluginInstallStatus.read_only.value}' AS writes,
          s.opens AND a.enabled AS switched_on
-  FROM (VALUES {installs}) AS t(install_id, kind)
-  JOIN guild_plugins a ON a.id = t.install_id
+  FROM (VALUES {installs}) AS t(listing_uid, kind)
+  JOIN guild_plugins a ON a.listing_uid = t.listing_uid
   LEFT JOIN public.plugin_installs pi
-    ON pi.guild_id = {gucs.ROUTED_GUILD_ID} AND pi.install_id = t.install_id
+    ON pi.guild_id = {gucs.ROUTED_GUILD_ID} AND pi.install_id = a.id
   CROSS JOIN LATERAL (
     SELECT COALESCE(pi.status, '{PluginInstallStatus.active.value}') AS status,
            COALESCE(pi.status NOT IN ({hidden}), true)
@@ -621,18 +607,18 @@ def _tool_permission_values(tools: ToolSet) -> str:
     )
 
 
-def _permission_key_values() -> str:
+def _permission_key_values(tools: ToolSet) -> str:
     """Every initiative role key, as a one-column ``VALUES`` list."""
-    return ", ".join(f"('{key.value}')" for key in PermissionKey)
+    return ", ".join(f"('{key}')" for key in permission_defaults(tools))
 
 
-def _permission_default_values() -> str:
+def _permission_default_values(tools: ToolSet) -> str:
     """Every initiative role key with the answer it gets where a role has no
     row for it, as a ``VALUES`` list of ``(key, is_default)``: the defaults
     the content policies hand ``initiative_role_permits``."""
     return ", ".join(
-        f"('{key.value}', {str(DEFAULT_PERMISSION_VALUES.get(key, False)).lower()})"
-        for key in PermissionKey
+        f"('{key}', {str(on).lower()})"
+        for key, on in permission_defaults(tools).items()
     )
 
 
@@ -941,7 +927,7 @@ permitted AS (
   SELECT p.initiative_id, k.key
   FROM placed p
   JOIN member_role mr ON mr.initiative_id = p.initiative_id
-  CROSS JOIN (VALUES {_permission_default_values()}) AS k(key, is_default)
+  CROSS JOIN (VALUES {_permission_default_values(tools)}) AS k(key, is_default)
   LEFT JOIN community_defaults cd
     ON {_HELD_FOR_MEMBERS.replace("m.", "mr.")}
    AND cd.key = '{INITIATIVE_MEMBER_PREFIX}' || k.key
@@ -973,7 +959,7 @@ granted AS (
 denied AS (
   SELECT DISTINCT p.initiative_id || ':' || k.key AS pair
   FROM placed p
-  CROSS JOIN (VALUES {_permission_key_values()}) AS k(key)
+  CROSS JOIN (VALUES {_permission_key_values(tools)}) AS k(key)
   WHERE NOT EXISTS (
     SELECT 1 FROM granted gr WHERE gr.pair = p.initiative_id || ':' || k.key
   )
@@ -1556,7 +1542,7 @@ def standing_values(
     return {guc: getattr(context, guc.bind, None) for guc in gucs.STANDING}
 
 
-@functools.cache
+@functools.lru_cache(KEPT_TOOL_SETS)
 def _community_standing_sql(tools: ToolSet) -> str:
     return standing_sql(tools)
 

@@ -840,7 +840,9 @@ async def create_initiative(
         initiative.color = initiative_in.color
     session.add(initiative)
     await session.flush()
-    await write_switches(session, initiative.id, switches(initiative_in.tools))
+    await write_switches(
+        session, initiative.id, switches(initiative_in.tools, guild_context.tools)
+    )
 
     # Create built-in roles for this initiative
     roles = await initiatives_service.create_builtin_roles(

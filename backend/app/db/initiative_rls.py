@@ -27,7 +27,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, replace
-from functools import cache
+from functools import lru_cache
 
 from sqlalchemy import ForeignKey, Table
 
@@ -40,7 +40,7 @@ from app.core.relationships import (
     Provenance,
     RelationshipType,
 )
-from app.core.tool_set import BUILTIN_TOOLS, ToolRecord, ToolSet
+from app.core.tool_set import BUILTIN_TOOLS, KEPT_TOOL_SETS, ToolRecord, ToolSet
 from app.core.tools import (
     INSTALL_METADATA_KIND,
     ITEM_KINDS,
@@ -206,7 +206,7 @@ def _switch_leg(tool: ToolRecord, initiative: str, write: bool = False) -> str:
         f" OR ({_P.this_guild} AND ({initiative}::text || ':{tool.kind}')"
         f" = ANY ({_P.field('enabled_tools')})))"
     )
-    if tool.install_id is None:
+    if not tool.installed:
         return leg
     return f"({tool_present(f"'{tool.kind}'", write)} AND {leg})"
 
@@ -1695,7 +1695,7 @@ def collection_files_path() -> InitiativePath:
     )
 
 
-@cache
+@lru_cache(KEPT_TOOL_SETS)
 def _paths(tools: ToolSet) -> dict[str, InitiativePath]:
     """:func:`paths_for`, once per tool set, for a path that walks to
     another table's."""
@@ -1727,7 +1727,7 @@ def content_kind_path(tools: ToolSet) -> InitiativePath:
     )
 
 
-@cache
+@lru_cache(KEPT_TOOL_SETS)
 def paths_for(tools: ToolSet) -> dict[str, InitiativePath]:
     """table -> how its rows resolve an initiative for initiative_access(...),
     for a community with ``tools``. THE source of truth: the rendered RLS DDL

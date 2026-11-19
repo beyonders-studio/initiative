@@ -7,6 +7,7 @@ from sqlalchemy import update
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tool_set import BUILTIN_TOOLS
 from app.core.tools import Tool
 from app.models.platform.user import User
 from app.models.tenant.initiative import (
@@ -214,7 +215,7 @@ async def seed_initiative(
     session.add(initiative)
     await session.flush()
     # Each tool's own switch, as a new initiative's: its record's default.
-    await write_switches(session, initiative.id, switches({}))
+    await write_switches(session, initiative.id, switches({}, BUILTIN_TOOLS))
 
     roles = await create_builtin_roles(session, initiative_id=initiative.id)
     role = await creator_role(
@@ -253,7 +254,9 @@ async def create_initiative(c: Community, key: str, d: dict) -> Initiative:
     c.session.add(initiative)
     await c.session.flush()
     await write_switches(
-        c.session, initiative.id, switches({tool: True for tool in tools})
+        c.session,
+        initiative.id,
+        switches({tool: True for tool in tools}, BUILTIN_TOOLS),
     )
     c.ids["initiatives"].append(initiative.id)
 

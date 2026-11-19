@@ -20,7 +20,7 @@ import enum
 import hashlib
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
-from functools import cache, partial
+from functools import lru_cache, partial
 from typing import Any
 
 from sqlalchemy import JSON, DateTime, Enum, MetaData, Table
@@ -29,7 +29,7 @@ from sqlmodel import SQLModel
 from app.core.file_types import FileType
 from app.core.identity_boundary import STORED_MENTION
 from app.core.search import SearchEntityType
-from app.core.tool_set import BUILTIN_TOOLS, ToolRecord, ToolSet
+from app.core.tool_set import BUILTIN_TOOLS, KEPT_TOOL_SETS, ToolRecord, ToolSet
 from app.core.tools import Kind, Tool
 from app.db.initiative_rls import (
     comment_parents,
@@ -562,7 +562,7 @@ TEXT_OVERRIDES: dict[str, dict[str, object]] = {
 }
 
 
-@cache
+@lru_cache(KEPT_TOOL_SETS)
 def search_sources(tools: ToolSet) -> dict[str, SearchSource]:
     """table -> how its rows are indexed, in a community with ``tools``: every
     tool's own table and every kind inside one, derived; the guild's tags; and

@@ -111,6 +111,19 @@ DEFAULT_PERMISSION_VALUES: dict["PermissionKey", bool] = {
 }
 
 
+def permission_defaults(tools: "ToolSet | None") -> dict[str, bool]:
+    """Every role key in a community with ``tools``, with the answer a role
+    that has no row for it gets: :data:`PermissionKey`'s, then each installed
+    tool's pair, as a built-in tool's: viewing as its record says, creating
+    off."""
+    installed = () if tools is None else tools.installed
+    return {
+        **{key.value: DEFAULT_PERMISSION_VALUES[key] for key in PermissionKey},
+        **{tool.view_permission: tool.spec.on_by_default for tool in installed},
+        **{tool.create_permission: False for tool in installed},
+    }
+
+
 class BuiltinRole(NamedTuple):
     """One of the roles every initiative is created with.
 
@@ -126,6 +139,13 @@ class BuiltinRole(NamedTuple):
     is_manager: bool
     override_share_restrictions: bool
     permissions: dict["PermissionKey", bool]
+
+    def holds(self, tools: "ToolSet | None") -> dict[str, bool]:
+        """What the role holds of every key in a community with ``tools``:
+        every key where it holds every built-in one, the defaults
+        otherwise."""
+        every = all(self.permissions.values())
+        return {key: every or on for key, on in permission_defaults(tools).items()}
 
 
 #: The built-in role an ordinary member holds, whose permissions a community
@@ -233,26 +253,30 @@ def _quoted(keys) -> str:
 
 
 def _rule_keys(tools: "ToolSet | None") -> str:
-    """Which keys a rule row may hold, in a community with ``tools``: a tool's
-    or the community's own with no install; anything an install's row names,
-    by role or for the whole community; and, in an initiative with no role, an
-    installed tool plug-in's switch, which is its install's row."""
-    keys = (
+    """Which keys a rule row may hold, in a community with ``tools``: a role
+    key of one of its tools, or one of the community's own, with no install;
+    and anything an install's row names, by role or for the whole
+    community."""
+    keys = permission_defaults(tools)
+    community = dict.fromkeys(
+        (
+            *COMMUNITY_DEFAULT_KEYS,
+            *(
+                f"{INITIATIVE_TOOL_PREFIX}{tool.kind}"
+                for tool in (() if tools is None else tools.installed)
+            ),
+            *(f"{INITIATIVE_MEMBER_PREFIX}{key}" for key in keys),
+        )
+    )
+    return (
         "(install_id IS NULL AND ((initiative_id IS NOT NULL AND key IN ("
-        + _quoted(key.value for key in PermissionKey)
+        + _quoted(keys)
         + ")) OR (initiative_id IS NULL AND initiative_role_id IS NULL"
         + " AND key IN ("
-        + _quoted(COMMUNITY_DEFAULT_KEYS)
+        + _quoted(community)
         + "))))"
         + " OR (install_id IS NOT NULL"
         + " AND (initiative_id IS NULL) = (initiative_role_id IS NULL))"
-    )
-    switches = [] if tools is None else [r.view_permission for r in tools.installed]
-    if not switches:
-        return keys
-    return (
-        f"{keys} OR (install_id IS NOT NULL AND initiative_id IS NOT NULL"
-        f" AND initiative_role_id IS NULL AND key IN ({_quoted(switches)}))"
     )
 
 

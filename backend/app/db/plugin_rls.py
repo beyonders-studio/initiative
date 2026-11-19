@@ -135,7 +135,7 @@ def plugin_table_access(tools: ToolSet) -> dict[str, PluginTableAccess]:
         governed = governing_walk(table, paths)
         # A tool plug-in's tool has no scope a plug-in can be granted yet, so
         # no installed plug-in reaches its tables.
-        if governed is not None and governed[0].install_id is None:
+        if governed is not None and not governed[0].installed:
             access[table] = PluginTableAccess(
                 PluginTableKind.scoped, PluginScopeResource(governed[0].scope)
             )

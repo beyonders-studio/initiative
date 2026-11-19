@@ -28,7 +28,7 @@ or, for a shared tool, by the initiative's managers and the community's admin
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from sqlalchemy import (
     CheckConstraint,
@@ -46,9 +46,6 @@ from app.core.tools import LAYOUT_KINDS, LAYOUT_TARGETS, LAYOUTS_SHARED, TYPED_D
 from app.db.registry_checks import FROM_REGISTRY
 from app.models.tenant._mixins import CreatedByMixin
 
-if TYPE_CHECKING:
-    from app.core.tool_set import ToolSet
-
 _TOOL_VALUES = ", ".join(f"'{target}'" for target in LAYOUT_TARGETS)
 _SHARED_VALUES = ", ".join(f"'{tool.value}'" for tool in LAYOUTS_SHARED)
 _KIND_VALUES = ", ".join(f"'{kind}'" for kind in LAYOUT_KINDS)
@@ -60,61 +57,25 @@ _TYPED = " OR ".join(
 #: The columns a row's target is named by.
 _TARGET = ("initiative_id", "tool", "tool_id")
 
-#: The layout a tool plug-in's table shows one of its rows in; it lists them
-#: as its declaration's list says (``tool_plugins.TOOL_LIST_LAYOUTS``).
-PLUGIN_DETAIL = "detail"
-
-
-def _plugin_tables(tools: ToolSet | None) -> str:
-    """Every table of the community's tool plug-ins' tools, by its kind: the
-    targets of the starting layouts each declares. None for the built-in
-    tools alone."""
-    if tools is None:
-        return ""
-    return ", ".join(
-        f"'{kind}'"
-        for record in tools.installed
-        for kind in (record.kind, *(child.value for child in record.children))
-    )
-
-
-def _tool_check(tools: ToolSet | None) -> str:
-    plugin = _plugin_tables(tools)
-    return f"tool IN ({_TOOL_VALUES}{', ' + plugin if plugin else ''})"
-
-
-def _target_check(tools: ToolSet | None) -> str:
-    shared = f"(tool IN ({_SHARED_VALUES})) = (tool_id IS NULL)"
-    plugin = _plugin_tables(tools)
-    return f"({shared} OR tool IN ({plugin}))" if plugin else shared
-
-
-def _kind_check(tools: ToolSet | None) -> str:
-    """The layouts a row may be: every built-in tool's, and with a tool
-    plug-in installed its table's item page too (its lists are a grid or a
-    table, which built-in tools have)."""
-    detail = f", '{PLUGIN_DETAIL}'" if _plugin_tables(tools) else ""
-    return f"kind IN ({_KIND_VALUES}{detail})"
-
 
 class ToolLayout(CreatedByMixin, table=True):
     __tablename__ = "tool_layouts"
     __table_args__ = (
         CheckConstraint(
-            _tool_check(None),
+            f"tool IN ({_TOOL_VALUES})",
             name="ck_tool_layouts_tool",
-            info={FROM_REGISTRY: _tool_check},
+            info={FROM_REGISTRY: True},
         ),
         # A shared tool names no instance, and every other tool's layout names one.
         CheckConstraint(
-            _target_check(None),
+            f"(tool IN ({_SHARED_VALUES})) = (tool_id IS NULL)",
             name="ck_tool_layouts_target",
-            info={FROM_REGISTRY: _target_check},
+            info={FROM_REGISTRY: True},
         ),
         CheckConstraint(
-            _kind_check(None),
+            f"kind IN ({_KIND_VALUES})",
             name="ck_tool_layouts_kind",
-            info={FROM_REGISTRY: _kind_check},
+            info={FROM_REGISTRY: True},
         ),
         # A detail laid out per type names its type, and nothing else does.
         CheckConstraint(

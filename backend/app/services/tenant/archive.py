@@ -26,13 +26,13 @@ flushed explicitly rather than assumed.
 
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from functools import cache
+from functools import lru_cache
 from typing import Any
 
 from sqlalchemy import Table
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.tool_set import ToolSet
+from app.core.tool_set import KEPT_TOOL_SETS, ToolSet
 from app.db.session import routed_tools
 from app.models.tenant._mixins import ArchiveMixin
 from app.services.tenant.lifecycle_tree import (
@@ -44,7 +44,7 @@ from app.services.tenant.lifecycle_tree import (
 )
 
 
-@cache
+@lru_cache(KEPT_TOOL_SETS)
 def archive_children(tools: ToolSet) -> dict[Table, list[Edge]]:
     """The trash can's tree in a community with ``tools``, narrowed to what
     can be archived: the tables that carry the stamp."""

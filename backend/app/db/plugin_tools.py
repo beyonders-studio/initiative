@@ -14,22 +14,23 @@ as it reads a built-in tool, and into the DDL that creates its tables.
   prefix keeps them apart from every table a release adds, the uid from
   another plug-in's.
 * **Columns** are the ones a built-in tool's tables have, from the mixins
-  their models are made of (a tool's own table as ``counter_groups``, an
-  item table as ``counters`` with the archive stamp beside them), and one
-  typed column per declared field, its kind in the column's ``info``.
+  their models are made of (a tool's own table those every built-in tool's
+  is made of, an item table those every item table in the trash is, with the
+  archive stamp beside them), and one typed column per declared field, its
+  kind in the column's ``info``. Their CHECKs and triggers are a built-in
+  tool table's, from ``app.db.guild_ddl.tool_table_rules``.
 * **Permissions** are ``<kind>:enabled``, the tool's switch in each initiative
-  and the role key for viewing it, and ``<kind>:create``. Their rows are the
-  install's.
+  and the role key for viewing it, and ``<kind>:create``: a built-in tool's
+  pair, written by the same writer and role defaults, owned by no install.
 
 * **Versions** only add to the tables: the structure brings a table up to
   its declaration (new columns, a select's new options, a field's default)
   and takes nothing away. A field or an option a new major drops goes by
   :func:`drop_ddl`, once the community's admin confirms it.
 * **Removal**: an uninstalled tool keeps its tables and every row naming it
-  until its install's deletion window ends; then
-  :func:`delete_tool_content` deletes what names it, and the community's
-  next provisioning drops the tables no installed tool declares
-  (:func:`drop_unclaimed_tables`).
+  until its install's deletion window ends; then the deletion sweep purges
+  its rows as the trash does, and the community's next provisioning drops
+  the tables of that listing (:func:`drop_tool_tables`).
 
 Every name is built from the declaration's keys and the listing's uid, so
 each is checked again here, one character at a time, whatever registration
@@ -40,8 +41,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import string
+from collections import OrderedDict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from types import EllipsisType
 from typing import Any
 
 import sqlalchemy as sa
@@ -50,20 +54,13 @@ from sqlalchemy.schema import AddConstraint, CreateColumn, CreateIndex, CreateTa
 from sqlmodel import SQLModel
 from sqlmodel.main import get_column_from_field
 
-from app.core.tool_set import BUILTIN_TOOLS, ToolRecord, ToolSet
+from app.core.tool_set import BUILTIN_TOOLS, KEPT_TOOL_SETS, ToolRecord, ToolSet
 from app.core.tools import Kind, ToolSpec
+from app.db.base import MODELS_BY_TABLE
 from app.db.names import object_name
-from app.models.tenant._mixins import (
-    ActorKind,
-    ArchiveMixin,
-    CommentLockMixin,
-    CommentsToggleMixin,
-    CreatedByMixin,
-    HoldMixin,
-    ListingProvenanceMixin,
-    SoftDeleteMixin,
-)
+from app.models.tenant import _mixins
 from app.models.tenant.counter import COUNTER_NUMBER
+from app.services.marketplace import contract
 from app.services.marketplace.tool_plugins import (
     MAX_TOOL_KEY_LENGTH,
     TOOL_COLUMNS,
@@ -74,18 +71,14 @@ __all__ = [
     "InstalledTool",
     "PluginKind",
     "PluginToolError",
-    "ToolContentHeld",
     "build_tool",
     "community_tool_set",
-    "delete_tool_content",
     "drop_ddl",
-    "drop_unclaimed_tables",
-    "installed_digest",
-    "installed_tools",
+    "drop_tool_tables",
     "is_plugin_kind",
     "provisioned_tools",
-    "rendered_tools",
     "structure_ddl",
+    "tool_set",
     "tool_table_name",
     "tools_digest",
 ]
@@ -93,28 +86,42 @@ __all__ = [
 #: The prefix of every table a tool plug-in has.
 TABLE_PREFIX = "p_"
 
-#: The mixins of a tool's own table and of an item table: what
-#: ``counter_groups`` and ``counters`` are made of.
-_TOOL_MIXINS: tuple[type[SQLModel], ...] = (
-    HoldMixin,
-    CommentLockMixin,
-    CommentsToggleMixin,
-    CreatedByMixin,
-    ArchiveMixin,
-    ListingProvenanceMixin,
-    SoftDeleteMixin,
-)
-_ITEM_MIXINS: tuple[type[SQLModel], ...] = (
-    HoldMixin,
-    CreatedByMixin,
-    ArchiveMixin,
-    SoftDeleteMixin,
+
+def _mixins_of(tables: Iterable[str]) -> tuple[type[SQLModel], ...]:
+    """The mixins the model of every one of ``tables`` is made of, in the
+    order the first lists them."""
+    models = [MODELS_BY_TABLE[name] for name in tables]
+    return tuple(
+        base
+        for base in models[0].__mro__
+        if issubclass(base, SQLModel)
+        and base.__module__ == _mixins.__name__
+        and all(issubclass(model, base) for model in models)
+    )
+
+
+#: The mixins of a tool's own table: those every built-in tool's is made of.
+_TOOL_MIXINS = _mixins_of(record.table.name for record in BUILTIN_TOOLS)
+#: The mixins of an item table: those every built-in item table in the trash
+#: is made of, and the archive stamp, since an item is put away as its tool
+#: is.
+_ITEM_MIXINS = (
+    *_mixins_of(
+        table.name
+        for record in BUILTIN_TOOLS
+        for table in record.items
+        if "deleted_at" in table.c
+    ),
+    _mixins.ArchiveMixin,
 )
 
 _KEY_START = frozenset("abcdefghijklmnopqrstuvwxyz")
 _KEY_CHARS = _KEY_START | frozenset("0123456789_")
 _UID_CHARS = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 _UID_LENGTH = 14
+#: What a select option's value is written with, as registration holds it.
+_OPTION_CHARS = frozenset(string.ascii_letters + string.digits + "_-")
+_MAX_OPTION_LENGTH = contract.cap("optionValueLength")
 
 _DIALECT = postgresql.dialect()
 
@@ -143,7 +150,6 @@ class PluginKind(Kind):
 class InstalledTool:
     """One installed tool plug-in, as its community's tool set reads it."""
 
-    install_id: int
     listing_uid: str
     definition: Mapping[str, Any]
 
@@ -171,6 +177,18 @@ def _uid(raw: Any) -> str:
     return raw.lower()
 
 
+def _option(raw: Any) -> str:
+    """A select option's value, checked one character at a time: it is
+    written into a CHECK and into the DDL that empties it."""
+    if (
+        not isinstance(raw, str)
+        or not 0 < len(raw) <= _MAX_OPTION_LENGTH
+        or not set(raw) <= _OPTION_CHARS
+    ):
+        raise PluginToolError(f"{raw!r} is not an option's value")
+    return raw
+
+
 def _field_key(raw: Any) -> str:
     key = _key(raw, "field key")
     if key in TOOL_COLUMNS or key.endswith("_id"):
@@ -187,8 +205,11 @@ def _kind(listing_uid: str, key: str) -> str:
     return f"{_key(key, 'key')}.{_uid(listing_uid)}"
 
 
-def is_plugin_kind(value: str) -> bool:
-    """Whether ``value`` has the form of a tool plug-in's kind."""
+def is_plugin_kind(value: Any) -> bool:
+    """Whether ``value`` has the form of a tool plug-in's kind: the one check
+    every place that writes one into SQL asks."""
+    if not isinstance(value, str):
+        return False
     key, dot, uid = value.partition(".")
     try:
         return bool(dot) and _key(key, "key") == key and _uid(uid.upper()) == uid
@@ -278,37 +299,22 @@ def _field_column(field: Mapping[str, Any]) -> sa.Column:
     )
 
 
-def _checks(table: str, fields: Sequence[Mapping[str, Any]]) -> list[sa.Constraint]:
-    """The CHECKs a tool's table carries: who made and binned a row, as on
-    every tool table, and each select field held to its options."""
-    actors = ", ".join(f"'{kind.value}'" for kind in ActorKind)
-    system = ActorKind.system.value
-    checks = [
-        sa.CheckConstraint(
-            f"(created_by_kind = '{system}') = (created_by IS NULL)",
-            name=object_name("ck", table, "created_by"),
-        ),
-        sa.CheckConstraint(
-            f"created_by_kind IN ({actors})",
-            name=object_name("ck", table, "created_by_kind"),
-        ),
-        sa.CheckConstraint(
-            "CASE WHEN deleted_at IS NULL"
-            " THEN deleted_by IS NULL AND deleted_by_kind IS NULL"
-            " ELSE deleted_by_kind IS NOT NULL"
-            f" AND (deleted_by_kind = '{system}') = (deleted_by IS NULL) END",
-            name=object_name("ck", table, "deleted_by"),
-        ),
-        sa.CheckConstraint(
-            f"deleted_by_kind IN ({actors})",
-            name=object_name("ck", table, "deleted_by_kind"),
-        ),
+def _checks(
+    table: str, columns: Iterable[str], fields: Sequence[Mapping[str, Any]]
+) -> list[sa.Constraint]:
+    """The CHECKs a tool's table carries: a built-in tool table's, from the
+    columns it has, and each select field held to its options."""
+    from app.db.guild_ddl import tool_table_rules
+
+    shared, _ = tool_table_rules(table, frozenset(columns), None)
+    checks: list[sa.Constraint] = [
+        sa.CheckConstraint(expression, name=name) for name, expression in shared.items()
     ]
     for field in fields:
         if field.get("kind") != "select":
             continue
-        options = [option["value"] for option in field.get("options", [])]
-        if not options or not all(isinstance(v, str) for v in options):
+        options = [_option(option.get("value")) for option in field.get("options", [])]
+        if not options:
             raise PluginToolError(f"select field {field.get('key')!r} has no options")
         checks.append(
             sa.CheckConstraint(
@@ -348,6 +354,7 @@ def _table(
         if column.name in seen:
             raise PluginToolError(f"{name}: two columns named {column.name!r}")
         seen.add(column.name)
+    universal = _mixin_columns(_TOOL_MIXINS if parent is None else _ITEM_MIXINS)
     table = sa.Table(
         name,
         metadata,
@@ -356,7 +363,7 @@ def _table(
         sa.Column("name", sa.String(255), nullable=False),
         sa.Column("position", COUNTER_NUMBER, nullable=False, server_default="0"),
         *declared,
-        *_mixin_columns(_TOOL_MIXINS if parent is None else _ITEM_MIXINS),
+        *universal,
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -369,7 +376,7 @@ def _table(
             nullable=False,
             server_default=sa.func.now(),
         ),
-        *_checks(name, fields),
+        *_checks(name, (column.name for column in universal), fields),
         # A tool row is read back by no RETURNING clause, as a built-in
         # tool's is (``CounterGroup``): nothing is shared with anyone yet.
         implicit_returning=parent is not None,
@@ -457,41 +464,56 @@ def build_tool(
         view_permission=f"{kind}:enabled",
         create_permission=f"{kind}:create",
         scope=kind,
-        install_id=tool.install_id,
     )
 
 
-def installed_digest(installed: Sequence[InstalledTool]) -> str:
-    """What a community's tool plug-ins are, as one digest: the install, its
-    listing and its declaration, in install order."""
+def _ordered(installed: Iterable[InstalledTool]) -> list[InstalledTool]:
+    return sorted(installed, key=lambda tool: tool.listing_uid)
+
+
+def tools_digest(installed: Sequence[InstalledTool]) -> str | None:
+    """What a community's tool plug-ins are, as one digest of each listing
+    and its declaration, by listing: what its schema's stamp names them by,
+    and None for a community with none. Communities with the same versions
+    share it."""
+    if not installed:
+        return None
     body = json.dumps(
-        [[t.install_id, t.listing_uid, t.definition] for t in installed],
+        [[t.listing_uid, t.definition] for t in _ordered(installed)],
         sort_keys=True,
         separators=(",", ":"),
     )
     return hashlib.sha256(body.encode()).hexdigest()[:16]
 
 
-_SETS: dict[str, ToolSet] = {}
+#: The tool sets this process built, by digest, the least recently used
+#: first.
+_SETS: OrderedDict[str, ToolSet] = OrderedDict()
+
+
+def _kept(digest: str) -> ToolSet | None:
+    found = _SETS.get(digest)
+    if found is not None:
+        _SETS.move_to_end(digest)
+    return found
 
 
 def community_tool_set(
     installed: Sequence[InstalledTool], codes: Mapping[str, int]
 ) -> ToolSet:
-    """The built-in tools and ``installed``'s, kept per digest so a
-    community's set is built once per process. :data:`BUILTIN_TOOLS` itself
-    where nothing is installed."""
-    if not installed:
+    """The built-in tools and ``installed``'s, kept by digest so a set is
+    built once per process. :data:`BUILTIN_TOOLS` itself where nothing is
+    installed."""
+    digest = tools_digest(installed)
+    if digest is None:
         return BUILTIN_TOOLS
-    ordered = sorted(installed, key=lambda tool: tool.install_id)
-    digest = installed_digest(ordered)
-    found = _SETS.get(digest)
+    found = _kept(digest)
     if found is None:
         metadata = sa.MetaData()
-        records = tuple(build_tool(tool, codes, metadata) for tool in ordered)
-        found = _SETS.setdefault(
-            digest, ToolSet((*BUILTIN_TOOLS, *records), digest=digest)
-        )
+        records = (build_tool(tool, codes, metadata) for tool in _ordered(installed))
+        found = _SETS[digest] = ToolSet((*BUILTIN_TOOLS, *records), digest=digest)
+        while len(_SETS) > KEPT_TOOL_SETS:
+            _SETS.popitem(last=False)
     return found
 
 
@@ -540,25 +562,19 @@ def _structure(table: sa.Table, record: ToolRecord) -> list[str]:
         str(CreateIndex(index, if_not_exists=True).compile(dialect=_DIALECT))
         for index in sorted(table.indexes, key=lambda index: str(index.name))
     ]
-    statements.append(
-        f"CREATE OR REPLACE TRIGGER {object_name('tr', table.name, 'set_created_by')}"
-        f" BEFORE INSERT ON {quoted} FOR EACH ROW"
-        " EXECUTE FUNCTION public.fn_set_author()"
+    from app.db.guild_ddl import tool_table_rules
+
+    _, triggers = tool_table_rules(
+        table.name, table.c.keys(), record.kind if table is record.table else None
     )
-    if table is record.table:
-        statements.append(
-            f"CREATE OR REPLACE TRIGGER {object_name('tr', table.name, 'install_owns')}"
-            f" AFTER INSERT ON {quoted} FOR EACH ROW"
-            f" EXECUTE FUNCTION public.fn_install_owns_what_it_creates('{record.kind}')"
-        )
-    return statements
+    return statements + triggers
 
 
 def structure_ddl(tools: ToolSet) -> str:
     """The tables of every installed tool in ``tools``, their keys, indexes
-    and CHECKs, and the triggers a tool's table carries from its migration
-    (who made a row, and the owner grant a request's new row takes).
-    Schema-relative and idempotent, like the template's structure."""
+    and CHECKs, and the triggers a built-in tool's table carries from its
+    migration. Schema-relative and idempotent, like the template's
+    structure."""
     statements = [
         statement
         for record in tools.installed
@@ -568,37 +584,32 @@ def structure_ddl(tools: ToolSet) -> str:
     return "".join(f"{statement};\n" for statement in statements)
 
 
-#: The tables of a schema a tool plug-in's tool may have made: named with
-#: :data:`TABLE_PREFIX`.
-_PLUGIN_TABLES = sa.text(
-    "SELECT c.relname FROM pg_class c"
-    " WHERE c.relnamespace = to_regnamespace(:schema) AND c.relkind = 'r'"
-    " AND starts_with(c.relname, :prefix) ORDER BY c.relname"
-)
-
-
-async def drop_unclaimed_tables(conn: Any, schema: str, tools: ToolSet) -> list[str]:
-    """Drop every tool plug-in table in ``schema`` that no tool in ``tools``
-    declares: an uninstalled tool's once its window has ended, and what an
-    install whose provisioning failed made. Returns their names. Run on the
-    provisioning connection, under the community's provisioning lock."""
-    declared = {
-        table.name
-        for record in tools.installed
-        for table in (record.table, *record.items)
-    }
+async def drop_tool_tables(conn: Any, schema: str, listing_uid: str) -> list[str]:
+    """Drop the tables in ``schema`` of the tool plug-in ``listing_uid``
+    (``p_<uid>_``), whose install the deletion sweep removed once its window
+    ended. Returns their names. Run on the provisioning connection, under the
+    community's provisioning lock."""
     found = (
-        (await conn.execute(_PLUGIN_TABLES, {"schema": schema, "prefix": TABLE_PREFIX}))
+        (
+            await conn.execute(
+                sa.text(
+                    "SELECT c.relname FROM pg_class c"
+                    " WHERE c.relnamespace = to_regnamespace(:schema)"
+                    " AND c.relkind = 'r' AND starts_with(c.relname, :prefix)"
+                    " ORDER BY c.relname"
+                ),
+                {"schema": schema, "prefix": f"{TABLE_PREFIX}{_uid(listing_uid)}_"},
+            )
+        )
         .scalars()
         .all()
     )
-    unclaimed = [name for name in found if name not in declared]
     quote = _DIALECT.identifier_preparer.quote
-    for name in unclaimed:
+    for name in found:
         await conn.exec_driver_sql(
             f"DROP TABLE IF EXISTS {quote(schema)}.{quote(name)} CASCADE"
         )
-    return unclaimed
+    return list(found)
 
 
 def drop_ddl(listing_uid: str, before: Mapping[str, Any], changes: Any) -> str:
@@ -621,13 +632,17 @@ def drop_ddl(listing_uid: str, before: Mapping[str, Any], changes: Any) -> str:
     emptied: dict[tuple[str, str], list[str]] = {}
     for name in changes.dropped_options:
         table_key, field_key, value = name.split(".", 2)
-        emptied.setdefault((table_key, field_key), []).append(value)
+        emptied.setdefault((table_key, field_key), []).append(_option(value))
     statements: list[str] = []
     for (table_key, field_key), values in emptied.items():
         table = quote(tool_table_name(listing_uid, table_key))
         column = quote(_field_key(field_key))
         listed = ", ".join(
-            str(sa.literal(value).compile(compile_kwargs={"literal_binds": True}))
+            str(
+                sa.literal(value).compile(
+                    dialect=_DIALECT, compile_kwargs={"literal_binds": True}
+                )
+            )
             for value in values
         )
         if kinds[(table_key, field_key)] == "select":
@@ -661,156 +676,49 @@ def drop_ddl(listing_uid: str, before: Mapping[str, Any], changes: Any) -> str:
     return "".join(f"{statement};\n" for statement in statements)
 
 
-# --- deleting ----------------------------------------------------------------
-
-#: What the platform keeps about content, which outlives it: its holds and its
-#: moderation record.
-_PLATFORM_RECORDS = frozenset(
-    {"content_holds", "moderation_actions", "moderation_reports"}
-)
-
-
-def _naming_columns() -> list[tuple[str, str, str | None]]:
-    """Every column of a community's tables that names a tool or a kind inside
-    one, as ``(table, kind column, id column)``: a kind column ending in
-    ``_type`` beside its ``_id`` column with no key (a comment's subject, a
-    link's ends, a grant's resource, a recent view), a row's governing tool
-    (``dac_tool``, whose id column is not needed) and a layout's target."""
-    from app.db.tenancy import GUILD_SCOPED_TABLES
-
-    found: list[tuple[str, str, str | None]] = [("tool_layouts", "tool", "tool_id")]
-    for table in SQLModel.metadata.tables.values():
-        if table.name not in GUILD_SCOPED_TABLES or table.name in _PLATFORM_RECORDS:
-            continue
-        for column in table.columns:
-            if column.name == "dac_tool":
-                found.append((table.name, column.name, None))
-                continue
-            stem = column.name.removesuffix("_type")
-            ids = table.columns.get(f"{stem}_id") if stem != column.name else None
-            if ids is not None and not ids.foreign_keys:
-                found.append((table.name, column.name, ids.name))
-    return sorted(found)
-
-
-class ToolContentHeld(Exception):
-    """The platform holds content in a tool, so its deletion waits."""
-
-
-async def delete_tool_content(session: Any, listing_uid: str, definition: Any) -> None:
-    """Delete every row in the community that names the tool plug-in's tool
-    or a kind inside it, and every row that names a comment on one of those:
-    its links, comments, reactions, tags, search entries, layouts, personal
-    items, recent views and grants. The tool's own tables and its rule rows go
-    with it after (the tables by :func:`drop_unclaimed_tables`, the rules with
-    the install). On a system session routed into the community; raises
-    :class:`ToolContentHeld`, deleting nothing, while the platform holds any
-    of its rows or a comment on one."""
-    from app.services.marketplace.tool_plugins import tool_kinds
-
-    kinds = tool_kinds(definition, listing_uid=listing_uid)
-    tool = definition["tool"]
-    keys = [tool["key"], *(item["key"] for item in tool.get("items", []))]
-    tables = [tool_table_name(listing_uid, key) for key in keys]
-    present = [
-        name
-        for name in tables
-        if await session.scalar(sa.select(sa.func.to_regclass(name)))
-    ]
-    quote = _DIALECT.identifier_preparer.quote
-    held = " OR ".join(
-        [
-            *(
-                f"EXISTS (SELECT 1 FROM {quote(name)} WHERE held_at IS NOT NULL)"
-                for name in present
-            ),
-            (
-                "EXISTS (SELECT 1 FROM comments WHERE subject_type = ANY(:kinds)"
-                " AND held_at IS NOT NULL)"
-            ),
-        ]
-    )
-    if await session.scalar(sa.text(f"SELECT {held}"), {"kinds": kinds}):
-        raise ToolContentHeld(f"{kinds[0]} holds content the platform holds")
-    comments = list(
-        (
-            await session.exec(
-                sa.text("SELECT id FROM comments WHERE subject_type = ANY(:kinds)"),
-                params={"kinds": kinds},
-            )
-        ).scalars()
-    )
-    # What names a comment first, while the comment is there for its row's
-    # policy to find; then what names the tool, while its rows are.
-    naming = _naming_columns()
-    for table, kind_column, id_column in naming:
-        if id_column is not None and comments:
-            await session.exec(
-                sa.text(
-                    f"DELETE FROM {quote(table)} WHERE {quote(kind_column)} = 'comment'"
-                    f" AND {quote(id_column)} = ANY(:comments)"
-                ),
-                params={"comments": comments},
-            )
-    for table, kind_column, _ in naming:
-        await session.exec(
-            sa.text(
-                f"DELETE FROM {quote(table)} WHERE {quote(kind_column)} = ANY(:kinds)"
-            ),
-            params={"kinds": kinds},
-        )
-
-
 # --- loading -----------------------------------------------------------------
 
 #: A community's installed tool plug-ins, read from the routed session of
 #: whoever asks: a member reads its community's installs.
 _DEFINITIONS = sa.text(
-    "SELECT id, listing_uid, definition FROM guild_plugins"
+    "SELECT listing_uid, definition FROM guild_plugins"
     " WHERE plugin_kind = 'tool' ORDER BY id"
 )
 
 
-async def _codes() -> dict[str, int]:
-    """Every plug-in kind's code, read on the system engine: the table is the
-    deployment's, and no community's role reads it."""
+async def tool_set(session: Any, stamped: str | None | EllipsisType = ...) -> ToolSet:
+    """The tool set of the community ``session`` is routed into, as its
+    installs stand. ``stamped`` is the digest its schema's stamp names, where
+    the caller read it (``schema_provisioning.stamp_tools``): the built-in
+    tools where it names none, and the set this process keeps for it, with no
+    query. Every plug-in kind's code is read on the system engine (the table
+    is the deployment's, and no community's role reads it), and only to build
+    a set this process does not keep. While a community's provisioning lags
+    its installs, this is the set they make now."""
     from app.db import session as db_session
     from app.db.kind_codes import plugin_kind_codes
 
-    async with db_session.system_engine.connect() as conn:
-        return await plugin_kind_codes(conn)
-
-
-async def _installed(session: Any) -> list[InstalledTool]:
-    rows = (await session.exec(_DEFINITIONS)).all()
-    return [InstalledTool(row.id, row.listing_uid, row.definition) for row in rows]
-
-
-async def rendered_tools(session: Any, digest: str | None) -> ToolSet:
-    """The tool set a community's rules were rendered with, by the digest its
-    schema's stamp names (``schema_provisioning.stamp_tools``): the built-in
-    tools where it names none, with no query, and otherwise the set this
-    process built for that digest. Only the first request to name a digest
-    reads the community's installs and the kind codes."""
-    if digest is None:
+    if stamped is None:
         return BUILTIN_TOOLS
-    found = _SETS.get(digest)
+    found = None if stamped is ... else _kept(stamped)
     if found is not None:
         return found
-    return community_tool_set(await _installed(session), await _codes())
+    installed = [
+        InstalledTool(row.listing_uid, row.definition)
+        for row in (await session.exec(_DEFINITIONS)).all()
+    ]
+    digest = tools_digest(installed)
+    found = BUILTIN_TOOLS if digest is None else _kept(digest)
+    if found is not None:
+        return found
+    async with db_session.system_engine.connect() as conn:
+        return community_tool_set(installed, await plugin_kind_codes(conn))
 
 
-def tools_digest(installed: Sequence[InstalledTool]) -> str | None:
-    """What a community's schema stamp names its tool plug-ins by: the digest
-    of ``installed`` in install order, or None for a community with none."""
-    if not installed:
-        return None
-    return installed_digest(sorted(installed, key=lambda tool: tool.install_id))
-
-
-async def installed_tools(guild_id: int) -> list[InstalledTool]:
-    """``guild_id``'s installed tool plug-ins, read on the system engine:
-    none for a community whose schema does not exist yet."""
+async def provisioned_tools(guild_id: int) -> ToolSet:
+    """The tool set of ``guild_id`` as its installs stand, read on the system
+    engine: the built-in tools for a community whose schema does not exist
+    yet."""
     from app.db import cohorts
     from app.db import session as db_session
     from app.db.request_context import SystemGuild
@@ -822,20 +730,8 @@ async def installed_tools(guild_id: int) -> list[InstalledTool]:
             {"t": f'"{guild_schema_name(guild_id)}".guild_plugins'},
         )
         if not exists:
-            return []
+            return BUILTIN_TOOLS
         await db_session.set_rls_context(session, SystemGuild(guild_id))
-        installed = await _installed(session)
+        tools = await tool_set(session)
         await session.rollback()
-    return installed
-
-
-async def provisioned_tools(
-    guild_id: int, installed: Sequence[InstalledTool] | None = None
-) -> ToolSet:
-    """The tool set of ``guild_id`` as its installs stand (``installed``, or
-    read now), for provisioning."""
-    if installed is None:
-        installed = await installed_tools(guild_id)
-    if not installed:
-        return BUILTIN_TOOLS
-    return community_tool_set(installed, await _codes())
+    return tools

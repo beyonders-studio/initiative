@@ -434,10 +434,13 @@ def serialize_role(
         members_hold,
     )
 
-    stored = [perm for perm in (role.permissions or []) if perm.install_id is None]
     permissions = {
         **DEFAULT_PERMISSION_VALUES,
-        **{perm.key: perm.enabled for perm in stored},
+        **{
+            perm.key: perm.enabled
+            for perm in (role.permissions or [])
+            if perm.install_id is None and perm.key in PermissionKey._value2member_map_
+        },
     }
     community: dict[tuple[int, str], bool] = {}
     if defaults is not None and community_holds_role(role, defaults):
