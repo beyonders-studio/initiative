@@ -113,8 +113,9 @@ class ArchiveParent:
     @property
     def label(self) -> str:
         """What its trigger is named by: the column, or ``<kind>_id`` for a
-        pair, which is the name a comment's column for the kind had."""
-        return self.column if self.kind is None else f"{self.kind}_id"
+        pair, which is the name a comment's column for the kind had (a tool
+        plug-in's ``.`` spelled ``_``)."""
+        return self.column if self.kind is None else f"{self.kind.replace('.', '_')}_id"
 
     def archived(self, row: str) -> str:
         if self.through is None:

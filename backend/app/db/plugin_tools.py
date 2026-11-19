@@ -82,6 +82,9 @@ __all__ = [
     "drop_unclaimed_tables",
     "installed_digest",
     "installed_tools",
+    "is_plugin_kind",
+    "plugin_kind_of_table",
+    "plugin_table_pattern",
     "provisioned_tools",
     "rendered_tools",
     "structure_ddl",
@@ -184,6 +187,15 @@ def tool_table_name(listing_uid: str, key: str) -> str:
 
 def _kind(listing_uid: str, key: str) -> str:
     return f"{_key(key, 'key')}.{_uid(listing_uid)}"
+
+
+def is_plugin_kind(value: str) -> bool:
+    """Whether ``value`` has the form of a tool plug-in's kind."""
+    key, dot, uid = value.partition(".")
+    try:
+        return bool(dot) and _key(key, "key") == key and _uid(uid.upper()) == uid
+    except PluginToolError:
+        return False
 
 
 def plugin_table_pattern() -> str:

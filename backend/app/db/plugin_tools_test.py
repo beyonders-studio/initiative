@@ -74,7 +74,7 @@ _UNIVERSAL_TOOL = {
 _UNIVERSAL_ITEM = {
     "id", "counter_group_id", "name", "position", "created_at", "updated_at",
     "created_by", "created_by_kind", "deleted_at", "deleted_by",
-    "deleted_by_kind", "purge_at", "held_at", "hold_id",
+    "deleted_by_kind", "purge_at", "archived_at", "held_at", "hold_id",
 }  # fmt: skip
 
 

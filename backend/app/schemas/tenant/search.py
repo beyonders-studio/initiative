@@ -7,7 +7,13 @@ from pydantic import BaseModel, ConfigDict
 from app.core.search import SearchEntityType
 from app.core.tools import Tool
 from app.schemas.base import MentionStr
+from app.schemas.kinds import with_installed
 from app.schemas.query import PageMeta
+
+#: What a result is, and the tool it lives in: a built-in kind or tool, or a
+#: tool plug-in's.
+FoundKind = with_installed(SearchEntityType)
+FoundIn = with_installed(Tool)
 
 
 class SearchHit(BaseModel):
@@ -21,12 +27,12 @@ class SearchHit(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    entity_type: SearchEntityType
+    entity_type: FoundKind
     entity_id: int
     title: str
     snippet: str | None = None
     initiative_id: int | None = None
-    tool: Tool | None = None
+    tool: FoundIn | None = None
     tool_id: int | None = None
 
 
@@ -42,13 +48,13 @@ class SearchSuggestion(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    entity_type: SearchEntityType
+    entity_type: FoundKind
     entity_id: int
     #: A comment's is the start of what was written, so it mentions as the
     #: comment does.
     title: MentionStr
     initiative_id: int | None = None
-    tool: Tool | None = None
+    tool: FoundIn | None = None
     tool_id: int | None = None
     #: Whether this reader may change the thing, not only open it. A picker
     #: needs it to know which links are theirs to make: a relation describing
