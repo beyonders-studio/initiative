@@ -9,7 +9,7 @@ import pytest
 
 from app.services.marketplace.definitions import normalize_listing_definition
 from app.services.marketplace.manifest_values import ListingDefinitionError
-from app.services.marketplace.tool_plugins import tool_kinds
+from app.services.marketplace.tool_plugins import tool_kinds, tool_row_problems
 from app.testing import COUNTERS_UID, counters_tool_manifest
 
 
@@ -38,7 +38,7 @@ def test_a_layout_names_the_table_s_fields_and_every_row_s():
     _counter(body)["fields"].append(
         {"key": "mood", "name": {"en": "Mood"}, "kind": "scale"}
     )
-    _layouts(body)["list"] = {
+    _layouts(body)["lists"][1] = {
         "kind": "table",
         "columns": ["name", "count", "mood", "created_by", "updated_at", "tags"],
         "displays": {"count": "clock", "mood": "stars"},
@@ -46,6 +46,25 @@ def test_a_layout_names_the_table_s_fields_and_every_row_s():
     _detail(body)["main"].append(_required("color"))
     stored = _normalize(body)
     assert _layouts(stored) == _layouts(body)
+
+
+def test_a_masonry_wall_is_a_list_a_tool_draws():
+    body = counters_tool_manifest()
+    _layouts(body)["lists"].append({**_list(body), "kind": "masonry"})
+    assert _layouts(_normalize(body))["lists"][2]["kind"] == "masonry"
+
+
+def test_a_row_is_held_to_its_required_fields_and_checks():
+    counter = _counter(_normalize(counters_tool_manifest()))
+    row = {"step": 1, "initial_count": 0, "view_mode": "bar", "min": 0, "max": 9}
+    assert tool_row_problems(counter, row) == []
+    # An empty side holds, as the table's CHECK does.
+    assert tool_row_problems(counter, {**row, "max": None}) == []
+    assert tool_row_problems(counter, {**row, "step": None, "min": 10}) == [
+        ("step", "required"),
+        ("min", "at_most"),
+    ]
+    assert tool_row_problems(counter, {**row, "step": 0}) == [("step", "above")]
 
 
 def test_a_republish_stores_the_same_document():
@@ -86,7 +105,7 @@ def _add_field(field: dict) -> Callable[[dict], None]:
 _NOTE = {
     "fields": [{"key": "note", "name": {"en": "Note"}, "kind": "text"}],
     "layouts": {
-        "list": {"kind": "table", "columns": ["name", "note"]},
+        "lists": [{"kind": "table", "columns": ["name", "note"]}],
         "detail": {"main": [{"type": "field", "props": {"field": "note"}}]},
     },
 }
@@ -128,7 +147,23 @@ def _layouts(body: dict) -> dict:
 
 
 def _list(body: dict) -> dict:
-    return _layouts(body)["list"]
+    """The counter's grid."""
+    return _layouts(body)["lists"][0]
+
+
+def _preview(body: dict) -> dict:
+    """The props of the counters a group's card previews."""
+    return _tool(body)["layouts"]["lists"][0]["card"]["children"][0]["props"]
+
+
+def _checks(*checks: dict) -> Callable[[dict], None]:
+    return _set(_counter, "checks", list(checks))
+
+
+def _sorts(*fields: str) -> Callable[[dict], None]:
+    return lambda body: _list(body)["presets"][0].__setitem__(
+        "sort", [{"field": field} for field in fields]
+    )
 
 
 def _detail(body: dict) -> dict:
@@ -171,7 +206,7 @@ REFUSALS: dict[str, tuple[Callable[[dict], None], str]] = {
     "an upper-case key": (_set(_tool, "key", "Group"), "lower-case letter"),
     "a key with a hyphen": (_set(_tool, "key", "counter-group"), "not '-'"),
     "a key with a quote": (_set(_tool, "key", "a'b"), 'not "\'"'),
-    "a key over 40 characters": (_set(_tool, "key", "a" * 41), "longer than 40"),
+    "a key over 17 characters": (_set(_tool, "key", "a" * 18), "longer than 17"),
     "a universal column": (
         _add_field({"key": "position", "name": {"en": "P"}, "kind": "number"}),
         "every tool's rows have",
@@ -270,6 +305,46 @@ REFUSALS: dict[str, tuple[Callable[[dict], None], str]] = {
         lambda body: _field(body, "view_mode").__setitem__("default", "dial"),
         "not a value",
     ),
+    "a required field with no default": (
+        _add_field(
+            {"key": "note", "name": {"en": "N"}, "kind": "text", "required": True}
+        ),
+        "has a default",
+    ),
+    "a required person": (
+        _add_field(
+            {
+                "key": "who",
+                "name": {"en": "W"},
+                "kind": "user_reference",
+                "required": True,
+            }
+        ),
+        "never required",
+    ),
+    "required that is not true or false": (
+        lambda body: _field(body, "step").__setitem__("required", "yes"),
+        "true or false",
+    ),
+    "no checks": (_checks(), "leave 'checks' out"),
+    "nine checks": (_checks(*[{"field": "step", "above": 0}] * 9), "more than 8"),
+    "a check on a colour": (_checks({"field": "color", "above": 0}), "reads a number"),
+    "a check on no field": (
+        _checks({"field": "ghost", "above": 0}),
+        "not a field of this table",
+    ),
+    "a check that is not a comparison": (
+        _checks({"field": "count", "is": True}),
+        "not a condition",
+    ),
+    "a check with another table's field": (
+        _checks({"field": "min", "below": {"field": "description"}}),
+        "not a number or counter field of this table",
+    ),
+    "a check the defaults break": (
+        _checks({"field": "initial_count", "at_least": {"field": "step"}}),
+        "defaults do not hold",
+    ),
     "a colour default that is not #rrggbb": (
         lambda body: _field(body, "color").__setitem__("default", "red"),
         "not a value",
@@ -338,7 +413,7 @@ REFUSALS: dict[str, tuple[Callable[[dict], None], str]] = {
     "no layouts": (_set(_tool, "layouts", None), "layouts must be an object"),
     "an item with no page": (
         lambda body: _layouts(body).pop("detail"),
-        "a list and a detail",
+        "lists and a detail",
     ),
     "a field named tags": (
         _add_field({"key": "tags", "name": {"en": "T"}, "kind": "text"}),
@@ -351,8 +426,8 @@ REFUSALS: dict[str, tuple[Callable[[dict], None], str]] = {
     "a task's field": (
         _set(
             lambda b: _tool(b)["layouts"],
-            "list",
-            {"kind": "table", "columns": ["title"]},
+            "lists",
+            [{"kind": "table", "columns": ["title"]}],
         ),
         "'title' is not a field of this table",
     ),
@@ -362,14 +437,95 @@ REFUSALS: dict[str, tuple[Callable[[dict], None], str]] = {
     ),
     "a board": (_set(_list, "kind", "board"), "kind must be one of"),
     "a grid of columns": (
-        _set(_layouts, "list", {"kind": "grid", "columns": ["name"]}),
+        _set(_layouts, "lists", [{"kind": "grid", "columns": ["name"]}]),
         "a grid holds its card",
     ),
     "a table with no columns": (
-        _set(_layouts, "list", {"kind": "table", "columns": []}),
+        _set(_layouts, "lists", [{"kind": "table", "columns": []}]),
         "a table holds its columns",
     ),
-    "presets": (_set(_list, "presets", []), "a grid holds its card"),
+    "no presets": (_set(_list, "presets", []), "leave 'presets' out"),
+    "no lists": (_set(_layouts, "lists", []), "one way at least"),
+    "two grids": (
+        lambda body: _layouts(body)["lists"].append(dict(_list(body))),
+        "a different kind",
+    ),
+    "four lists": (
+        lambda body: _layouts(body)["lists"].extend([_list(body)] * 2),
+        "more than 3",
+    ),
+    "a card tinted by a number": (
+        lambda body: _list(body)["card"].__setitem__("props", {"tint": "min"}),
+        "'min' is not a color field",
+    ),
+    "a card tinted by nothing": (
+        lambda body: _list(body)["card"].__setitem__("props", {"tint": "ghost"}),
+        "'ghost' is not a field of this table",
+    ),
+    "a preview of no item under it": (
+        lambda body: _list(body)["card"]["children"].append(
+            {
+                "type": "items",
+                "props": {"item": "counter", "fields": ["name"], "limit": 1},
+            }
+        ),
+        "not an item table directly under it",
+    ),
+    "a preview of another table's field": (
+        lambda body: _preview(body).__setitem__("fields", ["description"]),
+        "'description' is not a field of 'counter'",
+    ),
+    "a preview showing a field twice": (
+        lambda body: _preview(body).__setitem__("fields", ["name", "name"]),
+        "each field once",
+    ),
+    "a preview of five fields": (
+        lambda body: _preview(body).__setitem__(
+            "fields", ["name", "count", "min", "max", "step"]
+        ),
+        "at most 4 items",
+    ),
+    "a preview of nine items": (
+        lambda body: _preview(body).__setitem__("limit", 9),
+        "less than or equal to 8",
+    ),
+    "a preview tinted by a number": (
+        lambda body: _preview(body).__setitem__("tint", "min"),
+        "'min' is not a color field",
+    ),
+    "a look from a number": (
+        _set(_list, "displays", {"count": {"from": "min"}}),
+        "'min' is not a select field",
+    ),
+    "a look from a select offering what is no look": (
+        lambda body: _field(body, "view_mode")["options"].append(
+            {"value": "dial", "label": {"en": "Dial"}}
+        ),
+        "offers an option",
+    ),
+    "a sort by a colour": (_sorts("color"), "'color' does not sort"),
+    "a sort by who made it": (_sorts("created_by"), "'created_by' does not sort"),
+    "a sort by another table's field": (
+        _sorts("description"),
+        "'description' is not a field of this table",
+    ),
+    "a sort by a field twice": (_sorts("count", "count"), "a field twice"),
+    "five sorts": (
+        _sorts("count", "min", "max", "step", "initial_count"),
+        "sorts by 1 to 4",
+    ),
+    "a preset with no languages": (
+        lambda body: _list(body)["presets"][0].__setitem__("name", "By name"),
+        "label",
+    ),
+    "a preset slug in capitals": (
+        lambda body: _list(body)["presets"][0].__setitem__("slug", "By-name"),
+        "pattern",
+    ),
+    "a preset slug twice": (
+        lambda body: _list(body)["presets"][1].__setitem__("slug", "by-name"),
+        "own slug",
+    ),
     "a plug-in's part on a card": (
         _on_card({"type": "plugin", "props": {"plugin": 1, "part": "badge"}}),
         "not a plug-in's parts",

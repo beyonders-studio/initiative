@@ -46,14 +46,17 @@ from app.schemas.tenant.tool_layout import (
     PLUGIN_FIELD_PREFIX,
     PROPERTY_FIELD_PREFIX,
     CalendarFilterSpec,
+    CardPart,
     CounterDetailFieldId,
     DetailFieldPart,
     DetailLayoutDefinition,
     DetailLayoutRead,
     DetailLayoutWrite,
+    DisplayFrom,
     EventDetailFieldId,
     FieldPart,
     FileFieldId,
+    ItemsPart,
     ListLayoutDefinition,
     ListLayoutRead,
     ListLayoutWrite,
@@ -442,6 +445,15 @@ def _check_list_fields(
     its columns, its other lists a card — and how its scales are drawn."""
     cards = [definition.card] if definition.card is not None else []
     parts = [part for root in cards for part, _ in parts_of(root)]
+    # A tint, a preview of items and a look read from the row are a tool
+    # plug-in's, whose rows hold the fields they name.
+    if any(
+        isinstance(part, ItemsPart) or (isinstance(part, CardPart) and part.props)
+        for part in parts
+    ) or any(
+        isinstance(look, DisplayFrom) for look in (definition.displays or {}).values()
+    ):
+        raise _bad_request(ToolLayoutMessages.KIND_NOT_ALLOWED)
     shown = [
         getattr(field, "value", field)
         for field in (

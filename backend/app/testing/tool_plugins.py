@@ -49,20 +49,32 @@ def counters_tool_manifest() -> dict[str, Any]:
                 {"key": "description", "name": {"en": "Description"}, "kind": "text"}
             ],
             "layouts": {
-                "list": {
-                    "kind": "grid",
-                    "card": {
-                        "type": "card",
-                        "children": [
-                            _field("name"),
-                            {
-                                "type": "stack",
-                                "props": {"tone": "muted"},
-                                "children": [_field("description")],
-                            },
-                        ],
+                "lists": [
+                    {
+                        "kind": "grid",
+                        "card": {
+                            "type": "card",
+                            "children": [
+                                {
+                                    "type": "items",
+                                    "props": {
+                                        "item": "counter",
+                                        "fields": ["name", "count"],
+                                        "limit": 4,
+                                        "tint": "color",
+                                    },
+                                },
+                                _field("name"),
+                                {
+                                    "type": "stack",
+                                    "props": {"tone": "muted"},
+                                    "children": [_field("description")],
+                                },
+                            ],
+                        },
                     },
-                },
+                    {"kind": "table", "columns": ["name", "description", "updated_at"]},
+                ],
                 "detail": {
                     "header": _header(),
                     "main": [_field("description"), {"type": "relations"}],
@@ -95,41 +107,70 @@ def counters_tool_manifest() -> dict[str, Any]:
                             "name": {"en": "Step"},
                             "kind": "number",
                             "default": 1,
+                            "required": True,
                         },
                         {
                             "key": "initial_count",
                             "name": {"en": "Starting count"},
                             "kind": "number",
                             "default": 0,
+                            "required": True,
                         },
-                        {"key": "color", "name": {"en": "Colour"}, "kind": "color"},
+                        {
+                            "key": "color",
+                            "name": {"en": "Colour"},
+                            "kind": "color",
+                            "default": "random",
+                        },
                         {
                             "key": "view_mode",
                             "name": {"en": "Look"},
                             "kind": "select",
                             "default": "number",
+                            "required": True,
                             "options": [
                                 {"value": "number", "label": {"en": "Number"}},
-                                {
-                                    "value": "progress_bar",
-                                    "label": {"en": "Progress bar"},
-                                },
-                                {
-                                    "value": "segmented_clock",
-                                    "label": {"en": "Segmented clock"},
-                                },
+                                {"value": "bar", "label": {"en": "Progress bar"}},
+                                {"value": "clock", "label": {"en": "Segmented clock"}},
                             ],
                         },
                     ],
+                    "checks": [
+                        {"field": "min", "at_most": {"field": "max"}},
+                        {"field": "step", "above": 0},
+                    ],
                     "layouts": {
-                        "list": {
-                            "kind": "grid",
-                            "card": {
-                                "type": "card",
-                                "children": [_field("name"), _field("count")],
+                        "lists": [
+                            {
+                                "kind": "grid",
+                                "card": {
+                                    "type": "card",
+                                    "props": {"tint": "color"},
+                                    "children": [_field("name"), _field("count")],
+                                },
+                                "displays": {"count": {"from": "view_mode"}},
+                                "presets": [
+                                    {
+                                        "slug": "by-name",
+                                        "name": {"en": "By name"},
+                                        "sort": [{"field": "name"}],
+                                    },
+                                    {
+                                        "slug": "by-count",
+                                        "name": {"en": "By count"},
+                                        "sort": [
+                                            {"field": "count", "dir": "desc"},
+                                            {"field": "name"},
+                                        ],
+                                    },
+                                ],
                             },
-                            "displays": {"count": "bar"},
-                        },
+                            {
+                                "kind": "table",
+                                "columns": ["name", "count", "min", "max"],
+                                "displays": {"count": {"from": "view_mode"}},
+                            },
+                        ],
                         "detail": {
                             "header": _header(),
                             "main": [_field("count"), {"type": "relations"}],

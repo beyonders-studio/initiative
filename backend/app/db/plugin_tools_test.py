@@ -11,9 +11,11 @@ from typing import Any
 import pytest
 import sqlalchemy as sa
 from httpx import AsyncClient
+from sqlalchemy.exc import IntegrityError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import GuildPluginMessages
+from app.core.palette import COLOR_PALETTE
 from app.core.tool_set import BUILTIN_TOOLS
 from app.db.event_capture import render_guild_capture_ddl
 from app.db.guild_ddl import render_guild_rls_ddl
@@ -662,6 +664,36 @@ async def test_turning_a_tool_plugin_off_is_its_switch(
         await reader.rollback()
 
 
+async def test_a_row_holds_to_its_checks_and_takes_its_defaults(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """A counter takes its required fields' defaults and a colour from the
+    app's palette, and a row breaking a check is refused; an empty side
+    passes."""
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    await install_tool_plugin(client, session, seat)
+    await route_session_to_guild(session, seat.guild.id)
+    await session.exec(
+        sa.text(
+            f"WITH g AS (INSERT INTO {_GROUP} (initiative_id, name)"
+            " VALUES (:i, 'Group') RETURNING id)"
+            f" INSERT INTO {_COUNTER} (counter_group_id, name, max)"
+            " SELECT id, 'Open', NULL FROM g"
+        ),
+        params={"i": seat.initiative.id},
+    )
+    row = (
+        await session.exec(sa.text(f"SELECT step, view_mode, color FROM {_COUNTER}"))
+    ).one()
+    assert (row.step, row.view_mode) == (1, "number")
+    assert row.color in COLOR_PALETTE
+    for breaking in ("step = 0", "min = 5, max = 1"):
+        with pytest.raises(IntegrityError, match="check_"):
+            async with session.begin_nested():
+                await session.exec(sa.text(f"UPDATE {_COUNTER} SET {breaking}"))
+    await session.exec(sa.text(f"UPDATE {_COUNTER} SET min = 5"))
+
+
 async def test_a_version_adding_to_the_tool_waits_for_the_seat(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
@@ -672,16 +704,30 @@ async def test_a_version_adding_to_the_tool_waits_for_the_seat(
     install = await install_tool_plugin(client, session, seat)
     await route_session_to_guild(session, seat.guild.id)
     await session.exec(
-        sa.text(f"INSERT INTO {_GROUP} (initiative_id, name) VALUES (:i, 'Kept')"),
+        sa.text(
+            f"WITH g AS (INSERT INTO {_GROUP} (initiative_id, name)"
+            " VALUES (:i, 'Kept') RETURNING id)"
+            f" INSERT INTO {_COUNTER} (counter_group_id, name) SELECT id, 'Open' FROM g"
+        ),
         params={"i": seat.initiative.id},
     )
     await session.commit()
 
     def grow(tool: dict[str, Any]) -> None:
         counter = tool["items"][0]
+        # A field added required, and one made required: the rows already
+        # there take each's default.
         counter["fields"].append(
-            {"key": "unit", "name": {"en": "Unit"}, "kind": "text"}
+            {
+                "key": "unit",
+                "name": {"en": "Unit"},
+                "kind": "text",
+                "default": "each",
+                "required": True,
+            }
         )
+        low = next(f for f in counter["fields"] if f["key"] == "min")
+        low.update(default=0, required=True)
         view_mode = next(f for f in counter["fields"] if f["key"] == "view_mode")
         view_mode["options"].append({"value": "dial", "label": {"en": "Dial"}})
         tally = copy.deepcopy(counter)
@@ -715,12 +761,17 @@ async def test_a_version_adding_to_the_tool_waits_for_the_seat(
     assert "unit" in columns[_COUNTER] and tally in columns
     await route_session_to_guild(session, seat.guild.id)
     assert await session.scalar(sa.text(f"SELECT name FROM {_GROUP}")) == "Kept"
+    filled = (await session.exec(sa.text(f"SELECT min, unit FROM {_COUNTER}"))).one()
+    assert (filled.min, filled.unit) == (0, "each")
     await session.exec(
         sa.text(
             f"INSERT INTO {_COUNTER} (counter_group_id, name, view_mode)"
             f" SELECT id, 'Dial', 'dial' FROM {_GROUP}"
         )
     )
+    with pytest.raises(IntegrityError, match="not-null"):
+        async with session.begin_nested():
+            await session.exec(sa.text(f"UPDATE {_COUNTER} SET min = NULL"))
 
 
 async def test_the_sweep_takes_a_version_asking_nothing_and_holds_the_rest(
@@ -769,7 +820,7 @@ async def test_a_major_drops_what_the_seat_confirms_and_keeps_the_rest(
             " VALUES (:i, 'Looks') RETURNING id)"
             f" INSERT INTO {_COUNTER} (counter_group_id, name, view_mode, color)"
             " SELECT g.id, v.name, v.mode, '#112233' FROM g, (VALUES"
-            " ('Clock', 'segmented_clock'), ('Bar', 'progress_bar')) AS v(name, mode)"
+            " ('Clock', 'clock'), ('Bar', 'bar')) AS v(name, mode)"
         ),
         params={"i": seat.initiative.id},
     )
@@ -778,6 +829,8 @@ async def test_a_major_drops_what_the_seat_confirms_and_keeps_the_rest(
     def shed(tool: dict[str, Any]) -> None:
         counter = tool["items"][0]
         counter["fields"] = [f for f in counter["fields"] if f["key"] != "color"]
+        del counter["layouts"]["lists"][0]["card"]["props"]
+        del tool["layouts"]["lists"][0]["card"]["children"][0]["props"]["tint"]
         view_mode = next(f for f in counter["fields"] if f["key"] == "view_mode")
         view_mode["options"].pop()
         detail = counter["layouts"]["detail"]["side"][0]
@@ -797,7 +850,7 @@ async def test_a_major_drops_what_the_seat_confirms_and_keeps_the_rest(
         assert unconfirmed.status_code == 409, unconfirmed.text
     asks = unconfirmed.json()["detail"]
     assert asks["dropped_fields"] == ["counter.color"]
-    assert asks["dropped_options"] == ["counter.view_mode.segmented_clock"]
+    assert asks["dropped_options"] == ["counter.view_mode.clock"]
     columns = await _columns(session, guild_schema_name(seat.guild.id))
     assert "color" in columns[_COUNTER]
 
@@ -807,7 +860,7 @@ async def test_a_major_drops_what_the_seat_confirms_and_keeps_the_rest(
         json={
             "version": "2.0.0",
             "drop_fields": ["counter.color"],
-            "drop_options": ["counter.view_mode.segmented_clock"],
+            "drop_options": ["counter.view_mode.clock"],
         },
     )
     assert taken.status_code == 200, taken.text
@@ -817,7 +870,7 @@ async def test_a_major_drops_what_the_seat_confirms_and_keeps_the_rest(
     looks = dict(
         (await session.exec(sa.text(f"SELECT name, view_mode FROM {_COUNTER}"))).all()
     )
-    assert looks == {"Clock": None, "Bar": "progress_bar"}
+    assert looks == {"Clock": None, "Bar": "bar"}
     refused = await session.exec(
         sa.text(
             f"SELECT relforcerowsecurity FROM pg_class WHERE oid = '{_COUNTER}'::regclass"

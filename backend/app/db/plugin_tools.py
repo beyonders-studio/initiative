@@ -17,15 +17,20 @@ as it reads a built-in tool, and into the DDL that creates its tables.
   their models are made of (a tool's own table those every built-in tool's
   is made of, an item table those every item table in the trash is, with the
   archive stamp beside them), and one typed column per declared field, its
-  kind in the column's ``info``. Their CHECKs and triggers are a built-in
-  tool table's, from ``app.db.guild_ddl.tool_table_rules``.
+  kind in the column's ``info``: NOT NULL where the field is required, and
+  a colour that defaults to ``random`` picking from the app's palette per
+  row. Their CHECKs and triggers are a built-in tool table's, from
+  ``app.db.guild_ddl.tool_table_rules``, beside a CHECK per select field's
+  options and per declared check.
 * **Permissions** are ``<kind>:enabled``, the tool's switch in each initiative
   and the role key for viewing it, and ``<kind>:create``: a built-in tool's
   pair, written by the same writer and role defaults, owned by no install.
 
 * **Versions** only add to the tables: the structure brings a table up to
-  its declaration (new columns, a select's new options, a field's default)
-  and takes nothing away. A field or an option a new major drops goes by
+  its declaration (new columns, a select's new options, a field's default,
+  whether it is required, the checks) and takes nothing away. A field that
+  becomes required fills its empty cells with its default first; a check
+  holds every row written from then on. A field or an option a new major drops goes by
   :func:`drop_ddl`, once the community's admin confirms it.
 * **Removal**: an uninstalled tool keeps its tables and every row naming it
   until its install's deletion window ends; then the deletion sweep purges
@@ -41,6 +46,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import string
 from collections import OrderedDict
 from collections.abc import Iterable, Mapping, Sequence
@@ -54,6 +60,7 @@ from sqlalchemy.schema import AddConstraint, CreateColumn, CreateIndex, CreateTa
 from sqlmodel import SQLModel
 from sqlmodel.main import get_column_from_field
 
+from app.core.palette import COLOR_PALETTE
 from app.core.tool_set import BUILTIN_TOOLS, KEPT_TOOL_SETS, ToolRecord, ToolSet
 from app.core.tools import Kind, ToolSpec
 from app.db.base import MODELS_BY_TABLE
@@ -62,7 +69,10 @@ from app.models.tenant import _mixins
 from app.models.tenant.counter import COUNTER_NUMBER
 from app.services.marketplace import contract
 from app.services.marketplace.tool_plugins import (
+    COMPARISONS,
+    MAX_TOOL_CHECKS,
     MAX_TOOL_KEY_LENGTH,
+    RANDOM_COLOR,
     TOOL_COLUMNS,
     TOOL_FIELD_KINDS,
     field_start,
@@ -130,6 +140,11 @@ _DIALECT = postgresql.dialect()
 #: The ``info`` key marking a select field's CHECK of its options, which a
 #: later version of the tool may widen.
 _OPTIONS = "options"
+#: The ``info`` key marking a declared check's CHECK, which a later version
+#: may add, change or take away.
+_DECLARED = "declared"
+#: The kinds of field a check compares.
+_NUMBERS = frozenset({"number", "counter"})
 
 
 class PluginToolError(ValueError):
@@ -245,9 +260,26 @@ def _mixin_columns(mixins: Iterable[type[SQLModel]]) -> list[sa.Column]:
     return list(columns.values())
 
 
+def _compiled(clause: Any) -> sa.TextClause:
+    """``clause`` with its values written in by the dialect."""
+    return sa.text(
+        str(clause.compile(dialect=_DIALECT, compile_kwargs={"literal_binds": True}))
+    )
+
+
+#: A colour from the app's palette, picked as each row goes in.
+_RANDOM_COLOR = _compiled(
+    sa.literal(list(COLOR_PALETTE), postgresql.ARRAY(sa.Text))[
+        sa.cast(sa.func.floor(sa.func.random() * len(COLOR_PALETTE)), sa.Integer) + 1
+    ]
+)
+
+
 def _literal(value: Any, kind: str) -> Any:
     """A declared default as a server default, written by the dialect from a
     bound value rather than by pasting it."""
+    if kind == "color" and value == RANDOM_COLOR:
+        return _RANDOM_COLOR
     if kind == "multi_select":
         array = sa.literal(list(value), postgresql.ARRAY(sa.Text))
         return sa.text(
@@ -296,16 +328,80 @@ def _field_column(field: Mapping[str, Any]) -> sa.Column:
         if start is None
         else _literal(start, "number" if kind == "counter" else kind)
     )
+    required = field.get("required") is True
+    if required and default is None:
+        raise PluginToolError(f"field {key!r} is required and has no default")
     return sa.Column(
-        key, _FIELD_TYPES[kind](), server_default=default, info={"field": kind}
+        key,
+        _FIELD_TYPES[kind](),
+        server_default=default,
+        nullable=not required,
+        info={"field": kind},
     )
 
 
+def _operand(raw: Any, numbers: frozenset[str]) -> Any:
+    """What a check compares its field with, checked again: a finite number,
+    or ``{"field": key}``, a number or counter field of the same table."""
+    if isinstance(raw, Mapping):
+        key = raw.get("field")
+        if set(raw) != {"field"} or key not in numbers:
+            raise PluginToolError(f"{raw!r} is not a number field of its table")
+        return sa.column(_field_key(key))
+    if isinstance(raw, bool) or not isinstance(raw, int | float):
+        raise PluginToolError(f"{raw!r} is not a number")
+    try:
+        finite = math.isfinite(raw)
+    except OverflowError:
+        finite = False
+    if not finite:
+        raise PluginToolError(f"{raw!r} is not a number")
+    return sa.literal(raw)
+
+
+def _declared_checks(
+    table: str,
+    fields: Sequence[Mapping[str, Any]],
+    checks: Sequence[Mapping[str, Any]],
+) -> list[sa.Constraint]:
+    """A CHECK per declared check, each one comparison of a number or counter
+    field with a number or another such field. An empty side passes, as a
+    CHECK that reads NULL does."""
+    if len(checks) > MAX_TOOL_CHECKS:
+        raise PluginToolError(f"{table}: more than {MAX_TOOL_CHECKS} checks")
+    numbers = frozenset(
+        field.get("key") for field in fields if field.get("kind") in _NUMBERS
+    )
+    built: list[sa.Constraint] = []
+    for index, check in enumerate(checks):
+        terms = [term for term in check if term != "field"]
+        if len(terms) != 1 or terms[0] not in COMPARISONS:
+            raise PluginToolError(f"{table}: check {index} is not one comparison")
+        if check.get("field") not in numbers:
+            raise PluginToolError(f"{table}: check {index} reads no number field")
+        compare = COMPARISONS[terms[0]]
+        built.append(
+            sa.CheckConstraint(
+                compare(
+                    sa.column(_field_key(check["field"])),
+                    _operand(check[terms[0]], numbers),
+                ),
+                name=object_name("ck", table, f"check_{index}"),
+                info={_DECLARED: True},
+            )
+        )
+    return built
+
+
 def _checks(
-    table: str, columns: Iterable[str], fields: Sequence[Mapping[str, Any]]
+    table: str,
+    columns: Iterable[str],
+    fields: Sequence[Mapping[str, Any]],
+    declared: Sequence[Mapping[str, Any]],
 ) -> list[sa.Constraint]:
     """The CHECKs a tool's table carries: a built-in tool table's, from the
-    columns it has, and each select field held to its options."""
+    columns it has, each select field held to its options, and its declared
+    checks."""
     from app.db.guild_ddl import tool_table_rules
 
     shared, _ = tool_table_rules(table, frozenset(columns), None)
@@ -325,7 +421,7 @@ def _checks(
                 info={_OPTIONS: True},
             )
         )
-    return checks
+    return checks + _declared_checks(table, fields, declared)
 
 
 def _table(
@@ -334,6 +430,7 @@ def _table(
     *,
     parent: tuple[str, sa.Table] | None,
     fields: Sequence[Mapping[str, Any]],
+    checks: Sequence[Mapping[str, Any]],
 ) -> sa.Table:
     """A tool's own table (``parent`` None) or an item table under
     ``parent``, a ``(column, table)``."""
@@ -378,7 +475,7 @@ def _table(
             nullable=False,
             server_default=sa.func.now(),
         ),
-        *_checks(name, (column.name for column in universal), fields),
+        *_checks(name, (column.name for column in universal), fields, checks),
         # A tool row is read back by no RETURNING clause, as a built-in
         # tool's is (``CounterGroup``): nothing is shared with anyone yet.
         implicit_returning=parent is not None,
@@ -414,6 +511,7 @@ def build_tool(
         tool_table_name(uid, key),
         parent=None,
         fields=block.get("fields", []),
+        checks=block.get("checks", []),
     )
     tables = {key: own}
     children: list[Kind] = []
@@ -429,6 +527,7 @@ def build_tool(
             tool_table_name(uid, item_key),
             parent=(f"{_key(parent_key, 'parent key')}_id", tables[parent_key]),
             fields=item.get("fields", []),
+            checks=item.get("checks", []),
         )
         item_kind = _kind(uid, item_key)
         if item_kind not in codes:
@@ -551,7 +650,14 @@ def _structure(table: sa.Table, record: ToolRecord) -> list[str]:
             statements.append(
                 f"ALTER TABLE {quoted} ALTER COLUMN {name}"
                 + (" DROP DEFAULT" if default is None else f" SET DEFAULT {default}")
+                + (
+                    ""
+                    if not column.nullable
+                    else f", ALTER COLUMN {name} DROP NOT NULL"
+                )
             )
+            if not column.nullable:
+                statements.append(_required(quoted, name))
     for check in sorted(
         (c for c in table.constraints if c.info.get(_OPTIONS)),
         key=lambda c: str(c.name),
@@ -562,6 +668,27 @@ def _structure(table: sa.Table, record: ToolRecord) -> list[str]:
             f"ALTER TABLE {quoted} DROP CONSTRAINT IF EXISTS {name},"
             + add.removeprefix(f"ALTER TABLE {quoted}")
         )
+    # A declared check holds the rows written from now on: one a later
+    # version adds does not refuse the rows already there.
+    declared = sorted(
+        (c for c in table.constraints if c.info.get(_DECLARED)),
+        key=lambda c: str(c.name),
+    )
+    retired = (
+        "DROP CONSTRAINT IF EXISTS "
+        + _DIALECT.identifier_preparer.quote(
+            object_name("ck", table.name, f"check_{index}")
+        )
+        for index in range(MAX_TOOL_CHECKS)
+    )
+    added = (
+        str(AddConstraint(check).compile(dialect=_DIALECT)).removeprefix(
+            f"ALTER TABLE {quoted} "
+        )
+        + " NOT VALID"
+        for check in declared
+    )
+    statements.append(f"ALTER TABLE {quoted} " + ", ".join((*retired, *added)))
     statements += [
         str(CreateIndex(index, if_not_exists=True).compile(dialect=_DIALECT))
         for index in sorted(table.indexes, key=lambda index: str(index.name))
@@ -572,6 +699,26 @@ def _structure(table: sa.Table, record: ToolRecord) -> list[str]:
         table.name, table.c.keys(), record.kind if table is record.table else None
     )
     return statements + triggers
+
+
+def _required(table: str, column: str) -> str:
+    """Makes ``column`` of ``table`` (both quoted) NOT NULL where it is not
+    yet, its empty cells first taking its default, as each row would have
+    had it been required from the start."""
+    regclass = _compiled(sa.literal(table, sa.Text))
+    attname = _compiled(sa.literal(column.strip('"'), sa.Text))
+    return (
+        "DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_attribute"
+        f" WHERE attrelid = {regclass}::regclass AND attname = {attname}"
+        " AND NOT attnotnull) THEN"
+        f" ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY;"
+        f" ALTER TABLE {table} DISABLE TRIGGER USER;"
+        f" UPDATE {table} SET {column} = DEFAULT WHERE {column} IS NULL;"
+        f" ALTER TABLE {table} ENABLE TRIGGER USER;"
+        f" ALTER TABLE {table} FORCE ROW LEVEL SECURITY;"
+        f" ALTER TABLE {table} ALTER COLUMN {column} SET NOT NULL;"
+        " END IF; END $$"
+    )
 
 
 def structure_ddl(tools: ToolSet) -> str:

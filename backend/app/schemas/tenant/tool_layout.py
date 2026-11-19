@@ -95,6 +95,9 @@ MAX_COMMUNITY_IDS = 50
 
 SLUG_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
 MAX_SLUG_LENGTH = 64
+#: What an ``items`` part previews of a row's items.
+MAX_PREVIEW_ITEMS = contract.cap("previewItems")
+MAX_PREVIEW_FIELDS = contract.cap("previewFields")
 
 
 class _Strict(SanitizedBaseModel):
@@ -394,6 +397,8 @@ DetailFieldId = Annotated[
 ]
 #: The field a list's look is for.
 DisplayFieldId = Annotated[PropertyFieldId, _ToolField]
+#: The colour field a card is drawn in.
+TintFieldId = Annotated[NamedFieldId, _ToolField]
 
 
 def _part_id(value: str) -> str:
@@ -406,6 +411,10 @@ def _part_id(value: str) -> str:
 
 
 # -- Parts --------------------------------------------------------------------
+
+
+def _unset(value: Any) -> bool:
+    return value is None
 
 
 class StackProps(_Strict):
@@ -421,8 +430,15 @@ class FieldProps(_Strict):
     field: CardFieldId
 
 
+class CardProps(_Strict):
+    #: A colour field of the row, which the card is drawn in. A row with no
+    #: colour draws plain.
+    tint: TintFieldId | None = None
+
+
 class CardPart(_Strict):
     type: Literal["card"]
+    props: CardProps | None = Field(default=None, exclude_if=_unset)
     children: list[CardChild] = Field(default_factory=list)
 
 
@@ -457,17 +473,37 @@ class PluginPart(_Strict):
     props: PluginPartProps
 
 
+#: What an item part names in the item table it previews: that table's
+#: fields, which the card's own table does not hold.
+_ItemKey = Annotated[str, Field(min_length=1, max_length=MAX_FIELD_ID_LENGTH)]
+
+
+class ItemsProps(_Strict):
+    #: The item table directly under the row's, by its key.
+    item: _ItemKey
+    #: Its fields each preview shows, in order.
+    fields: list[_ItemKey] = Field(min_length=1, max_length=MAX_PREVIEW_FIELDS)
+    #: How many of the row's items it shows at most.
+    limit: int = Field(ge=1, le=MAX_PREVIEW_ITEMS)
+    #: A colour field of the item table, which each preview is drawn in.
+    tint: _ItemKey | None = None
+
+
+class ItemsPart(_Strict):
+    """The row's first items of one item table, in their own order, each drawn
+    small with the fields ``fields`` names."""
+
+    type: Literal["items"]
+    props: ItemsProps
+
+
 CardChild = Annotated[
-    CardPart | StackPart | FieldPart | PropertiesPart | PluginPart,
+    CardPart | StackPart | FieldPart | PropertiesPart | PluginPart | ItemsPart,
     Field(discriminator="type"),
 ]
 
 CardPart.model_rebuild()
 StackPart.model_rebuild()
-
-
-def _unset(value: Any) -> bool:
-    return value is None
 
 
 class DetailFieldProps(_Strict):
@@ -600,8 +636,17 @@ TaskSortField = Literal[
 
 
 class PresetSort(_Strict):
-    field: TaskSortField
+    #: A task list's sort field, or, where the context names a tool plug-in's
+    #: fields, one of those.
+    field: Annotated[TaskSortField, _ToolField]
     dir: SortDir = SortDir.asc
+
+
+#: A preset's name in each language a tool plug-in ships it in.
+_PresetNames = dict[
+    Annotated[str, Field(min_length=1, max_length=35)],
+    Annotated[str, Field(min_length=1, max_length=100)],
+]
 
 
 class LayoutPreset(_Strict):
@@ -609,8 +654,11 @@ class LayoutPreset(_Strict):
     Picking one makes them that person's own."""
 
     #: Left out for a shipped preset no one renamed, which each reader sees
-    #: named in their own language.
-    name: str | None = Field(default=None, min_length=1, max_length=100)
+    #: named in their own language; a tool plug-in's names its in each
+    #: language it ships.
+    name: Annotated[str, Field(min_length=1, max_length=100)] | _PresetNames | None = (
+        None
+    )
     #: What a link to the preset carries; kept when it is renamed.
     slug: str = Field(min_length=1, max_length=MAX_SLUG_LENGTH, pattern=SLUG_PATTERN)
     #: Its tool's shape, which the service holds it to.
@@ -632,6 +680,17 @@ class LayoutGrouping(_Strict):
     hidden: list[Annotated[str, Field(max_length=MAX_SLUG_LENGTH)]] = Field(
         default_factory=list, max_length=MAX_HIDDEN_GROUPS
     )
+
+
+class DisplayFrom(_Strict):
+    """A look read from the row: a select field of it, each of whose options
+    is a look the drawn field has, so each row keeps its own."""
+
+    model_config = ConfigDict(
+        extra="forbid", validate_by_name=True, serialize_by_alias=True
+    )
+
+    from_: Annotated[NamedFieldId, _ToolField] = Field(alias="from")
 
 
 class ColumnLimit(_Strict):
@@ -664,8 +723,9 @@ class ListLayoutDefinition(_Strict):
     #: Left out of the list's menu; none keeps what its tool ships.
     hidden: bool | None = None
     #: How each scale or counter it shows is drawn, by the field's
-    #: ``property:<id>``. One with none is drawn as a number.
-    displays: dict[DisplayFieldId, FieldDisplay] | None = Field(
+    #: ``property:<id>``, or the select field of the row that names its look.
+    #: One with none is drawn as a number.
+    displays: dict[DisplayFieldId, FieldDisplay | DisplayFrom] | None = Field(
         default=None, max_length=MAX_NODES
     )
 
