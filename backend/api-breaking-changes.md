@@ -9,6 +9,326 @@ matter and can be deleted.
 
 ## After 0.79.2
 
+### A universal route takes any kind its community has
+
+The universal routes (archive, trash, comments, tags, links, sharing,
+properties, personal items, search, export and tool counts) take and answer a
+kind as a string, in place of an enum of the built-in kinds: a community's
+tool plug-ins bring kinds of their own. A kind the community does not have is
+404 `NOT_FOUND`, where a value outside the enum was 422.
+
+- POST /api/v1/c/{community_id}/archive/{entity_type}/{entity_id} removed the enum value `calendar` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/archive/{entity_type}/{entity_id} removed the enum value `collection` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/archive/{entity_type}/{entity_id} removed the enum value `contact` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/archive/{entity_type}/{entity_id} removed the enum value `counter_group` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/archive/{entity_type}/{entity_id} removed the enum value `dashboard` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/archive/{entity_type}/{entity_id} removed the enum value `file` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/archive/{entity_type}/{entity_id} removed the enum value `initiative` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/archive/{entity_type}/{entity_id} removed the enum value `post` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/archive/{entity_type}/{entity_id} removed the enum value `project` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/archive/{entity_type}/{entity_id} removed the enum value `task` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/archive/{entity_type}/{entity_id} removed the enum value `wiki` from the `path` request parameter `entity_type`
+- GET /api/v1/c/{community_id}/exports/{tool} removed the enum value `calendar` from the `path` request parameter `tool`
+- GET /api/v1/c/{community_id}/exports/{tool} removed the enum value `contact` from the `path` request parameter `tool`
+- GET /api/v1/c/{community_id}/exports/{tool} removed the enum value `counter_group` from the `path` request parameter `tool`
+- GET /api/v1/c/{community_id}/exports/{tool} removed the enum value `dashboard` from the `path` request parameter `tool`
+- GET /api/v1/c/{community_id}/exports/{tool} removed the enum value `file` from the `path` request parameter `tool`
+- GET /api/v1/c/{community_id}/exports/{tool} removed the enum value `post` from the `path` request parameter `tool`
+- GET /api/v1/c/{community_id}/exports/{tool} removed the enum value `project` from the `path` request parameter `tool`
+- GET /api/v1/c/{community_id}/exports/{tool} removed the enum value `wiki` from the `path` request parameter `tool`
+- DELETE /api/v1/c/{community_id}/personal-items/bookmark/{tool}/{entity_id} removed the enum value `calendar` from the `path` request parameter `tool`
+- DELETE /api/v1/c/{community_id}/personal-items/bookmark/{tool}/{entity_id} removed the enum value `contact` from the `path` request parameter `tool`
+- DELETE /api/v1/c/{community_id}/personal-items/bookmark/{tool}/{entity_id} removed the enum value `counter_group` from the `path` request parameter `tool`
+- DELETE /api/v1/c/{community_id}/personal-items/bookmark/{tool}/{entity_id} removed the enum value `dashboard` from the `path` request parameter `tool`
+- DELETE /api/v1/c/{community_id}/personal-items/bookmark/{tool}/{entity_id} removed the enum value `file` from the `path` request parameter `tool`
+- DELETE /api/v1/c/{community_id}/personal-items/bookmark/{tool}/{entity_id} removed the enum value `post` from the `path` request parameter `tool`
+- DELETE /api/v1/c/{community_id}/personal-items/bookmark/{tool}/{entity_id} removed the enum value `project` from the `path` request parameter `tool`
+- DELETE /api/v1/c/{community_id}/personal-items/bookmark/{tool}/{entity_id} removed the enum value `wiki` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/personal-items/bookmark/{tool}/{entity_id} removed the enum value `calendar` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/personal-items/bookmark/{tool}/{entity_id} removed the enum value `contact` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/personal-items/bookmark/{tool}/{entity_id} removed the enum value `counter_group` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/personal-items/bookmark/{tool}/{entity_id} removed the enum value `dashboard` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/personal-items/bookmark/{tool}/{entity_id} removed the enum value `file` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/personal-items/bookmark/{tool}/{entity_id} removed the enum value `post` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/personal-items/bookmark/{tool}/{entity_id} removed the enum value `project` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/personal-items/bookmark/{tool}/{entity_id} removed the enum value `wiki` from the `path` request parameter `tool`
+- DELETE /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `calendar_event` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `calendar` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `collection` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `contact` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `counter_group` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `counter` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `dashboard` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `file` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `post` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `project` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `task` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `wiki_page` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `wiki` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `calendar_event` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `calendar` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `collection` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `contact` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `counter_group` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `counter` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `dashboard` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `file` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `post` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `project` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `task` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `wiki_page` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `wiki` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `calendar_event` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `calendar` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `collection` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `contact` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `counter_group` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `counter` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `dashboard` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `file` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `post` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `project` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `task` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `wiki_page` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `wiki` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `calendar_event` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `calendar` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `collection` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `contact` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `counter_group` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `counter` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `dashboard` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `file` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `post` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `project` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `task` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `wiki_page` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `wiki` from the `path` request parameter `kind`
+- GET /api/v1/c/{community_id}/personal-items/{kind}/{entity_id} removed the enum value `calendar_event` from the `path` request parameter `kind`
+- GET /api/v1/c/{community_id}/personal-items/{kind}/{entity_id} removed the enum value `calendar` from the `path` request parameter `kind`
+- GET /api/v1/c/{community_id}/personal-items/{kind}/{entity_id} removed the enum value `collection` from the `path` request parameter `kind`
+- GET /api/v1/c/{community_id}/personal-items/{kind}/{entity_id} removed the enum value `contact` from the `path` request parameter `kind`
+- GET /api/v1/c/{community_id}/personal-items/{kind}/{entity_id} removed the enum value `counter_group` from the `path` request parameter `kind`
+- GET /api/v1/c/{community_id}/personal-items/{kind}/{entity_id} removed the enum value `counter` from the `path` request parameter `kind`
+- GET /api/v1/c/{community_id}/personal-items/{kind}/{entity_id} removed the enum value `dashboard` from the `path` request parameter `kind`
+- GET /api/v1/c/{community_id}/personal-items/{kind}/{entity_id} removed the enum value `file` from the `path` request parameter `kind`
+- GET /api/v1/c/{community_id}/personal-items/{kind}/{entity_id} removed the enum value `post` from the `path` request parameter `kind`
+- GET /api/v1/c/{community_id}/personal-items/{kind}/{entity_id} removed the enum value `project` from the `path` request parameter `kind`
+- GET /api/v1/c/{community_id}/personal-items/{kind}/{entity_id} removed the enum value `task` from the `path` request parameter `kind`
+- GET /api/v1/c/{community_id}/personal-items/{kind}/{entity_id} removed the enum value `wiki_page` from the `path` request parameter `kind`
+- GET /api/v1/c/{community_id}/personal-items/{kind}/{entity_id} removed the enum value `wiki` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/properties/{target}/{entity_id} removed the enum value `calendar_event` from the `path` request parameter `target`
+- PUT /api/v1/c/{community_id}/properties/{target}/{entity_id} removed the enum value `calendar` from the `path` request parameter `target`
+- PUT /api/v1/c/{community_id}/properties/{target}/{entity_id} removed the enum value `collection` from the `path` request parameter `target`
+- PUT /api/v1/c/{community_id}/properties/{target}/{entity_id} removed the enum value `contact` from the `path` request parameter `target`
+- PUT /api/v1/c/{community_id}/properties/{target}/{entity_id} removed the enum value `counter_group` from the `path` request parameter `target`
+- PUT /api/v1/c/{community_id}/properties/{target}/{entity_id} removed the enum value `counter` from the `path` request parameter `target`
+- PUT /api/v1/c/{community_id}/properties/{target}/{entity_id} removed the enum value `dashboard` from the `path` request parameter `target`
+- PUT /api/v1/c/{community_id}/properties/{target}/{entity_id} removed the enum value `file` from the `path` request parameter `target`
+- PUT /api/v1/c/{community_id}/properties/{target}/{entity_id} removed the enum value `post` from the `path` request parameter `target`
+- PUT /api/v1/c/{community_id}/properties/{target}/{entity_id} removed the enum value `project` from the `path` request parameter `target`
+- PUT /api/v1/c/{community_id}/properties/{target}/{entity_id} removed the enum value `task` from the `path` request parameter `target`
+- PUT /api/v1/c/{community_id}/properties/{target}/{entity_id} removed the enum value `wiki_page` from the `path` request parameter `target`
+- PUT /api/v1/c/{community_id}/properties/{target}/{entity_id} removed the enum value `wiki` from the `path` request parameter `target`
+- GET /api/v1/c/{community_id}/relationships/ added `subschema #1` to the `items/other/tool` response property `anyOf` list for the response status `200`
+- POST /api/v1/c/{community_id}/relationships/ added `subschema #1` to the `other/tool` response property `anyOf` list for the response status `201`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `calendar_event` of the request property `source/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `calendar_event` of the request property `target/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `calendar` of the request property `source/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `calendar` of the request property `target/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `collection` of the request property `source/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `collection` of the request property `target/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `contact` of the request property `source/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `contact` of the request property `target/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `counter_group` of the request property `source/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `counter_group` of the request property `target/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `counter` of the request property `source/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `counter` of the request property `target/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `dashboard` of the request property `source/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `dashboard` of the request property `target/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `file` of the request property `source/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `file` of the request property `target/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `post` of the request property `source/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `post` of the request property `target/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `project` of the request property `source/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `project` of the request property `target/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `tag` of the request property `source/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `tag` of the request property `target/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `task` of the request property `source/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `task` of the request property `target/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `user` of the request property `source/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `user` of the request property `target/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `wiki_page` of the request property `source/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `wiki_page` of the request property `target/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `wiki` of the request property `source/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `wiki` of the request property `target/type`
+- PUT /api/v1/c/{community_id}/relationships/ added `subschema #1` to the `items/other/tool` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/relationships/ removed the enum value `calendar_event` from the `query` request parameter `other_type`
+- PUT /api/v1/c/{community_id}/relationships/ removed the enum value `calendar` from the `query` request parameter `other_type`
+- PUT /api/v1/c/{community_id}/relationships/ removed the enum value `collection` from the `query` request parameter `other_type`
+- PUT /api/v1/c/{community_id}/relationships/ removed the enum value `contact` from the `query` request parameter `other_type`
+- PUT /api/v1/c/{community_id}/relationships/ removed the enum value `counter_group` from the `query` request parameter `other_type`
+- PUT /api/v1/c/{community_id}/relationships/ removed the enum value `counter` from the `query` request parameter `other_type`
+- PUT /api/v1/c/{community_id}/relationships/ removed the enum value `dashboard` from the `query` request parameter `other_type`
+- PUT /api/v1/c/{community_id}/relationships/ removed the enum value `file` from the `query` request parameter `other_type`
+- PUT /api/v1/c/{community_id}/relationships/ removed the enum value `post` from the `query` request parameter `other_type`
+- PUT /api/v1/c/{community_id}/relationships/ removed the enum value `project` from the `query` request parameter `other_type`
+- PUT /api/v1/c/{community_id}/relationships/ removed the enum value `tag` from the `query` request parameter `other_type`
+- PUT /api/v1/c/{community_id}/relationships/ removed the enum value `task` from the `query` request parameter `other_type`
+- PUT /api/v1/c/{community_id}/relationships/ removed the enum value `user` from the `query` request parameter `other_type`
+- PUT /api/v1/c/{community_id}/relationships/ removed the enum value `wiki_page` from the `query` request parameter `other_type`
+- PUT /api/v1/c/{community_id}/relationships/ removed the enum value `wiki` from the `query` request parameter `other_type`
+- GET /api/v1/c/{community_id}/relationships/neighbourhood added `subschema #1` to the `nodes/items/end/tool` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/resource-grants/bulk removed the enum value `calendar` of the request property `items/items/resource_type`
+- PUT /api/v1/c/{community_id}/resource-grants/bulk removed the enum value `contact` of the request property `items/items/resource_type`
+- PUT /api/v1/c/{community_id}/resource-grants/bulk removed the enum value `counter_group` of the request property `items/items/resource_type`
+- PUT /api/v1/c/{community_id}/resource-grants/bulk removed the enum value `dashboard` of the request property `items/items/resource_type`
+- PUT /api/v1/c/{community_id}/resource-grants/bulk removed the enum value `file` of the request property `items/items/resource_type`
+- PUT /api/v1/c/{community_id}/resource-grants/bulk removed the enum value `post` of the request property `items/items/resource_type`
+- PUT /api/v1/c/{community_id}/resource-grants/bulk removed the enum value `project` of the request property `items/items/resource_type`
+- PUT /api/v1/c/{community_id}/resource-grants/bulk removed the enum value `wiki` of the request property `items/items/resource_type`
+- GET /api/v1/c/{community_id}/search/ added `subschema #1` to the `items/items/tool` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/search/ removed the enum value `calendar_event` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/ removed the enum value `calendar` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/ removed the enum value `collection` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/ removed the enum value `comment` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/ removed the enum value `contact` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/ removed the enum value `counter_group` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/ removed the enum value `counter` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/ removed the enum value `dashboard` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/ removed the enum value `file` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/ removed the enum value `post` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/ removed the enum value `project` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/ removed the enum value `tag` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/ removed the enum value `task` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/ removed the enum value `wiki_page` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/ removed the enum value `wiki` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/recent added `subschema #1` to the `items/tool` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/search/recent removed the enum value `calendar_event` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/recent removed the enum value `calendar` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/recent removed the enum value `collection` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/recent removed the enum value `comment` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/recent removed the enum value `contact` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/recent removed the enum value `counter_group` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/recent removed the enum value `counter` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/recent removed the enum value `dashboard` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/recent removed the enum value `file` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/recent removed the enum value `post` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/recent removed the enum value `project` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/recent removed the enum value `tag` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/recent removed the enum value `task` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/recent removed the enum value `wiki_page` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/recent removed the enum value `wiki` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/suggest added `subschema #1` to the `items/tool` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/search/suggest removed the enum value `calendar_event` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/suggest removed the enum value `calendar` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/suggest removed the enum value `collection` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/suggest removed the enum value `comment` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/suggest removed the enum value `contact` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/suggest removed the enum value `counter_group` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/suggest removed the enum value `counter` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/suggest removed the enum value `dashboard` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/suggest removed the enum value `file` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/suggest removed the enum value `post` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/suggest removed the enum value `project` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/suggest removed the enum value `tag` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/suggest removed the enum value `task` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/suggest removed the enum value `wiki_page` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/suggest removed the enum value `wiki` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- POST /api/v1/c/{community_id}/tags/bulk removed the enum value `calendar_event` of the request property `target_type`
+- POST /api/v1/c/{community_id}/tags/bulk removed the enum value `calendar` of the request property `target_type`
+- POST /api/v1/c/{community_id}/tags/bulk removed the enum value `collection` of the request property `target_type`
+- POST /api/v1/c/{community_id}/tags/bulk removed the enum value `contact` of the request property `target_type`
+- POST /api/v1/c/{community_id}/tags/bulk removed the enum value `counter_group` of the request property `target_type`
+- POST /api/v1/c/{community_id}/tags/bulk removed the enum value `dashboard` of the request property `target_type`
+- POST /api/v1/c/{community_id}/tags/bulk removed the enum value `file` of the request property `target_type`
+- POST /api/v1/c/{community_id}/tags/bulk removed the enum value `post` of the request property `target_type`
+- POST /api/v1/c/{community_id}/tags/bulk removed the enum value `project` of the request property `target_type`
+- POST /api/v1/c/{community_id}/tags/bulk removed the enum value `task` of the request property `target_type`
+- POST /api/v1/c/{community_id}/tags/bulk removed the enum value `wiki_page` of the request property `target_type`
+- POST /api/v1/c/{community_id}/tags/bulk removed the enum value `wiki` of the request property `target_type`
+- GET /api/v1/c/{community_id}/tags/{tag_id}/entities added `subschema #1` to the `items/items/tool` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/tags/{tag_id}/entities removed the enum value `calendar_event` from the `query` request parameter `kind`
+- GET /api/v1/c/{community_id}/tags/{tag_id}/entities removed the enum value `calendar` from the `query` request parameter `kind`
+- GET /api/v1/c/{community_id}/tags/{tag_id}/entities removed the enum value `collection` from the `query` request parameter `kind`
+- GET /api/v1/c/{community_id}/tags/{tag_id}/entities removed the enum value `contact` from the `query` request parameter `kind`
+- GET /api/v1/c/{community_id}/tags/{tag_id}/entities removed the enum value `counter_group` from the `query` request parameter `kind`
+- GET /api/v1/c/{community_id}/tags/{tag_id}/entities removed the enum value `dashboard` from the `query` request parameter `kind`
+- GET /api/v1/c/{community_id}/tags/{tag_id}/entities removed the enum value `file` from the `query` request parameter `kind`
+- GET /api/v1/c/{community_id}/tags/{tag_id}/entities removed the enum value `post` from the `query` request parameter `kind`
+- GET /api/v1/c/{community_id}/tags/{tag_id}/entities removed the enum value `project` from the `query` request parameter `kind`
+- GET /api/v1/c/{community_id}/tags/{tag_id}/entities removed the enum value `task` from the `query` request parameter `kind`
+- GET /api/v1/c/{community_id}/tags/{tag_id}/entities removed the enum value `wiki_page` from the `query` request parameter `kind`
+- GET /api/v1/c/{community_id}/tags/{tag_id}/entities removed the enum value `wiki` from the `query` request parameter `kind`
+- GET /api/v1/c/{community_id}/tools/counts/by-initiative removed 'propertyNames' constraint from the `counts` response property for the status `200`
+- GET /api/v1/c/{community_id}/tools/{tool}/counts removed the enum value `calendar` from the `path` request parameter `tool`
+- GET /api/v1/c/{community_id}/tools/{tool}/counts removed the enum value `contact` from the `path` request parameter `tool`
+- GET /api/v1/c/{community_id}/tools/{tool}/counts removed the enum value `counter_group` from the `path` request parameter `tool`
+- GET /api/v1/c/{community_id}/tools/{tool}/counts removed the enum value `dashboard` from the `path` request parameter `tool`
+- GET /api/v1/c/{community_id}/tools/{tool}/counts removed the enum value `file` from the `path` request parameter `tool`
+- GET /api/v1/c/{community_id}/tools/{tool}/counts removed the enum value `post` from the `path` request parameter `tool`
+- GET /api/v1/c/{community_id}/tools/{tool}/counts removed the enum value `project` from the `path` request parameter `tool`
+- GET /api/v1/c/{community_id}/tools/{tool}/counts removed the enum value `wiki` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/tools/{tool}/{tool_id}/comments removed the enum value `calendar` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/tools/{tool}/{tool_id}/comments removed the enum value `contact` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/tools/{tool}/{tool_id}/comments removed the enum value `counter_group` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/tools/{tool}/{tool_id}/comments removed the enum value `dashboard` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/tools/{tool}/{tool_id}/comments removed the enum value `file` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/tools/{tool}/{tool_id}/comments removed the enum value `post` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/tools/{tool}/{tool_id}/comments removed the enum value `project` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/tools/{tool}/{tool_id}/comments removed the enum value `wiki` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/tools/{tool}/{tool_id}/tags removed the enum value `calendar` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/tools/{tool}/{tool_id}/tags removed the enum value `contact` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/tools/{tool}/{tool_id}/tags removed the enum value `counter_group` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/tools/{tool}/{tool_id}/tags removed the enum value `dashboard` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/tools/{tool}/{tool_id}/tags removed the enum value `file` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/tools/{tool}/{tool_id}/tags removed the enum value `post` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/tools/{tool}/{tool_id}/tags removed the enum value `project` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/tools/{tool}/{tool_id}/tags removed the enum value `wiki` from the `path` request parameter `tool`
+- DELETE /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/purge removed the enum value `calendar_event` from the `path` request parameter `entity_type`
+- DELETE /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/purge removed the enum value `calendar` from the `path` request parameter `entity_type`
+- DELETE /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/purge removed the enum value `collection` from the `path` request parameter `entity_type`
+- DELETE /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/purge removed the enum value `comment` from the `path` request parameter `entity_type`
+- DELETE /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/purge removed the enum value `contact` from the `path` request parameter `entity_type`
+- DELETE /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/purge removed the enum value `counter_group` from the `path` request parameter `entity_type`
+- DELETE /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/purge removed the enum value `counter` from the `path` request parameter `entity_type`
+- DELETE /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/purge removed the enum value `dashboard` from the `path` request parameter `entity_type`
+- DELETE /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/purge removed the enum value `file` from the `path` request parameter `entity_type`
+- DELETE /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/purge removed the enum value `initiative` from the `path` request parameter `entity_type`
+- DELETE /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/purge removed the enum value `post` from the `path` request parameter `entity_type`
+- DELETE /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/purge removed the enum value `project` from the `path` request parameter `entity_type`
+- DELETE /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/purge removed the enum value `tag` from the `path` request parameter `entity_type`
+- DELETE /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/purge removed the enum value `task` from the `path` request parameter `entity_type`
+- DELETE /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/purge removed the enum value `wiki_page` from the `path` request parameter `entity_type`
+- DELETE /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/purge removed the enum value `wiki` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/restore removed the enum value `calendar_event` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/restore removed the enum value `calendar` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/restore removed the enum value `collection` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/restore removed the enum value `comment` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/restore removed the enum value `contact` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/restore removed the enum value `counter_group` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/restore removed the enum value `counter` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/restore removed the enum value `dashboard` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/restore removed the enum value `file` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/restore removed the enum value `initiative` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/restore removed the enum value `post` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/restore removed the enum value `project` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/restore removed the enum value `tag` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/restore removed the enum value `task` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/restore removed the enum value `wiki_page` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/restore removed the enum value `wiki` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/unarchive/{entity_type}/{entity_id} removed the enum value `calendar` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/unarchive/{entity_type}/{entity_id} removed the enum value `collection` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/unarchive/{entity_type}/{entity_id} removed the enum value `contact` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/unarchive/{entity_type}/{entity_id} removed the enum value `counter_group` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/unarchive/{entity_type}/{entity_id} removed the enum value `dashboard` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/unarchive/{entity_type}/{entity_id} removed the enum value `file` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/unarchive/{entity_type}/{entity_id} removed the enum value `initiative` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/unarchive/{entity_type}/{entity_id} removed the enum value `post` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/unarchive/{entity_type}/{entity_id} removed the enum value `project` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/unarchive/{entity_type}/{entity_id} removed the enum value `task` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/unarchive/{entity_type}/{entity_id} removed the enum value `wiki` from the `path` request parameter `entity_type`
+
 ### An initiative's tool switches are one map
 
 Each initiative's switch for each tool is a rule of the initiative's, read and
