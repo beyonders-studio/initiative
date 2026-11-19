@@ -8,6 +8,7 @@
  */
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderPage } from "@/__tests__/helpers/render";
@@ -121,16 +122,29 @@ describe("NewConversationDialog", () => {
     expect(screen.getByRole("button", { name: /Actions for hedy/i })).toBeEnabled();
   });
 
-  it("opens from outside without drawing a button of its own", async () => {
-    const onOpenChange = vi.fn();
-    renderPage(() => <NewConversationDialog open onOpenChange={onOpenChange} />, {
-      initialRoute: "/messages",
-    });
+  it("opens and shuts from outside without drawing a button of its own", async () => {
+    const Holder = () => {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            Create
+          </button>
+          <NewConversationDialog open={open} onOpenChange={setOpen} />
+        </>
+      );
+    };
+    renderPage(() => <Holder />, { initialRoute: "/messages" });
 
+    await userEvent.click(await screen.findByRole("button", { name: "Create" }));
     expect(await screen.findByRole("dialog", { name: "Start a conversation" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "Start a conversation" })).toBeNull();
-    await userEvent.click(screen.getByText("ada"));
-    expect(onOpenChange).toHaveBeenCalledWith(false);
+
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+    expect(await screen.findByRole("dialog", { name: "Start a conversation" })).toBeVisible();
   });
 
   it("goes to the conversation rather than deciding anything about it", async () => {
