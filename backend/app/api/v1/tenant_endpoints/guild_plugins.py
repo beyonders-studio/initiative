@@ -377,15 +377,28 @@ async def _provision_tool(
     of its tables: rows its community's rules admit once they are rendered
     with it. Until then a new install's tool is off everywhere. ``drop`` is
     the columns a new major version stops declaring, which the seat
-    confirmed. Where any of it fails, the install is taken back, or put back
-    on ``previous`` (its version and definition), and the community rendered
-    again, so no install stands without the tables its version declares."""
+    confirmed. Where any of it fails, the install is taken back, and the
+    community rendered again, so no install stands without the tables its
+    version declares. A new version is put back on ``previous`` (its version
+    and definition) only where its tables were not brought up to it: once
+    they were, a field it dropped is gone, so it stays, and only rows for a
+    table it added can be missing, which its starting layouts are."""
     guild_id, plugin_id = routed_guild_id(session), plugin.id
+    provisioned = False
     try:
         await provision_community_tools(guild_id, drop=drop)
+        provisioned = True
         await initiative_tools.write_plugin_tool_rules(session)
         await session.commit()
     except Exception as exc:
+        if provisioned and previous is not None:
+            logger.exception(
+                "tool plug-in %s: rows for its new version in guild %s",
+                plugin_id,
+                guild_id,
+            )
+            await session.rollback()
+            return
         logger.exception("tool plug-in %s: provisioning guild %s", plugin_id, guild_id)
         await session.rollback()
         if previous is None:
