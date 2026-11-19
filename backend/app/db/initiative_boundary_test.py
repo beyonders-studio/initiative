@@ -75,16 +75,19 @@ from app.db.plugin_tools import provisioned_tools
 from app.db.soft_delete_filter import SOFT_DELETE_TABLES
 from app.db.tool_rows import load_row, locate
 from app.models.platform.guild import CommunityRole
+from app.models.platform.notification import Notification, NotificationType
 from app.models.platform.plugin_install import PluginInstall, PluginInstallStatus
 from app.models.tenant._mixins import ActorKind
 from app.models.tenant.initiative import InitiativeRule
-from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
+from app.models.tenant.metadata import MetadataType
+from app.models.tenant.personal_item import PersonalItem
 from app.services.tenant.initiative_tools import write_switches
 from app.testing import (
     COUNTERS_UID,
     Actor,
-    add_counter_group,
     create_initiative,
+    create_property_definition,
+    drain_notices,
     install_tool_plugin,
     make_operations_community,
     route_as,
@@ -1057,9 +1060,9 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
 
     async def sweep_state(state: str, *, reads: bool) -> None:
         """Every row of the tool plug-in's in A reads as ``reads`` says, to A's
-        moderator and the community admin, and none is written. With it read
-        only, only the tool's own rows are held to that here: what is said,
-        reacted and linked on them, by the sharing and holds sweep below."""
+        moderator and the community admin, and none is written. A comment on
+        a read-only tool's row is said, changed and removed as on any row its
+        reader reads, so only the tool's own rows are held to that there."""
         for who, person in everybody.items():
             reader = await reading_as(person, guild.id)
             for name, case in plugin_cases.items():
@@ -1397,177 +1400,184 @@ async def test_the_tool_plugin_routes_keep_its_rows_in_their_initiative(
     await watching.rollback()
 
 
-async def test_sharing_holds_and_responses_keep_a_tool_plugins_rows_in_their_initiative(
+async def test_notices_and_marks_keep_a_tool_plugins_rows_in_their_initiative(
     session: AsyncSession,
     acting_user: Callable[..., Awaitable[Actor]],
-    reading_as: Callable[[int, int], Awaitable[AsyncSession]],
     client: AsyncClient,
 ) -> None:
-    """A tool plug-in's row in initiative A, shared by name with a moderator
-    of B and a member of no initiative, is shared, held and taken out of the
-    trash by neither of them, and shared by A's moderator. With the plug-in
-    read only, A's moderator reads the comments on its rows and says, reacts
-    and links nothing more on them."""
-    from app.services.tenant.soft_delete import trash
-
+    """A reply, an @mention and a subscription on a tool plug-in's item in
+    initiative A tell only people who can open it, and its line names it: a
+    moderator of B and a member of no initiative hear nothing, though it is
+    shared with them by name, they are mentioned and they subscribed to it
+    and its tool. Neither of them views, bookmarks or subscribes to A's rows
+    or sets a property on them, which A's moderators do; a kind the community
+    lacks is not found."""
     admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     guild = admin.guild
     initiative_b = await create_initiative(session, guild, admin.user)
-    moderator_a = await acting_user(
-        guild=guild, initiative=admin.initiative, initiative_role="moderator"
-    )
+    moderators_a = [
+        await acting_user(
+            guild=guild, initiative=admin.initiative, initiative_role="moderator"
+        )
+        for _ in range(3)
+    ]
+    moderator_a, mentioned_a, subscriber_a = moderators_a
     moderator_b = await acting_user(
         guild=guild, initiative=initiative_b, initiative_role="moderator"
     )
     outsider = await acting_user(guild=guild)
-    await session.commit()
+    text = await create_property_definition(session, admin.initiative)
+    person = await create_property_definition(
+        session, admin.initiative, type=MetadataType.user_reference
+    )
     seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
-    install = await install_tool_plugin(client, session, seat)
+    await install_tool_plugin(client, session, seat)
     tools = await provisioned_tools(guild.id)
     tool = tools.installed[0]
     (item_kind,) = (child.value for child in tool.children)
-    mine = await reading_as(moderator_a.user.id, guild.id)
-    rows: dict[str, int] = dict(
-        zip((tool.kind, item_kind), await add_counter_group(mine, admin.initiative.id))
+    await route_session_to_guild(session, guild.id)
+    seeder = _Seeder(
+        session,
+        await _Catalog.read(session),
+        admin.initiative.id,
+        grantor=moderator_a.user.id,
+        grantees=(moderator_b.user.id, outsider.user.id),
+        tools=tools,
     )
-    trashed, _ = await add_counter_group(mine, admin.initiative.id)
-    mine.add_all(
-        ResourceGrant(
-            resource_type=tool.kind,
-            resource_id=row_id,
-            initiative_id=admin.initiative.id,
-            user_id=person.user.id,
-            level=ResourceAccessLevel.write,
-        )
-        for row_id in (rows[tool.kind], trashed)
-        for person in (moderator_b, outsider)
-    )
-    await mine.flush()
-    located = locate(tools, tool.kind)
-    assert located is not None
-    row = await load_row(mine, located, tools, trashed)
-    assert row is not None
-    await trash(mine, row, deleted_by_user_id=moderator_a.user.id)
-    await mine.commit()
-
-    def sharing(row_id: int, kind: str = tool.kind) -> dict[str, Any]:
-        return {
-            "items": [
-                {
-                    "resource_type": kind,
-                    "resource_id": row_id,
-                    "grants": [{"user_id": outsider.user.id, "level": "read"}],
-                }
-            ]
-        }
-
+    item_row = await seeder.make(tool.items[0].name, moderator_a.user.id)
+    rows = {
+        tool.kind: item_row[f"{tool.kind.split('.')[0]}_id"],
+        item_kind: item_row["id"],
+    }
+    # Subscribed before they were moved out of reach: kept, and not told.
     for actor in (moderator_b, outsider):
-        response = await client.put(
-            actor.g("/resource-grants/bulk"),
-            headers=actor.headers,
-            json=sharing(rows[tool.kind]),
-        )
-        assert response.status_code == 200, response.text
-        assert response.json()["results"][0]["status"] == "not_found"
         for kind, row_id in rows.items():
-            response = await client.post(
-                actor.g("/holds"),
-                headers=actor.headers,
-                json={
-                    "target_type": kind,
-                    "target_id": row_id,
-                    "reason": "legal_request",
-                },
+            session.add(
+                PersonalItem(
+                    user_id=actor.user.id,
+                    entity_type=kind,
+                    entity_id=row_id,
+                    subscribed_at=datetime.now(UTC),
+                )
             )
+    await session.commit()
+
+    def properties(actor: Actor, kind: str, values: list[dict[str, Any]]) -> Any:
+        return client.put(
+            actor.g(f"/properties/{kind}/{rows.get(kind, 1)}"),
+            headers=actor.headers,
+            json={"values": values},
+        )
+
+    written = [{"property_id": text.id, "value": "boundary"}]
+    for actor in (moderator_b, outsider):
+        for kind, row_id in rows.items():
+            for mark in ("view", "subscribe"):
+                response = await client.put(
+                    actor.g(f"/personal-items/{mark}/{kind}/{row_id}"),
+                    headers=actor.headers,
+                )
+                assert response.status_code == 404, (mark, kind, response.text)
+            response = await properties(actor, kind, written)
             assert response.status_code == 404, (kind, response.text)
-        response = await client.post(
-            actor.g(f"/trash/{tool.kind}/{trashed}/restore"), headers=actor.headers
+        response = await client.put(
+            actor.g(f"/personal-items/bookmark/{tool.kind}/{rows[tool.kind]}"),
+            headers=actor.headers,
         )
         assert response.status_code == 404, response.text
 
-    # A kind the community lacks is not found.
-    stranger = f"stranger.{'x' * 14}"
-    response = await client.put(
-        moderator_a.g("/resource-grants/bulk"),
-        headers=moderator_a.headers,
-        json=sharing(rows[tool.kind], stranger),
-    )
-    assert response.json()["results"][0]["status"] == "not_found", response.text
-    response = await client.post(
-        moderator_a.g("/holds"),
-        headers=moderator_a.headers,
-        json={"target_type": stranger, "target_id": 1, "reason": "legal_request"},
-    )
+    # A kind the community has not installed is not found, nor is an item
+    # bookmarked: a bookmark is on a tool.
+    stranger = f"stranger.{'X' * 14}"
+    for method, path in (
+        ("GET", f"/personal-items/{stranger}/1"),
+        ("PUT", f"/personal-items/subscribe/{stranger}/1"),
+        ("PUT", f"/personal-items/bookmark/{stranger}/1"),
+        ("PUT", f"/personal-items/bookmark/{item_kind}/{rows[item_kind]}"),
+    ):
+        response = await client.request(
+            method, moderator_a.g(path), headers=moderator_a.headers
+        )
+        assert response.status_code == 404, (path, response.text)
+    response = await properties(moderator_a, stranger, written)
     assert response.status_code == 404, response.text
 
     response = await client.put(
-        moderator_a.g("/resource-grants/bulk"),
+        moderator_a.g(f"/personal-items/bookmark/{tool.kind}/{rows[tool.kind]}"),
         headers=moderator_a.headers,
-        json=sharing(rows[tool.kind]),
     )
-    assert response.json()["results"][0]["status"] == "ok", response.text
-
-    # Said while the tool may be written, each comment is read once it is
-    # read only, and nothing more is said, reacted or linked on its rows.
-    comments: dict[str, int] = {}
-    for kind, row_id in rows.items():
-        response = await client.post(
-            moderator_a.g("/comments/"),
-            headers=moderator_a.headers,
-            json={"subject_type": kind, "subject_id": row_id, "content": "hi"},
-        )
-        assert response.status_code == 201, (kind, response.text)
-        comments[kind] = response.json()["id"]
-    link = sa.text(
-        "INSERT INTO relationships (source_type, source_id, relationship_type,"
-        " target_type, target_id, provenance, created_at)"
-        " VALUES (:s, :si, 'depends_on', :t, :ti, 'manual', now())"
+    assert response.status_code == 200, response.text
+    assert response.json()["entity_type"] == tool.kind
+    response = await client.get(
+        moderator_a.g("/personal-items"),
+        headers=moderator_a.headers,
+        params={"mark": "bookmark"},
     )
-    ends = {
-        "s": tool.kind,
-        "si": rows[tool.kind],
-        "t": item_kind,
-        "ti": rows[item_kind],
-    }
-    linking = await reading_as(moderator_a.user.id, guild.id)
-    assert await _attempt(linking, link.bindparams(**ends)) == 1
-    await linking.rollback()
-
-    read_only = {"status": PluginInstallStatus.read_only.value}
-    await session.exec(
-        pg_insert(PluginInstall)
-        .values(
-            guild_id=guild.id,
-            install_id=install["id"],
-            listing_uid=COUNTERS_UID,
-            enabled=True,
-            **read_only,
-        )
-        .on_conflict_do_update(
-            index_elements=["guild_id", "install_id"], set_=read_only
-        )
+    assert [
+        (item["entity_type"], item["entity_id"], item["initiative_id"])
+        for item in response.json()
+    ] == [(tool.kind, rows[tool.kind], admin.initiative.id)], response.text
+    response = await client.put(
+        subscriber_a.g(f"/personal-items/subscribe/{item_kind}/{rows[item_kind]}"),
+        headers=subscriber_a.headers,
     )
-    await session.commit()
-    for kind, row_id in rows.items():
-        response = await client.get(
-            moderator_a.g("/comments/"),
-            headers=moderator_a.headers,
-            params={"subject_type": kind, "subject_id": row_id},
-        )
+    assert response.status_code == 200, response.text
+    assert response.json()["subscribed"] is True
+    for kind in rows:
+        response = await properties(moderator_a, kind, written)
         assert response.status_code == 200, (kind, response.text)
-        assert [c["id"] for c in response.json()["comments"]] == [comments[kind]]
-        response = await client.post(
-            moderator_a.g("/comments/"),
-            headers=moderator_a.headers,
-            json={"subject_type": kind, "subject_id": row_id, "content": "again"},
+        assert [value["value"] for value in response.json()] == ["boundary"]
+        response = await properties(
+            moderator_a, kind, [{"property_id": person.id, "value": outsider.user.id}]
         )
-        assert response.status_code == 403, (kind, response.text)
-        response = await client.put(
-            moderator_a.g(f"/reactions/comment/{comments[kind]}"),
-            headers=moderator_a.headers,
-            json={"emoji": "👍"},
-        )
-        assert response.status_code == 403, (kind, response.text)
-    linking = await reading_as(moderator_a.user.id, guild.id)
-    assert await _attempt(linking, link.bindparams(**ends)) == _REFUSED
-    await linking.rollback()
+        assert response.status_code == 422, (kind, response.text)
+
+    said = await client.post(
+        moderator_a.g("/comments/"),
+        headers=moderator_a.headers,
+        json={
+            "subject_type": item_kind,
+            "subject_id": rows[item_kind],
+            "content": "first",
+        },
+    )
+    assert said.status_code == 201, said.text
+    mentions = " ".join(
+        f"@[someone]({actor.user.id})" for actor in (mentioned_a, moderator_b, outsider)
+    )
+    answered = await client.post(
+        admin.g("/comments/"),
+        headers=admin.headers,
+        json={
+            "subject_type": item_kind,
+            "subject_id": rows[item_kind],
+            "content": f"answer {mentions}",
+            "parent_comment_id": said.json()["id"],
+        },
+    )
+    assert answered.status_code == 201, answered.text
+    await drain_notices()
+
+    told = {
+        user_id: kind
+        for user_id, kind, data in (
+            await session.exec(
+                sa.select(Notification.user_id, Notification.type, Notification.data)
+            )
+        ).all()
+        if data.get("comment_id") == answered.json()["id"]
+        and data.get("target_path")
+        == f"/go/{item_kind.replace('_', '-')}/{rows[item_kind]}"
+    }
+    assert told == {
+        moderator_a.user.id: NotificationType.comment_reply,
+        mentioned_a.user.id: NotificationType.mention,
+        subscriber_a.user.id: NotificationType.subscription_activity,
+    }
+    response = await client.get("/api/v1/notifications/", headers=moderator_a.headers)
+    (line,) = (
+        line
+        for line in response.json()["notifications"]
+        if line["data"].get("comment_id") == answered.json()["id"]
+    )
+    assert line["data"]["entity_name"] == item_row["name"], line
