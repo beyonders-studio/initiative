@@ -1859,13 +1859,20 @@ NAMED_PEOPLE: tuple[NamedPerson, ...] = (
 )
 
 
-def initiative_of(table: str, row: str, *, qualify: str = "") -> str:
+def initiative_of(
+    table: str,
+    row: str,
+    *,
+    qualify: str = "",
+    paths: Mapping[str, InitiativePath] | None = None,
+) -> str:
     """The initiative a row of ``table`` belongs to, as a sub-select, walked
     through the hops its policies declare. ``qualify`` goes before each table
     name (a schema). A table that names its subject as a ``(kind, id)`` pair,
     or holds its own ``initiative_id``, has no hops to walk, and answers
-    through its own ``initiative_expr``."""
-    path = INITIATIVE_PATHS[table]
+    through its own ``initiative_expr``. ``paths`` are a community's
+    (:func:`paths_for`), the built-in tools' when not given."""
+    path = (paths or INITIATIVE_PATHS)[table]
     if path.dac is None or not path.dac.via:
         return path.initiative_expr(row)
     hops = path.dac.via

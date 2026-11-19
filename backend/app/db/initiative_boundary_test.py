@@ -40,27 +40,33 @@ from typing import Any
 
 import pytest
 import sqlalchemy as sa
+from httpx import AsyncClient
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import DBAPIError
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.tool_set import BUILTIN_TOOLS
-from app.core.tools import COMMENT_TARGETS, Tool
+from app.core.tool_set import BUILTIN_TOOLS, ToolRecord, ToolSet
+from app.core.tools import Tool
 from app.db.guild_ddl import _WRITTEN_BY
 from app.db.initiative_rls import (
     INITIATIVE_PATHS,
     entity_tables,
     governing_walk,
     initiative_of,
+    paths_for,
 )
+from app.db.plugin_tools import provisioned_tools
 from app.db.soft_delete_filter import SOFT_DELETE_TABLES
 from app.models.platform.guild import CommunityRole
 from app.models.tenant._mixins import ActorKind
 from app.models.tenant.initiative import InitiativeRule
 from app.services.tenant.initiative_tools import write_switches
 from app.testing import (
+    COUNTERS_UID,
     Actor,
     create_initiative,
+    install_tool_plugin,
     make_operations_community,
     route_as,
     route_session_to_guild,
@@ -141,7 +147,8 @@ _SEEN_WITH: dict[str, tuple[str, str]] = {
 }
 
 #: Commands a moderator of A is refused on a table by a rule other than the
-#: initiative's, which the positive control leaves out.
+#: initiative's, which the positive control leaves out. A tool plug-in's
+#: tables are added by :func:`_not_a_moderators`.
 _NOT_A_MODERATORS: dict[str, frozenset[str]] = {
     # Hard deletion is the community admin's purge; a member's is the trash.
     **{t: frozenset({"DELETE"}) for t in SOFT_DELETE_TABLES if t in INITIATIVE_PATHS},
@@ -153,23 +160,32 @@ _NOT_A_MODERATORS: dict[str, frozenset[str]] = {
     "moderation_actions": frozenset({"UPDATE", "DELETE"}),
 }
 
+
+def _not_a_moderators(tools: ToolSet) -> dict[str, frozenset[str]]:
+    """:data:`_NOT_A_MODERATORS` in a community with ``tools``: a tool
+    plug-in's tables have the trash from the same mixin."""
+    trashed = tools.tables_carrying("deleted_at")
+    return {**_NOT_A_MODERATORS, **{t: frozenset({"DELETE"}) for t in trashed}}
+
+
 #: Tables the community's administration reads and writes rather than an
 #: initiative's members, whose positive control is the community admin.
 _ADMINISTERED: frozenset[str] = frozenset({"guest_invite_grants"})
 
-#: Tables whose row names its subject by kind, swept once per kind it may name,
-#: so every kind's arm of the policy is proven and not only the first.
-_EVERY_SUBJECT: dict[str, tuple[str, tuple[str, ...]]] = {
-    "comments": ("subject_type", COMMENT_TARGETS),
+#: Tables whose row names its subject by kind, swept once per kind it may name
+#: in the community, so every kind's arm of the policy is proven and not only
+#: the first.
+_EVERY_SUBJECT: dict[str, tuple[str, Callable[[ToolSet], tuple[str, ...]]]] = {
+    "comments": ("subject_type", lambda tools: tools.comment_targets),
 }
 
 
-def _variants(name: str) -> list[tuple[str, dict[str, Any] | None]]:
+def _variants(name: str, tools: ToolSet) -> list[tuple[str, dict[str, Any] | None]]:
     """The cases one table is swept as: once, or once per subject kind."""
     if name not in _EVERY_SUBJECT:
         return [(name, None)]
     column, kinds = _EVERY_SUBJECT[name]
-    return [(f"{name} on a {kind}", {column: kind}) for kind in kinds]
+    return [(f"{name} on a {kind}", {column: kind}) for kind in kinds(tools)]
 
 
 @dataclass(frozen=True)
@@ -259,12 +275,22 @@ class _Seeder:
     #: Who makes the grants on tool rows, and who they are made to.
     grantor: int
     grantees: tuple[int, ...]
+    #: The community's tools, a tool plug-in's among them.
+    tools: ToolSet = BUILTIN_TOOLS
     counter: int = 0
     #: How many rows took a ``_DISTINCT`` value, by ``(table, column)``.
     taken: dict[tuple[str, str], int] = field(default_factory=dict)
 
     def table(self, name: str) -> sa.Table:
-        return SQLModel.metadata.tables[name]
+        found = SQLModel.metadata.tables.get(name)
+        if found is not None:
+            return found
+        return next(
+            table
+            for record in self.tools.installed
+            for table in (record.table, *record.items)
+            if table.name == name
+        )
 
     def required(self, table: sa.Table, column: sa.Column) -> bool:
         """NOT NULL in the schema, with nothing on either side to fill it."""
@@ -293,7 +319,7 @@ class _Seeder:
         allowed = self.catalog.allowed.get((table, column))
         if allowed is None or Tool.project.value in allowed:
             return Tool.project.value
-        return next(kind for kind in allowed if kind in entity_tables(BUILTIN_TOOLS))
+        return next(kind for kind in allowed if kind in entity_tables(self.tools))
 
     def _fill(self, table: sa.Table, column: sa.Column) -> Any:
         """A value for a NOT NULL column nothing else decided: the first its
@@ -394,7 +420,7 @@ class _Seeder:
             kind = values[kind_column]
             # A grant is made on a subject nobody holds one on yet.
             subject = await self.make(
-                entity_tables(BUILTIN_TOOLS).get(kind, kind),
+                entity_tables(self.tools).get(kind, kind),
                 owner,
                 share=name != "resource_grants",
             )
@@ -422,7 +448,7 @@ class _Seeder:
         if name in _SEEN_WITH:
             child, column = _SEEN_WITH[name]
             await self.make(child, owner, inherit={column: row["id"]})
-        tool = BUILTIN_TOOLS.by_table.get(name)
+        tool = self.tools.by_table.get(name)
         if tool is not None and share:
             grants = self.table("resource_grants")
             for person in self.grantees:
@@ -528,13 +554,13 @@ def _own_writes(case: _Case, person: int) -> dict[str, sa.Executable]:
     }
 
 
-def _locating(table: sa.Table) -> list[str]:
+def _locating(table: sa.Table, paths: dict[str, Any]) -> list[str]:
     """The columns that say which initiative a row is in: its own
     ``initiative_id``, its foreign keys to initiative-scoped rows, and the
     ``(kind, id)`` pairs naming its subject."""
     columns = ["initiative_id"] if "initiative_id" in table.c else []
     for fk in table.foreign_key_constraints:
-        if fk.referred_table.name in INITIATIVE_PATHS:
+        if fk.referred_table.name in paths:
             columns += [element.parent.name for element in fk.elements]
     for pair in _kind_pairs(table):
         columns += pair
@@ -564,47 +590,54 @@ class _Move:
         return sa.update(case.table).values(**self.values)
 
 
-def _move(case: _Case, own: tuple[Any, ...], in_b: dict[str, Any]) -> _Move:
+def _move(
+    case: _Case, own: tuple[Any, ...], in_b: dict[str, Any], paths: dict[str, Any]
+) -> _Move:
     """Repoint ``own`` at the parents of ``in_b``, a row built in B."""
-    values = {c: in_b[c] for c in _locating(case.table) if c in in_b}
+    values = {c: in_b[c] for c in _locating(case.table, paths) if c in in_b}
     keys = [c.name for c in case.table.primary_key.columns]
     moved = tuple(values.get(k, v) for k, v in zip(keys, own, strict=True))
     return _Move(values, moved)
 
 
-def _initiative_of(table: sa.Table) -> str:
+def _initiative_of(table: sa.Table, paths: dict[str, Any]) -> str:
     """The initiative of a row ``r`` of ``table``, by the lookup the change
-    capture stamps events with."""
-    return initiative_of(table.name, "r")
+    capture stamps events with, in the community whose paths are ``paths``."""
+    return initiative_of(table.name, "r", paths=paths)
 
 
 async def _initiative_of_row(
-    session: AsyncSession, table: sa.Table, row: tuple[Any, ...]
+    session: AsyncSession,
+    table: sa.Table,
+    row: tuple[Any, ...],
+    paths: dict[str, Any],
 ) -> int | None:
     """The initiative one row of ``table`` is in."""
     keys = [c.name for c in table.primary_key.columns]
     where = " AND ".join(f"r.{k} = :{k}" for k in keys)
     statement = sa.text(
-        f"SELECT {_initiative_of(table)} FROM {table.name} r WHERE {where}"
+        f"SELECT {_initiative_of(table, paths)} FROM {table.name} r WHERE {where}"
     )
     result = await session.exec(statement, params=dict(zip(keys, row, strict=True)))
     return result.scalar_one_or_none()
 
 
-async def _outside(session: AsyncSession, case: _Case, initiative_id: int) -> int:
+async def _outside(
+    session: AsyncSession, case: _Case, initiative_id: int, paths: dict[str, Any]
+) -> int:
     """How many of the rows made for ``case`` are not in ``initiative_id``."""
     rows = set(case.rows.values())
     columns = ", ".join(f"r.{c.name}" for c in case.table.primary_key.columns)
     statement = sa.text(
         f"SELECT {columns} FROM {case.table.name} r"
-        f" WHERE {_initiative_of(case.table)} = :initiative_id"
+        f" WHERE {_initiative_of(case.table, paths)} = :initiative_id"
     )
     result = await session.exec(statement, params={"initiative_id": initiative_id})
     return len(rows - {tuple(row) for row in result.all()})
 
 
 async def _keep_only(
-    session: AsyncSession, table: sa.Table, initiative_id: int
+    session: AsyncSession, table: sa.Table, initiative_id: int, paths: dict[str, Any]
 ) -> None:
     """Delete every row of ``table`` not in ``initiative_id``, with triggers
     off, so whatever a statement on the whole table reaches is A's."""
@@ -612,7 +645,7 @@ async def _keep_only(
     await session.exec(
         sa.text(
             f"DELETE FROM {table.name} r"
-            f" WHERE {_initiative_of(table)} IS DISTINCT FROM :initiative_id"
+            f" WHERE {_initiative_of(table, paths)} IS DISTINCT FROM :initiative_id"
         ),
         params={"initiative_id": initiative_id},
     )
@@ -624,13 +657,41 @@ async def _tools_on(
     person: int,
     guild_id: int,
     initiative_id: int,
+    tools: ToolSet,
 ) -> None:
     """Assert every tool is switched on in ``initiative_id`` for ``person``."""
     session = await role_session("app_user")
     context = await route_as(session, user_id=person, guild_id=guild_id)
     await session.rollback()
-    expected = {f"{initiative_id}:{tool.kind}" for tool in BUILTIN_TOOLS}
+    expected = {f"{initiative_id}:{tool.kind}" for tool in tools}
     assert expected <= set(context.enabled_tools)
+
+
+async def _write_switches(
+    session: AsyncSession, initiative_id: int, switches: dict[ToolRecord, bool]
+) -> None:
+    """Each tool's own switch in the initiative: a built-in tool's row, and a
+    tool plug-in's, which is its install's."""
+    await write_switches(
+        session,
+        initiative_id,
+        {Tool(t.kind): on for t, on in switches.items() if t.install_id is None},
+    )
+    for tool, on in switches.items():
+        if tool.install_id is None:
+            continue
+        statement = pg_insert(InitiativeRule).values(
+            initiative_id=initiative_id,
+            key=tool.view_permission,
+            enabled=on,
+            install_id=tool.install_id,
+        )
+        await session.exec(
+            statement.on_conflict_do_update(
+                constraint="uq_initiative_rules_subject",
+                set_={"enabled": statement.excluded.enabled},
+            )
+        )
 
 
 async def test_nobody_outside_an_initiative_reaches_its_rows(
@@ -638,6 +699,7 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
     acting_user: Callable[..., Awaitable[Actor]],
     reading_as: Callable[[int, int], Awaitable[AsyncSession]],
     role_session: Callable[[str], Awaitable[AsyncSession]],
+    client: AsyncClient,
 ) -> None:
     # A and B are each in the hands of a moderator, the role with every tool
     # permission and full access to the initiative's content.
@@ -659,6 +721,17 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
 
     # The operations community holds every table the others do and its own.
     await make_operations_community(session, guild.id)
+    # A tool plug-in's tool, installed by the community's seat, is swept as a
+    # built-in tool is: its tables are the community's paths.
+    await session.commit()
+    seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
+    await install_tool_plugin(client, session, seat)
+    tools = await provisioned_tools(guild.id)
+    assert [tool.kind for tool in tools.installed] == [
+        f"counter_group.{COUNTERS_UID.lower()}"
+    ]
+    paths = paths_for(tools)
+    not_a_moderators = _not_a_moderators(tools)
     await route_session_to_guild(session, guild.id)
     seeder = _Seeder(
         session,
@@ -666,13 +739,14 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
         initiative_a,
         grantor=people.moderator_a,
         grantees=people.outsiders,
+        tools=tools,
     )
     cases: dict[str, _Case] = {}
     unseeded: dict[str, str] = {}
-    for name in INITIATIVE_PATHS:
+    for name in paths:
         table = seeder.table(name)
         owners = everyone if seeder.personal(table) else (people.moderator_a,)
-        variants = _variants(name)
+        variants = _variants(name, tools)
         for label, inherit in variants:
             savepoint = await session.begin_nested()
             try:
@@ -702,17 +776,17 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
     misplaced = [
         name
         for name, case in cases.items()
-        if await _outside(session, case, initiative_a)
+        if await _outside(session, case, initiative_a, paths)
     ]
     assert not misplaced, f"rows meant for initiative A that are not in it: {misplaced}"
     # The community's other rows (B's, and its own) are cleared, so the rows a
     # statement on a whole table reaches are A's.
     for table in {case.table for case in cases.values()}:
-        await _keep_only(session, table, initiative_a)
+        await _keep_only(session, table, initiative_a, paths)
     await session.commit()
 
-    await _tools_on(role_session, people.moderator_a, guild.id, initiative_a)
-    await _tools_on(role_session, people.moderator_b, guild.id, initiative_b_id)
+    await _tools_on(role_session, people.moderator_a, guild.id, initiative_a, tools)
+    await _tools_on(role_session, people.moderator_b, guild.id, initiative_b_id, tools)
 
     failures: list[str] = []
     for person, who in (
@@ -748,7 +822,7 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
         if (seen := await _count(reader, case.table, own)) != 1:
             failures.append(f"{name}: {who} reads {seen} of its own row")
         for command, statement in _own_writes(case, people.moderator_a).items():
-            if command in _NOT_A_MODERATORS.get(case.table.name, ()):
+            if command in not_a_moderators.get(case.table.name, ()):
                 continue
             if (answer := await _attempt(reader, statement)) != 1:
                 failures.append(f"{name}: {who} cannot {command} in A ({answer})")
@@ -769,19 +843,19 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
         in_b[name] = await seeder.values(
             case.table.name, people.moderator_a, case.inherit
         )
-        move = _move(case, own, in_b[name])
+        move = _move(case, own, in_b[name], paths)
         moves[name] = move.blind(case)
         # Each lands its row in B: the move with triggers and foreign keys
         # off (a collection's entries hold it to its initiative by key).
         savepoint = await session.begin_nested()
         await session.exec(sa.text("SET LOCAL session_replication_role = replica"))
         await session.exec(move.statement(case, own))
-        moved = await _initiative_of_row(session, case.table, move.moved_pk)
+        moved = await _initiative_of_row(session, case.table, move.moved_pk, paths)
         await savepoint.rollback()
         savepoint = await session.begin_nested()
         insert = sa.insert(case.table).values(**in_b[name])
         made = (await session.exec(insert.returning(*case.table.primary_key))).one()
-        inserted = await _initiative_of_row(session, case.table, tuple(made))
+        inserted = await _initiative_of_row(session, case.table, tuple(made), paths)
         await savepoint.rollback()
         assert (moved, inserted) == (initiative_b_id, initiative_b_id), (
             f"{name}: a row moved or built for B lands in {moved} and {inserted}"
@@ -795,7 +869,7 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
     reader = await reading_as(people.moderator_a, guild.id)
     for name, move in moves.items():
         refused = {_REFUSED}
-        if "UPDATE" in _NOT_A_MODERATORS.get(cases[name].table.name, ()):
+        if "UPDATE" in not_a_moderators.get(cases[name].table.name, ()):
             # Updating nothing at all, its move reaches no row or meets the
             # table's own refusal of any change.
             refused |= {0, _FROZEN}
@@ -811,25 +885,27 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
     governed = {
         name: governing[0]
         for name, case in cases.items()
-        if (governing := governing_walk(case.table.name, INITIATIVE_PATHS)) is not None
+        if (governing := governing_walk(case.table.name, paths)) is not None
     }
-    every = {tool.kind for tool in BUILTIN_TOOLS}
+    every = {tool.kind for tool in tools}
     assert {tool.kind for tool in governed.values()} == every
-    for off in [{tool.kind} for tool in BUILTIN_TOOLS] + [every]:
+    switch_keys = [tool.view_permission for tool in tools.installed]
+    for off in [{tool.kind} for tool in tools] + [every]:
         await route_session_to_guild(session, guild.id)
         if off == every:
             await session.exec(
                 sa.delete(InitiativeRule).where(
                     InitiativeRule.initiative_id == initiative_a,
                     InitiativeRule.initiative_role_id.is_(None),
-                    InitiativeRule.install_id.is_(None),
+                    sa.or_(
+                        InitiativeRule.install_id.is_(None),
+                        InitiativeRule.key.in_(switch_keys),
+                    ),
                 )
             )
         else:
-            await write_switches(
-                session,
-                initiative_a,
-                {Tool(tool.kind): tool.kind not in off for tool in BUILTIN_TOOLS},
+            await _write_switches(
+                session, initiative_a, {tool: tool.kind not in off for tool in tools}
             )
         await session.commit()
         state = "no switch rows" if len(off) > 1 else f"{next(iter(off))} off"
