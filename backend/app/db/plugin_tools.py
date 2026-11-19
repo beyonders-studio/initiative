@@ -690,33 +690,46 @@ _DEFINITIONS = sa.text(
 )
 
 
-async def tool_set(session: Any, stamped: str | None | EllipsisType = ...) -> ToolSet:
-    """The tool set of the community ``session`` is routed into, as its
-    installs stand. ``stamped`` is the digest its schema's stamp names, where
-    the caller read it (``schema_provisioning.stamp_tools``): the built-in
-    tools where it names none, and the set this process keeps for it, with no
-    query. Every plug-in kind's code is read on the system engine (the table
-    is the deployment's, and no community's role reads it), and only to build
-    a set this process does not keep. While a community's provisioning lags
-    its installs, this is the set they make now."""
-    from app.db import session as db_session
-    from app.db.kind_codes import plugin_kind_codes
-
-    if stamped is None:
-        return BUILTIN_TOOLS
-    found = None if stamped is ... else kept_tool_set(stamped)
-    if found is not None:
-        return found
-    installed = [
+async def _installed(session: Any) -> list[InstalledTool]:
+    """The community's installed tool plug-ins, read on ``session``."""
+    return [
         InstalledTool(row.listing_uid, row.definition)
         for row in (await session.exec(_DEFINITIONS)).all()
     ]
+
+
+async def _built(installed: list[InstalledTool]) -> ToolSet:
+    """The tool set of ``installed``: the one this process keeps, or one built
+    with every plug-in kind's code, read on a system connection of its own
+    (the table is the deployment's, and no community's role reads it). The
+    caller holds no other system connection while this reads, so one
+    connection is all a cold set ever takes."""
+    from app.db import session as db_session
+    from app.db.kind_codes import plugin_kind_codes
+
     digest = tools_digest(installed)
     found = BUILTIN_TOOLS if digest is None else kept_tool_set(digest)
     if found is not None:
         return found
     async with db_session.system_engine.connect() as conn:
-        return community_tool_set(installed, await plugin_kind_codes(conn))
+        codes = await plugin_kind_codes(conn)
+    return community_tool_set(installed, codes)
+
+
+async def tool_set(session: Any, stamped: str | None | EllipsisType = ...) -> ToolSet:
+    """The tool set of the community ``session`` is routed into, as its
+    installs stand. ``stamped`` is the digest its schema's stamp names, where
+    the caller read it (``schema_provisioning.stamp_tools``): the built-in
+    tools where it names none, and the set this process keeps for it, with no
+    query. The codes are read only to build a set this process does not keep
+    (:func:`_built`). While a community's provisioning lags its installs, this
+    is the set they make now."""
+    if stamped is None:
+        return BUILTIN_TOOLS
+    found = None if stamped is ... else kept_tool_set(stamped)
+    if found is not None:
+        return found
+    return await _built(await _installed(session))
 
 
 async def provisioned_tools(guild_id: int) -> ToolSet:
@@ -736,6 +749,7 @@ async def provisioned_tools(guild_id: int) -> ToolSet:
         if not exists:
             return BUILTIN_TOOLS
         await db_session.set_rls_context(session, SystemGuild(guild_id))
-        tools = await tool_set(session)
+        installed = await _installed(session)
         await session.rollback()
-    return tools
+    # Built once the community's connection is back in its pool.
+    return await _built(installed)

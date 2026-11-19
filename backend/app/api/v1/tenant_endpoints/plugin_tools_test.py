@@ -15,9 +15,12 @@ from sqlmodel import select
 from app.core.messages import KindMessages, PluginMessages, ToolPluginMessages
 from app.db import plugin_tools
 from app.db import session as db_session
+from app.db.session import require_guild_context
 from app.models.platform.guild import CommunityRole
 from app.models.platform.notice_outbox import NoticeOutboxItem
 from app.models.platform.notification import NotificationType
+from app.schemas.tenant.plugin_tool import PluginToolActionRun
+from app.services.tenant import plugin_tool_rows as rows_service
 from app.testing import (
     COUNTERS_UID,
     counters_tool_manifest,
@@ -69,7 +72,7 @@ async def _counters(
 
 
 async def test_a_new_row_starts_as_declared_and_actions_side_by_side_both_land(
-    client, session, acting_user
+    client, session, acting_user, reading_as
 ):
     a, _member = await _counters(
         client, session, acting_user, _with_more(counters_tool_manifest())
@@ -87,9 +90,33 @@ async def test_a_new_row_starts_as_declared_and_actions_side_by_side_both_land(
     assert counter["fields"]["done"] is False
     assert counter["fields"]["count"] == 0
 
+    async def run(kind: str, row_id: int, action_id: str) -> None:
+        """Run an action on a connection of its own, as two requests do."""
+        own = await reading_as(a.user.id, a.guild.id)
+        context = require_guild_context(own)
+        located = rows_service.located_kind(context.tools, kind)
+        row = await rows_service.load_authorized(
+            own,
+            context,
+            located,
+            context.tools,
+            row_id,
+            action=rows_service.writing(located),
+        )
+        await rows_service.run_action(
+            own,
+            context,
+            located,
+            context.tools,
+            row,
+            action_id,
+            PluginToolActionRun(),
+            author=None,
+        )
+        await own.commit()
+
     await asyncio.gather(
-        call(f"{GROUP}/{group['id']}/actions/add_all"),
-        call(f"{COUNTER}/{counter['id']}/actions/add_one"),
+        run(GROUP, group["id"], "add_all"), run(COUNTER, counter["id"], "add_one")
     )
     read = await client.get(
         a.g(f"/plugin-tools/{COUNTER}/{counter['id']}"), headers=a.headers

@@ -966,3 +966,36 @@ async def test_boot_provisions_an_install_whose_provisioning_never_ran(
     # Once current, the next boot leaves it alone.
     await session.commit()
     assert await _backfill_guild(seat.guild.id, wait=True) is False
+
+
+async def test_a_cold_tool_set_takes_one_system_connection_at_a_time(
+    client: AsyncClient, session: AsyncSession, acting_user, monkeypatch
+):
+    """Building a tool set this process does not keep reads the community's
+    installs and the deployment's kind codes on one system connection after
+    the other, so a pool of one serves it."""
+    from collections import OrderedDict
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    from app.db import cohorts, plugin_tools
+    from app.db import session as db_session
+
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    await install_tool_plugin(client, session, seat)
+    one = create_async_engine(
+        db_session.system_engine.url, pool_size=1, max_overflow=0, pool_timeout=3
+    )
+    maker = async_sessionmaker(
+        bind=one, autoflush=False, expire_on_commit=False, class_=AsyncSession
+    )
+    monkeypatch.setattr(db_session, "system_engine", one)
+    monkeypatch.setattr(cohorts, "system_sessionmaker", lambda _guild_id: maker)
+    monkeypatch.setattr(plugin_tools, "_SETS", OrderedDict())
+    try:
+        tools = await provisioned_tools(seat.guild.id)
+    finally:
+        await one.dispose()
+    assert [tool.kind for tool in tools.installed] == [
+        f"counter_group.{COUNTERS_UID.lower()}"
+    ]

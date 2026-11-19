@@ -1224,8 +1224,8 @@ async def test_the_tool_plugin_routes_keep_its_rows_in_their_initiative(
     """A tool plug-in's row and its item, in initiative A and shared by name
     with a moderator of B and a member of no initiative, are read, listed,
     changed, added to, copied, acted on and watched through the tool plug-in
-    routes by A's moderator, and by neither of the others: each is answered
-    404, or refused a new row in A, and lists nothing of A's."""
+    routes by A's moderator, and by neither of the others: each of their
+    requests, A's list and a new row in A among them, is answered 404."""
     from app.api.content_socket import tool_authorizer
 
     admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
@@ -1288,12 +1288,11 @@ async def test_the_tool_plugin_routes_keep_its_rows_in_their_initiative(
             )
             assert response.status_code == 404, (method, path, response.text)
         response = await client.get(actor.g(in_a), headers=actor.headers)
-        assert response.status_code == 200, response.text
-        assert response.json()["items"] == []
+        assert response.status_code == 404, response.text
         response = await client.post(
             actor.g(f"/plugin-tools/{tool.kind}/"), headers=actor.headers, json=new_in_a
         )
-        assert response.status_code == 403, response.text
+        assert response.status_code == 404, response.text
         watching = await reading_as(actor.user.id, guild.id)
         assert (
             await tool_authorizer(guild.id, tool.kind, tool_id)(watching, None) is None
