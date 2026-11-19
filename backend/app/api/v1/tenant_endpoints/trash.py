@@ -303,18 +303,17 @@ async def _load_trash_entity(
     the row is gone.
     """
     tools = routed_tools(session)
-    if entity_type not in entity_registry(tools):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=TrashMessages.NOT_FOUND
-        )
-    model = MODELS_BY_TABLE.get(entity_registry(tools)[entity_type][0].name)
+    entry = entity_registry(tools).get(entity_type)
     located = locate(tools, entity_type)
-    if located is not None:
+    if entry is None:
+        entity = None
+    elif located is not None:
         entity = await load_row(
             session, located, tools, entity_id, for_update=for_update
         )
     else:
-        stmt = select_including_deleted(model).where(model.id == entity_id)  # type: ignore[union-attr]
+        model = MODELS_BY_TABLE[entry[0].name]
+        stmt = select_including_deleted(model).where(model.id == entity_id)  # type: ignore[attr-defined]
         if for_update:
             stmt = stmt.with_for_update()
         entity = (await session.exec(stmt)).one_or_none()

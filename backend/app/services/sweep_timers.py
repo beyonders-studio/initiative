@@ -53,6 +53,7 @@ from sqlmodel import SQLModel, col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import metrics
+from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.db import cohorts
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
@@ -121,6 +122,9 @@ class Sweep:
     #: How a table no model declares, a tool plug-in's, gives the sweep work,
     #: or ``None`` where that table gives it none.
     table_source: Callable[[Table], TimerSource | None] | None = None
+    #: The earliest such a table has work, as ``next_due`` reads it, or
+    #: ``None`` where it gives the sweep none.
+    table_due: Callable[[Table], Any] | None = None
     #: ``(community, now)``: the sweep's next due time read outside the
     #: community's schema, for a sweep whose work is kept in ``public`` (where
     #: the community's role reads nothing). The reconcile asks this in place of
@@ -449,6 +453,11 @@ def sweeps() -> tuple[Sweep, ...]:
                 ),
             ),
             table_source=binned,
+            table_due=lambda table: (
+                select(func.min(table.c.purge_at)).where(table.c.purge_at.is_not(None))
+                if "purge_at" in table.c
+                else None
+            ),
         ),
         # Resumable uploads nobody finished or took.
         Sweep(
@@ -903,11 +912,43 @@ async def arm(session: AsyncSession, kind: str, due: datetime) -> None:
     )
 
 
+def _due(sweep: Sweep, now: datetime, tools: ToolSet) -> Any:
+    """The sweep's ``next_due`` in a community with ``tools``: its installed
+    tools' tables' too, where the sweep reads them (``table_due``)."""
+    statement = sweep.next_due(now)
+    installed = [
+        due
+        for table in tools.installed_tables
+        if sweep.table_due is not None and (due := sweep.table_due(table)) is not None
+    ]
+    if not installed:
+        return statement
+    return select(
+        func.least(
+            statement.scalar_subquery(), *(due.scalar_subquery() for due in installed)
+        )
+    )
+
+
+async def _tools(guild_id: int | None) -> ToolSet:
+    from app.db.plugin_tools import provisioned_tools
+
+    return BUILTIN_TOOLS if guild_id is None else await provisioned_tools(guild_id)
+
+
 async def _next_due(
     session: AsyncSession, sweep: Sweep, now: datetime
 ) -> datetime | None:
+    from app.db.session import routed_guild_id
+
+    tools = (
+        await _tools(routed_guild_id(session))
+        if sweep.table_due is not None
+        else BUILTIN_TOOLS
+    )
+    statement = _due(sweep, now, tools)
     return (
-        await session.exec(sweep.next_due(now).execution_options(include_deleted=True))
+        await session.exec(statement.execution_options(include_deleted=True))
     ).first()
 
 
@@ -1210,8 +1251,12 @@ async def reconcile(session: AsyncSession, guild_id: int) -> datetime:
         and sweep.due_outside is None
         and (operations or sweep.scope is not Scope.OPERATIONS)
     ]
+    tools = await _tools(guild_id)
     probe = select(
-        *(sweep.next_due(now).scalar_subquery().label(sweep.kind) for sweep in checked)
+        *(
+            _due(sweep, now, tools).scalar_subquery().label(sweep.kind)
+            for sweep in checked
+        )
     ).execution_options(include_deleted=True)
     row = list((await session.exec(probe)).one())
     # The sweeps whose work the community's own role cannot read.

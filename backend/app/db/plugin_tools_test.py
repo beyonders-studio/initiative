@@ -323,6 +323,24 @@ async def test_a_tool_plugins_rows_are_heard_found_and_purged_on_time(
         "tr_p_tsjvtcm0s7gv2x_counter_group_timer_trash",
         "tr_p_tsjvtcm0s7gv2x_counter_timer_trash",
     ]
+    # The trash sweep's next visit, as a visit and the reconcile read it,
+    # counts the item in the bin.
+    from app.services.sweep_timers import _due, sweeps
+
+    purge_at = datetime(2030, 1, 1, tzinfo=UTC)
+    await session.exec(
+        sa.text(
+            "UPDATE p_tsjvtcm0s7gv2x_counter SET deleted_at = now(),"
+            " deleted_by_kind = 'system', purge_at = :at WHERE id = :c"
+        ),
+        params={"at": purge_at, "c": counter},
+    )
+    trash = next(sweep for sweep in sweeps() if sweep.kind == "trash")
+    tools = await provisioned_tools(seat.guild.id)
+    due = await session.exec(
+        _due(trash, datetime.now(UTC), tools).execution_options(include_deleted=True)
+    )
+    assert due.first() == purge_at
 
 
 async def test_the_tool_is_on_in_every_initiative_then_and_later(
