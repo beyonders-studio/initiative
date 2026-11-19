@@ -49,6 +49,7 @@ from app.db.frozen import PARK, RELEASED_NAMES
 from app.db.query import ids_in
 from app.db.session import raise_flag, routed_tools
 from app.db.soft_delete_filter import select_including_deleted
+from app.db.tool_rows import table_of
 from app.models.tenant._mixins import ActorKind, SoftDeleteMixin
 from app.models.tenant.batched_notice import BatchedNotice
 from app.models.tenant.comment import Comment, said_on
@@ -364,7 +365,11 @@ def _doomed(level: Level, model: type) -> list[int]:
     return level.get(model.__table__, [])  # type: ignore[attr-defined]
 
 
-async def _answered(session: AsyncSession, comments: list[Comment]) -> set[int]:
+def _is_comment(row: Any) -> bool:
+    return table_of(row) is Comment.__table__
+
+
+async def _answered(session: AsyncSession, comments: list[Any]) -> set[int]:
     """Which of these comments have a reply under them, at any depth, that is
     not in the trash. Asked as the platform when ``session`` is a person's: a
     reply held for the platform reads as absent to them, and is still there.
@@ -492,10 +497,10 @@ async def hard_purge_entities(
     # A comment its author deleted with replies still under it keeps its
     # place for them: the trash lets go of its words, not of it.
     released: set[str] = set()
-    kept = await _answered(session, [r for r in roots if isinstance(r, Comment)])
+    kept = await _answered(session, [r for r in roots if _is_comment(r)])
     if kept:
         released |= await _leave_tombstones(session, kept)
-        roots = [r for r in roots if not (isinstance(r, Comment) and r.id in kept)]
+        roots = [r for r in roots if not (_is_comment(r) and r.id in kept)]
         if not roots:
             return released
 

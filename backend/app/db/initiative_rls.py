@@ -25,7 +25,7 @@ the tool (:func:`item_paths`), read off the model metadata.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Iterable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, replace
 from functools import cache
 
@@ -110,7 +110,7 @@ def _parent(table: str, id_expr: str) -> str:
 #: Reads back what ``_parent`` writes. One formatter, one reader, so the drift
 #: test can ask a rendered chain which resources it names without a second
 #: declaration of the set.
-_PARENT_TYPE_RE = re.compile(r"'type', '([a-z_]+)'")
+_PARENT_TYPE_RE = re.compile(r"'type', '([a-z0-9_]+)'")
 
 
 def parent_types(chain_expr: str) -> frozenset[str]:
@@ -336,13 +336,11 @@ def _dac_via(
     return DacPath(tool=tool, via=((fk, parent),), predicate=build)
 
 
-def _dac_two_hop(
-    mid: str, mid_fk: str, parent: str, fk: str, tool: ToolRecord | None = None
-) -> DacPath:
-    """Two hops to the governing resource: ``table.<fk> -> mid -> parent`` — a
-    task's tag link by its task's project, an attendee by its event's calendar.
-    ``tool`` is the record of ``parent``, a built-in tool's when not given."""
-    tool = tool or BUILTIN_TOOLS.by_table[parent]
+def _dac_two_hop(tool: ToolRecord, mid: str, mid_fk: str, fk: str) -> DacPath:
+    """Two hops to the governing resource: ``table.<fk> -> mid ->`` ``tool``'s
+    table — a task's tag link by its task's project, an attendee by its
+    event's calendar."""
+    parent = tool.table.name
 
     def build(t: str, c: str, w: bool) -> str | None:
         if c == "SELECT" and parent_answers_for_reads(mid, tool):
@@ -526,8 +524,8 @@ def parent_answers_for_reads(parent: str, tool: ToolRecord | None = None) -> boo
     guild-scoped by the schema boundary) answers nothing, and a child of one
     keeps asking for itself.
     """
-    if tool is not None and tool.install_id is not None:
-        return parent in {table.name for table in (tool.table, *tool.items)}
+    if tool is not None and parent in {t.name for t in (tool.table, *tool.items)}:
+        return True
     return parent in INITIATIVE_PATHS
 
 
@@ -553,87 +551,13 @@ def via(tool: ToolRecord, fk: str, *, parent_pk: str = "id") -> InitiativePath:
     )
 
 
-def via_task_project(fk: str = "task_id") -> InitiativePath:
-    """Two hops: ``table.<fk> -> tasks -> projects.initiative_id``."""
-
-    def predicate(t: str, w: bool) -> str:
-        if not w and parent_answers_for_reads("tasks"):
-            # One hop is enough for a read: the task's own policy is what walks
-            # on to its project.
-            return f"EXISTS (SELECT 1 FROM tasks tk WHERE tk.id = {t}.{fk})"
-        return (
-            f"EXISTS (SELECT 1 FROM tasks tk JOIN projects pr ON pr.id = tk.project_id "
-            f"WHERE tk.id = {t}.{fk} "
-            f"AND {_access('pr.initiative_id', w)})"
-        )
-
-    return InitiativePath(
-        predicate=predicate,
-        initiative_expr=lambda r: (
-            f"(SELECT pr.initiative_id FROM tasks tk "
-            f"JOIN projects pr ON pr.id = tk.project_id WHERE tk.id = {r}.{fk})"
-        ),
-        parents=lambda r: _parent_chain(
-            "tasks tk",
-            "tk.id",
-            f"{r}.{fk}",
-            ("tasks", "tk.id"),
-            ("projects", "tk.project_id"),
-        ),
-        dac=_dac_two_hop("tasks", "project_id", "projects", fk),
-    )
-
-
-def via_post_poll(fk: str = "poll_id") -> InitiativePath:
-    """Two hops: ``table.<fk> -> post_polls -> posts.initiative_id``."""
-    return InitiativePath(
-        predicate=lambda t, w: (
-            f"EXISTS (SELECT 1 FROM post_polls pp JOIN posts po ON po.id = pp.post_id "
-            f"WHERE pp.id = {t}.{fk} "
-            f"AND {_access('po.initiative_id', w)})"
-        ),
-        initiative_expr=lambda r: (
-            f"(SELECT po.initiative_id FROM post_polls pp "
-            f"JOIN posts po ON po.id = pp.post_id WHERE pp.id = {r}.{fk})"
-        ),
-        # A poll has no route of its own — the notice that asks the question is
-        # the addressable thing, so the chain skips straight to it.
-        parents=lambda r: _parent_chain(
-            "post_polls pp", "pp.id", f"{r}.{fk}", ("posts", "pp.post_id")
-        ),
-        dac=_dac_two_hop("post_polls", "post_id", "posts", fk),
-    )
-
-
-def via_event_calendar(fk: str = "calendar_event_id") -> InitiativePath:
-    """Two hops: ``table.<fk> -> calendar_events -> calendars.initiative_id``."""
-    return InitiativePath(
-        predicate=lambda t, w: (
-            f"EXISTS (SELECT 1 FROM calendar_events ce "
-            f"JOIN calendars cal ON cal.id = ce.calendar_id "
-            f"WHERE ce.id = {t}.{fk} "
-            f"AND {_access('cal.initiative_id', w)})"
-        ),
-        initiative_expr=lambda r: (
-            f"(SELECT cal.initiative_id FROM calendar_events ce "
-            f"JOIN calendars cal ON cal.id = ce.calendar_id WHERE ce.id = {r}.{fk})"
-        ),
-        parents=lambda r: _parent_chain(
-            "calendar_events ce",
-            "ce.id",
-            f"{r}.{fk}",
-            ("calendar_events", "ce.id"),
-            ("calendars", "ce.calendar_id"),
-        ),
-        dac=_dac_two_hop("calendar_events", "calendar_id", "calendars", fk),
-    )
-
-
-def _via_item(tool: ToolRecord, mid: str, mid_fk: str, fk: str) -> InitiativePath:
-    """Two hops through another of a tool plug-in's items:
-    ``table.<fk> -> mid -> the tool's table``, the walk the built-in two-hop
-    paths make, written for any tool's tables."""
+def via_item(tool: ToolRecord, mid: str, fk: str) -> InitiativePath:
+    """Two hops: ``table.<fk>`` to ``mid``, one of ``tool``'s items, and on
+    to the tool's table by ``mid``'s own key to it — a task's tag link by its
+    task's project, an attendee by its event's calendar."""
     parent = tool.table.name
+    (key,) = _keys_to(next(t for t in tool.items if t.name == mid), (parent,))
+    mid_fk = key.parent.name
 
     def walk(row: str) -> str:
         return (
@@ -647,26 +571,17 @@ def _via_item(tool: ToolRecord, mid: str, mid_fk: str, fk: str) -> InitiativePat
             return f"EXISTS (SELECT 1 FROM {mid} dmid WHERE dmid.id = {t}.{fk})"
         return f"EXISTS (SELECT 1 {walk(t)} AND {_access('dpar.initiative_id', w)})"
 
+    # The chain names what a reader fetches by its id: the middle item where it
+    # is a kind (a task), not where it is part of one (a post's poll).
+    named = ((mid, "dmid.id"),) if mid in {k.table for k in tool.children} else ()
     return InitiativePath(
         predicate=predicate,
         initiative_expr=lambda r: f"(SELECT dpar.initiative_id {walk(r)})",
         parents=lambda r: _parent_chain(
-            f"{mid} dmid",
-            "dmid.id",
-            f"{r}.{fk}",
-            (mid, "dmid.id"),
-            (parent, f"dmid.{mid_fk}"),
+            f"{mid} dmid", "dmid.id", f"{r}.{fk}", *named, (parent, f"dmid.{mid_fk}")
         ),
-        dac=_dac_two_hop(mid, mid_fk, parent, fk, tool),
+        dac=_dac_two_hop(tool, mid, mid_fk, fk),
     )
-
-
-#: The two-hop paths, by the item table the walk goes through.
-_TWO_HOP: dict[str, Callable[[str], InitiativePath]] = {
-    "tasks": via_task_project,
-    "post_polls": via_post_poll,
-    "calendar_events": via_event_calendar,
-}
 
 
 def _keys_to(table: Table, parents: Iterable[str]) -> list[ForeignKey]:
@@ -688,14 +603,12 @@ def item_path(tool: ToolRecord, item: Table) -> InitiativePath:
     whatever its parent in the tool says.
 
     Its foreign key to the tool's table is one hop. Without one, its key to
-    another of the tool's items that has one is two, by that item's path in
-    :data:`_TWO_HOP`. Which tables are items is the record's to say; only the
-    column and the path come from the schema. No key, or more than one,
-    raises rather than choosing.
+    another of the tool's items that has one is two (:func:`via_item`). Which
+    tables are items is the record's to say; only the column and the path come
+    from the schema. No key, or more than one, raises rather than choosing.
     """
     parent = tool.table.name
     table = item.name
-    tables = {t.name: t for t in (tool.table, *tool.items)}
     own = _keys_to(item, (parent,))
     if len(own) == 1:
         return via(tool, own[0].parent.name)
@@ -707,18 +620,7 @@ def item_path(tool: ToolRecord, item: Table) -> InitiativePath:
         raise ValueError(
             f"{table} has {len(through)} keys to {parent}'s items, needs one"
         )
-    fk = through[0].parent.name
-    mid = through[0].column.table.name
-    mid_fk = _keys_to(tables[mid], (parent,))[0].parent.name
-    if tool.install_id is not None:
-        # A tool plug-in's item under another of its items.
-        return _via_item(tool, mid, mid_fk, fk)
-    if mid not in _TWO_HOP:
-        raise ValueError(f"{table} walks through {mid}, which has no two-hop path")
-    path = _TWO_HOP[mid](fk)
-    if path.dac is None or path.dac.via != ((fk, mid), (mid_fk, parent)):
-        raise ValueError(f"{table}: the {mid} path does not walk {mid}.{mid_fk}")
-    return path
+    return via_item(tool, through[0].column.table.name, through[0].parent.name)
 
 
 def item_paths(tools: ToolSet) -> dict[str, InitiativePath]:
@@ -764,105 +666,64 @@ class CommentParent:
     tool_fk: str | None = None
 
 
-def _tool_comment_parent(tool: ToolRecord) -> CommentParent:
-    """The comment subject for one tool — every tool's is the same shape.
-
-    A tool entity names its own initiative, so the join is the table itself and
-    the table stands as its own alias. Derived rather than listed so a comment
-    thread arrives with a new tool instead of waiting to be wired.
-    """
-    table = tool.table.name
+def _own_comment_parent(
+    kind: str, table: str, governed_by: ToolRecord | None
+) -> CommentParent:
+    """A subject that names its own initiative, so the join is the table
+    itself and the table stands as its own alias: every tool, and a kind in
+    no one instance of its tool (a collection), which no sharing governs."""
     return CommentParent(
-        tool.kind,
+        kind,
         table,
         f"{table}.id",
         f"{table}.initiative_id",
         ((table, f"{table}.id"),),
         table=table,
-        governed_by=tool,
+        governed_by=governed_by,
     )
 
 
-#: The kinds inside a tool that take comments, in ``COMMENT_TARGETS`` order.
-#: They are written out rather than derived because each names its own way up
-#: to a tool: a comment on a task names the project too — it is the surface a
-#: task comment shows up on, and the join is already made — and a comment on a
-#: wiki page names its wiki too.
-_KIND_COMMENT_PARENTS: tuple[CommentParent, ...] = (
-    CommentParent(
-        "task",
-        "tasks tk JOIN projects pr ON pr.id = tk.project_id",
-        "tk.id",
-        "pr.initiative_id",
-        (("tasks", "tk.id"), ("projects", "pr.id")),
-        table="tasks",
-        governed_by=BUILTIN_TOOLS.by_kind[Tool.project.value],
-        tool_fk="project_id",
-    ),
-    CommentParent(
-        "wiki_page",
-        "wiki_pages wp JOIN wikis wkp ON wkp.id = wp.wiki_id",
-        "wp.id",
-        "wkp.initiative_id",
-        (("wiki_pages", "wp.id"), ("wikis", "wkp.id")),
-        table="wiki_pages",
-        governed_by=BUILTIN_TOOLS.by_kind[Tool.wiki.value],
-        tool_fk="wiki_id",
-    ),
-    CommentParent(
-        "collection",
-        "collections",
-        "collections.id",
-        "collections.initiative_id",
-        (("collections", "collections.id"),),
-        table="collections",
-        governed_by=None,
-    ),
-)
-
-
-def _installed_comment_parents(tools: ToolSet) -> Iterator[CommentParent]:
-    """The items of each installed tool, each said on as a task is: reached
-    through the hops its path walks up to its tool, whose sharing governs it."""
-    for tool in tools.installed:
-        kinds = {kind.table: kind.value for kind in tool.children if kind.commentable}
-        for item in tool.items:
-            if item.name not in kinds:
-                continue
-            dac = item_path(tool, item).dac
-            assert dac is not None, item.name
-            aliases = ("ci", "cm", "ct")[: len(dac.via)] + ("ct",)
-            frm = f"{item.name} ci"
-            chain = [(item.name, "ci.id")]
-            for (fk, parent), here, there in zip(
-                dac.via, aliases, aliases[1:], strict=False
-            ):
-                frm += f" JOIN {parent} {there} ON {there}.id = {here}.{fk}"
-                chain.append((parent, f"{there}.id"))
-            yield CommentParent(
-                kinds[item.name],
-                frm,
-                "ci.id",
-                "ct.initiative_id",
-                tuple(chain),
-                table=item.name,
-                governed_by=tool,
-                tool_fk=dac.via[0][0] if len(dac.via) == 1 else None,
-            )
+def _item_comment_parent(tool: ToolRecord, kind: str, item: Table) -> CommentParent:
+    """A kind inside ``tool``, reached through the hops its path walks up to
+    the tool, whose sharing governs it. Its chain names every row of the walk:
+    a comment on a task names the project too, the surface it shows up on."""
+    dac = item_path(tool, item).dac
+    assert dac is not None, item.name
+    aliases = ("ci", "cm", "ct")[: len(dac.via)] + ("ct",)
+    frm = f"{item.name} ci"
+    chain = [(item.name, "ci.id")]
+    for (fk, parent), here, there in zip(dac.via, aliases, aliases[1:], strict=False):
+        frm += f" JOIN {parent} {there} ON {there}.id = {here}.{fk}"
+        chain.append((parent, f"{there}.id"))
+    return CommentParent(
+        kind,
+        frm,
+        "ci.id",
+        "ct.initiative_id",
+        tuple(chain),
+        table=item.name,
+        governed_by=tool,
+        tool_fk=dac.via[0][0] if len(dac.via) == 1 else None,
+    )
 
 
 def comment_parents(tools: ToolSet) -> dict[str, CommentParent]:
     """Every kind a comment is said on, keyed by the kind, in
     ``COMMENT_TARGETS`` order: the kinds inside a tool that take comments,
-    then every tool."""
-    return {
-        p.kind: p
-        for p in (
-            *_KIND_COMMENT_PARENTS,
-            *_installed_comment_parents(tools),
-            *map(_tool_comment_parent, tools),
+    then every tool. Derived rather than listed, so a thread arrives with a
+    new tool or kind instead of waiting to be wired."""
+    tool_of = {kind.value: tool for tool in tools for kind in tool.children}
+    inside = [
+        _own_comment_parent(kind.value, kind.table, None)
+        if kind.standalone
+        else _item_comment_parent(
+            tool_of[kind.value], kind.value, tools.tables[kind.table]
         )
-    }
+        for kind in tools.child_kinds
+        if kind.commentable
+    ]
+    tools_own = [_own_comment_parent(t.kind, t.table.name, t) for t in tools]
+    return {p.kind: p for p in (*inside, *tools_own)}
 
 
 #: Every kind a comment is said on among the built-in tools — what the other
@@ -1672,6 +1533,13 @@ def uploads_path() -> InitiativePath:
     )
 
 
+#: The built-in tools the paths written by hand name.
+_PROJECTS = BUILTIN_TOOLS.by_kind[Tool.project.value]
+_POSTS = BUILTIN_TOOLS.by_kind[Tool.post.value]
+#: Collections are part of Files.
+_FILES = BUILTIN_TOOLS.by_kind[Tool.file.value]
+
+
 def evidence_path() -> InitiativePath:
     """A stored object is reached exactly as the one parent it names is: a
     community report by those who settle it, an operations case by those in
@@ -1685,7 +1553,7 @@ def evidence_path() -> InitiativePath:
     report_walk = (
         "EXISTS (SELECT 1 FROM moderation_reports mr WHERE mr.id = {t}.report_id"
     )
-    case = via_task_project("case_task_id")
+    case = via_item(_PROJECTS, "tasks", "case_task_id")
 
     def predicate(t: str, w: bool) -> str:
         if not w:
@@ -1706,12 +1574,6 @@ def evidence_path() -> InitiativePath:
             f"WHERE mr.id = {r}.report_id), {case.initiative_expr(r)})"
         ),
     )
-
-
-#: The built-in tools the paths written by hand name.
-_PROJECTS = BUILTIN_TOOLS.by_kind[Tool.project.value]
-#: Collections are part of Files.
-_FILES = BUILTIN_TOOLS.by_kind[Tool.file.value]
 
 
 def _collection_writer(initiative: str) -> str:
@@ -1929,14 +1791,14 @@ def paths_for(tools: ToolSet) -> dict[str, InitiativePath]:
         "intake_bindings": via(_PROJECTS, "project_id"),
         # A case is read exactly as hard as the task it describes, so it hangs off
         # the task rather than off the project column it is keyed by.
-        "intake_cases": via_task_project("task_id"),
+        "intake_cases": via_item(_PROJECTS, "tasks", "task_id"),
         # The votes for an idea are read as hard as the task that is the idea.
-        "idea_votes": via_task_project("task_id"),
+        "idea_votes": via_item(_PROJECTS, "tasks", "task_id"),
         # What a person attached: reached as its report or its case is.
         "evidence": evidence_path(),
         # A vote's poll_id is keyed with its option to the option, not to the poll,
         # so no key leads to the poll: the vote walks to its post by the id alone.
-        "post_poll_votes": via_post_poll("poll_id"),
+        "post_poll_votes": via_item(_POSTS, "post_polls", "poll_id"),
         # Every metadata value, properties included, on any tool and sub-tool and
         # on an install, by (entity_type, entity_id).
         "metadata_values": metadata_values_path(tools),
@@ -2182,11 +2044,12 @@ def reports_as(parent: str, fk: str, facet: str) -> ReportsAs:
     )
 
 
-def grants_report_on_their_resource() -> ReportsAs:
+def grants_report_on_their_resource(tools: ToolSet) -> ReportsAs:
     """A grant is sharing ON something — report it against that something.
 
-    ``resource_type`` holds the Tool value and ``resource_id`` its id, so the
-    event lands on the project (or file, counter group, …) whose access changed.
+    ``resource_type`` holds the tool's kind and ``resource_id`` its id, so the
+    event lands on the project (or file, tool plug-in's tool, …) whose access
+    changed.
     That is both what a subscriber wants to hear and already resolvable, where
     the grant row's own id resolves nowhere.
 
@@ -2194,9 +2057,9 @@ def grants_report_on_their_resource() -> ReportsAs:
     skipped, so the vocabulary below and what the trigger can emit stay the same
     set.
     """
-    arms = " ".join(f"WHEN '{t.value}' THEN '{t.plural}'" for t in Tool)
+    arms = " ".join(f"WHEN '{t.kind}' THEN '{t.table.name}'" for t in tools)
     return ReportsAs(
-        resource_types=frozenset(t.plural for t in Tool),
+        resource_types=frozenset(t.table.name for t in tools),
         id_expr=lambda r: f"{r}.resource_id",
         facet="sharing",
         type_expr=lambda r: f"(CASE {r}.resource_type {arms} END)",
@@ -2237,6 +2100,7 @@ def _reported_as(table: str) -> tuple[str, Callable[[str], str]]:
     if declared is None:
         return table, lambda alias: f"{alias}.id"
     report = declared[0] if isinstance(declared, tuple) else declared
+    assert isinstance(report, ReportsAs), table
     (parent,) = report.resource_types
     return parent, report.id_expr
 
@@ -2386,8 +2250,11 @@ class Emit:
     guild_wide: bool = False
     #: Report against a parent resource instead of naming this table. A tuple
     #: emits one event per entry — for a row that is a facet of more than one
-    #: thing, so every surface it shows on is told to re-read.
-    reports_as: ReportsAs | tuple[ReportsAs, ...] | None = None
+    #: thing, so every surface it shows on is told to re-read. A function is
+    #: the report in a community with the tools it is given.
+    reports_as: (
+        ReportsAs | tuple[ReportsAs, ...] | Callable[[ToolSet], ReportsAs] | None
+    ) = None
     #: Publish this table's own events under this resource type instead of the
     #: table's name, for a table whose API segment differs from it. Keeps the
     #: readback rule (``resource_type`` -> the detail route that serves the id)
@@ -2534,7 +2401,7 @@ EVENT_SOURCES: dict[str, Emit | Silent] = {
     # A draft page is read only by the wiki's writers, so like an unpublished
     # notice it is not news until it is finished.
     "wiki_pages": Emit(quiet_when=lambda r: f"{r}.is_draft"),
-    "resource_grants": Emit(reports_as=grants_report_on_their_resource()),
+    "resource_grants": Emit(reports_as=grants_report_on_their_resource),
     "post_polls": Emit(reports_as=reports_as("posts", "post_id", "poll")),
     "post_poll_options": Emit(reports_as=poll_options_report_on_their_post()),
     # A vote is the one gesture whose author is the private half of it — a poll

@@ -24,7 +24,7 @@ from app.db.search_index import (
     COMMENT_PREVIEW_CHARS,
     NOT_SEARCHABLE,
     SEARCH_SOURCES,
-    TOOL_OVERRIDES,
+    TEXT_OVERRIDES,
     addressable_tables,
     entity_types,
     render_guild_search_ddl,
@@ -390,7 +390,7 @@ def test_every_tool_is_searchable_without_being_listed():
 
 def test_a_tool_that_overrides_nothing_takes_the_shared_shape():
     """Only what differs is written down."""
-    plain = [t for t in Tool if t not in TOOL_OVERRIDES]
+    plain = [t for t in Tool if t not in TEXT_OVERRIDES]
     assert plain, "the derivation is pointless if every tool overrides it"
     for tool in plain:
         source = SEARCH_SOURCES[tool.plural]

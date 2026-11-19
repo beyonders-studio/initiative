@@ -15,14 +15,11 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
-from sqlalchemy import Table, select
+from sqlalchemy import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
 from app.core.tool_set import BUILTIN_TOOLS, ToolSet
-from app.db.base import MODELS_BY_TABLE
-from app.db.initiative_rls import content_kind_tables
-from app.db.soft_delete_filter import select_including_deleted
 from app.db.tool_rows import ToolRow
 from app.services import audit as audit_service
 from app.services.tenant.attachments import (
@@ -34,29 +31,11 @@ from app.services.tenant.lifecycle_tree import (
     binned_tables,
     cascade_children,
     parents_first,
+    trash_kinds,
 )
 from app.services.tenant.soft_delete import hard_purge_entities
 
 logger = logging.getLogger(__name__)
-
-
-def _entity_type(table: Table, tools: ToolSet) -> str:
-    """The trash-can name for a table's rows — ``CounterGroup`` →
-    ``counter_group``, and a tool plug-in's table its kind."""
-    model = MODELS_BY_TABLE.get(table.name)
-    if model is None:
-        return next(
-            kind
-            for kind, name in content_kind_tables(tools).items()
-            if name == table.name
-        )
-    name = model.__name__
-    parts: list[str] = []
-    for index, char in enumerate(name):
-        if char.isupper() and index:
-            parts.append("_")
-        parts.append(char.lower())
-    return "".join(parts)
 
 
 async def _run_purge_pass(
@@ -78,33 +57,26 @@ async def _run_purge_pass(
     purged: dict[str, int] = {}
     released: set[str] = set()
     tree = cascade_children(tools)
+    entity_types = {table: kind for kind, table in trash_kinds(tools).items()}
     for table in parents_first(binned_tables(tools), tools):
         # A row an earlier pass took with its parent is already gone from the
         # database, so it is not found here. A row another process is purging
         # is locked, and left to it.
-        model = MODELS_BY_TABLE.get(table.name)
         stmt = (
-            (
-                select_including_deleted(model)
-                if model is not None
-                else select(table).execution_options(include_deleted=True)
-            )
+            select(table.c.id)
+            .execution_options(include_deleted=True)
             .where(table.c.purge_at.is_not(None))
             .where(table.c.purge_at < now)
             .with_for_update(skip_locked=True)
         )
-        found = list((await session.exec(stmt)).all())
-        rows = (
-            found
-            if model is not None
-            else [ToolRow(table, dict(row._mapping)) for row in found]
-        )
+        found = (await session.exec(stmt)).scalars().all()
+        rows = [ToolRow(table, {"id": row_id}) for row_id in found]
         # What holds something the platform holds waits for its release, and
         # is tried again on the next pass (app.db.holds).
         rows = [row for row in rows if not await holds_under(session, [row], tree=tree)]
         if rows:
             released |= await hard_purge_entities(session, rows, tools=tools)
-            purged[_entity_type(table, tools)] = len(rows)
+            purged[entity_types[table]] = len(rows)
 
     if guild_id is not None and purged:
         await audit_service.record(
