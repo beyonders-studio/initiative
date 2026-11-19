@@ -44,7 +44,7 @@ import { renderEmbeddable, validateEmbeddable } from "@/ui/lib/whiteboardEmbeds"
 import {
   changedKeys,
   newestOver,
-  pruneTombstones,
+  pruneRoom,
   type RoomMaps,
   readRoomAppState,
   readRoomElements,
@@ -254,6 +254,24 @@ export function WhiteboardFileEditor({
             : undefined,
           captureUpdate: CaptureUpdateAction.NEVER,
         });
+        // Two people writing one element at once leave the room holding
+        // whichever write Yjs ordered last, not the higher version. Where the
+        // local copy won the reconcile, the canvas did not change, so nothing
+        // else would write it back: hand it to the room here.
+        if (changedElements) {
+          queueMicrotask(() => {
+            if (!writesAllowedRef.current) return;
+            writeToRoom(
+              yDoc,
+              maps,
+              api
+                .getSceneElementsIncludingDeleted()
+                .filter((element) => changedElements.has(element.id)),
+              {},
+              api.getFiles()
+            );
+          });
+        }
       } catch (err) {
         console.error("Failed to apply remote whiteboard update:", err);
       }
@@ -387,7 +405,7 @@ export function WhiteboardFileEditor({
 
     bootstrapDoneRef.current = true;
     writesAllowedRef.current = true;
-    pruneTombstones(yDoc, maps);
+    pruneRoom(yDoc, maps);
     // Hand the room whatever the scene on screen has that it lacks: all of
     // it for a room that held nothing, our cached work when that won.
     const appState = excalidrawAPI.getAppState();

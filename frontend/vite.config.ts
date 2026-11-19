@@ -35,10 +35,8 @@ const CLOUD_ORIGIN = fs
   .readFileSync(path.resolve(import.meta.dirname, "../CLOUD_ORIGIN"), "utf-8")
   .trim();
 
-// A WebSocket upgrade keeps the Host the browser sent. Chromium sends no
-// Sec-Fetch-Site on an upgrade, so the backend checks the handshake's Origin
-// against its Host; rewritten to the backend's port, that never matches a page
-// served from a port other than APP_URL's, as a linked worktree's is.
+// A WebSocket upgrade keeps the Host the browser sent, so the backend sees the
+// address the page was served from, as it does behind a production proxy.
 type DevProxy = Parameters<NonNullable<ProxyOptions["configure"]>>[0];
 
 const keepHostOnUpgrade = (proxy: DevProxy) => {

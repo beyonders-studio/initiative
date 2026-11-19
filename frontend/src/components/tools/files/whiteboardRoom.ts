@@ -206,16 +206,26 @@ export function writeToRoom(
   return wrote;
 }
 
-/** Drop the tombstones older than {@link TOMBSTONE_TTL_MS}. */
-export function pruneTombstones(doc: Y.Doc, maps: RoomMaps, now = Date.now()): void {
-  const expired: string[] = [];
+/**
+ * Drop the tombstones older than {@link TOMBSTONE_TTL_MS}, and the files no
+ * element the room still holds uses. A file stays while a tombstone uses it,
+ * so undoing the deletion of an image still finds it.
+ */
+export function pruneRoom(doc: Y.Doc, maps: RoomMaps, now = Date.now()): void {
+  const expired = new Set<string>();
+  const usedFiles = new Set<string>();
   maps.elements.forEach((element, id) => {
     if (element.isDeleted && now - (element.updated ?? 0) > TOMBSTONE_TTL_MS) {
-      expired.push(id);
+      expired.add(id);
+      return;
     }
+    const fileId = (element as { fileId?: string | null }).fileId;
+    if (fileId) usedFiles.add(fileId);
   });
-  if (expired.length === 0) return;
+  const unusedFiles = [...maps.files.keys()].filter((id) => !usedFiles.has(id));
+  if (expired.size === 0 && unusedFiles.length === 0) return;
   doc.transact(() => {
     for (const id of expired) maps.elements.delete(id);
+    for (const id of unusedFiles) maps.files.delete(id);
   });
 }

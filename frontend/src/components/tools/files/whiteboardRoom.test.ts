@@ -6,7 +6,7 @@ import * as Y from "yjs";
 import {
   changedKeys,
   newestOver,
-  pruneTombstones,
+  pruneRoom,
   readRoomElements,
   roomHoldsScene,
   roomMaps,
@@ -27,8 +27,9 @@ const element = (id: string, overrides: Record<string, unknown> = {}) =>
     ...overrides,
   }) as unknown as ExcalidrawElement;
 
-const room = () => {
+const room = (clientID?: number) => {
   const doc = new Y.Doc();
+  if (clientID !== undefined) doc.clientID = clientID;
   return { doc, maps: roomMaps(doc) };
 };
 
@@ -207,7 +208,7 @@ describe("reading the room", () => {
   });
 });
 
-describe("pruneTombstones", () => {
+describe("pruneRoom", () => {
   it("drops tombstones past their time, and keeps the rest", () => {
     const r = room();
     const now = 10 * TOMBSTONE_TTL_MS;
@@ -220,7 +221,60 @@ describe("pruneTombstones", () => {
       element("old", { version: 2, isDeleted: true, updated: now - TOMBSTONE_TTL_MS - 1 }),
       element("recent", { version: 2, isDeleted: true, updated: now - 1 }),
     ]);
-    pruneTombstones(r.doc, r.maps, now);
+    pruneRoom(r.doc, r.maps, now);
     expect([...r.maps.elements.keys()].sort()).toEqual(["live", "recent"]);
+  });
+
+  it("drops the files no element uses, and keeps one a tombstone uses", () => {
+    const r = room();
+    const now = 10 * TOMBSTONE_TTL_MS;
+    const file = (id: string) =>
+      ({ id, dataURL: "data:x", mimeType: "image/png" }) as unknown as BinaryFileData;
+    const files = {
+      kept: file("kept"),
+      undoable: file("undoable"),
+      gone: file("gone"),
+    } as BinaryFiles;
+    const image = (id: string, fileId: string, overrides: Record<string, unknown> = {}) =>
+      element(id, { type: "image", fileId, ...overrides });
+    write(r, [image("a", "kept"), image("b", "undoable"), image("c", "gone")], { files });
+    write(r, [
+      image("b", "undoable", { version: 2, isDeleted: true, updated: now - 1 }),
+      image("c", "gone", { version: 2, isDeleted: true, updated: now - TOMBSTONE_TTL_MS - 1 }),
+    ]);
+
+    pruneRoom(r.doc, r.maps, now);
+
+    expect([...r.maps.files.keys()].sort()).toEqual(["kept", "undoable"]);
+  });
+});
+
+describe("two people writing one element at once", () => {
+  it("leaves the higher version to be written back by whoever holds it", () => {
+    // Of two concurrent writes to one key, Yjs keeps the higher client's: here
+    // the one writing the older copy.
+    const a = room(2);
+    write(a, [element("x")]);
+    const b = room(1);
+    Y.applyUpdate(b.doc, Y.encodeStateAsUpdate(a.doc));
+
+    // Both edit before hearing from the other.
+    const older = element("x", { version: 2, width: 20 });
+    const newer = element("x", { version: 3, width: 30 });
+    write(a, [older]);
+    write(b, [newer]);
+    Y.applyUpdate(a.doc, Y.encodeStateAsUpdate(b.doc));
+    Y.applyUpdate(b.doc, Y.encodeStateAsUpdate(a.doc));
+
+    expect(a.maps.elements.get("x")?.version).toBe(2);
+    expect(b.maps.elements.get("x")?.version).toBe(2);
+
+    // The one holding the newer copy writes it back, and the room converges.
+    write(a, [older]);
+    write(b, [newer]);
+    Y.applyUpdate(a.doc, Y.encodeStateAsUpdate(b.doc));
+    Y.applyUpdate(b.doc, Y.encodeStateAsUpdate(a.doc));
+    expect(a.maps.elements.get("x")?.version).toBe(3);
+    expect(b.maps.elements.get("x")?.version).toBe(3);
   });
 });
