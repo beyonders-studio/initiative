@@ -517,6 +517,20 @@ takes.
 - PUT /api/v1/c/{community_id}/layouts/default response property `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/presets/anyOf[subschema #1]/items/name` list-of-types was widened by adding types `object` to media type `application/json` of response `200`
 - PUT /api/v1/c/{community_id}/layouts/default the `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/displays/anyOf[subschema #1]/additionalProperties/` response's property `type` changed from `string` to `any` for status `200`
 
+### A plug-in's registration has no installation-sharing switch
+
+Every community that connects the same vendor account holds its route, so a
+registration no longer reads or takes `shared_routes`. It reads
+`platform_connections` instead: the connections the platform can connect once
+for every community.
+
+- GET /api/v1/plugin-services/ removed the required property `items/shared_routes` from the response with the `200` status
+- GET /api/v1/plugin-services/{registration_id} removed the required property `shared_routes` from the response with the `200` status
+- POST /api/v1/plugin-services/ removed the required property `shared_routes` from the response with the `201` status
+- PATCH /api/v1/plugin-services/{registration_id} removed the required property `shared_routes` from the response with the `200` status
+- POST /api/v1/plugin-services/{registration_id}/connect removed the required property `shared_routes` from the response with the `200` status
+- POST /api/v1/plugin-services/{registration_id}/vendor-setup/complete removed the required property `shared_routes` from the response with the `200` status
+
 ## After 0.79.0
 
 ### A plug-in is suspended, not switched off

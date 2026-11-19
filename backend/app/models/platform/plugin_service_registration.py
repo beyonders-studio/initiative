@@ -40,9 +40,10 @@ Some columns exist only because of that split:
   deployment's operations community (``app_settings.operations_guild_id``),
   and none while none is named. Out of reach, it is suspended: offered
   nowhere, installed by the mandatory sweep nowhere, and live nowhere.
-* ``shared_routes`` — one vendor installation may route to several communities.
-  Off, each route of its installs is held by one community
-  (``plugin_installs.exclusive``).
+* ``platform_connections`` — the community connections the operator connected
+  once for every community, by connection id: each holds ``values``, read as a
+  community's own stored connection reads, and who connected it and when.
+  While one is held, no community connects or disconnects that connection.
 
 * ``vendor_values`` — what the operator supplies for the plug-in's vendor client,
   as the listing's manifest declares it under ``vendor``: one Fernet
@@ -332,10 +333,11 @@ class PluginServiceRegistration(SQLModel, table=True):
         default=PluginAvailability.none.value,
         sa_column=Column(Text, nullable=False, server_default="none"),
     )
-    # One vendor installation may route to several communities.
-    shared_routes: bool = Field(
-        default=False,
-        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    # The community connections connected once for every community, by
+    # connection id (``app.services.marketplace.platform_connections``).
+    platform_connections: dict = Field(
+        default_factory=dict,
+        sa_column=Column(JSONB, nullable=False, server_default="{}"),
     )
     # The owner suspended it everywhere, and who did: nothing flows through it
     # and no community sees it until the suspension is lifted.

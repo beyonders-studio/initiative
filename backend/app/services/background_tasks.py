@@ -82,6 +82,7 @@ def start_background_tasks() -> list[asyncio.Task]:
         SESSION_PURGE_POLL_SECONDS,
         process_dead_session_purge,
     )
+    from app.services.marketplace import platform_connections
     from app.services.marketplace.tuf_registry import (
         process_registry_refresh,
         registry_available,
@@ -151,6 +152,14 @@ def start_background_tasks() -> list[asyncio.Task]:
         asyncio.create_task(sweep_timers.catalog_loop.run(sweep_timers.watch_catalog)),
         asyncio.create_task(
             Loop("hourly", interval=HOURLY_PASS_SECONDS).run(hourly_pass)
+        ),
+        # The plug-in connections the platform made for every community,
+        # checked once for all of them.
+        asyncio.create_task(
+            Loop(
+                "platform-connections",
+                interval=platform_connections.HEALTH_CHECK_SECONDS,
+            ).run(platform_connections.check_health)
         ),
         asyncio.create_task(
             Loop("hold-summary", interval=HOLD_SUMMARY_POLL_SECONDS).run(

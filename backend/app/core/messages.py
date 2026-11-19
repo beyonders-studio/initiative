@@ -1546,9 +1546,9 @@ class GuildPluginMessages:
     #: The plug-in could not be asked to check what was typed into the
     #: connection, or answered something that cannot be stored; nothing was.
     CONNECTION_NOT_CHECKED = "COMMUNITY_PLUGIN_CONNECTION_NOT_CHECKED"
-    #: Another community holds the account the plug-in checked these values
-    #: against; nothing was stored.
-    CONNECTION_TAKEN = "COMMUNITY_PLUGIN_CONNECTION_TAKEN"
+    #: The platform connected this connection for every community, so no
+    #: community connects or disconnects it.
+    CONNECTION_HELD_BY_PLATFORM = "COMMUNITY_PLUGIN_CONNECTION_HELD_BY_PLATFORM"
     #: A connection the plug-in checks is saved on its own, not beside others.
     CONNECTION_CHECKED_ALONE = "COMMUNITY_PLUGIN_CONNECTION_CHECKED_ALONE"
     #: The plug-in is installed but turned off, so nothing flows through it.
@@ -1698,9 +1698,11 @@ class PluginServiceMessages:
     #: The vendor values changed while the vendor check ran on them, so what
     #: was checked is not what would be written. Saving again checks again.
     VENDOR_VALUES_CHANGED = "PLUGIN_SERVICE_VENDOR_VALUES_CHANGED"
-    #: Sharing is turned off while a vendor installation is connected to more
-    #: than one community.
-    SHARED_ROUTES_IN_USE = "PLUGIN_SERVICE_SHARED_ROUTES_IN_USE"
+    #: The connection is not one the platform can connect for every
+    #: community: the plug-in does not declare it, or it is not a community
+    #: connection whose token is minted from the vendor values and that
+    #: Initiative checks itself.
+    CONNECTION_NOT_FOR_PLATFORM = "PLUGIN_SERVICE_CONNECTION_NOT_FOR_PLATFORM"
 
 
 class PluginSignInMessages:

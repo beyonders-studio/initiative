@@ -57,6 +57,31 @@ class PluginBetaCommunityRead(SanitizedBaseModel):
     name: str
 
 
+class PluginPlatformConnectionRead(SanitizedBaseModel):
+    """A community connection the platform can connect once for every
+    community, and what it connected."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    connection_id: str
+    #: The connection's label, by locale, as its manifest declares it.
+    label: dict[str, str] = {}
+    connected: bool = False
+    #: The account it is connected to, as the plug-in named it.
+    account_label: str | None = None
+    connected_at: datetime | None = None
+    #: The vendor reported the account's installation removed.
+    removed: bool = False
+
+
+class PluginPlatformConnectStart(SanitizedBaseModel):
+    """Where to send the operator to connect it."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    connect_url: str
+
+
 class PluginServiceRegistrationRead(SanitizedBaseModel):
     """A registration as the owner's settings see it."""
 
@@ -105,8 +130,9 @@ class PluginServiceRegistrationRead(SanitizedBaseModel):
     availability: PluginAvailability = PluginAvailability.none
     #: The communities the owner picked, while it is beta.
     beta_communities: list[PluginBetaCommunityRead] = []
-    #: One vendor installation may connect to several communities.
-    shared_routes: bool = False
+    #: The community connections the platform can connect once for every
+    #: community, each with what is connected.
+    platform_connections: list[PluginPlatformConnectionRead] = []
     #: When the owner suspended it everywhere; null while it is not.
     suspended_at: datetime | None = None
     #: ``registry`` when its plug-in facts come from a listing the registry signed,
@@ -207,9 +233,6 @@ class PluginServiceRegistrationUpdate(_DeploymentFacts):
     jwks: dict[str, Any] | None = None
     jwks_uri: str | None = Field(default=None, max_length=1000)
     mandatory: bool | None = None
-    #: Let one vendor installation connect to several communities. Turning it
-    #: off is refused while one is connected to more than one.
-    shared_routes: bool | None = None
     #: Suspend it everywhere, or lift the suspension.
     suspended: bool | None = None
     #: Replace a beta plug-in's list of communities.

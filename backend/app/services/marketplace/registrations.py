@@ -51,8 +51,7 @@ from fastapi import HTTPException
 from fastapi import status as http_status
 from jwt import PyJWK
 from jwt.exceptions import InvalidKeyError, PyJWKError
-from sqlalchemy import delete, func, or_, update
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import delete, func, or_
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -62,7 +61,6 @@ from app.core.config import settings
 from app.core.messages import GuildMessages, PluginServiceMessages
 from app.core.plugin_scopes import ALL_SCOPES, is_known_scope
 from app.core.security import plugin_platform_signing_enabled
-from app.db.errors import dbapi_constraint
 from app.db.query import paginated_query
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.guild import Guild
@@ -70,7 +68,7 @@ from app.models.platform.marketplace import (
     MarketplaceListing,
     MarketplaceListingVersion,
 )
-from app.models.platform.plugin_install import EXCLUSIVE_ROUTE_INDEX, PluginInstall
+from app.models.platform.plugin_install import PluginInstall
 from app.models.platform.plugin_service_registration import (
     IMAGE_REFERENCE_MAX_LENGTH,
     LISTING_STATED_FIELDS,
@@ -124,7 +122,6 @@ AUDITED_FIELDS: tuple[str, ...] = (
     "scope_ceiling",
     "mandatory",
     "availability",
-    "shared_routes",
     "suspended_at",
     "source",
     "image_digest",
@@ -687,7 +684,6 @@ async def update_registration(
     jwks: dict | None = None,
     jwks_uri: str | None = None,
     mandatory: bool | None = None,
-    shared_routes: bool | None = None,
     suspended: bool | None = None,
     beta_community_ids: Iterable[int] | None = None,
     vendor_values: dict[str, str | None] | None = None,
@@ -703,10 +699,7 @@ async def update_registration(
 
     An empty ``page_origin`` clears it, putting both surfaces back on
     ``base_url``; an empty ``jwks_uri`` clears it. A ``jwks_uri`` kept while
-    ``base_url`` moves is checked against the new origin. ``shared_routes``
-    is written to the registration's installs in the install index in the same
-    transaction, and turning it off is refused (409) while a vendor
-    installation routes to more than one community. A suspension, its lift,
+    ``base_url`` moves is checked against the new origin. A suspension, its lift,
     or a new beta list is told for each install (:func:`reach_moved`). A list
     for a plug-in that is not beta is refused (409), and so is one naming a
     community that does not exist (400).
@@ -756,8 +749,6 @@ async def update_registration(
     )
     if mandatory is not None:
         row.mandatory = mandatory
-    if shared_routes is not None:
-        row.shared_routes = shared_routes
     if suspended is not None and suspended != was_suspended:
         row.suspended_at = utcnow() if suspended else None
         row.suspended_by = actor_user_id if suspended else None
@@ -766,8 +757,6 @@ async def update_registration(
 
     row.updated_at = utcnow()
     session.add(row)
-    if shared_routes is not None and row.listing_uid:
-        await _write_exclusive(session, row)
     changed = audit_service.changed_fields(
         before, audit_service.snapshot(row, AUDITED_FIELDS)
     )
@@ -819,34 +808,6 @@ async def update_registration(
     # drops it rather than waiting out its TTL.
     invalidate_registrations()
     return row
-
-
-async def _write_exclusive(
-    session: AsyncSession, row: PluginServiceRegistration
-) -> None:
-    """Write each of the registration's installs ``exclusive`` as
-    ``shared_routes`` now says. The registration's row is written first: a
-    connect claiming a route reads it under a share lock, so it comes wholly
-    before this write or after it."""
-    exclusive = not row.shared_routes
-    await session.flush()
-    try:
-        await session.exec(
-            update(PluginInstall)
-            .where(
-                PluginInstall.listing_uid == row.listing_uid,
-                PluginInstall.exclusive != exclusive,
-            )
-            .values(exclusive=exclusive)
-        )
-    except IntegrityError as exc:
-        await session.rollback()
-        if dbapi_constraint(exc) != EXCLUSIVE_ROUTE_INDEX:
-            raise
-        raise HTTPException(
-            status_code=http_status.HTTP_409_CONFLICT,
-            detail=PluginServiceMessages.SHARED_ROUTES_IN_USE,
-        ) from exc
 
 
 def _write_placement(

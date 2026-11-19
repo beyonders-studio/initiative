@@ -38,6 +38,7 @@ from app.core.messages import (
     GuildPluginMessages,
     PluginChannelMessages,
     PluginDataMessages,
+    PluginServiceMessages,
 )
 from app.core.plugin_access_token import seal_install_token
 from app.core.security import SESSION_COOKIE_NAME
@@ -1779,8 +1780,7 @@ class TestVendorWebhooks:
         listing,
     ):
         """One community connected installation 42 and a third connected 7.
-        The second's connect of 42 is refused, storing nothing, until the
-        registration shares routes, and then goes through. A delivery for 42
+        The second connects 42 too. A delivery for 42
         is queued in each of the two, and each one's visit forwards it on a
         lifecycle token naming that install. A redelivery forwards nothing,
         under its own id or another."""
@@ -1797,19 +1797,9 @@ class TestVendorWebhooks:
         }
         guild_id, install_id = seats[1].guild.id, plugins[1].id
 
-        refused = await _connect_installation(client, seats[1], plugins[1], vendor)
-        assert refused["outcome"] == "taken"
-        stored = await _reload(session, guild_id, install_id)
-        assert not stored.config and not stored.connection_refs
-        assert (await _indexed(session, guild_id, install_id)).hook_route is None
-
-        registration.shared_routes = True
-        session.add(registration)
-        await session.commit()
         connected = await _connect_installation(client, seats[1], plugins[1], vendor)
         assert connected["outcome"] == "connected"
-        indexed = await _indexed(session, guild_id, install_id)
-        assert (indexed.hook_route, indexed.exclusive) == ("42", False)
+        assert (await _indexed(session, guild_id, install_id)).hook_route == "42"
 
         body, headers = vendor.webhook({"action": "opened", "installation": {"id": 42}})
 
@@ -2142,43 +2132,28 @@ class TestCheckedTypedConnection:
         revoked = [call["values"] for name, call, _ in vendor.hooks if name == "revoke"]
         assert sorted(values["key"] for values in revoked) == ["ck_1", "ck_2"]
 
-    async def test_a_shop_another_community_holds_is_not_kept(
+    async def test_two_communities_connect_the_same_shop(
         self, client: AsyncClient, acting_user, session, vendor, shop
     ):
-        """Only one community connects a shop; the second's checked values are
-        revoked, so the plug-in removes what it made for them."""
-        from app.services import sweep_timers
-
+        """Each community that checks the shop keeps it, and both hold its
+        route."""
         first, second = [
             await acting_user(guild_role=CommunityRole.superadmin) for _ in range(2)
         ]
-        vendor.after_connect_answer = _checked("s-42", "hook-secret-1")
         plugins = [
             await _install(session, seat, SHOP_DEFINITION) for seat in (first, second)
         ]
-        kept = await self._save(
-            client, first, plugins[0], {"url": "https://shop.example", "key": "ck_1"}
-        )
-        assert kept.status_code == 200, kept.text
-
-        vendor.after_connect_answer = _checked("s-42", "hook-secret-2")
-        taken = await self._save(
-            client, second, plugins[1], {"url": "https://shop.example", "key": "ck_2"}
-        )
-
-        assert taken.status_code == 409
-        assert taken.json()["detail"] == GuildPluginMessages.CONNECTION_TAKEN
-        stored = await _reload(session, second.guild.id, plugins[1].id)
-        assert not stored.config and not stored.secret_fields
-        await post_commit.settle_all()
-        await sweep_timers.process_due_timers(outward=True)
-        [revoked] = [call for name, call, _ in vendor.hooks if name == "revoke"]
-        assert revoked["values"] == {
-            "url": "https://shop.example",
-            "key": "ck_2",
-            "store_id": "s-42",
-            "hook_secret": "hook-secret-2",
-        }
+        for seat, plugin, key in ((first, plugins[0], "1"), (second, plugins[1], "2")):
+            vendor.after_connect_answer = _checked("s-42", f"hook-secret-{key}")
+            saved = await self._save(
+                client,
+                seat,
+                plugin,
+                {"url": "https://shop.example", "key": f"ck_{key}"},
+            )
+            assert saved.status_code == 200, saved.text
+            indexed = await _indexed(session, seat.guild.id, plugin.id)
+            assert indexed.hook_route == "s-42"
 
     async def test_a_refused_shop_stores_nothing(
         self, client: AsyncClient, acting_user, session, vendor, shop
@@ -3224,6 +3199,181 @@ SYNC = {
         ' "set": {"github.issues": result.total, "github.since": since}}]'
     ),
 }
+
+
+async def _connect_for_every_community(
+    client: AsyncClient, owner, registration_id: int, vendor: FakeVendor
+) -> dict:
+    """The operator's install page, then one authorization, for installation
+    42, from the plug-in services page."""
+    response = await client.post(
+        f"/api/v1/plugin-services/{registration_id}/connections/workspace/connect",
+        headers=owner.headers,
+    )
+    assert response.status_code == 200, response.text
+    start = parse_qs(urlparse(response.json()["connect_url"]).query)
+    setup = await client.get(
+        "/api/v1/plugin-connections/setup",
+        headers=_cookie(owner),
+        params={
+            "state": start["state"][0],
+            "installation_id": "42",
+            "setup_action": "install",
+        },
+    )
+    assert setup.status_code == 303, setup.text
+    query = {
+        key: values[0]
+        for key, values in parse_qs(urlparse(setup.headers["location"]).query).items()
+    }
+    code = vendor.authorize(query["code_challenge"])
+    return await _callback(client, owner, state=query["state"], code=code)
+
+
+class TestPlatformConnection:
+    async def test_the_platform_connects_one_installation_for_every_community(
+        self, client: AsyncClient, acting_user, session, vendor, declarative
+    ):
+        """The operator connects installation 42 once. Every community with
+        the plug-in reads it as made and cannot change it, a delivery for 42
+        reaches each, and one for a community's own installation reaches
+        none. Disconnecting gives each community its own again."""
+        await _declarative_listing(session)
+        owner = await acting_user()
+        unconnected, own = [
+            await acting_user(guild_role=CommunityRole.superadmin) for _ in range(2)
+        ]
+        plugins = {
+            unconnected.guild.id: await _declarative_install(session, unconnected),
+            own.guild.id: await _declarative_install(
+                session, own, config=_connected("7")
+            ),
+        }
+        vendor.api_answers = [_installations((42, "acme"))]
+
+        landing = await _connect_for_every_community(
+            client, owner, declarative.id, vendor
+        )
+
+        assert landing["outcome"] == "connected"
+        read = await client.get(
+            f"/api/v1/plugin-services/{declarative.id}", headers=owner.headers
+        )
+        [held] = read.json()["platform_connections"]
+        assert held | {"connected_at": None} == {
+            "connection_id": "workspace",
+            "label": {"en": "Organization"},
+            "connected": True,
+            "account_label": "acme",
+            "connected_at": None,
+            "removed": False,
+        }
+        for seat in (unconnected, own):
+            plugin = plugins[seat.guild.id]
+            detail = await client.get(
+                seat.g(f"/plugins/{plugin.id}"), headers=seat.headers
+            )
+            [workspace] = detail.json()["connections"]
+            assert (workspace["platform"], workspace["satisfied"]) == (True, True)
+            assert workspace["values"] == {"owner": "acme", "installation_id": "42"}
+            refused = await client.post(
+                seat.g(f"/plugins/{plugin.id}/connections/workspace/connect"),
+                headers=seat.headers,
+            )
+            assert refused.status_code == 409
+            assert (
+                refused.json()["detail"]
+                == GuildPluginMessages.CONNECTION_HELD_BY_PLATFORM
+            )
+
+        for installation in (42, 7):
+            body, headers = vendor.webhook(
+                {**_issue(), "installation": {"id": installation}},
+                delivery=f"delivery-{installation}",
+            )
+            response = await client.post(
+                DECLARATIVE_HOOKS, content=body, headers=headers
+            )
+            assert response.status_code == 202, response.text
+        for guild_id in plugins:
+            await _delivered(session, guild_id)
+            assert [event for event, *_ in await _events(session, guild_id)] == [
+                ISSUE_OPENED
+            ]
+
+        ended = await client.delete(
+            f"/api/v1/plugin-services/{declarative.id}/connections/workspace",
+            headers=owner.headers,
+        )
+        assert ended.status_code == 200, ended.text
+        assert ended.json()["platform_connections"][0]["connected"] is False
+        detail = await client.get(
+            own.g(f"/plugins/{plugins[own.guild.id].id}"), headers=own.headers
+        )
+        [workspace] = detail.json()["connections"]
+        assert workspace["platform"] is False
+        assert workspace["values"] == {"owner": "acme", "installation_id": "7"}
+
+    async def test_a_removed_installation_is_marked_once_and_routes_nowhere(
+        self, client: AsyncClient, acting_user, session, vendor, declarative
+    ):
+        """GitHub's report that the platform's installation was deleted is
+        kept on the platform's connection, not in any community, and nothing
+        after it reaches a community."""
+        await _declarative_listing(session)
+        owner = await acting_user()
+        seat = await acting_user(guild_role=CommunityRole.superadmin)
+        await _declarative_install(session, seat)
+        vendor.api_answers = [_installations((42, "acme"))]
+        landing = await _connect_for_every_community(
+            client, owner, declarative.id, vendor
+        )
+        assert landing["outcome"] == "connected"
+
+        for serial, (event, payload) in enumerate(
+            (
+                ("installation", {"action": "deleted"}),
+                ("issues", _issue()),
+            )
+        ):
+            body, headers = vendor.webhook(
+                {**payload, "installation": {"id": 42}}, delivery=f"delivery-{serial}"
+            )
+            headers["X-GitHub-Event"] = event
+            response = await client.post(
+                DECLARATIVE_HOOKS, content=body, headers=headers
+            )
+            assert response.status_code == 202, response.text
+            await _delivered(session, seat.guild.id)
+
+        read = await client.get(
+            f"/api/v1/plugin-services/{declarative.id}", headers=owner.headers
+        )
+        assert read.json()["platform_connections"][0]["removed"] is True
+        assert await _events(session, seat.guild.id) == []
+
+    async def test_only_an_operator_who_may_manage_plug_ins_connects_for_everyone(
+        self, client: AsyncClient, acting_user, session, vendor, declarative
+    ):
+        """A community seat cannot start it, and a connection the platform
+        cannot make is refused."""
+        await _declarative_listing(session)
+        seat = await acting_user(guild_role=CommunityRole.superadmin)
+        response = await client.post(
+            f"/api/v1/plugin-services/{declarative.id}/connections/workspace/connect",
+            headers=seat.headers,
+        )
+        assert response.status_code == 403
+        owner = await acting_user()
+        unknown = await client.post(
+            f"/api/v1/plugin-services/{declarative.id}/connections/nothing/connect",
+            headers=owner.headers,
+        )
+        assert unknown.status_code == 409
+        assert (
+            unknown.json()["detail"]
+            == PluginServiceMessages.CONNECTION_NOT_FOR_PLATFORM
+        )
 
 
 def _syncing(**schedule: str) -> dict:

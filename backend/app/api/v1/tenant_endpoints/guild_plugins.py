@@ -432,6 +432,16 @@ def _connection_or_404(plugin: GuildPlugin, connection_id: str) -> dict:
     return connection
 
 
+async def _refuse_held_by_platform(plugin: GuildPlugin, connection_id: str) -> None:
+    """Refuse (409) a change to a community connection the platform made for
+    every community: it is the platform's to change."""
+    if connection_id in await plugin_config_service.platform_held(plugin):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=GuildPluginMessages.CONNECTION_HELD_BY_PLATFORM,
+        )
+
+
 async def _read(
     session: AsyncSession, plugin: GuildPlugin, context: GuildContext, viewer: AgeViewer
 ) -> CommunityPluginRead:
@@ -439,6 +449,7 @@ async def _read(
     return serialize_guild_plugin(
         plugin,
         viewer=viewer,
+        platform=await plugin_config_service.platform_held(plugin),
         install_state=await registration_lookup.install_state(
             plugin.definition,
             guild_id=context.guild_id,
@@ -495,6 +506,7 @@ async def _detail(
     return serialize_guild_plugin_detail(
         plugin,
         viewer=viewer,
+        platform=await plugin_config_service.platform_held(plugin),
         avatar_url=await _plugin_avatar(session, plugin),
         member_rows=await _member_rows(session, plugin_id=plugin.id, user_id=user_id),
         install_state=await registration_lookup.install_state(
@@ -585,11 +597,16 @@ async def list_community_plugins(
     artifacts = await guild_plugins_service.artifacts_by_install(
         session, [plugin.id for plugin in plugins]
     )
+    platform = {
+        plugin.id: await plugin_config_service.platform_held(plugin)
+        for plugin in plugins
+    }
     return CommunityPluginListResponse(
         items=[
             serialize_guild_plugin(
                 plugin,
                 viewer=viewer,
+                platform=platform[plugin.id],
                 install_state=states[plugin.id],
                 avatar_url=avatars.get(plugin.listing_uid),
                 context=guild_context,
@@ -1413,6 +1430,7 @@ async def connect_community_plugin(
     )
 
     if guild_wide:
+        await _refuse_held_by_platform(plugin, connection_id)
         stored_config = (plugin.config or {}).get(connection_id) or {}
         satisfied = plugin_config_service.is_satisfied(
             connection,
@@ -1478,6 +1496,7 @@ async def disconnect_community_plugin(
         require_seat(guild_context)
         await refuse_closed_surface(session, guild_context.guild_id, SURFACE_PLUGINS)
         require_grant_writes(guild_context)
+        await _refuse_held_by_platform(plugin, connection_id)
         # Clearing rewrites both configuration maps, so it takes the row: a plug-in
         # writing back at the same moment must not put back what was cleared.
         plugin = await _load(session, plugin_id, for_update=True)

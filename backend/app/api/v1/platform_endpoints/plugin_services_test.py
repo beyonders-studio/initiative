@@ -384,12 +384,11 @@ async def test_patch_replaces_a_beta_plugins_communities(
     ]
 
 
-async def test_sharing_is_turned_off_once_each_installation_has_one_community(
+async def test_every_community_that_connects_an_installation_holds_its_route(
     client: AsyncClient, session: AsyncSession
 ):
-    """Two communities hold installation 42. While sharing is off the second
-    is indexed without it; turning sharing on gives it the route, turning it
-    off is refused while both hold it, and goes through once one does."""
+    """Two communities connected installation 42: each holds its route, and
+    the registration has no switch to say otherwise."""
     headers = await _owner_headers(session)
     row = await _seed(session)
     user = await create_user(session)
@@ -404,40 +403,17 @@ async def test_sharing_is_turned_off_once_each_installation_has_one_community(
             listing_uid=LISTING_UID,
             config={"workspace": {"owner": "acme", "installation_id": "42"}},
         )
-        installs.append((guild.id, plugin))
-    (first, _), (second, second_plugin) = installs
+        await plugin_installs.record(guild.id, plugin)
+        installs.append(guild.id)
 
-    async def indexed() -> dict[int, tuple]:
-        session.expunge_all()
-        rows = await session.exec(
-            select(PluginInstall).where(PluginInstall.listing_uid == LISTING_UID)
-        )
-        return {item.guild_id: (item.hook_route, item.exclusive) for item in rows}
-
-    async def share(on: bool) -> httpx2.Response:
-        return await client.patch(
-            f"{BASE}{row.id}", headers=headers, json={"shared_routes": on}
-        )
-
-    assert await indexed() == {first: ("42", True), second: (None, True)}
-
-    shared = await share(True)
-    assert shared.status_code == 200, shared.text
-    assert shared.json()["shared_routes"] is True
-    await plugin_installs.record(second, second_plugin)
-    assert await indexed() == {first: ("42", False), second: ("42", False)}
-
-    refused = await share(False)
-    assert refused.status_code == 409
-    assert refused.json()["detail"] == PluginServiceMessages.SHARED_ROUTES_IN_USE
-    assert (await _listed(client, headers, row.id))["shared_routes"] is True
-    assert await indexed() == {first: ("42", False), second: ("42", False)}
-
-    await plugin_installs.forget(second, second_plugin.id)
-    unshared = await share(False)
-    assert unshared.status_code == 200, unshared.text
-    assert unshared.json()["shared_routes"] is False
-    assert await indexed() == {first: ("42", True)}
+    session.expunge_all()
+    rows = await session.exec(
+        select(PluginInstall).where(PluginInstall.listing_uid == LISTING_UID)
+    )
+    assert {item.guild_id: item.hook_route for item in rows} == dict.fromkeys(
+        installs, "42"
+    )
+    assert "shared_routes" not in await _listed(client, headers, row.id)
 
 
 async def test_the_browser_address_round_trips_and_clears(

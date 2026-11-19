@@ -1525,6 +1525,7 @@ def item_openability(
     context: GuildContext,
     age_allows: bool = True,
     frozen: bool = False,
+    platform: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> list[ItemOpenability]:
     """What of the plug-in the viewer meets on items, in each initiative it is
     placed in where they meet anything: each field, part and action whose
@@ -1535,15 +1536,19 @@ def item_openability(
     action while those its endpoint requires do too. A member's own connection
     an action requires is theirs to make when they run it, and so is one a
     declarative plug-in's endpoint requires, whose call may run on it; a
-    container's endpoint is called as the installation. A frozen community
-    runs none, and a viewer too young for the plug-in meets none of it."""
+    container's endpoint is called as the installation. A connection the
+    platform holds (``platform``) holds a value. A frozen community runs
+    none, and a viewer too young for the plug-in meets none of it."""
     if not age_allows:
         return []
     definition = plugin.definition if isinstance(plugin.definition, dict) else {}
 
     def met(entry: dict, members_connect: bool = False) -> bool:
         return plugin_config_service.installation_meets(
-            plugin, entry.get("requires"), members_connect=members_connect
+            plugin,
+            entry.get("requires"),
+            members_connect=members_connect,
+            platform=platform,
         )
 
     declarative = registration_lookup.is_declarative(definition)

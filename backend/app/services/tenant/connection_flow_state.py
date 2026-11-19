@@ -7,7 +7,8 @@ flow_state` uses for sign-in, under a salt of its own). It is confidential,
 cannot be altered, and expires ten minutes after it was minted.
 
 It names the install, the connection and the member (or none, for the
-community's own connection), the person who started it, the PKCE verifier,
+community's own connection), or, for a connection the platform makes for every
+community, no community and no install but the registration's ``public_id``; the person who started it, the PKCE verifier,
 the path to send the person back to, and the phase: ``install`` while a person is on the vendor's install
 page, ``authorize`` once the authorization request is sent. An
 installation-style flow's second leg carries the installation id the vendor's
@@ -61,8 +62,9 @@ class FlowStateError(Exception):
 
 @dataclass(frozen=True)
 class ConnectionFlowState:
-    guild_id: int
-    install_id: int
+    #: The community and install, or ``None`` for the platform's connection.
+    guild_id: int | None
+    install_id: int | None
     connection_id: str
     #: The member connecting their own account; ``None`` for the community's.
     user_id: int | None
@@ -77,6 +79,13 @@ class ConnectionFlowState:
     phase: str
     #: The id an installation-style flow's setup address returned.
     installation_id: str | None = None
+    #: The registration whose connection the platform makes for every
+    #: community; ``None`` for a community's.
+    public_id: str | None = None
+
+    @property
+    def for_platform(self) -> bool:
+        return self.public_id is not None
 
     def authorizing(self, installation_id: str | None) -> ConnectionFlowState:
         """The same flow, on its way to the authorization endpoint."""
@@ -91,14 +100,15 @@ def code_challenge(verifier: str) -> str:
 
 def new_state(
     *,
-    guild_id: int,
-    install_id: int,
+    guild_id: int | None,
+    install_id: int | None,
     connection_id: str,
     user_id: int | None,
     started_by: int,
     return_path: str,
     pkce: bool,
     phase: str,
+    public_id: str | None = None,
 ) -> ConnectionFlowState:
     return ConnectionFlowState(
         guild_id=guild_id,
@@ -109,6 +119,7 @@ def new_state(
         verifier=secrets.token_urlsafe(_VERIFIER_BYTES) if pkce else "",
         return_path=return_path,
         phase=phase,
+        public_id=public_id,
     )
 
 
@@ -124,6 +135,7 @@ def encode_state(state: ConnectionFlowState) -> str:
             "r": state.return_path,
             "p": state.phase,
             "x": state.installation_id,
+            "s": state.public_id,
         },
         separators=(",", ":"),
     )
@@ -145,8 +157,8 @@ def decode_state(
     try:
         data = json.loads(plaintext)
         state = ConnectionFlowState(
-            guild_id=int(data["g"]),
-            install_id=int(data["i"]),
+            guild_id=None if data["g"] is None else int(data["g"]),
+            install_id=None if data["i"] is None else int(data["i"]),
             connection_id=str(data["c"]),
             user_id=None if data.get("u") is None else int(data["u"]),
             started_by=int(data["b"]),
@@ -154,9 +166,15 @@ def decode_state(
             return_path=str(data["r"]),
             phase=str(data["p"]),
             installation_id=None if data.get("x") is None else str(data["x"]),
+            public_id=None if data.get("s") is None else str(data["s"]),
         )
     except (ValueError, KeyError, TypeError) as exc:
         raise FlowStateError("malformed state") from exc
     if state.phase not in PHASES or not state.return_path.startswith("/"):
+        raise FlowStateError("malformed state")
+    # A community's flow names its install; the platform's names neither.
+    if (state.guild_id is None) != state.for_platform or (
+        (state.install_id is None) != state.for_platform
+    ):
         raise FlowStateError("malformed state")
     return state

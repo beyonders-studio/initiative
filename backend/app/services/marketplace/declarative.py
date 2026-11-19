@@ -75,6 +75,7 @@ from app.services.marketplace.service_plugins import (
     _requests,
 )
 from app.services.safe_http import ResponseTooLargeError, request_public_target
+from app.services.tenant import plugin_config as plugin_config_service
 from app.services.tenant import plugin_connection_flows as flows
 from app.services.tenant.plugin_channels import PluginChannelError, load_install
 from app.services.tenant.plugin_config import (
@@ -1100,9 +1101,11 @@ async def run_schedule(
     run = _Run(plugin.definition, None, credentials={}, now=now)
     steps = endpoint.get("steps") or [{"request": endpoint["request"]}]
     connection = without_tokens(
-        (plugin.config or {}).get(
-            _request_connection(steps[0]["request"], "installation") or ""
-        )
+        plugin_config_service.static_maps(
+            plugin,
+            _request_connection(steps[0]["request"], "installation") or "",
+            await plugin_config_service.platform_held(plugin),
+        )[0]
     )
     installed = install_settings(plugin)
     try:
@@ -1281,7 +1284,9 @@ async def _credentials(
                         connection_id=connection_id,
                         guild_id=guild_id,
                     )
-                    values = (install.config or {}).get(connection_id)
+                    values = plugin_config_service.static_maps(
+                        install, connection_id, registration.platform_connections
+                    )[0]
             except flows.ConnectionFlowError as exc:
                 raise refusal from exc
             if held is None:
