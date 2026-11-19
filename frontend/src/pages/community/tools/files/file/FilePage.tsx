@@ -544,7 +544,15 @@ export const FilePage = () => {
         canEdit={canEditFile}
         collaboration={collaboration}
         live={collaborationEnabled && collaboration.isReady}
-        settled={fileQuery.isFetchedAfterMount}
+        // The file as the server has it now: fetched since the page mounted,
+        // or by the route on the way here and still fresh, which is never
+        // fetched again on mount. Data restored from the offline cache is
+        // stale, and data carried over from another file is a placeholder;
+        // both wait for the refetch.
+        settled={
+          fileQuery.isFetchedAfterMount ||
+          (fileQuery.isSuccess && !fileQuery.isStale && !fileQuery.isPlaceholderData)
+        }
         title={title}
         className={cn(isFullscreen && "h-full max-h-none min-h-0 flex-1")}
         onChange={handleBodyChange}

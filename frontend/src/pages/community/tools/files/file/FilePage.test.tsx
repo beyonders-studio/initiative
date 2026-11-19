@@ -7,6 +7,7 @@ import { buildFileSummary } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { createTestQueryClient, renderPage } from "@/__tests__/helpers/render";
+import { getReadFileQueryKey } from "@/api/generated/files/files";
 import { queryClient as appQueryClient } from "@/lib/queryClient";
 
 const collaborating = { value: false };
@@ -24,6 +25,10 @@ vi.mock("@/hooks/useCollaboration", () => ({
     resume: vi.fn(),
     disconnect: vi.fn(),
   }),
+}));
+
+vi.mock("@/components/tools/files/WhiteboardFileEditor", () => ({
+  WhiteboardFileEditor: () => <div>whiteboard canvas</div>,
 }));
 
 const editedBody = { root: { children: [{ type: "edited" }] } };
@@ -267,5 +272,28 @@ describe("switching files", () => {
     arrive();
     expect(await screen.findByDisplayValue("Second")).toBeInTheDocument();
     expect(patches).toEqual([]);
+  });
+});
+
+describe("opening a whiteboard", () => {
+  it("draws the canvas from the read the route made on the way in", async () => {
+    // The route's loader fetches the file before the page mounts. Still fresh,
+    // it is not fetched again on mount, and the canvas must not wait for a
+    // fetch that never comes.
+    const whiteboard = {
+      ...seed,
+      file_type: "excalidraw",
+      content: { elements: [], appState: {}, files: {} },
+    };
+    stored = whiteboard;
+    const queryClient = createTestQueryClient();
+    queryClient.setDefaultOptions({
+      queries: { ...queryClient.getDefaultOptions().queries, staleTime: 30_000, gcTime: 60_000 },
+    });
+    queryClient.setQueryData(getReadFileQueryKey(1, 7), whiteboard);
+
+    renderDoc({ queryClient });
+
+    expect(await screen.findByText("whiteboard canvas")).toBeInTheDocument();
   });
 });
