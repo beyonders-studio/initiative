@@ -22,6 +22,7 @@ from app.schemas.base import MentionStr, SanitizedBaseModel, TitleStr, reject_nu
 from app.schemas.query import PageMeta
 from app.schemas.tenant.archive import ToolCan, ToolState
 from app.schemas.tenant.created_by import CreatedByRead
+from app.schemas.tenant.property import CurrencyCode
 from app.schemas.tenant.resource_grant import ResourceGrantSchema, initiative_readable
 from app.schemas.tenant.tag import TagSummary
 
@@ -158,7 +159,7 @@ class PluginToolFieldRead(SanitizedBaseModel):
     #: A select's or a multi-select's options.
     options: list[PluginToolOptionRead] = Field(default_factory=list)
     #: A currency field's currency.
-    currency: str | None = None
+    currency: CurrencyCode | None = None
     #: A counter field's bounds.
     counter: PluginToolCounterRead | None = None
 

@@ -19,10 +19,12 @@ import {
   type CommunityPluginListResponse,
   type CommunityPluginRead,
   CounterLook,
-  type CurrencyCode,
   type DetailLayoutDefinitionInput,
   type GetLayoutsParams,
   type MetadataType,
+  type PluginToolActionRead,
+  type PluginToolCounterRead,
+  type PluginToolFieldRead,
   type PluginToolRowRead,
   type PluginToolRowUpdate,
   type PluginToolRowUpdateFields,
@@ -96,7 +98,7 @@ const toolIcons = new Map<string, LucideIcon>();
 /** A tool's icon by the name it declares, drawn once it has loaded (taking
  *  its room until then), or the puzzle piece for a name the app does not
  *  have. One component per name, so a redraw keeps it. */
-export const toolPluginIcon = (name: string): LucideIcon => {
+const toolPluginIcon = (name: string): LucideIcon => {
   const load = TOOL_PLUGIN_ICONS[name];
   if (!load) return Puzzle;
   const known = toolIcons.get(name);
@@ -123,58 +125,25 @@ export const toolPluginIcon = (name: string): LucideIcon => {
   return icon;
 };
 
-/** The kinds of field a tool's rows hold (the contract's `toolFieldKind`). */
-export type ToolFieldKind =
-  | "text"
-  | "number"
-  | "date"
-  | "datetime"
-  | "checkbox"
-  | "url"
-  | "currency"
-  | "select"
-  | "multi_select"
-  | "user_reference"
-  | "scale"
-  | "counter"
-  | "color";
-
-/** A counter's bound: a number, or the key of a number field of its row. */
-export type ToolBound = number | string;
-
-/** One field of a table, as declared. */
-export interface ToolFieldDecl {
-  key: string;
-  name: LocalizedText;
-  kind: ToolFieldKind;
-  options?: { value: string; label: LocalizedText; color?: string }[];
-  currency?: CurrencyCode;
-  default?: unknown;
-  counter?: { min?: ToolBound; max?: ToolBound; step?: ToolBound; initial?: ToolBound };
-}
+/** One field of a table, as declared: a key, a kind, and its options, its
+ *  currency or a counter's bounds, each a number or the key of a number
+ *  field of its row. */
+export type ToolFieldDecl = PluginToolFieldRead;
 
 /** One way a table's rows are listed: a grid or a masonry wall of its card,
  *  or a table of its columns, with its looks and its presets. */
-export type ToolListLayout = ListLayoutDefinition & { kind: "grid" | "masonry" | "table" };
+type ToolListLayout = ListLayoutDefinition & { kind: "grid" | "masonry" | "table" };
 
 /** What one table draws: the lists its rows are listed in, the first the one
  *  a person starts on, and one row's page. */
-export interface ToolLayoutsDecl {
+interface ToolLayoutsDecl {
   lists: ToolListLayout[];
   detail: DetailLayoutDefinitionInput;
 }
 
-/** An action a reader runs on one row. */
-export interface ToolActionDecl {
-  id: string;
-  name: LocalizedText;
-  /** The key of the table whose rows it runs on. */
-  on: string;
-  /** The keys of the fields of its table the reader is asked for before it
-   *  runs. */
-  params?: string[];
-  confirm?: LocalizedText;
-}
+/** An action a reader runs on one row of the table whose key `on` names,
+ *  asking first for the fields its `params` name. */
+export type ToolActionDecl = PluginToolActionRead;
 
 interface ToolItemDecl {
   key: string;
@@ -226,7 +195,7 @@ export interface InstalledTool {
 
 /** A plug-in table's kind: its key, then `.` and the plug-in's uid in lower
  *  case. */
-export const toolPluginKind = (key: string, listingUid: string): string =>
+const toolPluginKind = (key: string, listingUid: string): string =>
   `${key}.${listingUid.toLowerCase()}`;
 
 /** How a plug-in table's kind is written: a key (a lower-case letter, then
@@ -421,8 +390,8 @@ export const withChange = <R extends Pick<PluginToolRowRead, "fields" | "people"
 
 /** A counter's bound as one row holds it: the number given, or the value of
  *  the field it names. */
-const boundOf = (row: PluginToolRowRead, bound: ToolBound | undefined): number | null => {
-  if (bound === undefined) return null;
+const boundOf = (row: PluginToolRowRead, bound: PluginToolCounterRead["min"]): number | null => {
+  if (bound === undefined || bound === null) return null;
   if (typeof bound === "number") return bound;
   const value = row.fields[bound];
   return value === null || value === undefined || value === "" ? null : Number(value);
