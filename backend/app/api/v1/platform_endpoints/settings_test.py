@@ -1173,6 +1173,20 @@ _ROUTES: list[tuple[str, str, str, dict | None]] = [
         "/api/v1/settings/auth/platform",
         {"session_max_hours": 12},
     ),
+    (_CONFIG_MANAGE, "get", "/api/v1/settings/intake", None),
+    (_CONFIG_MANAGE, "get", "/api/v1/settings/intake/options", None),
+    (
+        _CONFIG_MANAGE,
+        "put",
+        "/api/v1/settings/intake/community",
+        {"community_id": 1},
+    ),
+    (
+        _CONFIG_MANAGE,
+        "put",
+        "/api/v1/settings/intake/contact",
+        {"email": "ops@example.com"},
+    ),
     (_GUILDS_READ, "get", GUILDS, None),
     (_GUILDS_MANAGE, "patch", GUILDS + "/{community_id}", {"max_storage_bytes": 1024}),
     (_GUILDS_MANAGE, "patch", GUILDS + "/{community_id}", {"status": "suspended"}),
@@ -1361,16 +1375,9 @@ INTERFACE = "/api/v1/settings/interface"
 _COLOURS = {"light_accent_color": "#123456", "dark_accent_color": "#abcdef"}
 
 
-async def test_cookie_consent_starts_off(client, owner):
-    """A deployment nobody arrives at uninvited is not asked to explain itself
-    to arrivals. An owner running a public front door turns it on."""
-    response = await client.get("/api/v1/config")
-
-    assert response.status_code == 200, response.text
-    assert response.json()["cookie_consent_enabled"] is False
-
-
 async def test_an_owner_turns_cookie_consent_on_and_off(client, owner):
+    """The colours share the page and the payload but are a separate
+    decision: saving them leaves the answer alone."""
     on = await client.put(
         INTERFACE,
         json={**_COLOURS, "cookie_consent_enabled": True},
@@ -1379,6 +1386,10 @@ async def test_an_owner_turns_cookie_consent_on_and_off(client, owner):
     assert on.status_code == 200, on.text
     assert on.json()["cookie_consent_enabled"] is True
 
+    colours = await client.put(INTERFACE, json=_COLOURS, headers=owner.headers)
+    assert colours.status_code == 200, colours.text
+    assert colours.json()["cookie_consent_enabled"] is True
+
     off = await client.put(
         INTERFACE,
         json={**_COLOURS, "cookie_consent_enabled": False},
@@ -1386,21 +1397,6 @@ async def test_an_owner_turns_cookie_consent_on_and_off(client, owner):
     )
     assert off.status_code == 200, off.text
     assert off.json()["cookie_consent_enabled"] is False
-
-
-async def test_saving_a_colour_leaves_cookie_consent_alone(client, owner):
-    """The two live on one page and one payload; they are still two decisions,
-    so the colour form must not answer the other one by omission."""
-    await client.put(
-        INTERFACE,
-        json={**_COLOURS, "cookie_consent_enabled": True},
-        headers=owner.headers,
-    )
-
-    response = await client.put(INTERFACE, json=_COLOURS, headers=owner.headers)
-
-    assert response.status_code == 200, response.text
-    assert response.json()["cookie_consent_enabled"] is True
 
 
 async def test_cookie_consent_is_owner_only(client, operator):

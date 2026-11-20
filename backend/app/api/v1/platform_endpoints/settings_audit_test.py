@@ -95,6 +95,15 @@ async def test_each_area_of_the_settings_page_records_its_own_change(
     }
     assert hours["values"]["session_max_hours"] == {"from": None, "to": 72}
 
+    # Writing the same colours again changed nothing, and records nothing.
+    unchanged = await client.put(
+        "/api/v1/settings/interface",
+        headers=headers,
+        json={"light_accent_color": "#123456", "dark_accent_color": "#abcdef"},
+    )
+    assert unchanged.status_code == 200, unchanged.text
+    assert emitted(capfd, AuditEventType.PLATFORM_SETTINGS_CHANGED) == []
+
 
 async def test_an_email_change_says_whether_the_password_moved(
     client: AsyncClient, session: AsyncSession, capfd
@@ -153,23 +162,6 @@ async def test_a_storage_change_says_whether_the_key_moved(
     written = json.dumps(rows[0])
     assert S3_SECRET not in written
     assert "AKIAEXAMPLE" not in written
-
-
-async def test_a_write_that_changes_nothing_records_nothing(
-    client: AsyncClient, session: AsyncSession, capfd
-):
-    _, headers = await _owner(session)
-    payload = {"light_accent_color": "#123456", "dark_accent_color": "#abcdef"}
-
-    assert (
-        await client.put("/api/v1/settings/interface", headers=headers, json=payload)
-    ).status_code == 200
-    capfd.readouterr()
-    assert (
-        await client.put("/api/v1/settings/interface", headers=headers, json=payload)
-    ).status_code == 200
-
-    assert emitted(capfd, AuditEventType.PLATFORM_SETTINGS_CHANGED) == []
 
 
 async def test_a_refused_settings_write_records_nothing(
@@ -231,22 +223,15 @@ async def test_caps_and_status_are_recorded_against_the_community(
         "to": "read_only",
     }
 
-
-async def test_setting_a_cap_to_what_it_already_is_records_nothing(
-    client: AsyncClient, session: AsyncSession, capfd
-):
-    _, headers = await _owner(session)
-    guild = await create_guild(session)
-    capfd.readouterr()
-
-    for _ in range(2):
-        response = await client.patch(
-            f"/api/v1/settings/communities/{guild.id}",
-            headers=headers,
-            json={"max_users": 7},
-        )
-        assert response.status_code == 200, response.text
-
+    # Setting a cap to what it already is records nothing.
+    again = await client.patch(
+        f"/api/v1/settings/communities/{guild_id}",
+        headers=headers,
+        json={"max_users": 7},
+    )
+    assert again.status_code == 200, again.text
     written = emitted(capfd)
-    assert len(_of_type(written, AuditEventType.GUILD_SETTINGS_CHANGED)) == 1
+    assert _of_type(written, AuditEventType.GUILD_SETTINGS_CHANGED) == []
     assert _of_type(written, AuditEventType.GUILD_STATUS_CHANGED) == []
+
+

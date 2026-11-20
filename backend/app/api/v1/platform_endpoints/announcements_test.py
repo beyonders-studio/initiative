@@ -70,19 +70,23 @@ async def test_a_reader_sees_a_published_announcement(
     items = listed.json()["items"]
     assert [item["title"] for item in items] == ["Board view is new"]
     assert items[0]["sections"][0]["heading"] == "Look"
+    assert items[0]["key"].startswith("db:")
+    assert items[0]["is_builtin"] is False
 
 
-async def test_a_draft_is_invisible_to_a_reader(
+async def test_a_draft_and_a_scheduled_notice_are_invisible_to_a_reader(
     client: AsyncClient, session: AsyncSession
 ):
     _, author_headers = await _author(session)
     reader = await create_user(session)
 
-    await client.post(
-        "/api/v1/announcements/operator",
-        headers=author_headers,
-        json=_body(published_at=None),
-    )
+    for published_at in (None, (datetime.now(UTC) + timedelta(days=1)).isoformat()):
+        created = await client.post(
+            "/api/v1/announcements/operator",
+            headers=author_headers,
+            json=_body(published_at=published_at),
+        )
+        assert created.status_code == 201, created.text
 
     listed = await client.get("/api/v1/announcements", headers=get_auth_headers(reader))
     assert listed.json()["items"] == []
@@ -111,28 +115,14 @@ async def test_dismissing_removes_it_from_the_next_fetch(
         f"/api/v1/announcements/{key}/dismiss", headers=reader_headers
     )
     assert dismissed.status_code == 204
+    # Seeing it again does not undo the dismissal.
+    seen_again = await client.post(
+        f"/api/v1/announcements/{key}/seen", headers=reader_headers
+    )
+    assert seen_again.status_code == 204
 
     after = await client.get("/api/v1/announcements", headers=reader_headers)
     assert after.json()["items"] == []
-
-
-async def test_the_archive_returns_what_the_queue_has_finished_with(
-    client: AsyncClient, session: AsyncSession
-):
-    _, author_headers = await _author(session)
-    reader = await create_user(session)
-    reader_headers = get_auth_headers(reader)
-
-    created = await client.post(
-        "/api/v1/announcements/operator", headers=author_headers, json=_body()
-    )
-    key = created.json()["key"]
-    await client.post(f"/api/v1/announcements/{key}/dismiss", headers=reader_headers)
-
-    assert (await client.get("/api/v1/announcements", headers=reader_headers)).json()[
-        "items"
-    ] == []
-
     archive = await client.get(
         "/api/v1/announcements",
         headers=reader_headers,
@@ -269,22 +259,6 @@ async def test_writing_an_announcement_needs_the_capability(
     assert listed.status_code == 403
 
 
-async def test_an_author_sees_drafts_in_the_operator_list(
-    client: AsyncClient, session: AsyncSession
-):
-    _, author_headers = await _author(session)
-    await client.post(
-        "/api/v1/announcements/operator",
-        headers=author_headers,
-        json=_body(title="A draft", published_at=None),
-    )
-
-    listed = await client.get("/api/v1/announcements/operator", headers=author_headers)
-    assert listed.status_code == 200
-    titles = [item["title"] for item in listed.json()["items"]]
-    assert "A draft" in titles
-
-
 async def test_editing_publishes_and_unpublishes(
     client: AsyncClient, session: AsyncSession
 ):
@@ -305,14 +279,15 @@ async def test_editing_publishes_and_unpublishes(
         json={"published_at": (datetime.now(UTC) - timedelta(minutes=1)).isoformat()},
     )
     assert published.status_code == 200
-    assert (
-        len(
-            (await client.get("/api/v1/announcements", headers=reader_headers)).json()[
-                "items"
-            ]
-        )
-        == 1
+    # An edit that does not mention the date leaves it published.
+    renamed = await client.patch(
+        f"/api/v1/announcements/operator/{announcement_id}",
+        headers=author_headers,
+        json={"title": "Renamed"},
     )
+    assert renamed.status_code == 200
+    listed = await client.get("/api/v1/announcements", headers=reader_headers)
+    assert [item["title"] for item in listed.json()["items"]] == ["Renamed"]
 
     await client.patch(
         f"/api/v1/announcements/operator/{announcement_id}",
@@ -465,6 +440,8 @@ async def test_re_uploading_the_same_picture_still_serves_it(
         files={"file": ("shot.png", data, "image/png")},
     )
     assert again.status_code == 201
+
+    assert again.json()["sha256"] == first.json()["sha256"]
 
     served = await client.get(again.json()["url"], headers=get_auth_headers(reader))
     assert served.status_code == 200

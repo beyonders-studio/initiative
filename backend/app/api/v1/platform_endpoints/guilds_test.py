@@ -19,22 +19,44 @@ from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.models.platform.guild import CommunityRole, Guild, GuildMembership
+from app.core.audit_events import AuditEventType
+from app.models.platform.guild import (
+    CommunityRole,
+    Guild,
+    GuildInvite,
+    GuildMembership,
+)
 from app.models.platform.notification import Notification, NotificationType
 from app.models.platform.user import User, UserRole, UserStatus
 from app.models.platform.user_passkey import UserPasskey
 from app.models.tenant.initiative import Initiative, InitiativeMember
 from app.services.platform import rules
-from app.testing import drain_notices
+from app.testing import drain_notices, emitted
 from app.testing.factories import (
+    create_access_grant,
     create_federated_identity,
     create_guild,
     create_guild_membership,
     create_user,
+    get_auth_headers,
     get_auth_token,
     guild_administration,
 )
 from app.testing.schema_harness import route_session_to_guild
+
+
+def _where(row) -> tuple:
+    """The four columns every audit record is read by."""
+    return (
+        row["actor_user_id"],
+        row["target_user_id"],
+        row["guild_id"],
+        row["target"],
+    )
+
+
+def _of_type(written: list[dict], event_type: AuditEventType) -> list[dict]:
+    return [row for row in written if row["event_type"] == event_type.value]
 
 
 async def _just_signed_in(session: AsyncSession, user: User) -> dict[str, str]:
@@ -149,7 +171,7 @@ async def test_list_guilds_administration_fields_are_admin_only(
 
 
 async def test_accepting_an_invite_answers_with_the_member_tier_guild(
-    client: AsyncClient, session: AsyncSession, acting_user
+    client: AsyncClient, session: AsyncSession, acting_user, capfd
 ):
     """Redeeming a code hands back the guild the caller has just joined, in the
     same member-tier payload the list serves: they are not an admin, so the
@@ -158,10 +180,25 @@ async def test_accepting_an_invite_answers_with_the_member_tier_guild(
     admin = await acting_user(guild_role=CommunityRole.admin, guild=guild)
     await guild_administration(session, guild, max_users=25, tier_name="Bespoke Plan")
 
+    capfd.readouterr()
     invite = await client.post(
-        f"/api/v1/communities/{guild.id}/invites", headers=admin.headers, json={}
+        f"/api/v1/communities/{guild.id}/invites",
+        headers=admin.headers,
+        json={"max_uses": 3},
     )
     assert invite.status_code == 201, invite.text
+    invite_id = invite.json()["id"]
+    (minted,) = emitted(capfd, AuditEventType.GUILD_INVITE_CREATED)
+    assert _where(minted) == (
+        admin.user.id,
+        None,
+        guild.id,
+        {"type": "guild_invite", "id": invite_id},
+    )
+    assert minted["detail"]["max_uses"] == 3
+    assert minted["detail"]["addressed"] is False
+    # The code is the invite; the record describes its terms and never carries it.
+    assert "code" not in minted["detail"]
 
     joiner = await acting_user("member")
     resp = await client.post(
@@ -171,12 +208,26 @@ async def test_accepting_an_invite_answers_with_the_member_tier_guild(
     )
 
     assert resp.status_code == 200, resp.text
+    (added,) = emitted(capfd, AuditEventType.GUILD_MEMBER_ADDED)
+    assert _where(added) == (
+        joiner.user.id,
+        joiner.user.id,
+        guild.id,
+        {"type": "guild", "id": guild.id},
+    )
+    assert added["detail"] == {
+        "role": "member",
+        "via": "invite",
+        "invite_id": invite_id,
+    }
     body = resp.json()
     assert body["id"] == guild.id
     assert body["name"] == "Test Guild"
     assert body["role"] == "member"
     for field in ADMIN_ONLY_GUILD_FIELDS:
         assert body[field] is None, f"{field} must not reach a plain member"
+    status = await client.get(f"/api/v1/communities/invite/{invite.json()['code']}")
+    assert status.json()["uses"] == 1
 
 
 async def test_an_invite_with_no_use_limit_takes_any_number_of_people(
@@ -201,11 +252,13 @@ async def test_an_invite_with_no_use_limit_takes_any_number_of_people(
 
 
 async def test_creating_a_guild_seats_its_creator_and_leaves_the_icon_unset(
-    client: AsyncClient, acting_user
+    client: AsyncClient, acting_user, capfd
 ):
-    """Whoever makes a community holds its seat. An icon is a picture rather
-    than a field, so a new guild has none until ``PUT /communities/{id}/icon``."""
+    """Whoever makes a community holds its seat, and both are recorded. An icon
+    is a picture rather than a field, so a new guild has none until
+    ``PUT /communities/{id}/icon``."""
     a = await acting_user("member")
+    capfd.readouterr()
 
     response = await client.post(
         "/api/v1/communities/",
@@ -219,6 +272,15 @@ async def test_creating_a_guild_seats_its_creator_and_leaves_the_icon_unset(
     assert data["description"] == "A test guild"
     assert data["role"] == "superadmin"
     assert data["icon_url"] is None
+
+    written = emitted(capfd)
+    where = (a.user.id, a.user.id, data["id"], {"type": "guild", "id": data["id"]})
+    (created,) = _of_type(written, AuditEventType.GUILD_CREATED)
+    assert _where(created) == where
+    assert created["detail"] == {"owner_is_actor": True}
+    (added,) = _of_type(written, AuditEventType.GUILD_MEMBER_ADDED)
+    assert _where(added) == where
+    assert added["detail"] == {"role": "superadmin", "via": "created"}
 
 
 async def test_create_guild_requires_name(client: AsyncClient, acting_user):
@@ -466,11 +528,13 @@ async def test_an_unusable_owner_is_refused(
 
 
 async def test_update_guild_as_admin(
-    client: AsyncClient, session: AsyncSession, acting_user
+    client: AsyncClient, session: AsyncSession, acting_user, capfd
 ):
-    """Test that admin can update guild."""
+    """An admin edits the profile. The record names the fields that moved and,
+    both holding free text, copies neither; a restatement records nothing."""
     guild = await create_guild(session, name="Old Name", description="Old description")
     admin = await acting_user(guild_role=CommunityRole.admin, guild=guild)
+    capfd.readouterr()
 
     response = await client.patch(
         f"/api/v1/communities/{guild.id}",
@@ -482,6 +546,26 @@ async def test_update_guild_as_admin(
     data = response.json()
     assert data["name"] == "New Name"
     assert data["description"] == "New description"
+    (row,) = emitted(capfd, AuditEventType.GUILD_SETTINGS_CHANGED)
+    assert _where(row) == (
+        admin.user.id,
+        None,
+        guild.id,
+        {"type": "guild", "id": guild.id},
+    )
+    assert row["detail"] == {
+        "area": "profile",
+        "changed": ["description", "name"],
+        "values": {},
+    }
+
+    unchanged = await client.patch(
+        f"/api/v1/communities/{guild.id}",
+        headers=admin.headers,
+        json={"name": "New Name"},
+    )
+    assert unchanged.status_code == 200, unchanged.text
+    assert emitted(capfd, AuditEventType.GUILD_SETTINGS_CHANGED) == []
 
 
 async def test_an_ordinary_admin_cannot_delete_the_community(
@@ -535,15 +619,17 @@ async def test_deleting_a_guild_asks_for_the_password_and_the_phrase(
     client: AsyncClient,
     session: AsyncSession,
     acting_user,
+    capfd,
     password: str,
     confirmation: str,
     expected_status: int,
     expected_detail: str | None,
 ):
     """Both answers have to be right. A refusal is 400 rather than 401, which
-    is the status the SPA reads as a session ending."""
+    is the status the SPA reads as a session ending, and records nothing."""
     guild = await create_guild(session, name="To Delete")
     admin = await acting_user(guild_role=CommunityRole.superadmin, guild=guild)
+    capfd.readouterr()
 
     response = await client.request(
         "DELETE",
@@ -553,8 +639,20 @@ async def test_deleting_a_guild_asks_for_the_password_and_the_phrase(
     )
 
     assert response.status_code == expected_status, response.text
+    deleted = emitted(capfd, AuditEventType.GUILD_DELETED)
     if expected_detail is not None:
         assert response.json()["detail"] == expected_detail
+        assert deleted == []
+        return
+    (row,) = deleted
+    assert _where(row) == (
+        admin.user.id,
+        None,
+        guild.id,
+        {"type": "guild", "id": guild.id},
+    )
+    # One member, so the roster is the person deleting it and goes with it.
+    assert row["detail"] == {"via": "admin", "roster_cleared": True}
 
 
 @pytest.mark.parametrize(
@@ -701,7 +799,9 @@ async def test_an_admin_names_a_member(
     assert missing.status_code == 404, missing.text
 
 
-async def test_create_guild_invite_as_admin(client: AsyncClient, acting_user):
+async def test_create_guild_invite_as_admin(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
     """An admin mints an invite, with a use count and an expiry it chooses."""
     admin = await acting_user(guild_role=CommunityRole.admin)
 
@@ -727,6 +827,9 @@ async def test_create_guild_invite_as_admin(client: AsyncClient, acting_user):
     # address, from the ciphertext. The domain is elided too — a bare domain
     # narrows an address to one organisation.
     assert data["invitee_email"] == "i***e@e***m"
+    # Only a hash of the code is kept.
+    row = await session.get(GuildInvite, data["id"])
+    assert data["code"] not in row.code_hash
 
 
 @pytest.mark.parametrize(
@@ -765,9 +868,10 @@ async def test_minting_an_invite_respects_the_seat_cap(
 
 
 async def test_an_admin_lists_and_revokes_the_guilds_invites(
-    client: AsyncClient, session: AsyncSession, acting_user
+    client: AsyncClient, session: AsyncSession, acting_user, capfd
 ):
-    """The two halves of running a guild's invites: see them all, drop one."""
+    """The two halves of running a guild's invites: see them all, drop one.
+    Dropping one is recorded; dropping one that is not there records nothing."""
     from app.services.platform import guilds as guild_service
 
     admin = await acting_user(guild_role=CommunityRole.admin)
@@ -789,8 +893,22 @@ async def test_an_admin_lists_and_revokes_the_guilds_invites(
     assert listed.status_code == 200
     assert {row["id"] for row in listed.json()} == {i.id for i in invites}
 
+    capfd.readouterr()
     revoked = await client.delete(f"{url}/{invites[0].id}", headers=admin.headers)
     assert revoked.status_code == 204
+    assert [
+        _where(row) for row in emitted(capfd, AuditEventType.GUILD_INVITE_REVOKED)
+    ] == [
+        (
+            admin.user.id,
+            None,
+            admin.guild.id,
+            {"type": "guild_invite", "id": invites[0].id},
+        )
+    ]
+    again = await client.delete(f"{url}/{invites[0].id}", headers=admin.headers)
+    assert again.status_code == 204
+    assert emitted(capfd, AuditEventType.GUILD_INVITE_REVOKED) == []
 
     remaining = await client.get(url, headers=admin.headers)
     assert [row["id"] for row in remaining.json()] == [invites[1].id]
@@ -864,6 +982,7 @@ async def test_accept_invite_blocked_when_guild_full(
     [
         pytest.param("unknown", "INVITE_NOT_FOUND", id="a code nobody minted"),
         pytest.param("expired", "INVITE_EXPIRED_OR_USED", id="a code past its date"),
+        pytest.param("used", "INVITE_EXPIRED_OR_USED", id="a code used up"),
     ],
 )
 async def test_an_invite_that_cannot_be_redeemed_is_refused(
@@ -883,12 +1002,17 @@ async def test_an_invite_that_cannot_be_redeemed_is_refused(
         code = "invalidcode123"
     else:
         admin = await acting_user(guild_role=CommunityRole.admin)
-        _invite, invite_code = await guild_service.create_guild_invite(
+        invite, invite_code = await guild_service.create_guild_invite(
             session,
             guild_id=admin.guild.id,
             created_by=admin.user.id,
-            expires_at=datetime.now(UTC) - timedelta(days=1),
+            max_uses=1,
+            expires_at=(
+                datetime.now(UTC) - timedelta(days=1) if kind == "expired" else None
+            ),
         )
+        if kind == "used":
+            invite.uses = 1
         await session.commit()
         code = invite_code
 
@@ -900,6 +1024,99 @@ async def test_an_invite_that_cannot_be_redeemed_is_refused(
 
     assert response.status_code == 400
     assert response.json()["detail"] == expected_detail
+
+
+@pytest.mark.parametrize(
+    "invitee_email,account_email,added,expected_detail",
+    [
+        pytest.param(
+            "at-work@example.com",
+            "personal@example.com",
+            ("at-work@example.com", True),
+            None,
+            id="a verified second address",
+        ),
+        pytest.param(
+            "unproven@example.com",
+            "claimer@example.com",
+            ("unproven@example.com", False),
+            "INVITE_EMAIL_MISMATCH",
+            id="an address still being claimed",
+        ),
+        pytest.param(
+            "invitee@example.com",
+            "someone-else@example.com",
+            None,
+            "INVITE_EMAIL_MISMATCH",
+            id="another account",
+        ),
+        pytest.param(
+            "Invitee@Example.com",
+            "invitee@example.com",
+            None,
+            None,
+            id="the address in another case",
+        ),
+        pytest.param(None, "random@example.com", None, None, id="an unaddressed link"),
+    ],
+)
+async def test_an_addressed_invite_admits_only_the_account_holding_the_address(
+    client: AsyncClient,
+    session: AsyncSession,
+    acting_user,
+    invitee_email: str | None,
+    account_email: str,
+    added: tuple[str, bool] | None,
+    expected_detail: str | None,
+):
+    """An invite sent to an address is for whoever holds it, by any of their
+    proven addresses and in any case; a claim in progress holds nothing. An
+    unaddressed invite is a shareable link, and a billing grant the redeemer
+    holds in the guild does not hold them back."""
+    from app.services.auth import addresses
+    from app.services.platform import guilds as guild_service
+
+    admin = await acting_user(guild_role=CommunityRole.admin)
+    account = await create_user(session, email=account_email)
+    if added is not None:
+        addresses.record_address(
+            session,
+            user_id=account.id,
+            email=added[0],
+            source=addresses.SOURCE_ADDED,
+            verified=added[1],
+            is_primary=False,
+        )
+    if invitee_email is None:
+        await create_access_grant(
+            session, user=account, guild=admin.guild, purpose="billing"
+        )
+    invite, code = await guild_service.create_guild_invite(
+        session,
+        guild_id=admin.guild.id,
+        created_by=admin.user.id,
+        invitee_email=invitee_email,
+        max_uses=5,
+    )
+    await session.commit()
+
+    response = await client.post(
+        "/api/v1/communities/invite/accept",
+        headers=get_auth_headers(account),
+        json={"code": code},
+    )
+
+    await session.refresh(invite)
+    membership = await session.get(GuildMembership, (admin.guild.id, account.id))
+    if expected_detail is None:
+        assert response.status_code == 200, response.text
+        assert response.json()["role"] == "member"
+        assert invite.uses == 1
+    else:
+        assert response.status_code == 400
+        assert response.json()["detail"] == expected_detail
+        assert membership is None
+        assert invite.uses == 0
 
 
 # --- who each guild-router surface answers --------------------------------
@@ -1146,6 +1363,7 @@ async def test_guild_billing_handoff_succeeds_for_admin(
 async def test_a_departure_is_counted_against_the_communitys_last_seat(
     client: AsyncClient,
     acting_user,
+    capfd,
     leaver_role: CommunityRole,
     other_roles: tuple[CommunityRole, ...],
     can_leave: bool,
@@ -1155,7 +1373,8 @@ async def test_a_departure_is_counted_against_the_communitys_last_seat(
     """Holding a community's only superadmin seat is the one thing that stops a
     departure, and only while somebody is left behind. Being its last *admin*
     stops nobody — the seat is still there to appoint another. The eligibility
-    read answers the same question ahead of time."""
+    read answers the same question ahead of time. A departure is recorded
+    against the leaver, who is both actor and subject."""
     leaver = await acting_user(guild_role=leaver_role)
     for role in other_roles:
         await acting_user(guild_role=role, guild=leaver.guild)
@@ -1170,12 +1389,28 @@ async def test_a_departure_is_counted_against_the_communitys_last_seat(
         "is_last_superadmin": not can_leave,
     }
 
+    capfd.readouterr()
     response = await client.delete(
         f"/api/v1/communities/{leaver.guild.id}/leave", headers=leaver.headers
     )
     assert response.status_code == expected_status, response.text
+    removed = emitted(capfd, AuditEventType.GUILD_MEMBER_REMOVED)
     if expected_detail is not None:
         assert response.json()["detail"] == expected_detail
+        assert removed == []
+        return
+    guild_id = leaver.guild.id
+    assert [(_where(row), row["detail"]) for row in removed] == [
+        (
+            (
+                leaver.user.id,
+                leaver.user.id,
+                guild_id,
+                {"type": "guild", "id": guild_id},
+            ),
+            {"role": leaver_role.value, "via": "left"},
+        )
+    ]
 
 
 async def test_a_second_seat_frees_the_first(client: AsyncClient, acting_user):
