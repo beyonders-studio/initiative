@@ -98,6 +98,11 @@ async def seed(session: AsyncSession) -> None:
         # A release with built-in counters gives the upgrade a counter to
         # carry into the Counters plug-in.
         await testing.create_counter(session, by_name["counter_group"])
+    else:
+        # Where Counters is a plug-in, the community installs it, so every
+        # community holds the tool an upgraded one's counters became.
+        await testing.install_counters(session, guild.id, owner.id, {initiative.id})
+        await testing.add_counter(session, guild.id, initiative.id)
     await create_calendar_event(session, by_name["calendar"], owner)
     await create_wiki_page(session, by_name["wiki"], owner)
 

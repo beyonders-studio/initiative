@@ -19,6 +19,7 @@ __all__ = [
     "convert_counters",
     "counters_conversion",
     "counters_tool_manifest",
+    "install_counters",
     "install_tool_plugin",
 ]
 
@@ -264,6 +265,45 @@ async def install_tool_plugin(
     )
     assert response.status_code == 201, response.text
     return response.json()
+
+
+async def install_counters(
+    session: AsyncSession, guild_id: int, installer_id: int, placements: set[int]
+) -> ToolSet:
+    """Install the Counters this build's catalogue ships (``core.counters``)
+    in ``guild_id`` as ``installer_id``, its seat, through the service the
+    marketplace's install calls, placed in ``placements``; then make its
+    tables and switch it on in every initiative, as the install route does
+    once the install commits. Returns the community's tools. Committed."""
+    from app.db.schema_provisioning import provision_community_tools
+    from app.services.marketplace import catalog as catalog_service
+    from app.services.marketplace.installs import resolve_listing_install
+    from app.services.tenant import guild_plugins as guild_plugins_service
+    from app.services.tenant.initiative_tools import write_installed_tools
+    from app.testing.schema_harness import route_session_to_guild
+
+    await route_session_to_guild(session, guild_id)
+    found = await catalog_service.get_listing(session, "core.counters")
+    assert found is not None, "core.counters is not in the catalogue"
+    listing, version = await resolve_listing_install(session, found.uid, kind="plugin")
+    definition = dict(version.definition)
+    plugin = await guild_plugins_service.install_plugin(
+        session,
+        listing_uid=listing.uid,
+        listing_version=version.version,
+        definition=definition,
+        guild_id=guild_id,
+        name=definition["default_name"],
+        created_by=installer_id,
+        actor_user_id=installer_id,
+    )
+    await guild_plugins_service.set_placed_initiatives(session, plugin, placements)
+    await session.commit()
+    tools = await provision_community_tools(guild_id)
+    await route_session_to_guild(session, guild_id)
+    await write_installed_tools(session, tools)
+    await session.commit()
+    return tools
 
 
 async def add_counter(

@@ -110,6 +110,7 @@ from app.testing.tool_plugins import (
     add_counter,
     convert_counters,
     counters_tool_manifest,
+    install_counters,
     install_tool_plugin,
 )
 
@@ -188,6 +189,7 @@ __all__ = [
     "guild_of",
     "guild_url",
     "in_request_tasks",
+    "install_counters",
     "install_tool_plugin",
     "lexical_body",
     "make_actor",
