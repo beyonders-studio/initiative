@@ -61,7 +61,7 @@ describe("TrashTable", () => {
   it("names a tool plug-in's row by its own community's install", async () => {
     const book = `book.${TOOL_PLUGIN_UID.toLowerCase()}`;
     const renamed = shelfDefinition();
-    renamed.tool.items[0].name = { en: "Volume" };
+    renamed.tool.items[0].name = { en: "Volume", de: "Band" };
     server.use(
       http.get(myTrashEndpoint, () =>
         HttpResponse.json(

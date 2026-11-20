@@ -17,7 +17,7 @@ import {
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
-import { ActorKind } from "@/api/generated/initiativeAPI.schemas";
+import { ActorKind, type CardPartInput } from "@/api/generated/initiativeAPI.schemas";
 import { type InstalledTool, installedTool, type ToolTable } from "@/lib/toolPlugins";
 import { shippedLists } from "@/ui/layouts/layoutSet";
 
@@ -60,7 +60,7 @@ describe("ToolRows", () => {
   it("previews a row's first items on its card, each stepping its counter", async () => {
     const book = buildToolRowRead({ name: "Emma", fields: { read: 3, pages: 10 } });
     const shelf = tableOf("shelf");
-    const card = {
+    const card: CardPartInput = {
       type: "card",
       children: [
         { type: "field", props: { field: "name" } },
