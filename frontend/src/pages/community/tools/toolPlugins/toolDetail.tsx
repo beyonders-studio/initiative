@@ -73,7 +73,6 @@ const NameEditor = ({ item, label }: EditorProps) => {
 const DeclaredFieldEditor = ({ field, item, label }: EditorProps & { field: ToolFieldDecl }) => {
   const { i18n } = useTranslation();
   const home = useRowHome();
-  const searchMembers = useSearchMembers();
   const save = home.saves.useSave(label);
   const saved = fieldValue(item, field);
   const draft = useFieldDraft<unknown>(
@@ -110,23 +109,55 @@ const DeclaredFieldEditor = ({ field, item, label }: EditorProps & { field: Tool
   }
   return (
     <FieldFrame label={label} save={save} changed={draft.changed} keys={draft.keys}>
-      {field.kind === "color" ? (
-        <ColorPickerPopover
-          value={String(draft.value ?? "")}
-          onChangeComplete={draft.edit}
-          triggerLabel={label}
-        />
-      ) : (
-        <PropertyInput
-          definition={summary}
-          value={draft.value}
-          onChange={draft.edit}
-          initiativeId={home.initiativeId}
-          canOpen={home.canOpen}
-          searchMembers={searchMembers}
-        />
-      )}
+      <ToolFieldInput
+        field={field}
+        row={item}
+        label={label}
+        value={draft.value}
+        onChange={draft.edit}
+        initiativeId={home.initiativeId}
+        canOpen={home.canOpen}
+      />
     </FieldFrame>
+  );
+};
+
+/** A declared field's editor: the colour picker for a colour, the editor a
+ *  property of its kind has for any other. `row` gives a counter its bounds. */
+export const ToolFieldInput = ({
+  field,
+  row,
+  label,
+  value,
+  onChange,
+  initiativeId,
+  canOpen,
+}: {
+  field: ToolFieldDecl;
+  row: ToolRow;
+  label: string;
+  value: unknown;
+  onChange: (value: unknown) => void;
+  initiativeId?: number | null;
+  canOpen?: { tool: string; id: number };
+}) => {
+  const { i18n } = useTranslation();
+  const searchMembers = useSearchMembers();
+  return field.kind === "color" ? (
+    <ColorPickerPopover
+      value={String(value ?? "")}
+      onChangeComplete={onChange}
+      triggerLabel={label}
+    />
+  ) : (
+    <PropertyInput
+      definition={fieldSummary(field, row, i18n.language)}
+      value={value}
+      onChange={onChange}
+      initiativeId={initiativeId}
+      canOpen={canOpen}
+      searchMembers={searchMembers}
+    />
   );
 };
 

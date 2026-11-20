@@ -359,6 +359,7 @@
     },
     "create": "Neu: {{name}}",
     "loadError": "Diese konnten nicht geladen werden.",
+    "installsLoadError": "Die Tools dieser Community konnten nicht geladen werden.",
     "empty": "Hier ist noch nichts.",
     "notFound": "Das gibt es hier nicht",
     "notFoundBody": "Es wurde vielleicht entfernt, oder das Tool, zu dem es gehört, ist in dieser Community nicht installiert.",

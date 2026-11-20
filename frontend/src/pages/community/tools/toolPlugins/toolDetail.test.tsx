@@ -23,7 +23,7 @@ import { DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
 import { ItemDraftContext, type ItemEdit } from "@/ui/layouts/editing";
 import type { ItemSaves } from "@/ui/layouts/fieldEditors";
 
-import { AddToolRowDialog, blankRow } from "./AddToolRowDialog";
+import { AddToolRowDialog, blankRow, setOn } from "./AddToolRowDialog";
 import { type ToolRowContext, toolDetail } from "./toolDetail";
 
 const uid = TOOL_PLUGIN_UID.toLowerCase();
@@ -98,6 +98,29 @@ describe("AddToolRowDialog", () => {
     });
   });
 
+  it("shows each field as the server starts it", () => {
+    const table: ToolTable = {
+      ...bookTable(),
+      fields: [
+        { key: "pages", name: { en: "Pages" }, kind: "number", default: 300 },
+        { key: "left", name: { en: "Left" }, kind: "counter", counter: { initial: "pages" } },
+        { key: "owned", name: { en: "Owned" }, kind: "checkbox" },
+        { key: "cover", name: { en: "Cover" }, kind: "color", default: "random" },
+      ],
+    };
+    // A checkbox is false, a counter starts at the field it names, and the
+    // colour the server picks is none yet.
+    expect(blankRow(table, 4).fields).toEqual({ pages: 300, left: 300, owned: false, cover: null });
+  });
+
+  it("sends only the fields the person set", () => {
+    const table = bookTable();
+    const blank = blankRow(table, 4);
+    const item = { ...blank, name: "Emma", fields: { ...blank.fields, pages: 474 } };
+    expect(setOn(table, blank, item)).toEqual({ fields: { pages: 474 }, people: {} });
+    expect(setOn(table, blank, blank)).toEqual({ fields: {}, people: {} });
+  });
+
   it("makes the row from what was filled in, in its initiative", async () => {
     let sent: unknown = null;
     server.use(
@@ -125,11 +148,8 @@ describe("AddToolRowDialog", () => {
     await user.click(add);
 
     await waitFor(() => expect(onAdded).toHaveBeenCalled());
-    expect(sent).toMatchObject({
-      name: "Persuasion",
-      initiative_id: 4,
-      fields: expect.objectContaining({ read: 0 }),
-    });
+    // Nothing else was set, so the server starts every field.
+    expect(sent).toEqual({ name: "Persuasion", initiative_id: 4, fields: {}, people: {} });
     expect(onAdded.mock.calls[0][0]).toMatchObject({ id: 9 });
   });
 });

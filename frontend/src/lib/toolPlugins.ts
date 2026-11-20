@@ -186,6 +186,9 @@ export interface ToolActionDecl {
   name: LocalizedText;
   /** The key of the table whose rows it runs on. */
   on: string;
+  /** The keys of the fields of its table the reader is asked for before it
+   *  runs. */
+  params?: string[];
   confirm?: LocalizedText;
 }
 
@@ -349,6 +352,11 @@ export const toolRow = (read: PluginToolRowRead): ToolRow => ({ ...read, propert
  *  kind as its value. */
 export const fieldValue = (row: PluginToolRowRead, field: ToolFieldDecl): unknown =>
   (field.kind === "user_reference" ? row.people[field.key] : row.fields[field.key]) ?? null;
+
+/** What a declared field holds where nobody wrote it, as the server starts
+ *  it: its default, false for a checkbox, nothing otherwise. */
+export const fieldStart = (field: ToolFieldDecl): unknown =>
+  field.default ?? (field.kind === "checkbox" ? false : null);
 
 /** One field's value as a change sends it: a person among its people, any
  *  other kind among its fields. */

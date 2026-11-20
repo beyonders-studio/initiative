@@ -1,12 +1,14 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import { ActorKind } from "@/api/generated/initiativeAPI.schemas";
+import { ActorKind, type PluginToolRowCreate } from "@/api/generated/initiativeAPI.schemas";
 import { AddItemDialog } from "@/components/layouts/AddItemDialog";
 import { itemSaves } from "@/hooks/useFieldSave";
 import { pluginToolRowSaves, useCreatePluginToolRow } from "@/hooks/usePluginToolRows";
 import {
   fieldChange,
+  fieldStart,
+  fieldValue,
   type ToolFieldDecl,
   type ToolRow,
   type ToolTable,
@@ -14,18 +16,22 @@ import {
   toolText,
 } from "@/lib/toolPlugins";
 import type { DialogProps } from "@/types/dialog";
+import { sameJson } from "@/ui/layouts/editing";
 
 import { toolDetail } from "./toolDetail";
 
-/** A row of `table` not yet added, each field at its declared default and a
- *  counter at where it starts. */
+/** A row of `table` not yet added, each field shown as the server starts it:
+ *  a counter at its `initial`, the number or the field it names, and a
+ *  colour it picks at random as none yet. */
 export const blankRow = (table: ToolTable, initiativeId: number): ToolRow => {
-  const declared = (field: ToolFieldDecl) =>
-    field.kind === "counter"
-      ? typeof field.counter?.initial === "string"
-        ? (table.fields.find((each) => each.key === field.counter?.initial)?.default ?? 0)
-        : (field.counter?.initial ?? 0)
-      : (field.default ?? null);
+  const declared = (field: ToolFieldDecl): unknown => {
+    if (field.kind === "counter") {
+      const initial = field.counter?.initial;
+      const named = table.fields.find((each) => each.key === initial);
+      return (typeof initial === "string" ? (named ? fieldStart(named) : null) : initial) ?? 0;
+    }
+    return field.kind === "color" && field.default === "random" ? null : fieldStart(field);
+  };
   const start = table.fields.map((field) => fieldChange(field, declared(field)));
   return toolRow({
     kind: table.kind,
@@ -47,6 +53,21 @@ export const blankRow = (table: ToolTable, initiativeId: number): ToolRow => {
     created_at: "",
     updated_at: "",
   });
+};
+
+/** The fields `item` holds otherwise than `blank`: the ones the person set. */
+export const setOn = (
+  table: ToolTable,
+  blank: ToolRow,
+  item: ToolRow
+): Required<Pick<PluginToolRowCreate, "fields" | "people">> => {
+  const changes = table.fields
+    .filter((field) => !sameJson(fieldValue(item, field), fieldValue(blank, field)))
+    .map((field) => fieldChange(field, fieldValue(item, field)));
+  return {
+    fields: Object.assign({}, ...changes.map((change) => change.fields)),
+    people: Object.assign({}, ...changes.map((change) => change.people)),
+  };
 };
 
 /**
@@ -85,14 +106,12 @@ export const AddToolRowDialog = ({
       layouts={() => null}
       title={t("tool.create", { name: toolText(table.name, i18n.language) })}
       ready={(row) => row.name.trim() !== ""}
-      // The row as drawn holds every field's value; a field's own change names
-      // only its own.
+      // Only what the person set is sent, so the server starts the rest.
       create={async ({ item }) =>
         toolRow(
           await create.mutateAsync({
             name: item.name.trim(),
-            fields: item.fields,
-            people: item.people,
+            ...setOn(table, blank, item),
             ...(parentId === undefined ? { initiative_id: initiativeId } : { parent_id: parentId }),
           })
         )

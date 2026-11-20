@@ -4,11 +4,17 @@
  * pin the mapping from route to tab, including the two fallbacks that keep a
  * stale link from dead-ending.
  */
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 
-import { buildCommunity, buildInitiative } from "@/__tests__/factories";
+import {
+  buildCommunity,
+  buildInitiative,
+  buildToolPlugin,
+  TOOL_PLUGIN_UID,
+} from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
@@ -52,7 +58,7 @@ function stubEverything(hidden: Tool[] = [], roster = true) {
   );
 }
 
-const renderAt = (tool?: Tool) =>
+const renderAt = (tool?: string) =>
   renderPage(() => <InitiativePage tool={tool} />, {
     communities: {
       activeCommunityId: 1,
@@ -122,5 +128,79 @@ describe("InitiativePage", () => {
 
     const projectsTab = await screen.findByRole("tab", { name: "Projects" });
     expect(projectsTab).toHaveAttribute("href", `/c/1/i/${INITIATIVE_ID}/projects`);
+  });
+
+  describe("a tool plug-in's tab", () => {
+    const shelf = `shelf.${TOOL_PLUGIN_UID.toLowerCase()}`;
+    let name = "Apollo";
+
+    const stubShelf = (plugins: () => Response) => {
+      name = "Apollo";
+      server.use(
+        communityHttp.get("/initiatives/:id", ({ params }) =>
+          HttpResponse.json(
+            buildInitiative({
+              id: Number(params.id),
+              name,
+              can: {
+                manage: false,
+                moderate: false,
+                roster: true,
+                view: [Tool.project, shelf],
+                create: [shelf],
+              },
+            })
+          )
+        ),
+        communityHttp.get("/projects/", page),
+        communityHttp.get("/plugins/", plugins),
+        communityHttp.get(`/plugin-tools/${shelf}/`, page)
+      );
+    };
+
+    it("keeps an open add dialog and its draft when the initiative refreshes", async () => {
+      stubShelf(() => HttpResponse.json({ items: [buildToolPlugin()] }));
+      const { queryClient } = renderAt(shelf);
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByRole("button", { name: "New Shelf" }));
+      const field = await screen.findByRole("textbox", { name: "Name" });
+      await user.type(field, "Novels");
+      name = "Apollo II";
+      await queryClient.invalidateQueries();
+
+      // The page behind the dialog is hidden from the accessibility tree.
+      expect(await screen.findByText("Apollo II")).toBeInTheDocument();
+      expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("Novels");
+    });
+
+    it("picks no tab until the installs are read", async () => {
+      let release: () => void = () => {};
+      const read = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      stubShelf(() => HttpResponse.json({ items: [] }));
+      server.use(
+        communityHttp.get("/plugins/", async () => {
+          await read;
+          return HttpResponse.json({ items: [buildToolPlugin()] });
+        })
+      );
+      renderAt(shelf);
+
+      await waitFor(() => expect(screen.queryAllByRole("tab")).toHaveLength(0));
+      release();
+      await waitFor(() => expect(selectedTab()).toHaveTextContent("Reading"));
+    });
+
+    it("offers a retry rather than another tab when the installs can't be read", async () => {
+      stubShelf(() => HttpResponse.json({ detail: "x" }, { status: 500 }));
+      renderAt(shelf);
+
+      expect(
+        await screen.findByText("This community's tools couldn't be loaded.")
+      ).toBeInTheDocument();
+      expect(screen.queryAllByRole("tab")).toHaveLength(0);
+    });
   });
 });

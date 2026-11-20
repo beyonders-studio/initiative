@@ -359,6 +359,7 @@
     },
     "create": "Créer : {{name}}",
     "loadError": "Impossible de les charger.",
+    "installsLoadError": "Les outils de cette communauté n'ont pas pu être chargés.",
     "empty": "Rien ici pour l'instant.",
     "notFound": "Ce n'est pas ici",
     "notFoundBody": "Il a peut-être été supprimé, ou l'outil auquel il appartient n'est pas installé dans cette communauté.",
