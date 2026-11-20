@@ -16,7 +16,7 @@
  * parts rather than trusting the shape.
  */
 
-import contract from "@/contract/manifest.contract.json";
+import { caps, charsets } from "@/contract/manifest.contract.json";
 
 /** Language code → text. No locale is required: resolution falls back through
  *  the base language, then English, then whatever the widget did supply, so a
@@ -47,20 +47,20 @@ export interface WidgetMeta {
  * Refresh the vendored contract with `backend/scripts/refresh_plugin_kit.py`.
  */
 export const META_LIMITS = {
-  maxTextLength: contract.caps.textLength,
-  maxDescriptionLength: contract.caps.widgetDescriptionLength,
+  maxTextLength: caps.textLength,
+  maxDescriptionLength: caps.widgetDescriptionLength,
   /** Languages one string may be supplied in. Generous — the cap only stops a
    *  module from shipping a dictionary. */
-  maxLocales: contract.caps.locales,
-  maxOptions: contract.caps.widgetOptions,
-  maxValuesPerOption: contract.caps.valuesPerOption,
+  maxLocales: caps.locales,
+  maxOptions: caps.widgetOptions,
+  maxValuesPerOption: caps.valuesPerOption,
   /** `en`, `en-GB`, `pt-BR` — a language tag, not free text. */
-  maxLocaleTagLength: contract.caps.localeTagLength,
+  maxLocaleTagLength: caps.localeTagLength,
 } as const;
 
 // --- validation ------------------------------------------------------------
 
-const LOCALE_TAG_CHARS = contract.charsets.localeTag;
+const LOCALE_TAG_CHARS = charsets.localeTag;
 
 /** An explicit character check rather than a pattern: the set of things a
  *  language tag may contain is short enough to state outright. */
