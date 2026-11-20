@@ -123,12 +123,13 @@ export const RowActions = ({
     },
   });
 
-  // Each as a built-in tool's item offers it: archiving is an edit and the
-  // way back out its own answer; an item is deleted as it is changed, a
-  // tool's row by whoever may delete it.
+  // Each as a built-in tool's item offers it: archiving is an edit, and the
+  // way back out is its own answer while the tool it is in is archived, and
+  // an edit while that tool is live and only the row is put away. An item is
+  // deleted as it is changed, a tool's row by whoever may delete it.
   const declared = row.can.edit ? table.actions : [];
   const canShare = !isItem && row.can.share;
-  const canArchive = archived ? row.can.unarchive : row.can.edit;
+  const canArchive = archived ? row.can.unarchive || row.can.edit : row.can.edit;
   const canDelete = isItem ? row.can.contribute : row.can.delete;
   if (declared.length === 0 && !canShare && !canArchive && !canDelete) return null;
 

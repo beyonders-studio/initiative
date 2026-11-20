@@ -194,15 +194,19 @@ const TOOL_VIEW_SPECS: Partial<Record<Tool, ToolViewSpec>> = {
   [Tool.file]: TEMPLATE_VIEWS,
 };
 
+/** A tool's views by its kind: a tool plug-in's are the two every tool has. */
+const viewSpec = (tool: string): ToolViewSpec =>
+  (isBuiltInTool(tool) ? TOOL_VIEW_SPECS[tool] : undefined) ?? DEFAULT_VIEWS;
+
 /** The views a tool's list offers. */
-export const toolViews = (tool: Tool): ToolView[] =>
-  TOOL_VIEWS.filter((view) => view in (TOOL_VIEW_SPECS[tool] ?? DEFAULT_VIEWS));
+export const toolViews = (tool: string): ToolView[] =>
+  TOOL_VIEWS.filter((view) => view in viewSpec(tool));
 
 /** What a tool's list endpoint is asked for to show `view`. Most tools' live
  *  view asks for nothing, which keeps its query key — and so its cache entry —
  *  the one every other caller of the list already uses. */
-export const toolViewParams = (tool: Tool, view: ToolView): ToolViewParams =>
-  (TOOL_VIEW_SPECS[tool] ?? DEFAULT_VIEWS)[view] ?? {};
+export const toolViewParams = (tool: string, view: ToolView): ToolViewParams =>
+  viewSpec(tool)[view] ?? {};
 
 /**
  * Sidebar display order within an initiative. Projects render last because the

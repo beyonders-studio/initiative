@@ -51,11 +51,11 @@ export const useInstalledTools = (): InstalledTools => {
 };
 
 /** Every row of `kind` in one place, the tool's own in an initiative or an
- *  item table's under one row: `page_size: 0` walks the server's windows, so
- *  a preset sorts all of them. */
+ *  item table's under one row, live or archived: `page_size: 0` walks the
+ *  server's windows, so a preset sorts all of them. */
 export const usePluginToolRows = (
   kind: string,
-  where: { initiative_id: number } | { parent_id: number }
+  where: ({ initiative_id: number } | { parent_id: number }) & { archived?: true }
 ) => {
   const communityId = useActiveCommunityId();
   const params = { ...where, page_size: 0 };
