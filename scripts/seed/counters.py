@@ -1,11 +1,13 @@
 """Counter groups: hit points, clocks and tallies, kept in the Counters tool
-plug-in, which the community installs from the marketplace and places in the
-initiatives that keep them. Its rows are written as the plug-in's routes
-write them."""
+plug-in, which the server lists as one with no registry does and the
+community installs from the marketplace and places in the initiatives that
+keep them. Its rows are written as the plug-in's routes write them."""
 
 from __future__ import annotations
 
 from types import SimpleNamespace
+
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.db.request_context import SystemGuild
 from app.db.schema_provisioning import provision_community_tools
@@ -16,12 +18,13 @@ from app.services.marketplace.tool_plugins import tool_kinds
 from app.services.tenant import guild_plugins as guild_plugins_service
 from app.services.tenant.initiative_tools import write_installed_tools
 from app.services.tenant.plugin_tool_rows import column_values, insert, located_kind
+from app.testing.tool_plugins import counters_listing, list_counters
 from seed.common import Community, share
 from seed.guilds import COMMUNITIES
 from seed.plugins import install
 
 #: The Counters plug-in's listing.
-COUNTERS = "core.counters"
+COUNTERS = counters_listing()["public_id"]
 
 #: Each group, shared the way ``share`` reads it. A counter is ``(name, colour,
 #: count, min, max, step, initial count, view mode)``, in position order.
@@ -137,6 +140,14 @@ COUNTER_GROUPS: dict[str, list[dict]] = {
         },
     ],
 }
+
+
+async def list_plugin(session: AsyncSession) -> None:
+    """List Counters on the marketplace as a server's owner does where no
+    registry brings it: an upload of its listing file, the version the
+    upgrade installs."""
+    await list_counters(session)
+    await session.commit()
 
 
 async def seed(c: Community) -> None:

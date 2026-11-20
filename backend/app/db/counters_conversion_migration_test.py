@@ -388,6 +388,41 @@ async def test_a_community_without_counters_loses_the_tables(
     ) == [(0,)]
 
 
+async def test_a_converted_community_needs_no_listing(
+    session: AsyncSession, acting_user: Callable[..., Any], client: AsyncClient
+) -> None:
+    """On a server whose catalogue has no Counters, as one with no registry,
+    the install holds the version the conversion pinned: its page reads, and
+    the tool is served from it."""
+    admin, seat = await _community(acting_user, client, session)
+    guild_id = admin.guild.id
+    await install_tool_plugin(client, session, seat)
+    await add_counter(session, guild_id, admin.initiative.id)
+
+    async def unlisted(session: AsyncSession) -> None:
+        await _as_released(session, guild_schema_name(guild_id))
+        assert await _rows(
+            session,
+            "DELETE FROM public.marketplace_listings WHERE uid = :u RETURNING uid",
+            u=COUNTERS_UID,
+        ) == [(COUNTERS_UID,)]
+
+    install_id = await convert_counters(session, guild_id, between=unlisted)
+    assert install_id is not None
+    await session.commit()
+
+    page = await client.get(seat.g(f"/plugins/{install_id}"), headers=seat.headers)
+    assert page.status_code == 200, page.text
+    assert page.json()["listing"] is None
+    assert page.json()["update_version"] is None
+    made = await client.post(
+        admin.g(f"/plugin-tools/{GROUP}/"),
+        headers=admin.headers,
+        json={"initiative_id": admin.initiative.id, "name": "After"},
+    )
+    assert made.status_code == 201, made.text
+
+
 @pytest.mark.parametrize(
     ("sql", "renamed"),
     [
@@ -426,14 +461,6 @@ def test_a_dashboard_query_reads_the_plug_ins_tables(
     assert migration._rewrite_sql(sql, migration.TABLES) == renamed
 
 
-def test_the_frozen_version_is_the_bundled_one() -> None:
-    from app.services.marketplace.builtin import CATALOG_DIR
-
-    migration = counters_conversion()
-    bundled = json.loads(
-        (CATALOG_DIR / "core.counters.json").read_text(encoding="utf-8")
-    )
-    if bundled["version"] == migration._FROZEN["version"]:
-        assert bundled["definition"] == migration._FROZEN["definition"]
-    assert bundled["uid"] == COUNTERS_UID == migration.UID
+def test_the_conversion_installs_counters_uid() -> None:
+    assert counters_conversion().UID == COUNTERS_UID
     assert Tool.__members__.keys().isdisjoint({"counter_group"})

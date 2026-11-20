@@ -1,5 +1,6 @@
-"""Counters, the tool plug-in this build's catalogue ships, as a manifest a
-test registers, and the helpers that install it."""
+"""Counters, the tool plug-in an upgrade installs from the version frozen
+beside the revision that converts it, as a manifest a test registers, and the
+helpers that list and install it."""
 
 from __future__ import annotations
 
@@ -7,6 +8,7 @@ import copy
 import json
 from contextlib import asynccontextmanager
 from functools import cache
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -17,6 +19,7 @@ if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
 
     from app.core.tool_set import ToolSet
+    from app.models.platform.marketplace import MarketplaceListing
     from app.testing.actor import Actor
 
 __all__ = [
@@ -25,30 +28,67 @@ __all__ = [
     "convert_counters",
     "counters_conversion",
     "counters_follow_up",
+    "counters_listing",
     "counters_tool_manifest",
     "counters_tool_set",
     "install_counters",
     "install_tool_plugin",
+    "list_counters",
     "provisioning_login",
     "run_as_a_revision",
 ]
 
-#: The uid the catalogue ships Counters under.
+#: The uid Counters is published under.
 COUNTERS_UID = "TSJVTCM0S7GV2X"
+
+#: The revision that turns the built-in Counters into its plug-in, and the one
+#: that writes what it left behind.
+_CONVERSION = "20261119_0619_counters_become_a_plug_in.py"
+_FOLLOW_UP = "20261120_0621_counter_subscriptions_and_switches_follow_the_plug_in.py"
+_VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
 
 
 @cache
-def _catalogued() -> dict[str, Any]:
-    from app.services.marketplace.builtin import CATALOG_DIR
-
-    with (CATALOG_DIR / "core.counters.json").open(encoding="utf-8") as handle:
-        return json.load(handle)["definition"]
+def _frozen() -> dict[str, Any]:
+    with (_VERSIONS / _CONVERSION).with_suffix(".json").open(encoding="utf-8") as f:
+        return json.load(f)
 
 
 def counters_tool_manifest() -> dict[str, Any]:
-    """A fresh copy of the Counters tool plug-in's definition, as this build's
-    catalogue ships it (``core.counters``)."""
-    return copy.deepcopy(_catalogued())
+    """A fresh copy of the Counters tool plug-in's definition, as the
+    conversion froze it: the version an upgraded community has installed."""
+    return copy.deepcopy(_frozen()["definition"])
+
+
+def counters_listing() -> dict[str, Any]:
+    """Counters' listing file, as a server's owner uploads it where no
+    registry brings it: the frozen version, under the plug-in's uid."""
+    from app.models.platform.publisher import (
+        FIRST_PARTY_PUBLISHER_NAME,
+        FIRST_PARTY_PUBLISHER_PREFIX,
+    )
+
+    definition = counters_tool_manifest()
+    return {
+        "uid": COUNTERS_UID,
+        "public_id": f"{FIRST_PARTY_PUBLISHER_PREFIX}.counters",
+        "kind": "plugin",
+        "name": definition["default_name"],
+        "publisher": FIRST_PARTY_PUBLISHER_NAME,
+        "description": (
+            "Numbers that move: tallies, totals, scores, seats left, hit points."
+        ),
+        "version": _frozen()["version"],
+        "definition": definition,
+    }
+
+
+async def list_counters(session: AsyncSession) -> MarketplaceListing:
+    """List Counters on ``session``, a system session, as an owner's upload
+    of :func:`counters_listing` does. Flushed, not committed."""
+    from app.services.marketplace.local_listings import upload_listing
+
+    return await upload_listing(session, counters_listing())
 
 
 def counters_tool_set(
@@ -56,7 +96,7 @@ def counters_tool_set(
 ) -> ToolSet:
     """The built-in tools and Counters, as a community that installed it has
     them, for a test of what is built or rendered from a tool set.
-    ``definition`` is a declaration of it as stored (the catalogue's unless
+    ``definition`` is a declaration of it as stored (0619's frozen one unless
     given), held to no check here, so a builder's own refusal can be tested.
     Its kinds have the codes a server gives them: Counters' own the codes
     its built-in kinds had (``ADOPTED_KIND_CODES``), any other the next from
@@ -119,22 +159,22 @@ async def install_tool_plugin(
 async def install_counters(
     session: AsyncSession, guild_id: int, installer_id: int, placements: set[int]
 ) -> ToolSet:
-    """Install the Counters this build's catalogue ships (``core.counters``)
-    in ``guild_id`` as ``installer_id``, its seat, through the service the
+    """List Counters (:func:`list_counters`) and install it in ``guild_id``
+    as ``installer_id``, its seat, through the service the
     marketplace's install calls, placed in ``placements``; then make its
     tables and switch it on in every initiative, as the install route does
     once the install commits. Returns the community's tools. Committed."""
     from app.db.schema_provisioning import provision_community_tools
-    from app.services.marketplace import catalog as catalog_service
     from app.services.marketplace.installs import resolve_listing_install
     from app.services.tenant import guild_plugins as guild_plugins_service
     from app.services.tenant.initiative_tools import write_installed_tools
     from app.testing.schema_harness import route_session_to_guild
 
+    await list_counters(session)
     await route_session_to_guild(session, guild_id)
-    found = await catalog_service.get_listing(session, "core.counters")
-    assert found is not None, "core.counters is not in the catalogue"
-    listing, version = await resolve_listing_install(session, found.uid, kind="plugin")
+    listing, version = await resolve_listing_install(
+        session, COUNTERS_UID, kind="plugin"
+    )
     definition = dict(version.definition)
     plugin = await guild_plugins_service.install_plugin(
         session,
@@ -184,17 +224,10 @@ async def add_counter(
     return tools, group, row
 
 
-#: The revision that turns the built-in Counters into its plug-in, and the one
-#: that writes what it left behind.
-_CONVERSION = "20261119_0619_counters_become_a_plug_in.py"
-_FOLLOW_UP = "20261120_0621_counter_subscriptions_and_switches_follow_the_plug_in.py"
-
-
 def _revision(name: str) -> Any:
     import importlib.util
-    from pathlib import Path
 
-    path = Path(__file__).resolve().parents[2] / "alembic" / "versions" / name
+    path = _VERSIONS / name
     spec = importlib.util.spec_from_file_location(path.stem, path)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)

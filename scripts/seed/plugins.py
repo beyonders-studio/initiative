@@ -140,7 +140,7 @@ CONTACTS: dict[str, list[dict]] = {
 
 
 async def install(c: Community, public_id: str, installer: str) -> GuildPlugin:
-    """Install a plug-in the catalogue ships as ``installer``, one of the
+    """Install a plug-in the marketplace lists as ``installer``, one of the
     community's admins, would."""
     admin = c.users[installer]
     found = await catalog_service.get_listing(c.session, public_id)
