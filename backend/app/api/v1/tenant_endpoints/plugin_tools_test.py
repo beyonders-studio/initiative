@@ -598,9 +598,9 @@ async def test_a_tool_is_read_as_its_plugin_declares_it(client, session, acting_
         "counter_group",
         "gauge",
     )
-    assert (tool["name"], tool["instance_name"]) == (
-        {"en": "Counters"},
-        {"en": "Counter group"},
+    assert (tool["name"]["en"], tool["instance_name"]["en"]) == (
+        "Counters",
+        "Counter group",
     )
     assert [field["key"] for field in tool["fields"]] == ["description"]
     (item,) = tool["items"]
@@ -620,11 +620,13 @@ async def test_a_tool_is_read_as_its_plugin_declares_it(client, session, acting_
         True,
     )
     assert [option["value"] for option in look["options"]] == ["number", "bar", "clock"]
-    (action,) = tool["actions"]
-    assert (action["id"], action["on"], action["params"]) == ("reset_all", GROUP, [])
-    assert action["confirm"]
+    reset, reset_all = tool["actions"]
+    assert (reset["id"], reset["on"], reset["params"]) == ("reset", COUNTER, [])
+    assert (reset_all["id"], reset_all["on"]) == ("reset_all", GROUP)
+    assert reset_all["confirm"]
     # Neither its layouts nor what an action writes.
-    assert "layouts" not in tool and "layouts" not in item and "write" not in action
+    assert "layouts" not in tool and "layouts" not in item
+    assert "write" not in reset and "write" not in reset_all
 
     # By an item's kind, the tool it sits in.
     by_item = await client.get(a.g(f"/plugin-tools/{COUNTER}"), headers=a.headers)

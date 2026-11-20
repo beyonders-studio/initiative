@@ -444,7 +444,9 @@ REFUSALS: dict[str, tuple[Callable[[dict], None], str]] = {
         "neither the tool's key",
     ),
     "an action asking for another table's field": (
-        lambda body: _tool(body)["actions"][0].__setitem__("params", ["count"]),
+        lambda body: next(
+            action for action in _tool(body)["actions"] if action["id"] == "reset_all"
+        ).__setitem__("params", ["count"]),
         "not a field of 'counter_group'",
     ),
     # Layouts.
@@ -561,7 +563,7 @@ REFUSALS: dict[str, tuple[Callable[[dict], None], str]] = {
         "pattern",
     ),
     "a preset slug twice": (
-        lambda body: _list(body)["presets"][1].__setitem__("slug", "by-name"),
+        lambda body: _list(body)["presets"][1].__setitem__("slug", "name-asc"),
         "own slug",
     ),
     "a plug-in's part on a card": (

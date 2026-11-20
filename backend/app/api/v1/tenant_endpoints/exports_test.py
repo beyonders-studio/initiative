@@ -3887,7 +3887,7 @@ async def test_a_tool_plugins_tool_exports_and_backs_up_from_its_declaration(
     table = _assert_export(
         await _export(client, a, tool.kind, ids=[group_id], format="csv"), "csv"
     )
-    assert table.splitlines()[0].startswith("\ufeffCounter,Count,Minimum,Maximum")
+    assert table.splitlines()[0].startswith("\ufeffCounter,Count,Min,Max")
     assert "Gold,12" in table and "Progress bar" in table
     sheet = await _export(client, a, tool.kind, ids=[group_id], format="xlsx")
     assert sheet.status_code == 200, sheet.text
