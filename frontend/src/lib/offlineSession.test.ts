@@ -64,6 +64,7 @@ describe("the remembered community list", () => {
     saveOfflineCommunities([{ id: 3, name: "Beyonders" }], SERVER);
     expect(readOfflineCommunities<{ id: number }>(SERVER)).toEqual([{ id: 3, name: "Beyonders" }]);
     expect(readOfflineCommunities("https://other.example")).toBeNull();
+    saveOfflineCommunities([{ id: 3, name: "Beyonders" }], SERVER);
     clearOfflineSession();
     expect(readOfflineCommunities(SERVER)).toBeNull();
   });
