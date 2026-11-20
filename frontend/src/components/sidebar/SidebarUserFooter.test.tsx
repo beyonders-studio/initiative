@@ -99,12 +99,17 @@ describe("SidebarUserFooter", () => {
     expect(status).not.toHaveTextContent("Say what you're up to");
     unmount();
 
+    // Gone the moment it ends, with nothing fetched again.
     renderFooter({
-      custom_status: { emoji: "🌱", text: "Gone", clear_at: "2020-01-01T00:00:00Z" },
+      custom_status: {
+        emoji: "🌱",
+        text: "Leaving soon",
+        clear_at: new Date(Date.now() + 300).toISOString(),
+      },
     });
-    expect(await screen.findByRole("button", { name: "Your status" })).toHaveTextContent(
-      "Say what you're up to"
-    );
+    const ending = await screen.findByRole("button", { name: "Your status" });
+    expect(ending).toHaveTextContent("Leaving soon");
+    await waitFor(() => expect(ending).toHaveTextContent("Say what you're up to"));
   });
 
   it("sets a suggestion with the time it usually ends, paused until then", async () => {

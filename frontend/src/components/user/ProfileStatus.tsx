@@ -1,6 +1,6 @@
 import { addHours, addMinutes, endOfDay, endOfWeek } from "date-fns";
 import { MessageCircle, SmilePlus, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useReducer, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -31,7 +31,7 @@ import {
   EmojiPickerSearch,
 } from "@/ui/emoji-picker";
 import { Field } from "@/ui/field";
-import { useWeekStart } from "@/ui/host";
+import { useWeekStart, type WeekStart } from "@/ui/host";
 import { Input } from "@/ui/input";
 import { formatDateTime } from "@/ui/lib/formatDate";
 import { fromPickerValue, toPickerValue } from "@/ui/lib/localDateTime";
@@ -48,9 +48,27 @@ const STATUS_MAX_LENGTH = 40;
  * passed. The server reads an ended status as none too; this covers the time
  * between its end and the next read.
  */
-export const isStatusEmpty = (status: CustomStatusInput) =>
+const isStatusEmpty = (status: CustomStatusInput) =>
   (!status.emoji && !status.text) ||
   (!!status.clear_at && Date.parse(status.clear_at) <= Date.now());
+
+/**
+ * `isStatusEmpty`, asked again the moment the status ends, so a page left
+ * open drops it then rather than at its next fetch.
+ */
+export const useStatusEmpty = (status: CustomStatusInput | null | undefined) => {
+  const [checks, recheck] = useReducer((count: number) => count + 1, 0);
+  const empty = !status || isStatusEmpty(status);
+  const end = status?.clear_at ? Date.parse(status.clear_at) : null;
+  useEffect(() => {
+    if (empty || end === null) return;
+    // A timer holds about 24 days at most; a later end is asked about again
+    // when that runs out.
+    const timer = setTimeout(recheck, Math.min(end - Date.now(), 2 ** 31 - 1));
+    return () => clearTimeout(timer);
+  }, [empty, end, checks]);
+  return empty;
+};
 
 /** When the status comes off, as words for a tooltip, or nothing. */
 const useUntil = (status: CustomStatusInput | null | undefined) => {
@@ -118,7 +136,8 @@ export const StatusLine = ({
   className?: string;
 }) => {
   const until = useUntil(status);
-  if (!status || isStatusEmpty(status)) return null;
+  const empty = useStatusEmpty(status);
+  if (!status || empty) return null;
   const title = [[status.emoji, status.text].filter(Boolean).join(" "), until]
     .filter(Boolean)
     .join(" · ");
@@ -136,6 +155,20 @@ export const StatusLine = ({
 /** How long a status stays up. Every choice but `never` becomes a time. */
 const CLEAR_AFTER = ["never", "30m", "1h", "4h", "today", "week", "custom"] as const;
 type ClearAfter = (typeof CLEAR_AFTER)[number];
+
+/** When a choice ends, counted from now; null for `never` or no picked time. */
+const endOf = (choice: ClearAfter, custom: string, weekStartsOn: WeekStart): string | null => {
+  const now = new Date();
+  return {
+    never: null,
+    "30m": addMinutes(now, 30).toISOString(),
+    "1h": addHours(now, 1).toISOString(),
+    "4h": addHours(now, 4).toISOString(),
+    today: endOfDay(now).toISOString(),
+    week: endOfWeek(now, { weekStartsOn }).toISOString(),
+    custom: fromPickerValue(custom),
+  }[choice];
+};
 
 /** The common things to be up to, each with how long it usually lasts. */
 const SUGGESTIONS = [
@@ -197,47 +230,47 @@ export const StatusDialog = ({
     }
   }
 
-  const save = useUpdateCurrentUser(
-    {
-      onSuccess: async () => {
-        onOpenChange(false);
-        await onSaved?.();
-      },
-    },
-    "profiles:status.failed"
-  );
+  const save = useUpdateCurrentUser(undefined, "profiles:status.failed");
+  const saving = save.isPending || writePause.isPending;
 
+  // What the form shows; the end that is saved is counted again at Save, so
+  // time spent in the dialog does not come off the status.
   const now = new Date();
-  const clearAt = {
-    never: null,
-    "30m": addMinutes(now, 30).toISOString(),
-    "1h": addHours(now, 1).toISOString(),
-    "4h": addHours(now, 4).toISOString(),
-    today: endOfDay(now).toISOString(),
-    week: endOfWeek(now, { weekStartsOn }).toISOString(),
-    custom: fromPickerValue(custom),
-  }[clearAfter];
+  const clearAt = endOf(clearAfter, custom, weekStartsOn);
+  const passed = (end: string | null) => end !== null && Date.parse(end) <= Date.now();
   const blank = !emoji && !text.trim();
-  const endPassed = clearAt !== null && Date.parse(clearAt) <= now.getTime();
-  const customMissing = clearAfter === "custom" && (clearAt === null || endPassed);
+  const customMissing = clearAfter === "custom" && (clearAt === null || passed(clearAt));
   // A pause always ends, so it needs a status that does.
-  const pauseNeedsEnd = pauseChoice === true && clearAt === null;
+  const pauseNeedsEnd = !blank && pauseChoice === true && clearAt === null;
 
-  const commit = (next: CustomStatusInput | null) =>
-    save.mutate({ custom_status: next } as UserSelfUpdate);
-
-  const submit = async () => {
-    if (pauseChoice !== null && (pauseChoice || pauseRunning)) {
+  /** Save the status, then the pause, and close only once both stand. A
+   *  status that fails leaves the pause alone; a pause that fails after the
+   *  status saved says so and stays open to try again. */
+  const commit = async (next: CustomStatusInput | null, pause: boolean | null) => {
+    try {
+      await save.mutateAsync({ custom_status: next } as UserSelfUpdate);
+    } catch {
+      return;
+    }
+    await onSaved?.();
+    if (pause !== null && (pause || pauseRunning)) {
       try {
         await writePause.mutateAsync(
-          pauseChoice ? { pause_until: clearAt } : { clear_pause: true }
+          pause ? { pause_until: next?.clear_at ?? null } : { clear_pause: true }
         );
       } catch (error) {
         toast.error(getErrorMessage(error, "profiles:status.pause.failed"));
         return;
       }
     }
-    commit(blank ? null : { emoji, text: text.trim() || null, clear_at: clearAt });
+    onOpenChange(false);
+  };
+
+  const submit = () => {
+    const end = endOf(clearAfter, custom, weekStartsOn);
+    if (clearAfter === "custom" && (end === null || passed(end))) return;
+    if (blank) return commit(null, null);
+    return commit({ emoji, text: text.trim() || null, clear_at: end }, pauseChoice);
   };
 
   return (
@@ -391,7 +424,7 @@ export const StatusDialog = ({
           submitLabel={t("profiles:status.save")}
           pendingLabel={t("common:submitting")}
           onSubmit={submit}
-          pending={save.isPending || writePause.isPending}
+          pending={saving}
           disabled={customMissing || pauseNeedsEnd}
         >
           {current ? (
@@ -399,8 +432,8 @@ export const StatusDialog = ({
               type="button"
               variant="ghost"
               className="sm:mr-auto"
-              disabled={save.isPending}
-              onClick={() => commit(null)}
+              disabled={saving}
+              onClick={() => commit(null, null)}
             >
               {t("profiles:status.clear")}
             </Button>
@@ -432,7 +465,7 @@ export const ProfileStatus = ({
 }) => {
   const { t } = useTranslation("profiles");
   const [open, setOpen] = useState(false);
-  const empty = isStatusEmpty(status);
+  const empty = useStatusEmpty(status);
 
   if (!editable) {
     if (empty) return null;

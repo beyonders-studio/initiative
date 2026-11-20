@@ -28,10 +28,10 @@ import { PresenceMenu } from "@/components/user/PresenceMenu";
 import { PresenceMenuItems } from "@/components/user/PresenceMenuItems";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import {
-  isStatusEmpty,
   StatusBubble,
   StatusDialog,
   StatusLine,
+  useStatusEmpty,
 } from "@/components/user/ProfileStatus";
 import { UserHandle } from "@/components/user/UserHandle";
 import { openExternal } from "@/lib/openExternal";
@@ -89,6 +89,7 @@ export const SidebarUserFooter = ({
   const handle = getUrlHandle(user);
   const banner = resolveDecoration(user?.profile_decorations?.banner, "banner");
   const [statusOpen, setStatusOpen] = useState(false);
+  const statusEmpty = useStatusEmpty(user?.custom_status);
   // Asking for the editor only writes this down. It is opened once the menu has
   // gone (below), because the two are dismissable layers and a layer raised
   // while the one over it is still closing is a layer the closing one can take
@@ -212,7 +213,7 @@ export const SidebarUserFooter = ({
                                 : undefined
                             }
                           />
-                          {isStatusEmpty(user.custom_status) ? null : (
+                          {statusEmpty ? null : (
                             <DropdownMenuItem
                               className="absolute top-1.5 right-2 max-w-[70%] rounded-2xl p-0 focus:bg-transparent focus-visible:outline-2 focus-visible:outline-ring"
                               aria-label={t("profiles:status.edit")}
@@ -404,7 +405,7 @@ export const SidebarUserFooter = ({
                   aria-label={t("profiles:status.edit")}
                   onClick={() => setStatusOpen(true)}
                 >
-                  {isStatusEmpty(user.custom_status) ? (
+                  {statusEmpty ? (
                     <span className="truncate text-muted-foreground">
                       {t("profiles:status.empty")}
                     </span>
