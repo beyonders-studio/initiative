@@ -19,9 +19,8 @@ import pytest
 from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.db.guild_ddl import render_guild_rls_ddl
 from app.db.initiative_rls import parent_answers_for_reads, paths_for
-from app.db.plugin_tools import InstalledTool, community_tool_set
 from app.services.marketplace.tool_plugins import normalize_tool_plugin_definition
-from app.testing.tool_plugins import COUNTERS_UID, counters_tool_manifest
+from app.testing.tool_plugins import counters_tool_manifest, counters_tool_set
 
 pytestmark = pytest.mark.always
 
@@ -33,9 +32,7 @@ def _with_counters() -> ToolSet:
     definition["tool"]["items"].append(
         {"key": "tally", "name": {"en": "Tally"}, "parent": "counter", "fields": []}
     )
-    keys = ["counter_group", "counter", "tally"]
-    codes = {f"{key}.{COUNTERS_UID.lower()}": 1024 + i for i, key in enumerate(keys)}
-    return community_tool_set([InstalledTool(COUNTERS_UID, definition)], codes)
+    return counters_tool_set(definition)
 
 
 _SETS = pytest.mark.parametrize(

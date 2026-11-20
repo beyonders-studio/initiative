@@ -13,7 +13,6 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlmodel import select, update
 
-from app.core.tool_set import ToolSet
 from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
 from app.models.tenant._mixins import ActorKind
@@ -553,29 +552,14 @@ def test_an_event_no_scope_reaches_is_never_a_plugins():
     )
 
 
-def _counters() -> ToolSet:
-    """A community's tools with Counters installed as a tool plug-in."""
-    from app.db.plugin_tools import InstalledTool, community_tool_set
-    from app.services.marketplace.tool_plugins import (
-        normalize_tool_plugin_definition,
-        tool_kinds,
-    )
-    from app.testing import COUNTERS_UID, counters_tool_manifest
-
-    declared = normalize_tool_plugin_definition(counters_tool_manifest())
-    kinds = tool_kinds(declared, listing_uid=COUNTERS_UID)
-    return community_tool_set(
-        [InstalledTool(COUNTERS_UID, declared)],
-        {kind: 900 + i for i, kind in enumerate(kinds)},
-    )
-
-
 def test_a_tool_plugins_change_is_named_by_its_kinds_and_heard_where_it_is_on():
     """A change to a tool plug-in's item names it, its event type and its
     parents by their kinds, and is heard with its tool's read scope only in
     an initiative the tool is on in: by an installed plug-in's subscription
     and the community's own alike."""
-    tools = _counters()
+    from app.testing import counters_tool_set
+
+    tools = counters_tool_set()
     (tool,) = tools.installed
     (item,) = tool.children
     on = outbox_poller.CommunityTools(tools, frozenset({f"11:{tool.kind}"}))
