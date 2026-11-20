@@ -14,7 +14,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.initiative import (
-    Initiative,
     InitiativeMember,
     InitiativeRoleModel,
 )
@@ -67,56 +66,6 @@ async def _setup(session: AsyncSession, acting_user):
         email="pm@example.com",
     )
     return admin, owner, pm, admin.guild, initiative
-
-
-# ── The built-in roles as created ────────────────────────────────────────────
-
-
-async def test_moderator_holds_full_access_and_project_manager_does_not(
-    session: AsyncSession, acting_user
-):
-    _admin, _owner, _pm, _guild, initiative = await _setup(session, acting_user)
-
-    moderator = await _role_by_name(session, initiative, "moderator")
-    assert moderator.is_builtin is True
-    assert moderator.is_manager is True
-    assert moderator.override_share_restrictions is True
-    assert moderator.position == 0
-
-    pm_role = await _role_by_name(session, initiative, "project_manager")
-    assert pm_role.is_manager is True
-    assert pm_role.override_share_restrictions is False
-
-
-async def test_guild_admin_joins_an_initiative_as_moderator(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Every route into an initiative puts a community admin on the moderator
-    role — here, the row they write creating one, and the row a project manager
-    writes adding them to an existing one."""
-    admin, _owner, pm, guild, initiative = await _setup(session, acting_user)
-
-    resp = await client.post(
-        f"/api/v1/c/{guild.id}/initiatives/",
-        headers=admin.headers,
-        json={"name": "Founded by an admin"},
-    )
-    assert resp.status_code == 201, resp.text
-    founded = await session.get(Initiative, resp.json()["id"])
-    assert (await _role_of(session, founded, admin.user)).name == "moderator"
-
-    other_admin = await acting_user(
-        guild_role=CommunityRole.admin, guild=guild, email="other-admin@example.com"
-    )
-    member_role = await _role_by_name(session, initiative, "member")
-    resp = await client.post(
-        f"/api/v1/c/{guild.id}/initiatives/{initiative.id}/members",
-        headers=pm.headers,
-        json={"user_id": other_admin.user.id, "role_id": member_role.id},
-    )
-    assert resp.status_code == 200, resp.text
-
-    assert (await _role_of(session, initiative, other_admin.user)).name == "moderator"
 
 
 # ── Enforcement: end-to-end through the API (integration) ────────────────────

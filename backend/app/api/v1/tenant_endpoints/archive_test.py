@@ -19,22 +19,36 @@ from app.testing import create_file, create_task, create_wiki
 async def test_a_tool_that_could_not_be_archived_before_can_be_now(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
+    """Archived, it leaves the live list for the archived one, and goes back."""
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
     wiki = await create_wiki(session, a.initiative, a.user)
 
     response = await client.post(a.g(f"/archive/wiki/{wiki.id}"), headers=a.headers)
-
     assert response.status_code == 200
     assert response.json()["archived_at"] is not None
+
+    live = await client.get(a.g("/wikis/"), headers=a.headers)
+    assert [g["id"] for g in live.json()["items"]] == []
+    archived = await client.get(a.g("/wikis/?archived=true"), headers=a.headers)
+    assert [g["id"] for g in archived.json()["items"]] == [wiki.id]
+
+    back = await client.post(a.g(f"/unarchive/wiki/{wiki.id}"), headers=a.headers)
+    assert back.status_code == 200
+    assert back.json()["archived_at"] is None
 
 
 async def test_archiving_twice_answers_with_the_stamp_it_has(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
     """The second call is a repeat, not a conflict — an archived row is
-    read-only, and this is the write that made it so."""
+    read-only, and this is the write that made it so. Unarchiving something
+    live is a repeat too."""
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
     file = await create_file(session, a.initiative, a.user)
+
+    live = await client.post(a.g(f"/unarchive/file/{file.id}"), headers=a.headers)
+    assert live.status_code == 200
+    assert live.json()["archived_at"] is None
 
     first = await client.post(a.g(f"/archive/file/{file.id}"), headers=a.headers)
     assert first.status_code == 200
@@ -44,39 +58,18 @@ async def test_archiving_twice_answers_with_the_stamp_it_has(
     assert again.json()["archived_at"] == first.json()["archived_at"]
 
 
-async def test_unarchiving_something_live_is_a_repeat_too(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    file = await create_file(session, a.initiative, a.user)
-
-    response = await client.post(a.g(f"/unarchive/file/{file.id}"), headers=a.headers)
-
-    assert response.status_code == 200
-    assert response.json()["archived_at"] is None
-
-
-async def test_an_archived_tool_goes_back(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    wiki = await create_wiki(session, a.initiative, a.user)
-
-    await client.post(a.g(f"/archive/wiki/{wiki.id}"), headers=a.headers)
-    back = await client.post(a.g(f"/unarchive/wiki/{wiki.id}"), headers=a.headers)
-
-    assert back.status_code == 200
-    assert back.json()["archived_at"] is None
-
-
 async def test_archiving_an_initiative_archives_what_is_inside_it(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
     """Finished is finished all the way down, and with one stamp, so a list
-    filtering live work reads one column and gets the same answer everywhere."""
+    filtering live work reads one column and gets the same answer everywhere.
+    The shared stamp is what tells the two apart on the way back: a wiki put
+    away earlier carries a different one and keeps it."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     wiki = await create_wiki(session, a.initiative, a.user)
+    earlier = await create_wiki(session, a.initiative, a.user)
     task = await create_task(session, a.project)
+    await client.post(a.g(f"/archive/wiki/{earlier.id}"), headers=a.headers)
 
     response = await client.post(
         a.g(f"/archive/initiative/{a.initiative.id}"), headers=a.headers
@@ -84,44 +77,30 @@ async def test_archiving_an_initiative_archives_what_is_inside_it(
     assert response.status_code == 200
     stamp = response.json()["archived_at"]
 
-    await session.refresh(a.project)
-    await session.refresh(wiki)
-    await session.refresh(task)
-    assert a.project.archived_at is not None
-    assert wiki.archived_at is not None
-    assert task.archived_at is not None
+    for row in (a.project, wiki, task):
+        await session.refresh(row)
+        assert row.archived_at is not None
     # One stamp, shared — including the one the endpoint answered with.
     assert a.project.archived_at == wiki.archived_at == task.archived_at
     assert a.project.archived_at == datetime.fromisoformat(stamp)
 
-
-async def test_unarchiving_leaves_what_was_archived_on_its_own(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """The shared stamp is what tells the two apart: a wiki put away
-    earlier carries a different one and keeps it."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    wiki = await create_wiki(session, a.initiative, a.user)
-
-    await client.post(a.g(f"/archive/wiki/{wiki.id}"), headers=a.headers)
-    await client.post(a.g(f"/archive/initiative/{a.initiative.id}"), headers=a.headers)
     await client.post(
         a.g(f"/unarchive/initiative/{a.initiative.id}"), headers=a.headers
     )
-
-    await session.refresh(a.initiative)
-    await session.refresh(a.project)
-    await session.refresh(wiki)
+    for row in (a.initiative, a.project, earlier):
+        await session.refresh(row)
     assert a.initiative.archived_at is None
     assert a.project.archived_at is None
-    assert wiki.archived_at is not None
+    assert earlier.archived_at is not None
 
 
 async def test_a_task_cannot_be_taken_out_from_under_an_archived_project(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
     """Otherwise it is live inside a finished thing — and a live row is not
-    asked about its ancestry again, so it could then be moved or deleted out."""
+    asked about its ancestry again, so it could then be moved or deleted out.
+    The way out is the parent, and it still works — the cascade clears the
+    parent before the children, which is the order the guard requires."""
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
@@ -142,22 +121,9 @@ async def test_a_task_cannot_be_taken_out_from_under_an_archived_project(
     assert missing.status_code == 404
     assert missing.json() == KINDS["task"].not_found().body
 
-
-async def test_the_project_going_back_takes_its_tasks_with_it(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """The way out is the parent, and it still works — the cascade clears the
-    parent before the children, which is the order the guard requires."""
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    task = await create_task(session, a.project)
-
-    await client.post(a.g(f"/archive/project/{a.project.id}"), headers=a.headers)
     back = await client.post(
         a.g(f"/unarchive/project/{a.project.id}"), headers=a.headers
     )
-
     assert back.status_code == 200
     await session.refresh(task)
     assert task.archived_at is None

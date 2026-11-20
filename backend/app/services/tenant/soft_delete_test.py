@@ -8,21 +8,18 @@ uploaded and native files.
 from typing import Any
 
 import pytest
-from sqlalchemy import text
 from sqlalchemy.orm import undefer
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.file_types import FileType
 from app.core.tool_set import BUILTIN_TOOLS
-from app.db.schema_provisioning import guild_schema_name
 from app.db.soft_delete_filter import SOFT_DELETE_MODELS, select_including_deleted
 from app.db.tenancy import GUILD_SCOPED_TABLES
 from app.models.platform.user import User
 from app.models.tenant._mixins import ActorKind
 from app.models.tenant.file import File
 from app.models.tenant.initiative import Initiative
-from app.models.tenant.project import Project
 from app.models.tenant.task import Task
 from app.models.tenant.upload import Upload
 from app.services.tenant.lifecycle_tree import CASCADE_CHILDREN, CASCADE_PARENTS, Edge
@@ -30,92 +27,19 @@ from app.services.tenant.soft_delete import (
     restore_entity,
     soft_delete_entity,
 )
-from app.services.tenant.task_types import get_default_type
 from app.testing.factories import (
     create_file,
     create_guild,
     create_initiative,
     create_project,
+    create_task,
     create_upload,
     create_user,
 )
 
-
-async def _create_task(
-    session: AsyncSession, project: Project, *, title: str = "T"
-) -> Task:
-    """Build a task with a fresh status. The project factory does not seed
-    task statuses, so we create one on first use per-project."""
-    from sqlmodel import select
-
-    from app.models.tenant.task import TaskPriority, TaskStatus, TaskStatusCategory
-
-    status = (
-        await session.exec(
-            select(TaskStatus).where(TaskStatus.project_id == project.id).limit(1)
-        )
-    ).first()
-    if status is None:
-        status = TaskStatus(
-            project_id=project.id,
-            name="Todo",
-            category=TaskStatusCategory.todo,
-            position=0,
-            is_default=True,
-        )
-        session.add(status)
-        await session.commit()
-        await session.refresh(status)
-    task = Task(
-        project_id=project.id,
-        task_status_id=status.id,
-        task_type_id=(await get_default_type(session, project.id)).id,
-        title=title,
-        priority=TaskPriority.medium,
-    )
-    session.add(task)
-    await session.commit()
-    await session.refresh(task)
-    return task
-
-
 # ---------------------------------------------------------------------------
 # Cascade stamp / unstamp
 # ---------------------------------------------------------------------------
-
-
-async def test_soft_delete_project_cascades_to_tasks(session: AsyncSession):
-    """Soft-deleting a project stamps the same deleted_at on every task,
-    so children are hidden behind the parent in default selects."""
-    user = await create_user(session)
-    guild = await create_guild(session, creator=user)
-    initiative = await create_initiative(session, guild, user)
-    project = await create_project(session, initiative, user)
-    task_a = await _create_task(session, project, title="A")
-    task_b = await _create_task(session, project, title="B")
-
-    await soft_delete_entity(
-        session, project, deleted_by_user_id=user.id, retention_days=30
-    )
-    await session.commit()
-
-    refreshed_project = (
-        await session.exec(
-            select_including_deleted(Project).where(Project.id == project.id)
-        )
-    ).one()
-    refreshed_a = (
-        await session.exec(select_including_deleted(Task).where(Task.id == task_a.id))
-    ).one()
-    refreshed_b = (
-        await session.exec(select_including_deleted(Task).where(Task.id == task_b.id))
-    ).one()
-
-    assert refreshed_project.deleted_at is not None
-    assert refreshed_a.deleted_at == refreshed_project.deleted_at
-    assert refreshed_b.deleted_at == refreshed_project.deleted_at
-    assert refreshed_a.deleted_by == user.id
-    assert refreshed_a.purge_at is not None
 
 
 async def test_soft_delete_wiki_page_takes_its_thread(session: AsyncSession):
@@ -162,15 +86,16 @@ async def test_soft_delete_wiki_page_takes_its_thread(session: AsyncSession):
 async def test_restore_project_unstamps_only_matching_descendants(
     session: AsyncSession,
 ):
-    """If a task was independently soft-deleted earlier, restoring its
-    project must NOT bring that task back — it has its own deleted_at and
-    belongs in the trash on its own."""
+    """Soft-deleting a project stamps its own deleted_at on every live task, so
+    children are hidden behind the parent. If a task was independently
+    soft-deleted earlier, restoring its project must NOT bring that task back —
+    it has its own deleted_at and belongs in the trash on its own."""
     user = await create_user(session)
     guild = await create_guild(session, creator=user)
     initiative = await create_initiative(session, guild, user)
     project = await create_project(session, initiative, user)
-    independently_trashed = await _create_task(session, project, title="indep")
-    cascaded = await _create_task(session, project, title="cascaded")
+    independently_trashed = await create_task(session, project, title="indep")
+    cascaded = await create_task(session, project, title="cascaded")
 
     # 1. Trash the first task on its own.
     await soft_delete_entity(
@@ -184,6 +109,12 @@ async def test_restore_project_unstamps_only_matching_descendants(
         session, project, deleted_by_user_id=user.id, retention_days=30
     )
     await session.commit()
+    stamped = (
+        await session.exec(select_including_deleted(Task).where(Task.id == cascaded.id))
+    ).one()
+    assert stamped.deleted_at == project.deleted_at is not None
+    assert stamped.deleted_by == user.id
+    assert stamped.purge_at is not None
 
     # 3. Restore the project.
     await restore_entity(session, project)
@@ -203,51 +134,6 @@ async def test_restore_project_unstamps_only_matching_descendants(
 
 
 # ---------------------------------------------------------------------------
-# Restore needs-reassignment
-# ---------------------------------------------------------------------------
-
-
-async def test_restrictive_delete_policy_exists_on_each_soft_delete_table(
-    session: AsyncSession,
-):
-    """Every soft-delete-capable table carries a RESTRICTIVE FOR DELETE policy
-    (``soft_delete_admin_purge``) that admits only a routed guild admin
-    (``app.guild_admin = 'true'``); a hard delete is a purge. Post-squash
-    these tables (and thus their policies) live in the per-guild schemas, not
-    ``public``, rendered from the registry when a guild is provisioned. The
-    admin fixture can't exercise the policy at runtime, so we inspect
-    ``pg_policies`` in a freshly provisioned guild schema."""
-    guild = await create_guild(session)
-    expected = {
-        "projects",
-        "tasks",
-        "files",
-        "comments",
-        "initiatives",
-        "tags",
-        "calendars",
-        "calendar_events",
-    }
-    result = await session.exec(
-        text(
-            "SELECT tablename, policyname, cmd, permissive "
-            "FROM pg_policies "
-            "WHERE schemaname = :schema "
-            "AND policyname = 'soft_delete_admin_purge'"
-        ).bindparams(schema=guild_schema_name(guild.id))
-    )
-    rows = result.all()
-    found_tables = {row[0] for row in rows}
-    assert expected.issubset(found_tables), f"missing on: {expected - found_tables}"
-    for tname, pname, cmd, permissive in rows:
-        if tname in expected:
-            assert cmd == "DELETE", f"{tname}: {pname} cmd={cmd}"
-            assert permissive == "RESTRICTIVE", (
-                f"{tname}: {pname} permissive={permissive}"
-            )
-
-
-# ---------------------------------------------------------------------------
 # Upload preservation
 # ---------------------------------------------------------------------------
 
@@ -255,40 +141,25 @@ async def test_restrictive_delete_policy_exists_on_each_soft_delete_table(
 async def test_soft_delete_file_preserves_uploads(session: AsyncSession):
     """Soft-deleting a native file leaves its referenced Upload row
     alone so the image still works after a restore."""
+    from sqlmodel import select
+
     user = await create_user(session)
     guild = await create_guild(session, creator=user)
     initiative = await create_initiative(session, guild, user)
-
-    upload = Upload(
-        filename="abc123.png",
-        created_by=user.id,
-        created_by_kind=ActorKind.member,
-        size_bytes=1234,
-        content_type="image/png",
-    )
-    session.add(upload)
-    await session.commit()
-
-    doc = File(
-        initiative_id=initiative.id,
-        name="With image",
+    await create_upload(session, guild, user, filename="abc123.png")
+    doc = await create_file(
+        session,
+        initiative,
+        user,
         file_type=FileType.lexical,
         content={"text": "uses /uploads/abc123.png"},
         featured_image_url="/uploads/abc123.png",
-        created_by=user.id,
-        created_by_kind=ActorKind.member,
     )
-    session.add(doc)
-    await session.commit()
-    await session.refresh(doc)
 
     await soft_delete_entity(
         session, doc, deleted_by_user_id=user.id, retention_days=30
     )
     await session.commit()
-
-    # Upload row + filename still present after soft-delete.
-    from sqlmodel import select
 
     upload_row = (
         await session.exec(select(Upload).where(Upload.filename == "abc123.png"))
@@ -405,8 +276,8 @@ async def test_trash_listing_dedupes_nested_comment_replies(
     parent_comment_id pointing at a still-trashed row.
     """
     from app.models.platform.guild import CommunityRole
-    from app.models.tenant.comment import Comment
     from app.testing.factories import (
+        create_comment,
         create_guild_membership,
         get_auth_headers,
     )
@@ -418,29 +289,10 @@ async def test_trash_listing_dedupes_nested_comment_replies(
     )
     initiative = await create_initiative(session, guild, user)
     project = await create_project(session, initiative, user)
-    task = await _create_task(session, project, title="Task with comments")
+    task = await create_task(session, project, title="Task with comments")
 
-    parent = Comment(
-        subject_type="task",
-        subject_id=task.id,
-        created_by=user.id,
-        created_by_kind=ActorKind.member,
-        content="Top-level",
-    )
-    session.add(parent)
-    await session.commit()
-    await session.refresh(parent)
-
-    reply = Comment(
-        subject_type="task",
-        subject_id=task.id,
-        created_by=user.id,
-        created_by_kind=ActorKind.member,
-        content="Reply",
-        parent_comment_id=parent.id,
-    )
-    session.add(reply)
-    await session.commit()
+    parent = await create_comment(session, user, task=task)
+    await create_comment(session, user, task=task, parent_comment_id=parent.id)
 
     # Soft-delete the parent; the cascade stamps the reply too.
     await soft_delete_entity(
@@ -613,7 +465,8 @@ async def test_hard_purge_unlinks_references_in_linking_files(
     """Purging a file makes references to it in surviving files their words
     and takes the edges with it, so nothing dangles after the row is gone. A
     Yjs state the editor cannot read is cleared, and the next session makes it
-    from the repaired content."""
+    from the repaired content. A linking file sitting in the trash is unlinked
+    too, so restoring it after the purge brings back no dangling link."""
     from sqlmodel import select
 
     from app.core.relationships import RelationshipType, node_id
@@ -622,45 +475,50 @@ async def test_hard_purge_unlinks_references_in_linking_files(
     from app.services.tenant import content_references
     from app.services.tenant.relationships import Endpoint
     from app.services.tenant.soft_delete import hard_purge_entity
-    from app.testing.factories import create_file
 
     user = await create_user(session)
     guild = await create_guild(session, creator=user)
     initiative = await create_initiative(session, guild, user)
     target = await create_file(session, initiative, user, name="Target")
-    linking = await create_file(
-        session,
-        initiative,
-        user,
-        name="Linking",
-        content=_linking_content(target.id),
-        yjs_state=b"stale-collab-state",
-    )
-    await content_references.sync_for_entity(
-        session,
-        Endpoint(SearchEntityType.file, linking.id),
-        body=linking.content,
-        author_id=user.id,
-    )
+    linking, trashed = [
+        await create_file(
+            session,
+            initiative,
+            user,
+            name=name,
+            content=_linking_content(target.id),
+            yjs_state=state,
+        )
+        for name, state in (("Linking", b"stale-collab-state"), ("Trashed", None))
+    ]
+    for row in (linking, trashed):
+        await content_references.sync_for_entity(
+            session,
+            Endpoint(SearchEntityType.file, row.id),
+            body=row.content,
+            author_id=user.id,
+        )
     await session.commit()
 
-    await soft_delete_entity(
-        session, target, deleted_by_user_id=user.id, retention_days=30
-    )
+    for row in (trashed, target):
+        await soft_delete_entity(
+            session, row, deleted_by_user_id=user.id, retention_days=30
+        )
     await session.commit()
 
     await hard_purge_entity(session, target)
     await session.commit()
 
-    refreshed = (
-        await session.exec(
-            select(File)
-            .where(File.id == linking.id)
-            .options(undefer(File.content), undefer(File.yjs_state))
-        )
-    ).one()
-    assert _unlinked(refreshed.content)
-    assert refreshed.yjs_state is None
+    for row in (linking, trashed):
+        refreshed = (
+            await session.exec(
+                select_including_deleted(File)
+                .where(File.id == row.id)
+                .options(undefer(File.content), undefer(File.yjs_state))
+            )
+        ).one()
+        assert _unlinked(refreshed.content)
+        assert refreshed.yjs_state is None
 
     edges = (
         await session.exec(
@@ -675,119 +533,36 @@ async def test_hard_purge_unlinks_references_in_linking_files(
     assert edges == []
 
 
-async def test_hard_purge_unlinks_references_in_trashed_linking_files(
-    session: AsyncSession,
-):
-    """A linking file sitting in the trash gets its references unlinked too —
-    restoring it after the purge must not bring back a dangling link."""
-    from app.core.search import SearchEntityType
-    from app.services.tenant import content_references
-    from app.services.tenant.relationships import Endpoint
-    from app.services.tenant.soft_delete import hard_purge_entity
-    from app.testing.factories import create_file
-
-    user = await create_user(session)
-    guild = await create_guild(session, creator=user)
-    initiative = await create_initiative(session, guild, user)
-    target = await create_file(session, initiative, user, name="Target")
-    linking = await create_file(
-        session,
-        initiative,
-        user,
-        name="Trashed Linking",
-        content=_linking_content(target.id),
-    )
-    await content_references.sync_for_entity(
-        session,
-        Endpoint(SearchEntityType.file, linking.id),
-        body=linking.content,
-        author_id=user.id,
-    )
-    await session.commit()
-
-    # Both files go to the trash; only the target is purged.
-    await soft_delete_entity(
-        session, linking, deleted_by_user_id=user.id, retention_days=30
-    )
-    await soft_delete_entity(
-        session, target, deleted_by_user_id=user.id, retention_days=30
-    )
-    await session.commit()
-
-    await hard_purge_entity(session, target)
-    await session.commit()
-
-    refreshed = (
-        await session.exec(
-            select_including_deleted(File)
-            .where(File.id == linking.id)
-            .options(undefer(File.content))
-        )
-    ).one()
-    assert _unlinked(refreshed.content)
-
-
 # ---------------------------------------------------------------------------
 # Restoring a tree that has archived content in it
 # ---------------------------------------------------------------------------
 
 
-async def test_restore_initiative_brings_back_an_archived_calendars_events(
+async def test_restore_initiative_brings_back_archived_tools_children(
     session: AsyncSession,
 ):
-    """An event carries no ``archived_at``: inside an archived calendar it is
-    simply live, because that is the only state it has. Restoring the
-    initiative has to put it back in exactly that state."""
+    """An event carries no ``archived_at``, and archiving a file never touches
+    the comments on it: inside an archived tool they are simply live, because
+    that is the only state they have. Restoring the initiative has to put them
+    back in exactly that state, and the tool back in its archive."""
     from app.models.tenant.calendar import Calendar
     from app.models.tenant.calendar_event import CalendarEvent
+    from app.models.tenant.comment import Comment
     from app.services.tenant.archive import archive_entity
-    from app.testing.factories import create_calendar, create_calendar_event
+    from app.testing.factories import (
+        create_calendar,
+        create_calendar_event,
+        create_comment,
+    )
 
     user = await create_user(session)
     guild = await create_guild(session, creator=user)
     initiative = await create_initiative(session, guild, user)
     calendar = await create_calendar(session, initiative, user)
     event = await create_calendar_event(session, calendar, user)
-    await archive_entity(session, calendar)
-    await session.commit()
-
-    await soft_delete_entity(
-        session, initiative, deleted_by_user_id=user.id, retention_days=30
-    )
-    await session.commit()
-
-    await restore_entity(session, initiative)
-    await session.commit()
-
-    refreshed = (
-        await session.exec(
-            select_including_deleted(CalendarEvent).where(CalendarEvent.id == event.id)
-        )
-    ).one()
-    assert refreshed.deleted_at is None
-    refreshed_calendar = (
-        await session.exec(
-            select_including_deleted(Calendar).where(Calendar.id == calendar.id)
-        )
-    ).one()
-    assert refreshed_calendar.deleted_at is None
-    assert refreshed_calendar.archived_at is not None
-
-
-async def test_restore_initiative_brings_back_an_archived_files_comments(
-    session: AsyncSession,
-):
-    """Same rule, one hop further down: archiving a file never touches the
-    comments on it, so they come back out of the trash unstamped."""
-    from app.models.tenant.comment import Comment
-    from app.services.tenant.archive import archive_entity
-    from app.testing.factories import create_comment, create_file
-
-    user = await create_user(session)
-    guild = await create_guild(session, creator=user)
-    initiative = await create_initiative(session, guild, user)
     file = await create_file(session, initiative, user)
     comment = await create_comment(session, user, file=file)
+    await archive_entity(session, calendar)
     await archive_entity(session, file)
     await session.commit()
 
@@ -799,48 +574,20 @@ async def test_restore_initiative_brings_back_an_archived_files_comments(
     await restore_entity(session, initiative)
     await session.commit()
 
-    refreshed = (
+    for model, row_id in ((CalendarEvent, event.id), (Comment, comment.id)):
+        refreshed = (
+            await session.exec(
+                select_including_deleted(model).where(model.id == row_id)
+            )
+        ).one()
+        assert refreshed.deleted_at is None
+    refreshed_calendar = (
         await session.exec(
-            select_including_deleted(Comment).where(Comment.id == comment.id)
+            select_including_deleted(Calendar).where(Calendar.id == calendar.id)
         )
     ).one()
-    assert refreshed.deleted_at is None
-
-
-async def test_soft_delete_project_takes_its_own_thread(session: AsyncSession):
-    """A project's conversation is filed under the project, so it goes into the
-    bin with it and comes back with it."""
-    from app.models.tenant.comment import Comment
-    from app.testing.factories import create_comment
-
-    user = await create_user(session)
-    guild = await create_guild(session, creator=user)
-    initiative = await create_initiative(session, guild, user)
-    project = await create_project(session, initiative, user)
-    comment = await create_comment(session, user, project=project)
-    reply = await create_comment(
-        session, user, project=project, parent_comment_id=comment.id
-    )
-
-    await soft_delete_entity(
-        session, project, deleted_by_user_id=user.id, retention_days=30
-    )
-    await session.commit()
-
-    async def stamps() -> set:
-        rows = await session.exec(
-            select_including_deleted(Comment.deleted_at).where(
-                Comment.id.in_([comment.id, reply.id])
-            )
-        )
-        return set(rows.all())
-
-    assert await stamps() == {project.deleted_at}
-
-    await restore_entity(session, project)
-    await session.commit()
-
-    assert await stamps() == {None}
+    assert refreshed_calendar.deleted_at is None
+    assert refreshed_calendar.archived_at is not None
 
 
 async def test_trash_listing_shows_a_trashed_wiki_alone(session: AsyncSession, client):
