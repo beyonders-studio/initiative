@@ -48,11 +48,17 @@ vi.mock("./PostBody", () => ({
 const PINNED_AT = "2026-02-01T00:00:00.000Z";
 
 describe("PostCard", () => {
-  it("shows the headline and the body", async () => {
+  // Reacting is a read-level gesture, so it is offered on the board itself
+  // rather than only after opening the post. And a board that shows only what
+  // was said makes every notice read as the app's own announcement: a notice
+  // is somebody saying something, so it is signed.
+  it("shows the headline and the body, signed, with reactions on the board", async () => {
     renderCard({ name: "Server maintenance Sunday" });
 
     expect(await screen.findByText("Server maintenance Sunday")).toBeInTheDocument();
     expect(screen.getByTestId("post-body")).toBeInTheDocument();
+    expect(screen.getByText(/author/)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /add a reaction/i })).toBeInTheDocument();
   });
 
   // A lapsed pin still carries pinned_at; the server decides `is_pinned`, and
@@ -136,14 +142,6 @@ describe("PostCard", () => {
     expect(screen.queryByRole("menuitem", { name: /lock comments/i })).not.toBeInTheDocument();
   });
 
-  // Reacting is a read-level gesture, so it is offered on the board itself
-  // rather than only after opening the post.
-  it("offers reactions on the board", async () => {
-    renderCard();
-
-    expect(await screen.findByRole("button", { name: /add a reaction/i })).toBeInTheDocument();
-  });
-
   // "0 comments" reads as an absence; an invitation reads as a way in, so no
   // card ever counts none.
   it.each([
@@ -214,14 +212,6 @@ describe("PostCard", () => {
     } else {
       expect(control).not.toBeInTheDocument();
     }
-  });
-
-  // A board that shows only what was said makes every notice read as the app's
-  // own announcement. A notice is somebody saying something.
-  it("signs the notice with whoever wrote it", async () => {
-    renderCard();
-
-    expect(await screen.findByText(/author/)).toBeInTheDocument();
   });
 
   // Whether a notice landed is the point of putting it on a board, so the

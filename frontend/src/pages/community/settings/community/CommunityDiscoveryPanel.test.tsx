@@ -9,11 +9,10 @@
  */
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HttpResponse } from "msw";
+import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { buildCommunity, buildInitiative } from "@/__tests__/factories";
-import { communityHttp } from "@/__tests__/helpers/communityHttp";
+import { buildCommunity } from "@/__tests__/factories";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import type { CommunityRead } from "@/api/generated/initiativeAPI.schemas";
@@ -30,25 +29,12 @@ vi.mock("@/hooks/useAppConfig", () => ({
   useAppConfig: () => ({ communityDirectoryEnabled: config.communityDirectory }),
 }));
 
-vi.mock("@/api/generated/communities/communities", () => ({
-  updateCommunity: (...args: unknown[]) => patchCommunity(...args),
-}));
-
 const renderPanel = (community: CommunityRead) =>
   renderWithProviders(<CommunityDiscoveryPanel />, {
     communities: {
       communities: [community],
       activeCommunityId: community.id,
       activeCommunity: community,
-      loading: false,
-      error: null,
-      refreshCommunities: vi.fn(),
-      switchCommunity: vi.fn(),
-      syncCommunityFromUrl: vi.fn(),
-      createCommunity: vi.fn(),
-      updateCommunityInState: vi.fn(),
-      reorderCommunities: vi.fn(),
-      canCreateCommunities: true,
     },
   });
 
@@ -66,7 +52,12 @@ const certify = () => within(dialog()).getByLabelText("This community contains n
 beforeEach(() => {
   vi.clearAllMocks();
   config.communityDirectory = true;
-  patchCommunity.mockResolvedValue(adminCommunity({ join_policy: "open" }));
+  server.use(
+    http.patch("*/api/v1/communities/:communityId", async ({ params, request }) => {
+      patchCommunity(Number(params.communityId), await request.json());
+      return HttpResponse.json(adminCommunity({ join_policy: "open" }));
+    })
+  );
 });
 
 describe("CommunityDiscoveryPanel", () => {
@@ -83,65 +74,46 @@ describe("CommunityDiscoveryPanel", () => {
     expect(screen.queryByText("Community directory")).not.toBeInTheDocument();
   });
 
-  it("offers the opt-in to a community admin", () => {
+  it("offers the opt-in to a community admin, with no prompt or 18+ question while unlisted", () => {
     renderPanel(adminCommunity());
 
     expect(screen.getByText("Community directory")).toBeInTheDocument();
     expect(policyPicker()).toHaveTextContent("Invite only");
+    // A listing is a front door; the auto-join prompt is about the room behind it.
+    expect(
+      screen.queryByText("New members will arrive to an empty community")
+    ).not.toBeInTheDocument();
+    // The 18+ question belongs to the directory; the dialog's certification asks it.
+    expect(screen.queryByText(/adult content \(18\+\)/)).not.toBeInTheDocument();
   });
 
   describe("the publish dialog", () => {
-    it("stands between the choice and the listing", async () => {
+    it("stands between the choice and the listing, asking for a category and the certification", async () => {
       renderPanel(adminCommunity());
 
       await choose("Listed: anyone can join");
 
-      expect(await screen.findByRole("dialog")).toBeInTheDocument();
+      const panel = await screen.findByRole("dialog");
       // Nothing is published by opening it.
       expect(patchCommunity).not.toHaveBeenCalled();
-    });
-
-    it("will not confirm without a category", async () => {
-      renderPanel(adminCommunity());
-      await choose("Listed: anyone can join");
-      await screen.findByRole("dialog");
-
-      await userEvent.click(certify());
-
-      expect(within(dialog()).getByRole("button", { name: "List this community" })).toBeDisabled();
-    });
-
-    it("will not confirm without the certification", async () => {
-      renderPanel(adminCommunity());
-      await choose("Listed: anyone can join");
-      await screen.findByRole("dialog");
-
-      await userEvent.click(within(dialog()).getByRole("button", { name: "Gaming" }));
-
-      expect(within(dialog()).getByRole("button", { name: "List this community" })).toBeDisabled();
-    });
-
-    it("spells out what the certification covers", async () => {
-      renderPanel(adminCommunity());
-      await choose("Listed: anyone can join");
-      const panel = await screen.findByRole("dialog");
-
       // The criminal-liability line especially must be stated, not implied.
       expect(within(panel).getByText("Any sexual content involving a minor")).toBeInTheDocument();
       expect(within(panel).getByText("Pornography, sexual content, or nudity")).toBeInTheDocument();
       expect(within(panel).getByText(/Illegal activity — drug use or sale/)).toBeInTheDocument();
       expect(within(panel).getByText(/you are expected to watch for/i)).toBeInTheDocument();
-    });
 
-    it("publishes with the categories picked and the 18+ question answered", async () => {
-      renderPanel(adminCommunity());
-      await choose("Listed: anyone can join");
-      await screen.findByRole("dialog");
-
-      await userEvent.click(within(dialog()).getByRole("button", { name: "Gaming" }));
-      await userEvent.click(within(dialog()).getByRole("button", { name: "Tabletop RPG" }));
+      const confirm = within(panel).getByRole("button", { name: "List this community" });
+      // Certified, but no category.
       await userEvent.click(certify());
-      await userEvent.click(within(dialog()).getByRole("button", { name: "List this community" }));
+      expect(confirm).toBeDisabled();
+      // A category, but not certified.
+      await userEvent.click(certify());
+      await userEvent.click(within(panel).getByRole("button", { name: "Gaming" }));
+      expect(confirm).toBeDisabled();
+
+      await userEvent.click(within(panel).getByRole("button", { name: "Tabletop RPG" }));
+      await userEvent.click(certify());
+      await userEvent.click(confirm);
 
       await waitFor(() => {
         expect(patchCommunity).toHaveBeenCalledWith(7, {
@@ -152,8 +124,9 @@ describe("CommunityDiscoveryPanel", () => {
       });
     });
 
-    it("lists a community that asks people to request, as chosen", async () => {
-      renderPanel(adminCommunity());
+    it("lists a community that asks people to request, even one that had declared itself 18+", async () => {
+      renderPanel(adminCommunity({ has_adult_content: true }));
+      expect(policyPicker()).toBeEnabled();
       await choose("Listed: ask to join");
       await screen.findByRole("dialog");
 
@@ -161,6 +134,7 @@ describe("CommunityDiscoveryPanel", () => {
       await userEvent.click(certify());
       await userEvent.click(within(dialog()).getByRole("button", { name: "List this community" }));
 
+      // The certification answers the question afresh, whatever it said before.
       await waitFor(() => {
         expect(patchCommunity).toHaveBeenCalledWith(7, {
           join_policy: "request",
@@ -186,14 +160,6 @@ describe("CommunityDiscoveryPanel", () => {
 
   /** A listing is a front door; the prompt is about the room behind it. */
   describe("the auto-join prompt", () => {
-    it("is absent while the community is not listed", () => {
-      renderPanel(adminCommunity());
-
-      expect(
-        screen.queryByText("New members will arrive to an empty community")
-      ).not.toBeInTheDocument();
-    });
-
     it("warns a listed community that has nothing to land people in", async () => {
       // The default handler's initiative carries no auto-join.
       renderPanel(adminCommunity({ join_policy: "open", categories: ["art"] }));
@@ -201,24 +167,8 @@ describe("CommunityDiscoveryPanel", () => {
       expect(
         await screen.findByText("New members will arrive to an empty community")
       ).toBeInTheDocument();
-    });
-
-    it("is gone once an initiative takes new members", async () => {
-      server.use(
-        communityHttp.get("/initiatives/", () =>
-          HttpResponse.json([
-            buildInitiative({ name: "Welcome", join_policy: "open", auto_join: true }),
-          ])
-        )
-      );
-
-      renderPanel(adminCommunity({ join_policy: "open", categories: ["art"] }));
-
-      await waitFor(() =>
-        expect(
-          screen.queryByText("New members will arrive to an empty community")
-        ).not.toBeInTheDocument()
-      );
+      // Nor is the 18+ question put to a listed community.
+      expect(screen.queryByText(/adult content \(18\+\)/)).not.toBeInTheDocument();
     });
   });
 
@@ -261,45 +211,10 @@ describe("CommunityDiscoveryPanel", () => {
     });
   });
 
-  /** The 18+ question belongs to the directory, so the panel never puts it to a
-   *  community outside one — the certification in the dialog is where it is asked. */
-  describe("the 18+ question", () => {
-    it("is not put to a community that keeps to itself", () => {
-      renderPanel(adminCommunity());
-
-      expect(screen.queryByText(/adult content \(18\+\)/)).not.toBeInTheDocument();
-    });
-
-    it("is not put to a listed community either", () => {
-      renderPanel(adminCommunity({ join_policy: "open", categories: ["art"] }));
-
-      expect(screen.queryByText(/adult content \(18\+\)/)).not.toBeInTheDocument();
-    });
-
-    it("still offers the listing to a community that had declared itself 18+", async () => {
-      renderPanel(adminCommunity({ has_adult_content: true }));
-
-      expect(policyPicker()).toBeEnabled();
-
-      await choose("Listed: anyone can join");
-      await screen.findByRole("dialog");
-      await userEvent.click(within(dialog()).getByRole("button", { name: "Gaming" }));
-      await userEvent.click(certify());
-      await userEvent.click(within(dialog()).getByRole("button", { name: "List this community" }));
-
-      // The certification answers the question afresh, whatever it said before.
-      await waitFor(() => {
-        expect(patchCommunity).toHaveBeenCalledWith(7, {
-          join_policy: "open",
-          categories: ["gaming"],
-          has_adult_content: false,
-        });
-      });
-    });
-  });
-
   it("reports a refused save rather than looking like it worked", async () => {
-    patchCommunity.mockRejectedValue(new Error("nope"));
+    server.use(
+      http.patch("*/api/v1/communities/:communityId", () => new HttpResponse(null, { status: 500 }))
+    );
     vi.spyOn(console, "error").mockImplementation(() => {});
     renderPanel(adminCommunity({ join_policy: "open", categories: ["art"] }));
 

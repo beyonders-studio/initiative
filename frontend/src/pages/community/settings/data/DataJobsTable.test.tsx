@@ -11,9 +11,6 @@ import type { DataJobRead } from "@/api/generated/initiativeAPI.schemas";
 
 import { DataJobsTable } from "./DataJobsTable";
 
-vi.mock("@/lib/mascotToast", () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
-}));
 vi.mock("@/lib/exportDownload", () => ({
   downloadExportArtifact: vi.fn(),
 }));
@@ -48,7 +45,7 @@ describe("DataJobsTable", () => {
     vi.clearAllMocks();
   });
 
-  it("lists both directions with direction-specific actions", async () => {
+  it("lists both directions with direction-specific actions, and re-downloads an export", async () => {
     server.use(
       communityHttp.get("/data-jobs/", () =>
         HttpResponse.json([
@@ -74,16 +71,9 @@ describe("DataJobsTable", () => {
     expect(screen.getByRole("button", { name: /download/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /view report/i })).toBeInTheDocument();
-  });
 
-  it("re-downloads a finished export via the download helper", async () => {
-    server.use(
-      communityHttp.get("/data-jobs/", () =>
-        HttpResponse.json([exportJob({ id: 10, status: "done" })])
-      )
-    );
-    renderWithProviders(<DataJobsTable />);
-    await userEvent.click(await screen.findByRole("button", { name: /download/i }));
+    // A finished export downloads again through the download helper.
+    await userEvent.click(screen.getByRole("button", { name: /download/i }));
     await waitFor(() => expect(downloadExportArtifact).toHaveBeenCalled());
   });
 

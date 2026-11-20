@@ -37,27 +37,18 @@ beforeEach(() => {
 afterEach(() => setPendingShare(null));
 
 describe("SharePage", () => {
-  it("goes to what was made, then lets the share go", async () => {
-    renderPage();
-
-    act(() => finish("/c/3/i/4/projects/6/tasks/77"));
-
-    await vi.waitFor(() => expect(getPendingShare()).toBeNull());
-    expect(navigate.mock.calls).toEqual([[{ to: "/c/3/i/4/projects/6/tasks/77" }]]);
-  });
-
-  it("goes home when the share is put down", async () => {
-    renderPage();
-
-    act(() => finish());
-
-    await vi.waitFor(() => expect(getPendingShare()).toBeNull());
-    expect(navigate.mock.calls).toEqual([[{ to: "/", replace: true }]]);
-  });
-
-  it("marks the share shown", () => {
+  // To what was made, or home when the share is put down.
+  it.each([
+    ["/c/3/i/4/projects/6/tasks/77", { to: "/c/3/i/4/projects/6/tasks/77" }],
+    [undefined, { to: "/", replace: true }],
+  ])("marks the share shown, goes to %s, then lets the share go", async (made, to) => {
     renderPage();
     expect(getPendingShare()?.opened).toBe(true);
+
+    act(() => finish(made));
+
+    await vi.waitFor(() => expect(getPendingShare()).toBeNull());
+    expect(navigate.mock.calls).toEqual([[to]]);
   });
 
   it("goes home with nothing to share", () => {

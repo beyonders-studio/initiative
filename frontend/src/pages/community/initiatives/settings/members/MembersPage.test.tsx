@@ -101,8 +101,8 @@ beforeEach(() => {
 });
 
 describe("MembersPage", () => {
-  it("puts joining above the roster it fills", async () => {
-    stubInitiative();
+  it("puts joining above the roster it fills, offering every way in and showing the current one", async () => {
+    stubInitiative({ join_policy: "request" });
 
     renderMembers();
 
@@ -110,46 +110,23 @@ describe("MembersPage", () => {
     const joining = await screen.findByText("Joining");
     const members = screen.getByText("Members");
     expect(joining.compareDocumentPosition(members)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-  });
-
-  it("offers every way into an initiative", async () => {
-    stubInitiative();
-
-    renderMembers();
-
-    expect(await screen.findByRole("radio", { name: /Invite only/ })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /By request/ })).toBeInTheDocument();
+    expect(await screen.findByRole("radio", { name: /By request/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /Invite only/ })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /Anyone can join/ })).toBeInTheDocument();
   });
 
-  it("saves the chosen policy on its own, touching no other field", async () => {
+  it.each([
+    [/Anyone can join/, "open"],
+    [/By request/, "request"],
+  ])("saves the chosen policy %s on its own, touching no other field", async (radio, policy) => {
     const patches = stubInitiative();
 
     renderMembers();
 
-    await userEvent.click(await screen.findByRole("radio", { name: /Anyone can join/ }));
+    await userEvent.click(await screen.findByRole("radio", { name: radio }));
 
     await waitFor(() => expect(patches).toHaveLength(1));
-    expect(patches[0]).toEqual({ join_policy: "open" });
-  });
-
-  it("saves the by-request policy", async () => {
-    const patches = stubInitiative();
-
-    renderMembers();
-
-    await userEvent.click(await screen.findByRole("radio", { name: /By request/ }));
-
-    await waitFor(() => expect(patches).toHaveLength(1));
-    expect(patches[0]).toEqual({ join_policy: "request" });
-  });
-
-  it("shows the initiative's current policy as the chosen one", async () => {
-    stubInitiative({ join_policy: "request" });
-
-    renderMembers();
-
-    expect(await screen.findByRole("radio", { name: /By request/ })).toBeChecked();
+    expect(patches[0]).toEqual({ join_policy: policy });
   });
 
   it("finds someone to add by searching the community, and seats an admin as moderator", async () => {
@@ -226,36 +203,25 @@ describe("MembersPage", () => {
       renderMembers();
 
       expect(await screen.findByLabelText(AUTO_JOIN_LABEL)).toBeEnabled();
+      // People already in the community are not swept in.
+      expect(screen.getByText(/People already in the community are not added/)).toBeVisible();
     });
 
-    it("says people already in the community are not swept in", async () => {
-      stubInitiative({ join_policy: "open" });
+    it.each([
+      ["private", /Invite only/],
+      ["request", /By request/],
+    ] as const)(
+      "will not let a %s initiative enrol anyone, and says why",
+      async (policy, radio) => {
+        stubInitiative({ join_policy: policy });
 
-      renderMembers();
+        renderMembers();
 
-      expect(
-        await screen.findByText(/People already in the community are not added/)
-      ).toBeVisible();
-    });
-
-    it("will not let a closed initiative enrol anyone, and says why", async () => {
-      stubInitiative({ join_policy: "private" });
-
-      renderMembers();
-
-      await screen.findByRole("radio", { name: /Invite only/ });
-      expect(autoJoinSwitch()).toBeDisabled();
-      expect(screen.getByText(/needs the “Anyone can join” policy/)).toBeVisible();
-    });
-
-    it("will not let a by-request initiative enrol anyone either", async () => {
-      stubInitiative({ join_policy: "request" });
-
-      renderMembers();
-
-      await screen.findByRole("radio", { name: /By request/ });
-      expect(autoJoinSwitch()).toBeDisabled();
-    });
+        await screen.findByRole("radio", { name: radio });
+        expect(autoJoinSwitch()).toBeDisabled();
+        expect(screen.getByText(/needs the “Anyone can join” policy/)).toBeVisible();
+      }
+    );
 
     it("is not offered to a manager who is not a community admin", async () => {
       stubInitiative({ join_policy: "open", members: [managerMembership()] });
@@ -268,28 +234,21 @@ describe("MembersPage", () => {
       expect(autoJoinSwitch()).not.toBeInTheDocument();
     });
 
-    it("saves the switch on its own, touching no other field", async () => {
-      const patches = stubInitiative({ join_policy: "open" });
+    it.each([false, true])(
+      "flips the switch from %s on its own, touching no other field",
+      async (was) => {
+        const patches = stubInitiative({ join_policy: "open", auto_join: was });
 
-      renderMembers();
+        renderMembers();
 
-      await userEvent.click(await screen.findByLabelText(AUTO_JOIN_LABEL));
+        const autoJoin = await screen.findByLabelText(AUTO_JOIN_LABEL);
+        expect(autoJoin).toHaveAttribute("aria-checked", String(was));
+        await userEvent.click(autoJoin);
 
-      await waitFor(() => expect(patches).toHaveLength(1));
-      expect(patches[0]).toEqual({ auto_join: true });
-    });
-
-    it("turns it back off", async () => {
-      const patches = stubInitiative({ join_policy: "open", auto_join: true });
-
-      renderMembers();
-
-      expect(await screen.findByLabelText(AUTO_JOIN_LABEL)).toBeChecked();
-      await userEvent.click(screen.getByLabelText(AUTO_JOIN_LABEL));
-
-      await waitFor(() => expect(patches).toHaveLength(1));
-      expect(patches[0]).toEqual({ auto_join: false });
-    });
+        await waitFor(() => expect(patches).toHaveLength(1));
+        expect(patches[0]).toEqual({ auto_join: !was });
+      }
+    );
 
     it("closing the initiative clears auto-join in the same save", async () => {
       const patches = stubInitiative({ join_policy: "open", auto_join: true });
@@ -319,31 +278,25 @@ describe("MembersPage", () => {
       expect(screen.getByText(/Ask an admin to turn auto-join off/)).toBeVisible();
     });
 
-    it("reports the server's refusal of a non-admin in the server's words", async () => {
-      stubInitiative({ join_policy: "open" }, [403, "INITIATIVE_AUTO_JOIN_ADMIN_ONLY"]);
+    it.each([
+      [403, "INITIATIVE_AUTO_JOIN_ADMIN_ONLY", "Only community admins can change auto-join"],
+      [
+        400,
+        "INITIATIVE_AUTO_JOIN_REQUIRES_OPEN",
+        "Auto-join is only available for initiatives anyone can join",
+      ],
+    ])(
+      "reports the server's %s refusal %s in the reader's words",
+      async (status, detail, message) => {
+        stubInitiative({ join_policy: "open" }, [status, detail]);
 
-      renderMembers();
+        renderMembers();
 
-      await userEvent.click(await screen.findByLabelText(AUTO_JOIN_LABEL));
+        await userEvent.click(await screen.findByLabelText(AUTO_JOIN_LABEL));
 
-      await waitFor(() =>
-        expect(toast.error).toHaveBeenCalledWith("Only community admins can change auto-join")
-      );
-    });
-
-    it("reports the server's refusal of a closed initiative", async () => {
-      stubInitiative({ join_policy: "open" }, [400, "INITIATIVE_AUTO_JOIN_REQUIRES_OPEN"]);
-
-      renderMembers();
-
-      await userEvent.click(await screen.findByLabelText(AUTO_JOIN_LABEL));
-
-      await waitFor(() =>
-        expect(toast.error).toHaveBeenCalledWith(
-          "Auto-join is only available for initiatives anyone can join"
-        )
-      );
-    });
+        await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message));
+      }
+    );
   });
 
   describe("requests to join", () => {
@@ -379,6 +332,7 @@ describe("MembersPage", () => {
       const answered = stubQueue();
 
       renderMembers("admin", { appClient: true });
+      expect(await screen.findByText("Requests to join")).toBeInTheDocument();
       await userEvent.click(await screen.findByRole("button", { name: /Approve/ }));
 
       await waitFor(() => expect(answered).toEqual(["approve:11"]));

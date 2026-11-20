@@ -32,6 +32,28 @@ vi.mock("@/lib/csv", () => ({ downloadBlob: vi.fn() }));
 const INITIATIVE_ID = 1;
 const PROJECT_ID = 1;
 
+/** A calendar as the list serves it; `initiative_id: null` makes it the community's. */
+const calendarOf = (id: number, name: string, overrides: Record<string, unknown> = {}) => ({
+  id,
+  name,
+  description: null,
+  color: "#6366f1",
+  initiative_id: INITIATIVE_ID,
+  community_id: 1,
+  created_by: 1,
+  created_by_kind: ActorKind.member,
+  created_by_install: null,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+  can: writerCan(),
+  comments_enabled: true,
+  archived_at: null,
+  tags: [],
+  grants: [],
+  properties: [],
+  ...overrides,
+});
+
 /** A day comfortably inside the focus month, so it lands in every view. */
 const inFocusMonth = (dayOffset: number) => {
   const d = startOfMonth(new Date());
@@ -209,54 +231,8 @@ describe("CalendarsView calendar-entries query", () => {
     expect(screen.queryByText("Apollo task")).toBeNull();
   });
 
-  it("heads the tab's toolbar with the calendar picker, under the initiative's own title", async () => {
-    stubEntries({}, [
-      {
-        id: 3,
-        name: "Team",
-        description: null,
-        color: "#6366f1",
-        initiative_id: INITIATIVE_ID,
-        community_id: 1,
-        created_by: 1,
-        created_by_kind: ActorKind.member,
-        created_by_install: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        can: writerCan(),
-        comments_enabled: true,
-        archived_at: null,
-        tags: [],
-        grants: [],
-      },
-    ]);
-    renderCalendars();
-
-    const heading = await screen.findByRole("heading", { level: 2, name: /all calendars/i });
-    expect(within(heading).getByRole("button", { name: /all calendars/i })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
-  });
-
   it("fetches where the date range meets the month on screen, and exports the range", async () => {
-    const calendar = {
-      id: 3,
-      name: "Team",
-      description: null,
-      color: "#6366f1",
-      initiative_id: INITIATIVE_ID,
-      community_id: 1,
-      created_by: 1,
-      created_by_kind: ActorKind.member,
-      created_by_install: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      can: writerCan(),
-      comments_enabled: true,
-      archived_at: null,
-      tags: [],
-      grants: [],
-    };
-    const requests = stubEntries({}, [calendar]);
+    const requests = stubEntries({}, [calendarOf(3, "Team")]);
     const exports: URLSearchParams[] = [];
     server.use(
       communityHttp.get("/exports/events", ({ request }) => {
@@ -361,29 +337,16 @@ describe("CalendarsView presets", () => {
 });
 
 describe("CalendarsView subscribing on an initiative's tab", () => {
-  it("offers a link for each of the initiative's calendars", async () => {
-    const calendar = (id: number, name: string) => ({
-      id,
-      name,
-      description: null,
-      color: "#6366f1",
-      initiative_id: INITIATIVE_ID,
-      community_id: 1,
-      created_by: 1,
-      created_by_kind: ActorKind.member,
-      created_by_install: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      can: writerCan(),
-      comments_enabled: true,
-      archived_at: null,
-      tags: [],
-      grants: [],
-    });
-    stubEntries({}, [calendar(7, "Rehearsals"), calendar(8, "Matches")]);
+  it("heads the toolbar with the calendar picker, and offers a link for each calendar", async () => {
+    stubEntries({}, [calendarOf(7, "Rehearsals"), calendarOf(8, "Matches")]);
     const user = userEvent.setup();
 
     renderCalendars();
+    // Under the initiative's own title, so not a page heading of its own.
+    const heading = await screen.findByRole("heading", { level: 2, name: /all calendars/i });
+    expect(within(heading).getByRole("button", { name: /all calendars/i })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+
     const dialog = await subscribeFromMenu(user);
 
     expect(within(dialog).getByText("Rehearsals")).toBeInTheDocument();
@@ -394,25 +357,10 @@ describe("CalendarsView subscribing on an initiative's tab", () => {
 
 describe("CalendarsView on a community calendar", () => {
   /** The calendar the plug-in mounts: community-level, so it belongs to no initiative. */
-  const communityCalendar = {
-    id: 42,
-    name: "Community calendar",
-    description: null,
-    color: "#6366f1",
+  const communityCalendar = calendarOf(42, "Community calendar", {
     initiative_id: null,
-    community_id: 1,
-    created_by: 1,
-    created_by_kind: ActorKind.member,
-    created_by_install: null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    can: writerCan(),
-    comments_enabled: true,
-    archived_at: null,
-    tags: [],
     properties: [],
-    grants: [],
-  };
+  });
 
   it("starts a new event at the clicked hour", async () => {
     server.use(
@@ -483,24 +431,8 @@ describe("CalendarsView on a community calendar", () => {
 });
 
 describe("CalendarsView on the calendar plug-in's own surface", () => {
-  const communityCalendar = (id: number, name: string) => ({
-    id,
-    name,
-    description: null,
-    color: "#6366f1",
-    initiative_id: null,
-    community_id: 1,
-    created_by: 1,
-    created_by_kind: ActorKind.member,
-    created_by_install: null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    can: writerCan(),
-    comments_enabled: true,
-    archived_at: null,
-    tags: [],
-    grants: [],
-  });
+  const communityCalendar = (id: number, name: string) =>
+    calendarOf(id, name, { initiative_id: null });
 
   /** Serve the community's calendars, recording what the page asked for. */
   function stubCommunityScope(
@@ -544,7 +476,7 @@ describe("CalendarsView on the calendar plug-in's own surface", () => {
     });
   }
 
-  it("asks for the community's own calendars and overlays all of them", async () => {
+  it("asks for the community's own calendars, overlays them all and titles itself with the picker", async () => {
     const { entries, calendarList } = stubCommunityScope([
       communityCalendar(42, "Holidays"),
       communityCalendar(43, "Game nights"),
@@ -564,6 +496,19 @@ describe("CalendarsView on the calendar plug-in's own surface", () => {
     expect(entries[0].getAll("calendar_ids")).toEqual([]);
     expect(entries[0].get("include_tasks")).toBe("false");
     expect(entries[0].get("initiative_id")).toBeNull();
+
+    // The picker is the page's title: this surface has no other filter, so
+    // there is no disclosure to open before reaching it.
+    const title = await screen.findByRole("heading", { level: 1, name: "All calendars" });
+    expect(within(title).getByRole("button", { name: "All calendars" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /filters/i })).toBeNull();
+    // Adding a calendar is offered on a populated surface too, not only from
+    // the empty state.
+    expect(screen.getByRole("button", { name: /new calendar/i })).toBeInTheDocument();
+
+    const dialog = await subscribeFromMenu(userEvent.setup());
+    expect(within(dialog).getByText("Holidays")).toBeInTheDocument();
+    expect(within(dialog).getByText("Game nights")).toBeInTheDocument();
   });
 
   const midsummer = {
@@ -580,16 +525,6 @@ describe("CalendarsView on the calendar plug-in's own surface", () => {
     tags: [],
     can: writerCan(),
   };
-
-  it("offers a link for each of the community's own calendars", async () => {
-    stubCommunityScope([communityCalendar(42, "Holidays"), communityCalendar(43, "Game nights")]);
-
-    renderCommunityScope();
-    const dialog = await subscribeFromMenu(userEvent.setup());
-
-    expect(within(dialog).getByText("Holidays")).toBeInTheDocument();
-    expect(within(dialog).getByText("Game nights")).toBeInTheDocument();
-  });
 
   it("offers no Subscribe where the community does not take this member's keys", async () => {
     stubCommunityScope([communityCalendar(42, "Holidays")]);
@@ -658,21 +593,6 @@ describe("CalendarsView on the calendar plug-in's own surface", () => {
     await waitFor(() => expect(exports).toHaveLength(2));
     expect(exports[1].get("scope")).toBe("community");
     expect(exports[1].getAll("exclude_calendar_ids")).toEqual(["42"]);
-  });
-
-  it("titles the page with the picker and puts the way to add a calendar on it", async () => {
-    stubCommunityScope([communityCalendar(42, "Holidays"), communityCalendar(43, "Game nights")]);
-
-    renderCommunityScope();
-
-    // The picker is the page's title: this surface has no other filter, so
-    // there is no disclosure to open before reaching it.
-    const title = await screen.findByRole("heading", { level: 1, name: "All calendars" });
-    expect(within(title).getByRole("button", { name: "All calendars" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /filters/i })).toBeNull();
-    // Adding a calendar is offered on a populated surface too, not only from
-    // the empty state.
-    expect(screen.getByRole("button", { name: /new calendar/i })).toBeInTheDocument();
   });
 
   it("says how many calendars are showing, and shows them all again from the top", async () => {

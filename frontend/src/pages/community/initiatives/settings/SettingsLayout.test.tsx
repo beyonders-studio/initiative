@@ -1,16 +1,12 @@
 import { screen } from "@testing-library/react";
 import { HttpResponse } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { buildCommunity, buildInitiative, initiativeCan } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { UserRead } from "@/api/generated/initiativeAPI.schemas";
-
-vi.mock("@/lib/mascotToast", () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
-}));
 
 import { SettingsLayout } from "./SettingsLayout";
 
@@ -46,7 +42,7 @@ const renderLayout = ({
  * How the bar itself behaves — naming every section, navigating to the one a
  * tab names, lighting the one the address names — is the shared
  * `SettingsTabsNav`, proved once in
- * `src/pages/community/tools/settings/ToolSettingsLayout.test.tsx`. What is left
+ * `src/pages/community/tools/settings/SettingsLayout.test.tsx`. What is left
  * here is who gets a bar at all, which only this layout decides.
  */
 describe("SettingsLayout", () => {

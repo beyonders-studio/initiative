@@ -70,19 +70,13 @@ const open = async (onAdd = vi.fn()) => {
 const list = () => screen.getByRole("list", { name: "Widgets" });
 
 describe("WidgetPicker", () => {
-  it("offers every widget in one list, named by the widget itself", async () => {
-    await open();
-    const rows = within(list()).getAllByRole("button");
-    expect(rows.map((row) => row.textContent?.split(/(?=[A-Z])/)[0])).toHaveLength(2);
-    expect(within(list()).getByRole("button", { name: /^Chart/ })).toBeInTheDocument();
-    expect(within(list()).getByRole("button", { name: /^Stat/ })).toBeInTheDocument();
-  });
-
-  it("does not list presets separately from the widget they are made of", async () => {
+  it("offers every widget in one list, named by the widget itself, presets folded in", async () => {
     await open();
     // `bar_chart` is in the catalog; it must not appear as its own row, because
     // it is the chart widget with an option set — which the card offers.
     expect(within(list()).getAllByRole("button")).toHaveLength(2);
+    expect(within(list()).getByRole("button", { name: /^Chart/ })).toBeInTheDocument();
+    expect(within(list()).getByRole("button", { name: /^Stat/ })).toBeInTheDocument();
     expect(screen.queryByText(/ready-made/i)).toBeNull();
   });
 

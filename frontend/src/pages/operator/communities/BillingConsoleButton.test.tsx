@@ -18,18 +18,17 @@ const renderButton = () =>
   );
 
 describe("BillingConsoleButton", () => {
-  it.each(["web", "android", "electron"])("opens the portal on %s", (platform) => {
+  it.each([
+    ["web", true],
+    ["android", true],
+    ["electron", true],
+    // The plan shows on an iPhone without a way to open the portal.
+    ["ios", false],
+  ])("on %s, shows the plan, and a button: %s", (platform, button) => {
     vi.spyOn(Capacitor, "getPlatform").mockReturnValue(platform);
     renderButton();
 
-    expect(screen.getByRole("button", { name: "Gold" })).toBeInTheDocument();
-  });
-
-  it("shows the plan on an iPhone without a way to open the portal", () => {
-    vi.spyOn(Capacitor, "getPlatform").mockReturnValue("ios");
-    renderButton();
-
     expect(screen.getByText("Gold")).toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.queryAllByRole("button")).toHaveLength(button ? 1 : 0);
   });
 });

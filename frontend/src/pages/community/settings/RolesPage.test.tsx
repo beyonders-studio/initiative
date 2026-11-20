@@ -52,18 +52,7 @@ describe("RolesPage", () => {
     );
   });
 
-  it("lists the built-in roles, beside the way to add one", async () => {
-    setup();
-
-    expect(await screen.findByText("Superadmin")).toBeInTheDocument();
-    expect(screen.getByText("Admin")).toBeInTheDocument();
-    expect(screen.getByText("Member")).toBeInTheDocument();
-    // Guests are off unless the deployment turns them on.
-    expect(screen.queryByText("Guest")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add role" })).toBeInTheDocument();
-  });
-
-  it("makes a role for members holding only what a member may hold", async () => {
+  it("lists the built-in roles, and makes one for members holding only what a member may hold", async () => {
     const sent: CustomRoleCreate[] = [];
     server.use(
       communityHttp.post("/custom-roles/", async ({ request }) => {
@@ -75,6 +64,12 @@ describe("RolesPage", () => {
     const user = userEvent.setup();
     setup();
 
+    // The built-in roles sit beside the way to add one.
+    expect(await screen.findByText("Superadmin")).toBeInTheDocument();
+    expect(screen.getByText("Admin")).toBeInTheDocument();
+    expect(screen.getByText("Member")).toBeInTheDocument();
+    // Guests are off unless the deployment turns them on.
+    expect(screen.queryByText("Guest")).not.toBeInTheDocument();
     const { dialog, offered } = await fillNewRole(user);
     expect(offered).toHaveLength(6);
     await user.click(within(dialog).getByRole("button", { name: "Add role" }));

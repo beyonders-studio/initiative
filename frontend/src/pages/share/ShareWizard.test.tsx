@@ -109,20 +109,16 @@ describe("ShareWizard", () => {
     expect(screen.queryByText("File")).not.toBeInTheDocument();
   });
 
-  it("offers every kind for a share of pictures", async () => {
-    renderWizard(vi.fn(), { ...share, title: "", texts: [], files: [PNG] });
-
-    for (const kind of ["Task", "Document", "File", "Post"]) {
-      expect(await screen.findByText(kind)).toBeInTheDocument();
-    }
-  });
-
-  it("offers only an upload for a share that is only a PDF", async () => {
-    renderWizard(vi.fn(), { ...share, title: "", texts: [], files: [PDF] });
+  // Every kind for a share of pictures; only an upload for a share that is only a PDF.
+  it.each([
+    [PNG, ["Task", "Document", "File", "Post"]],
+    [PDF, ["File"]],
+  ])("offers what a share of %o can become", async (file, offered) => {
+    renderWizard(vi.fn(), { ...share, title: "", texts: [], files: [file] });
 
     expect(await screen.findByText("File")).toBeInTheDocument();
     for (const kind of ["Task", "Document", "Post"]) {
-      expect(screen.queryByText(kind)).not.toBeInTheDocument();
+      expect(screen.queryByText(kind) !== null).toBe(offered.includes(kind));
     }
   });
 
@@ -139,6 +135,8 @@ describe("ShareWizard", () => {
     const name = await screen.findByLabelText("Name for minutes.pdf");
     expect(name).toHaveValue("minutes");
     await user.clear(name);
+    // A file with no name is not uploaded.
+    expect(screen.getByRole("button", { name: "Upload 2 files" })).toBeDisabled();
     await user.type(name, "Committee minutes");
     expect(screen.getByLabelText("Name for cat.png")).toHaveValue("cat");
 
@@ -156,19 +154,7 @@ describe("ShareWizard", () => {
     );
   });
 
-  it("will not upload a file with no name", async () => {
-    shownCommunities = [communities[0]];
-    initiativesResult = oneInitiative;
-    const user = userEvent.setup();
-    renderWizard(vi.fn(), { ...share, texts: [], files: [PDF] });
-
-    await user.click(await screen.findByText("File"));
-    await user.clear(await screen.findByLabelText("Name for minutes.pdf"));
-
-    expect(screen.getByRole("button", { name: "Upload file" })).toBeDisabled();
-  });
-
-  it("says which files a document leaves out", async () => {
+  it("walks past a choice there is only one of, and says which files a document leaves out", async () => {
     shownCommunities = [communities[0]];
     initiativesResult = oneInitiative;
     const user = userEvent.setup();
@@ -176,8 +162,10 @@ describe("ShareWizard", () => {
 
     await user.click(await screen.findByText("Document"));
 
+    expect(await screen.findByText("Anvil Club > Spring Play")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create document" })).toBeInTheDocument();
     expect(
-      await screen.findByText("1 file isn't a picture, so it stays out. Choose File to upload it.")
+      screen.getByText("1 file isn't a picture, so it stays out. Choose File to upload it.")
     ).toBeInTheDocument();
   });
 
@@ -223,18 +211,6 @@ describe("ShareWizard", () => {
     expect(creatableFor).toHaveBeenCalledWith("post", 8);
   });
 
-  it("walks past a choice there is only one of", async () => {
-    shownCommunities = [communities[0]];
-    initiativesResult = oneInitiative;
-    const user = userEvent.setup();
-    renderWizard();
-
-    await user.click(await screen.findByText("Document"));
-
-    expect(await screen.findByText("Anvil Club > Spring Play")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Create document" })).toBeInTheDocument();
-  });
-
   const BELLWETHER_POST = {
     post: {
       communityId: 8,
@@ -272,7 +248,7 @@ describe("ShareWizard", () => {
     expect(screen.queryByText("Last used")).not.toBeInTheDocument();
   });
 
-  it("remembers where it shared, under this server", async () => {
+  it("says why a title with a sigil cannot be used, and remembers where it shared, under this server", async () => {
     shownCommunities = [communities[0]];
     initiativesResult = oneInitiative;
     landShare.mockResolvedValueOnce("/c/3/i/4/posts/9");
@@ -280,7 +256,15 @@ describe("ShareWizard", () => {
     const onDone = renderWizard();
 
     await user.click(await screen.findByText("Post"));
-    await user.click(await screen.findByRole("button", { name: "Post" }));
+    const title = await screen.findByLabelText("Title");
+    await user.clear(title);
+    await user.type(title, "Ask @moss");
+    expect(screen.getByText("Names and titles can’t contain # or @.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Post" })).toBeDisabled();
+    await user.clear(title);
+    await user.type(title, "A great article");
+
+    await user.click(screen.getByRole("button", { name: "Post" }));
     await vi.waitFor(() => expect(onDone).toHaveBeenCalled());
 
     const saved = JSON.parse(stored.get("initiative-last-share-destination") ?? "{}");
@@ -294,21 +278,6 @@ describe("ShareWizard", () => {
         },
       },
     });
-  });
-
-  it("says why a title with a sigil cannot be used", async () => {
-    shownCommunities = [communities[0]];
-    initiativesResult = oneInitiative;
-    const user = userEvent.setup();
-    renderWizard();
-
-    await user.click(await screen.findByText("Post"));
-    const title = await screen.findByLabelText("Title");
-    await user.clear(title);
-    await user.type(title, "Ask @moss");
-
-    expect(screen.getByText("Names and titles can’t contain # or @.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Post" })).toBeDisabled();
   });
 
   it("puts the share down on Cancel", async () => {

@@ -148,18 +148,19 @@ describe("PluginPlacementPanel", () => {
     await waitFor(() => expect(sent[2]).toEqual({ placed_initiative_ids: [2] }));
   });
 
-  it("places the plug-in in every current initiative in one choice", async () => {
-    renderPage(() => <PluginPlacementPanel plugin={plugin([1])} />);
-
-    (await screen.findByLabelText("Every current initiative")).click();
-    await waitFor(() => expect(sent).toEqual([{ placed_initiative_ids: [1, 2] }]));
-  });
-
-  it("reads a plug-in placed in every initiative as every current one", async () => {
+  it("reads a plug-in placed in every initiative as every current one, linking every placement's roles", async () => {
     renderPage(() => <PluginPlacementPanel plugin={plugin([1, 2])} />);
 
     expect(await screen.findByLabelText("Every current initiative")).toBeChecked();
     expect(screen.queryByLabelText("Platform")).toBeNull();
+    expect(screen.getByRole("link", { name: "Roles in Platform" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Roles in Marketing" })).toBeTruthy();
+
+    // Choosing to pick shows the current placements and saves nothing.
+    (await screen.findByLabelText("Only the initiatives I choose")).click();
+    expect(await screen.findByLabelText("Platform")).toBeChecked();
+    expect(screen.getByLabelText("Marketing")).toBeChecked();
+    expect(sent).toEqual([]);
   });
 
   describe("every initiative in the community", () => {
@@ -173,21 +174,6 @@ describe("PluginPlacementPanel", () => {
       (await screen.findByLabelText("Every current initiative")).click();
       await waitFor(() => expect(sent).toEqual([{ placed_initiative_ids: [1, 2] }]));
     });
-
-    it("does not read as every initiative while one the admin never joined is missing", async () => {
-      renderPage(() => <PluginPlacementPanel plugin={plugin([1])} />);
-
-      expect(await screen.findByLabelText("Only the initiatives I choose")).toBeChecked();
-    });
-  });
-
-  it("choosing to pick shows the current placements and saves nothing", async () => {
-    renderPage(() => <PluginPlacementPanel plugin={plugin([1, 2])} />);
-
-    (await screen.findByLabelText("Only the initiatives I choose")).click();
-    expect(await screen.findByLabelText("Platform")).toBeChecked();
-    expect(screen.getByLabelText("Marketing")).toBeChecked();
-    expect(sent).toEqual([]);
   });
 
   describe("where its roles are set", () => {
@@ -197,17 +183,12 @@ describe("PluginPlacementPanel", () => {
       renderPage(() => <PluginPlacementPanel plugin={plugin([1])} />);
 
       await screen.findByLabelText("Platform");
+      // Not every initiative while one the admin never joined is missing.
+      expect(screen.getByLabelText("Only the initiatives I choose")).toBeChecked();
       expect(rolesLink("Platform")?.getAttribute("href")).toMatch(/\/i\/1\/settings\/roles$/);
       // Marketing is not placed, so its roles have nothing of the plug-in.
       expect(rolesLink("Marketing")).toBeNull();
       expect(screen.getByText(/Each initiative's roles say who uses it there/)).toBeTruthy();
-    });
-
-    it("links every placement when placed everywhere", async () => {
-      renderPage(() => <PluginPlacementPanel plugin={plugin([1, 2])} />);
-
-      expect(await screen.findByRole("link", { name: "Roles in Platform" })).toBeTruthy();
-      expect(rolesLink("Marketing")).toBeTruthy();
     });
 
     it("links no roles for a plug-in with no page inside initiatives", async () => {

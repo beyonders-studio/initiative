@@ -1,46 +1,21 @@
 import { screen } from "@testing-library/react";
 import { HttpResponse } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { buildCommunity } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
-import type { useCommunities } from "@/hooks/useCommunities";
 
 import { CommunityExportCard } from "./CommunityExportCard";
 
-vi.mock("@/lib/mascotToast", () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
-}));
-vi.mock("@/lib/exportDownload", () => ({
-  downloadExportArtifact: vi.fn(),
-}));
-
-const activeCommunity = buildCommunity({ id: 1, name: "Test Community", role: "superadmin" });
-const communitiesValue: ReturnType<typeof useCommunities> = {
-  communities: [activeCommunity],
-  activeCommunityId: 1,
-  activeCommunity,
-  activeCommunityReadOnly: false,
-  loading: false,
-  error: null,
-  refreshCommunities: vi.fn(),
-  switchCommunity: vi.fn(),
-  syncCommunityFromUrl: vi.fn(),
-  createCommunity: vi.fn(),
-  updateCommunityInState: vi.fn(),
-  reorderCommunities: vi.fn(),
-  canCreateCommunities: true,
-};
-
 // Taking the whole community out in one file is the seat's errand, and the
-// card says so itself rather than resting on which tab it sits in. Partial:
-// the render helper reaches for ``CommunityContext`` from this module.
-vi.mock(import("@/hooks/useCommunities"), async (importOriginal) => ({
-  ...(await importOriginal()),
-  useCommunities: () => communitiesValue,
-}));
+// card says so itself rather than resting on which tab it sits in.
+const activeCommunity = buildCommunity({ id: 1, name: "Test Community", role: "superadmin" });
+const render = () =>
+  renderWithProviders(<CommunityExportCard />, {
+    communities: { communities: [activeCommunity], activeCommunityId: 1, activeCommunity },
+  });
 
 const now = new Date();
 const iso = (offsetMs: number) => new Date(now.getTime() + offsetMs).toISOString();
@@ -76,7 +51,7 @@ const status = (o: Record<string, unknown> = {}) =>
 describe("CommunityExportCard", () => {
   it("names who took the last export and offers it back", async () => {
     server.use(status({ latest: job(), latest_started_by: "Ada Lovelace" }));
-    renderWithProviders(<CommunityExportCard />);
+    render();
 
     expect(await screen.findByText(/Ada Lovelace/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /download/i })).toBeInTheDocument();
@@ -91,7 +66,7 @@ describe("CommunityExportCard", () => {
         next_available_at: iso(2 * 86_400_000),
       })
     );
-    renderWithProviders(<CommunityExportCard />);
+    render();
 
     expect(await screen.findByText(/next export available/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /export/i })).toBeDisabled();
@@ -101,7 +76,7 @@ describe("CommunityExportCard", () => {
 
   it("says so when nobody has taken one", async () => {
     server.use(status());
-    renderWithProviders(<CommunityExportCard />);
+    render();
 
     expect(await screen.findByText(/nobody has exported this community yet/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /export/i })).toBeEnabled();

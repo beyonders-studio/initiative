@@ -17,7 +17,7 @@ const entitlements = (bannerImageEnabled: boolean) =>
   );
 
 describe("CommunityArtworkPanel", () => {
-  it("offers a banner upload where the community has artwork on its plan", async () => {
+  it("offers a banner upload where the community has artwork on its plan, and text in two colours", async () => {
     entitlements(true);
 
     renderWithProviders(
@@ -25,9 +25,14 @@ describe("CommunityArtworkPanel", () => {
     );
 
     expect(await screen.findByLabelText("Banner")).toBeInTheDocument();
+    // Banner text is two colours, never a picker: a fill the community picked, or
+    // artwork of any colour, stays readable only at one end of the scale or the other.
+    expect(screen.getByRole("button", { name: "Light" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Dark" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByLabelText("Banner text")).not.toBeInTheDocument();
   });
 
-  it("offers the colour alone where it does not", async () => {
+  it("offers the colour alone where it does not, and the icon still", async () => {
     entitlements(false);
 
     renderWithProviders(
@@ -40,6 +45,8 @@ describe("CommunityArtworkPanel", () => {
     // The label stays — the banner still exists as a thing this community has.
     expect(screen.queryByLabelText("Banner")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Banner fill")).toBeInTheDocument();
+    // The icon is not part of that entitlement.
+    expect(screen.getByLabelText("Icon")).toBeInTheDocument();
   });
 
   it("keeps showing a banner the community already had", async () => {
@@ -121,33 +128,6 @@ describe("CommunityArtworkPanel", () => {
     expect(screen.queryByRole("button", { name: /use this colour/i })).not.toBeInTheDocument();
   });
 
-  it("offers banner text as two colours, never a picker", async () => {
-    entitlements(true);
-
-    renderWithProviders(
-      <CommunityArtworkPanel community={buildCommunity({ id: 1, role: "admin" })} />
-    );
-
-    // Black or white only: a fill the community picked, or artwork of any colour,
-    // stays readable only at one end of the scale or the other.
-    expect(await screen.findByRole("button", { name: "Light" })).toHaveAttribute(
-      "aria-pressed",
-      "true"
-    );
-    expect(screen.getByRole("button", { name: "Dark" })).toHaveAttribute("aria-pressed", "false");
-    expect(screen.queryByLabelText("Banner text")).not.toBeInTheDocument();
-  });
-
-  it("always offers the icon — it is not part of that entitlement", async () => {
-    entitlements(false);
-
-    renderWithProviders(
-      <CommunityArtworkPanel community={buildCommunity({ id: 1, role: "admin" })} />
-    );
-
-    expect(await screen.findByLabelText("Icon")).toBeInTheDocument();
-  });
-
   it("saves the alignment the moment it is picked, with the fade beside it", async () => {
     entitlements(true);
     const patched: Record<string, unknown>[] = [];
@@ -176,29 +156,19 @@ describe("CommunityArtworkPanel", () => {
       />
     );
 
-    await userEvent.click(await screen.findByRole("button", { name: "Left" }));
-
-    await waitFor(() => expect(patched).toHaveLength(1));
-    // The whole banner rides together, so a PATCH carries the community's own fade
-    // rather than resetting the part the admin did not touch.
-    expect(patched[0]).toMatchObject({ banner: { text_align: "left", fade: "weak" } });
-  });
-
-  it("offers three fades, with the community's own already pressed", async () => {
-    entitlements(true);
-
-    renderWithProviders(
-      <CommunityArtworkPanel
-        community={buildCommunity({ id: 1, role: "admin", banner: buildBanner({ fade: "weak" }) })}
-      />
-    );
-
+    // Three fades, with the community's own already pressed.
     expect(await screen.findByRole("button", { name: "Soft" })).toHaveAttribute(
       "aria-pressed",
       "true"
     );
     expect(screen.getByRole("button", { name: "None" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("button", { name: "Strong" })).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(screen.getByRole("button", { name: "Left" }));
+
+    await waitFor(() => expect(patched).toHaveLength(1));
+    // The whole banner rides together, so a PATCH carries the community's own fade
+    // rather than resetting the part the admin did not touch.
+    expect(patched[0]).toMatchObject({ banner: { text_align: "left", fade: "weak" } });
   });
 
   it("puts the layout back along with the colours on a reset", async () => {

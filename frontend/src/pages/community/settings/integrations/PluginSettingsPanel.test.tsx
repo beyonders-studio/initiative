@@ -52,7 +52,8 @@ beforeEach(() => {
 });
 
 describe("PluginSettingsPanel", () => {
-  it("shows what a setting holds, what it is for, and the earlier values", async () => {
+  it("shows what a setting holds, what it is for, and the earlier values, and saves a new one", async () => {
+    const sent = answerSave(() => HttpResponse.json({}));
     render();
 
     expect(await screen.findByLabelText("Task prefix")).toHaveValue("acme");
@@ -60,11 +61,6 @@ describe("PluginSettingsPanel", () => {
     expect(screen.getByText(/acmeold, acorp/)).toBeInTheDocument();
     // Nothing to save until it changes.
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
-  });
-
-  it("saves the new value", async () => {
-    const sent = answerSave(() => HttpResponse.json({}));
-    render();
 
     await rename("acmeco");
 

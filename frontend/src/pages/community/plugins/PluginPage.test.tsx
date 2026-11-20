@@ -195,37 +195,10 @@ const announceReady = () =>
   );
 
 describe("PluginPage", () => {
-  it("hands the first surface's token to the frame that asked", async () => {
-    mint.mockImplementation((surfaceId: string) => Promise.resolve(handoff(surfaceId)));
-    const { PluginPage } = await import("./PluginPage");
-    renderPage(() => <PluginPage pluginId={1} />);
-
-    await screen.findByTitle("Automations");
-    await announceReady();
-  });
-
-  it("sends the reader's appearance with the token", async () => {
+  it("hands the first surface's token to the frame that asked, with the reader's appearance and clock", async () => {
     // The page opens already wearing this page's theme: the resolved mode and
     // the effective palette ride the handoff, since an iframe on another
     // origin cannot read this document's custom properties.
-    mint.mockImplementation((surfaceId: string) => Promise.resolve(handoff(surfaceId)));
-    const { PluginPage } = await import("./PluginPage");
-    renderPage(() => <PluginPage pluginId={1} />);
-
-    await screen.findByTitle("Automations");
-    await announceReady();
-
-    const message = postSpy.mock.calls
-      .map(([sent]) => sent as { type: string; theme?: string; theme_colors?: unknown })
-      .find((sent) => sent.type === "initiative-plugin:handoff");
-    expect(message?.theme).toBe("light");
-    expect(message?.theme_colors).toMatchObject({
-      "--background": expect.stringMatching(/^oklch\(/),
-      "--foreground": expect.stringMatching(/^oklch\(/),
-    });
-  });
-
-  it("sends the reader's clock with the token, and when it changes", async () => {
     setClock({ timeFormat: "24", weekStart: 1 });
     try {
       mint.mockImplementation((surfaceId: string) => Promise.resolve(handoff(surfaceId)));
@@ -235,12 +208,21 @@ describe("PluginPage", () => {
       await screen.findByTitle("Automations");
       await announceReady();
 
-      type Sent = { type: string; time_format?: string; week_start?: number };
+      type Sent = {
+        type: string;
+        theme?: string;
+        theme_colors?: unknown;
+        time_format?: string;
+        week_start?: number;
+      };
       const sent = () => postSpy.mock.calls.map(([message]) => message as Sent);
-      expect(sent().find((m) => m.type === "initiative-plugin:handoff")).toMatchObject({
-        time_format: "24",
-        week_start: 1,
+      const message = sent().find((m) => m.type === "initiative-plugin:handoff");
+      expect(message?.theme).toBe("light");
+      expect(message?.theme_colors).toMatchObject({
+        "--background": expect.stringMatching(/^oklch\(/),
+        "--foreground": expect.stringMatching(/^oklch\(/),
       });
+      expect(message).toMatchObject({ time_format: "24", week_start: 1 });
 
       act(() => setClock({ weekStart: 6 }));
       expect(
@@ -256,28 +238,23 @@ describe("PluginPage", () => {
     }
   });
 
-  it("says with the token whether the host may sell here", async () => {
-    // A plug-in's page hides its own purchase copy where the host may not sell.
-    mint.mockImplementation((surfaceId: string) => Promise.resolve(handoff(surfaceId)));
-    const { PluginPage } = await import("./PluginPage");
-    const handoffSent = () =>
-      postSpy.mock.calls
-        .map(([sent]) => sent as { type: string; sells?: unknown })
-        .find((sent) => sent.type === "initiative-plugin:handoff");
-
-    const { unmount } = renderPage(() => <PluginPage pluginId={1} />);
-    await screen.findByTitle("Automations");
-    await announceReady();
-    expect(handoffSent()?.sells).toBe(false);
-    unmount();
-
-    postSpy.mockClear();
-    sale.canSell = true;
-    renderPage(() => <PluginPage pluginId={1} />);
-    await screen.findByTitle("Automations");
-    await announceReady();
-    expect(handoffSent()?.sells).toBe(true);
-  });
+  it.each([false, true])(
+    "says with the token whether the host may sell here (%s)",
+    async (sells) => {
+      // A plug-in's page hides its own purchase copy where the host may not sell.
+      sale.canSell = sells;
+      mint.mockImplementation((surfaceId: string) => Promise.resolve(handoff(surfaceId)));
+      const { PluginPage } = await import("./PluginPage");
+      renderPage(() => <PluginPage pluginId={1} />);
+      await screen.findByTitle("Automations");
+      await announceReady();
+      expect(
+        postSpy.mock.calls
+          .map(([sent]) => sent as { type: string; sells?: unknown })
+          .find((sent) => sent.type === "initiative-plugin:handoff")?.sells
+      ).toBe(sells);
+    }
+  );
 
   it("frames no page served from the app's own origin", async () => {
     mint.mockImplementation((surfaceId: string) =>
@@ -350,7 +327,7 @@ describe("PluginPage, read inside an initiative", () => {
     mint.mockImplementation((surfaceId: string) => Promise.resolve(handoff(surfaceId)));
   });
 
-  it("offers the surfaces that asked to render here, and no others", async () => {
+  it("offers the surfaces that asked to render here, minted through the initiative's route", async () => {
     const { PluginPage } = await import("./PluginPage");
     renderPage(() => <PluginPage pluginId={1} initiativeId={4} />);
 
@@ -359,14 +336,6 @@ describe("PluginPage, read inside an initiative", () => {
     // no tab strip at all, so the name appears nowhere.
     expect(screen.queryByText("One")).toBeNull();
     expect(screen.queryByText("Two")).toBeNull();
-    await waitFor(() => expect(mint).toHaveBeenCalledWith("inside", expect.anything()));
-  });
-
-  it("mints through the route that names the initiative", async () => {
-    const { PluginPage } = await import("./PluginPage");
-    renderPage(() => <PluginPage pluginId={1} initiativeId={4} />);
-
-    await screen.findByTitle("Automations");
     await waitFor(() =>
       expect(mint).toHaveBeenCalledWith("inside", { scope: "initiative", initiativeId: 4 })
     );
@@ -393,21 +362,13 @@ describe("PluginPage, who a plug-in comes from", () => {
     listingRef = { id: 9, source: "registry", publisher: "Acme Apps", first_party: false };
   });
 
-  it("offers to report the plug-in on every platform", async () => {
-    const { PluginPage } = await import("./PluginPage");
-    renderPage(() => <PluginPage pluginId={1} />);
-
-    await screen.findByTitle("Automations");
-    expect(screen.getByRole("button", { name: "Report" })).toBeInTheDocument();
-  });
-
-  it("opens straight away on the web, with no notice", async () => {
-    listingRef = { id: 9, source: "operator", publisher: "Acme Apps", first_party: false };
+  it("opens straight away on the web, with no notice, and offers to report it", async () => {
     const { PluginPage } = await import("./PluginPage");
     renderPage(() => <PluginPage pluginId={1} />);
 
     await screen.findByTitle("Automations");
     expect(screen.queryByText("Before you open Automations")).toBeNull();
+    expect(screen.getByRole("button", { name: "Report" })).toBeInTheDocument();
   });
 
   it("says who made it once per member on an iPhone, before anything opens", async () => {

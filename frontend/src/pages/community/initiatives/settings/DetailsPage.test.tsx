@@ -123,26 +123,16 @@ describe("DetailsPage", () => {
    * answered, and reported.
    */
   describe("tool switches", () => {
-    it("asks who a tool is for instead of turning it straight on", async () => {
-      const patches = stubInitiative();
-      stubRoles([managerRole(), memberRole()]);
-
-      renderDetails();
-
-      await userEvent.click(await screen.findByRole("switch", { name: /Posts/ }));
-
-      expect(await screen.findByRole("dialog")).toHaveTextContent("Turn on Posts");
-      // Nothing is saved until the audience question is answered.
-      expect(patches).toHaveLength(0);
-    });
-
-    it("grants the tool to every ordinary role when it is for everyone", async () => {
+    it("asks who a tool is for, and grants it to every ordinary role when it is for everyone", async () => {
       const initiativePatches = stubInitiative();
       const rolePatches = stubRoles([managerRole(), memberRole()]);
 
       renderDetails();
 
       await userEvent.click(await screen.findByRole("switch", { name: /Posts/ }));
+      expect(await screen.findByRole("dialog")).toHaveTextContent("Turn on Posts");
+      // Nothing is saved until the audience question is answered.
+      expect(initiativePatches).toHaveLength(0);
       await userEvent.click(await screen.findByRole("radio", { name: /Everyone in this/ }));
       await userEvent.click(screen.getByRole("button", { name: "Turn it on" }));
 
@@ -173,22 +163,6 @@ describe("DetailsPage", () => {
       expect(rolePatches).toHaveLength(0);
     });
 
-    it("says who can see a tool that is already on", async () => {
-      stubInitiative({ tools: { post: true } });
-      stubRoles([managerRole(), memberRole({ posts_enabled: true })]);
-
-      renderDetails();
-
-      // Scoped to the Posts row: projects and files are switched on too
-      // now, so the page says "Visible to Member" in several places and only
-      // this one is the answer under test.
-      const postsRow = (await screen.findByRole("switch", { name: /Posts/ })).closest(
-        "[data-slot='tool-card']"
-      );
-      expect(postsRow).not.toBeNull();
-      expect(within(postsRow as HTMLElement).getByText(/Visible to Member/)).toBeInTheDocument();
-    });
-
     it("shows a switch the community set as set, and offers no change", async () => {
       stubInitiative({ tools: { post: true } });
       stubRoles([managerRole(), memberRole({ posts_enabled: true })]);
@@ -206,21 +180,13 @@ describe("DetailsPage", () => {
       expect(within(postsRow).getByText(/sets this for every initiative/)).toBeInTheDocument();
     });
 
-    it("warns when a tool is on but no ordinary role has been given it", async () => {
-      stubInitiative({ tools: { post: true } });
-      stubRoles([managerRole(), memberRole()]);
-
-      renderDetails();
-
-      expect(await screen.findByText(/Only managers can see this/)).toBeInTheDocument();
-    });
-
-    it("grants it to everyone from that warning, without touching the switch", async () => {
+    it("warns when no ordinary role has a tool that is on, and grants it from there without touching the switch", async () => {
       const initiativePatches = stubInitiative({ tools: { post: true } });
       const rolePatches = stubRoles([managerRole(), memberRole()]);
 
       renderDetails();
 
+      expect(await screen.findByText(/Only managers can see this/)).toBeInTheDocument();
       await userEvent.click(
         (await screen.findAllByRole("button", { name: "Give it to everyone" }))[0]
       );
@@ -251,13 +217,18 @@ describe("DetailsPage", () => {
       expect(toast.success).not.toHaveBeenCalledWith(expect.stringContaining("can now see"));
     });
 
-    it("says what turning a tool off hides before it hides it", async () => {
+    it("says who can see a tool that is on, and what turning it off hides before it hides it", async () => {
       const patches = stubInitiative({ tools: { post: true } });
       stubRoles([managerRole(), memberRole({ posts_enabled: true })]);
 
       renderDetails();
 
-      await userEvent.click(await screen.findByRole("switch", { name: /Posts/ }));
+      const posts = await screen.findByRole("switch", { name: /Posts/ });
+      // Scoped to the Posts row: other tools are on too, so the page says
+      // "Visible to Member" in several places.
+      const postsRow = posts.closest("[data-slot='tool-card']") as HTMLElement;
+      expect(within(postsRow).getByText(/Visible to Member/)).toBeInTheDocument();
+      await userEvent.click(posts);
 
       expect(await screen.findByRole("alertdialog")).toHaveTextContent(
         /hides Posts and everything in it from everyone/

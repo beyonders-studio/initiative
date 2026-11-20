@@ -174,10 +174,20 @@ describe("InitiativesPage project managers", () => {
     });
   });
 
-  it("unticking an ordinary manager leaves them in the initiative as a member", async () => {
+  // An ordinary manager stays in the initiative as a member; a community admin
+  // holds no other role there, so their membership goes.
+  it.each([
+    [
+      "an ordinary manager",
+      MEMBER_ID,
+      "Bo Diddley",
+      { method: "PATCH", body: { role_id: MEMBER_ROLE.id } },
+    ],
+    ["a community admin", ADMIN_ID, "Ada Lovelace", { method: "DELETE" }],
+  ])("unticking %s", async (_label, userId, name, call) => {
     const calls = stubTable([
       buildInitiativeMember({
-        user: buildUserSummary({ id: MEMBER_ID, username: "bo" }),
+        user: buildUserSummary({ id: userId }),
         role_id: PM_ROLE.id,
         role_name: "project_manager",
         is_manager: true,
@@ -186,32 +196,10 @@ describe("InitiativesPage project managers", () => {
     const user = userEvent.setup();
     render();
 
-    await pick(user, "Bo Diddley");
+    await pick(user, name);
 
     await waitFor(() => expect(calls).toHaveLength(1));
-    expect(calls[0]).toMatchObject({
-      method: "PATCH",
-      url: String(MEMBER_ID),
-      body: { role_id: MEMBER_ROLE.id },
-    });
-  });
-
-  it("unticking a community admin takes their membership away, since they hold no other role", async () => {
-    const calls = stubTable([
-      buildInitiativeMember({
-        user: buildUserSummary({ id: ADMIN_ID, username: "ada" }),
-        role_id: PM_ROLE.id,
-        role_name: "project_manager",
-        is_manager: true,
-      }),
-    ]);
-    const user = userEvent.setup();
-    render();
-
-    await pick(user, "Ada Lovelace");
-
-    await waitFor(() => expect(calls).toHaveLength(1));
-    expect(calls[0]).toMatchObject({ method: "DELETE", url: String(ADMIN_ID) });
+    expect(calls[0]).toMatchObject({ ...call, url: String(userId) });
   });
 });
 

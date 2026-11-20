@@ -137,19 +137,25 @@ const renderPluginPage = async () => {
   await screen.findByRole("heading", { name: registrations[0].public_id });
 };
 
-describe("PluginServicesPage", () => {
-  beforeEach(() => {
-    registrations = [];
-    listParams = {};
-    createMutate.mockReset();
-    updateMutate.mockReset();
-    deleteMutate.mockReset();
-    readKeysMutate.mockReset();
-    connectMutate.mockReset();
-    startSetupMutate.mockReset();
-    completeSetupMutate.mockReset();
-  });
+beforeEach(() => {
+  registrations = [];
+  listParams = {};
+  for (const mutate of [
+    createMutate,
+    updateMutate,
+    deleteMutate,
+    readKeysMutate,
+    connectMutate,
+    startSetupMutate,
+    completeSetupMutate,
+    connectEveryMutate,
+    disconnectEveryMutate,
+  ]) {
+    mutate.mockReset();
+  }
+});
 
+describe("PluginServicesPage", () => {
   describe("capability gate", () => {
     it("offers nothing to manage without plugins.manage", () => {
       registrations = [buildRegistration()];
@@ -179,6 +185,8 @@ describe("PluginServicesPage", () => {
           version: null,
           jwks: null,
           live: false,
+          publisher_enabled: false,
+          suspended_at: "2026-11-15T12:00:00Z",
         }),
       ];
       await renderAsOperator();
@@ -188,10 +196,17 @@ describe("PluginServicesPage", () => {
       expect(within(github).getByText("Core Plug-ins")).toBeInTheDocument();
       expect(within(github).getByText("1.4.0")).toBeInTheDocument();
       expect(within(github).getByText("Live")).toBeInTheDocument();
+      // Added by this deployment itself: neither verified nor first-party.
+      expect(within(github).queryByText("Verified")).toBeNull();
+      expect(within(github).queryByText("Built by Initiative")).toBeNull();
 
       const slack = screen.getByRole("row", { name: /core\.slack/ });
       expect(within(slack).getByText("Waiting for its listing")).toBeInTheDocument();
       expect(within(slack).getByText("Not live")).toBeInTheDocument();
+      expect(within(slack).getByText("Publisher switched off")).toBeInTheDocument();
+      expect(
+        within(slack).getByText(`Suspended since ${formatDate("2026-11-15T12:00:00Z")}`)
+      ).toBeInTheDocument();
     });
 
     it("leads a row with its listing's name and art, the identifier under it", async () => {
@@ -212,14 +227,6 @@ describe("PluginServicesPage", () => {
       // Signed by the registry, and published by this project.
       expect(within(row).getByText("Verified")).toBeInTheDocument();
       expect(within(row).getByText("Built by Initiative")).toBeInTheDocument();
-    });
-
-    it("tags neither on a plug-in this deployment added itself", async () => {
-      registrations = [buildRegistration({ source: "operator", first_party: false })];
-      await renderAsOperator();
-
-      expect(screen.queryByText("Verified")).toBeNull();
-      expect(screen.queryByText("Built by Initiative")).toBeNull();
     });
 
     it("asks the server for what was searched, rather than filtering one page", async () => {
@@ -263,25 +270,6 @@ describe("PluginServicesPage", () => {
       expect(within(intake).getByText("In the operations community")).toBeInTheDocument();
       expect(within(intake).queryByText("In every community")).toBeNull();
     });
-
-    it("says when the publisher is switched off", async () => {
-      registrations = [
-        buildRegistration({ publisher_name: "Acme", publisher_enabled: false, live: false }),
-      ];
-      await renderAsOperator();
-
-      expect(screen.getByText("Not live")).toBeInTheDocument();
-      expect(screen.getByText("Publisher switched off")).toBeInTheDocument();
-    });
-
-    it("says since when a plug-in is suspended", async () => {
-      registrations = [buildRegistration({ suspended_at: "2026-11-15T12:00:00Z" })];
-      await renderAsOperator();
-
-      expect(
-        screen.getByText(`Suspended since ${formatDate("2026-11-15T12:00:00Z")}`)
-      ).toBeInTheDocument();
-    });
   });
 
   describe("registering", () => {
@@ -304,6 +292,13 @@ describe("PluginServicesPage", () => {
       const user = await fillNewService();
 
       expect(screen.queryByLabelText("Listing")).toBeNull();
+      // No shared secret, and no powers beyond the scope ceiling.
+      expect(screen.queryByText(/shared secret/i)).toBeNull();
+      expect(document.querySelector('input[type="password"]')).toBeNull();
+      // Connect reads from a saved base URL, so a new one has nothing to read.
+      expect(screen.queryByRole("button", { name: "Connect" })).toBeNull();
+      // One switch in the operator's box: whether every community gets it.
+      expect(within(screen.getByRole("dialog")).getAllByRole("switch")).toHaveLength(1);
       await user.click(screen.getByRole("button", { name: "Save" }));
 
       expect(createMutate).toHaveBeenCalledWith(
@@ -322,35 +317,15 @@ describe("PluginServicesPage", () => {
       );
     });
 
-    it("asks for no shared secret, and confers no powers beyond the scope ceiling", async () => {
-      const user = userEvent.setup();
-      await renderAsOperator();
-
-      await user.click(screen.getByRole("button", { name: "Add plug-in service" }));
-      await screen.findByLabelText("Plug-in identifier");
-
-      expect(screen.queryByText(/shared secret/i)).toBeNull();
-      expect(document.querySelector('input[type="password"]')).toBeNull();
-      // Connect reads from a saved base URL, so a new one has nothing to read.
-      expect(screen.queryByRole("button", { name: "Connect" })).toBeNull();
-      // One switch in the operator's box: whether every community gets it.
-      expect(within(screen.getByRole("dialog")).getAllByRole("switch")).toHaveLength(1);
-    });
-
     it("sends the browser address when the plug-in is published somewhere else", async () => {
-      const user = userEvent.setup();
-      await renderAsOperator();
+      const user = await fillNewService();
 
-      await user.click(screen.getByRole("button", { name: "Add plug-in service" }));
-
-      await user.type(await screen.findByLabelText("Plug-in identifier"), "acme.shopify");
-      await user.type(screen.getByLabelText("Base URL"), "http://shopify:8080");
       await user.type(screen.getByLabelText("Browser address"), "https://shop.example.com");
       await user.click(screen.getByRole("button", { name: "Save" }));
 
       expect(createMutate).toHaveBeenCalledWith(
         expect.objectContaining({
-          base_url: "http://shopify:8080",
+          base_url: "https://shopify.example.com",
           page_origin: "https://shop.example.com",
         }),
         expect.anything()
@@ -360,15 +335,6 @@ describe("PluginServicesPage", () => {
 });
 
 describe("PluginServicePage", () => {
-  beforeEach(() => {
-    registrations = [];
-    updateMutate.mockReset();
-    deleteMutate.mockReset();
-    readKeysMutate.mockReset();
-    connectMutate.mockReset();
-    startSetupMutate.mockReset();
-  });
-
   describe("what it is", () => {
     it("shows its listing's facts, and what keeps it from being live", async () => {
       registrations = [
@@ -389,54 +355,40 @@ describe("PluginServicePage", () => {
       expect(screen.getByText(/Not live until it has signing keys/)).toBeInTheDocument();
       // The identifier is the page's heading, not a box to edit.
       expect(screen.queryByLabelText("Plug-in identifier")).toBeNull();
-    });
-
-    it("says why a switched-off publisher stops it", async () => {
-      registrations = [
-        buildRegistration({ publisher_name: "Acme", publisher_enabled: false, live: false }),
-      ];
-      await renderPluginPage();
-
-      expect(
-        screen.getByText(/Every plug-in from Acme is stopped because its publisher is switched off/)
-      ).toBeInTheDocument();
-    });
-
-    it("says a registration waits on its vendor values", async () => {
-      registrations = [buildRegistration({ vendor_ready: false, live: false })];
-      await renderPluginPage();
-
-      expect(screen.getByText(/Not live until its vendor client is set/)).toBeInTheDocument();
-    });
-
-    it("offers no handshake to run", async () => {
-      registrations = [buildRegistration()];
-      await renderPluginPage();
-
+      // There is no handshake to run.
       expect(screen.queryByRole("button", { name: "Verify" })).toBeNull();
+    });
+
+    it.each([
+      [
+        { publisher_name: "Acme", publisher_enabled: false },
+        /Every plug-in from Acme is stopped because its publisher is switched off/,
+      ],
+      [{ vendor_ready: false }, /Not live until its vendor client is set/],
+    ])("says what stops it: %o", async (overrides, reason) => {
+      registrations = [buildRegistration({ ...overrides, live: false })];
+      await renderPluginPage();
+
+      expect(screen.getByText(reason)).toBeInTheDocument();
     });
   });
 
   describe("reach", () => {
-    it("spells out what mandatory means", async () => {
-      registrations = [buildRegistration({ mandatory: true })];
-      await renderPluginPage();
+    it.each([
+      [
+        "none",
+        "Installed into every community automatically. Community admins cannot remove it or turn it off.",
+      ],
+      ["operations", /added to the operations community only, and its admins cannot remove it/],
+    ] as const)(
+      "spells out what mandatory means for a plug-in declaring %s",
+      async (availability, said) => {
+        registrations = [buildRegistration({ mandatory: true, availability })];
+        await renderPluginPage();
 
-      expect(
-        screen.getByText(
-          "Installed into every community automatically. Community admins cannot remove it or turn it off."
-        )
-      ).toBeInTheDocument();
-    });
-
-    it("says a mandatory operations-only plug-in is installed in the operations community alone", async () => {
-      registrations = [buildRegistration({ mandatory: true, availability: "operations" })];
-      await renderPluginPage();
-
-      expect(
-        screen.getByText(/added to the operations community only, and its admins cannot remove it/)
-      ).toBeInTheDocument();
-    });
+        expect(screen.getByText(said)).toBeInTheDocument();
+      }
+    );
 
     it.each([
       ["none", "Every community"],
@@ -1019,15 +971,16 @@ describe("PluginServicePage", () => {
 describe("IndexPage", () => {
   it("does not land an plugins-only operator on settings they cannot manage", async () => {
     const { IndexPage } = await import("@/pages/platform/IndexPage");
-    renderPage(IndexPage, {
-      auth: { user: buildUser({ role: "owner", capabilities: ["plugins.manage"] }) },
+    const { router } = renderPage(IndexPage, {
+      auth: operator,
       initialRoute: "/settings/platform",
     });
-    // Authentication settings belong to config.manage. Rendering them here
-    // would contradict the tab this operator's own capability selects.
+    // Authentication settings belong to config.manage: this operator is sent
+    // to the tab their own capability selects.
     await waitFor(() =>
-      expect(screen.queryByRole("heading", { name: /authentication/i })).toBeNull()
+      expect(router.state.location.pathname).toBe("/settings/platform/integrations")
     );
+    expect(screen.queryByRole("heading", { name: /authentication/i })).toBeNull();
   });
 });
 
@@ -1035,7 +988,7 @@ describe("VendorSetupPage", () => {
   it("hands GitHub's code and the setup's state to the server once", async () => {
     const { VendorSetupPage } = await import("./VendorSetupPage");
     renderPage(VendorSetupPage, {
-      auth: { user: buildUser({ role: "owner", capabilities: ["plugins.manage"] }) },
+      auth: operator,
       initialRoute: "/settings/platform/integrations/vendor-setup/$registrationId",
       routeParams: { registrationId: "7" },
       routerSearch: { code: "abc123", state: "st" },
@@ -1053,7 +1006,7 @@ describe("VendorSetupPage", () => {
   it("says the setup failed when GitHub sent no code", async () => {
     const { VendorSetupPage } = await import("./VendorSetupPage");
     renderPage(VendorSetupPage, {
-      auth: { user: buildUser({ role: "owner", capabilities: ["plugins.manage"] }) },
+      auth: operator,
       initialRoute: "/settings/platform/integrations/vendor-setup/$registrationId",
       routeParams: { registrationId: "7" },
     });

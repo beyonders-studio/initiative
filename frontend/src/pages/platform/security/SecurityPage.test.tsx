@@ -120,15 +120,6 @@ describe("the sign-in rules", () => {
     expect(screen.getByText(/idle sessions end after 30 minutes/)).toBeInTheDocument();
     expect(screen.getByText("Cloudflare Turnstile")).toBeInTheDocument();
   });
-
-  it("says a captcha without its keys is not on", () => {
-    captcha = { ...baseCaptcha, has_secret_key: false, enforcing: false };
-    renderPage();
-
-    expect(
-      screen.getByText(/not on until its site key and secret key are saved/)
-    ).toBeInTheDocument();
-  });
 });
 
 describe("second factor", () => {
@@ -140,21 +131,24 @@ describe("second factor", () => {
     expect(screen.getByRole("radio", { name: /platform role/i })).toBeChecked();
   });
 
-  it("will not save the answer that is already stored", () => {
+  it("saves the answer that was chosen, and offers to present a factor when this account has none", () => {
     renderPage();
     change("Second factor");
 
+    // Nothing to save, and no cost to state, while nobody is asked.
     expect(save()).toBeDisabled();
-  });
-
-  it("saves the answer that was chosen", () => {
-    renderPage();
-    change("Second factor");
+    expect(screen.queryByText("When you save")).not.toBeInTheDocument();
+    expect(screen.queryByText(/personal API keys/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("radio", { name: /everybody/i }));
     fireEvent.click(save());
 
     expect(authMutate).toHaveBeenCalledWith({ second_factor_requirement: "everyone" });
+
+    act(() => lastWrite?.options?.onError?.(selfUnsatisfied(), lastWrite.variables));
+
+    expect(screen.getByText(/set up a second factor of your own/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /enter a code/i })).toBeInTheDocument();
   });
 
   it("says how many people the chosen answer would ask", () => {
@@ -181,26 +175,6 @@ describe("second factor", () => {
     expect(screen.getByText(/personal API keys/i)).toBeInTheDocument();
   });
 
-  it("says nothing about a cost while nobody is asked", () => {
-    renderPage();
-    change("Second factor");
-
-    expect(screen.queryByText("When you save")).not.toBeInTheDocument();
-    expect(screen.queryByText(/personal API keys/i)).not.toBeInTheDocument();
-  });
-
-  it("offers to present a factor when the server says this account has none", () => {
-    renderPage();
-    change("Second factor");
-    fireEvent.click(screen.getByRole("radio", { name: /everybody/i }));
-    fireEvent.click(save());
-
-    act(() => lastWrite?.options?.onError?.(selfUnsatisfied(), lastWrite.variables));
-
-    expect(screen.getByText(/set up a second factor of your own/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /enter a code/i })).toBeInTheDocument();
-  });
-
   it("cannot be changed while nothing could answer it", () => {
     settings = { ...base, factor_methods_permitted: false };
     renderPage();
@@ -211,19 +185,13 @@ describe("second factor", () => {
   });
 
   describe("which providers' word counts", () => {
-    it("lists the deployment's providers with the answer each one holds", () => {
+    it("lists the providers with the answer each holds, and writes it as the provider's own page does", async () => {
+      const user = userEvent.setup();
       renderPage();
       change("Second factor");
 
       expect(screen.getByLabelText("Corp SSO")).not.toBeChecked();
       expect(screen.getByLabelText("Entra")).toBeChecked();
-    });
-
-    it("writes the same answer the provider's own page holds", async () => {
-      const user = userEvent.setup();
-      renderPage();
-      change("Second factor");
-
       await user.click(screen.getByLabelText("Corp SSO"));
 
       expect(providerMutate).toHaveBeenCalledWith({
@@ -271,31 +239,20 @@ describe("session length", () => {
     expect(screen.getByLabelText(/hours/i)).toHaveValue(null);
   });
 
-  it("saves a session limit", () => {
+  // Both halves of the answer go in one write; an emptied field clears its limit.
+  it.each([
+    [null, /hours/i, "12", { session_max_hours: 12, session_idle_minutes: null }],
+    [12, /hours/i, "", { session_max_hours: null, session_idle_minutes: null }],
+    [null, /idle minutes/i, "20", { session_max_hours: null, session_idle_minutes: 20 }],
+  ])("saves from %s, setting %s to %o", (stored, field, value, written) => {
+    settings = { ...base, session_max_hours: stored };
     renderPage();
     change("Session length");
 
-    fireEvent.change(screen.getByLabelText(/hours/i), { target: { value: "12" } });
+    fireEvent.change(screen.getByLabelText(field), { target: { value } });
     fireEvent.click(save());
 
-    expect(authMutate).toHaveBeenCalledWith({
-      session_max_hours: 12,
-      session_idle_minutes: null,
-    });
-  });
-
-  it("clears the limit when the field is emptied", () => {
-    settings = { ...base, session_max_hours: 12 };
-    renderPage();
-    change("Session length");
-
-    fireEvent.change(screen.getByLabelText(/hours/i), { target: { value: "" } });
-    fireEvent.click(save());
-
-    expect(authMutate).toHaveBeenCalledWith({
-      session_max_hours: null,
-      session_idle_minutes: null,
-    });
+    expect(authMutate).toHaveBeenCalledWith(written);
   });
 
   it("will not save an unchanged or fractional limit", () => {
@@ -308,75 +265,51 @@ describe("session length", () => {
     fireEvent.change(screen.getByLabelText(/hours/i), { target: { value: "1.5" } });
     expect(save()).toBeDisabled();
   });
-
-  it("saves both halves of the answer in one write", () => {
-    renderPage();
-    change("Session length");
-
-    fireEvent.change(screen.getByLabelText(/idle minutes/i), { target: { value: "20" } });
-    fireEvent.click(save());
-
-    expect(authMutate).toHaveBeenCalledWith({
-      session_max_hours: null,
-      session_idle_minutes: 20,
-    });
-  });
 });
 
 describe("breached password check", () => {
-  it("turns the check off for a server that cannot reach the internet", () => {
+  // Off for a server that cannot reach the internet, and back on.
+  it.each([
+    [true, /don't check/i],
+    [false, "Check new passwords against known breaches"],
+  ])("turns the check over from %s", (enabled, answer) => {
+    settings = { ...base, breached_password_check_enabled: enabled };
     renderPage();
     change("Breached password check");
 
-    fireEvent.click(screen.getByRole("radio", { name: /don't check/i }));
+    fireEvent.click(screen.getByRole("radio", { name: answer }));
     fireEvent.click(save());
 
     // Only its own field: the other sign-in rules are left as they are.
-    expect(authMutate).toHaveBeenCalledWith({ breached_password_check_enabled: false });
-  });
-
-  it("turns it back on", () => {
-    settings = { ...base, breached_password_check_enabled: false };
-    renderPage();
-    change("Breached password check");
-
-    fireEvent.click(
-      screen.getByRole("radio", { name: "Check new passwords against known breaches" })
-    );
-    fireEvent.click(save());
-
-    expect(authMutate).toHaveBeenCalledWith({ breached_password_check_enabled: true });
+    expect(authMutate).toHaveBeenCalledWith({ breached_password_check_enabled: !enabled });
   });
 });
 
 describe("captcha", () => {
-  it("keeps the saved secret when the field is left blank", () => {
+  // A secret left blank keeps the saved one; one that was typed is sent.
+  it.each([
+    [/site key/i, "new-site", { provider: "turnstile", site_key: "new-site" }],
+    [
+      /secret key/i,
+      "s3cret",
+      { provider: "turnstile", site_key: "site-key", secret_key: "s3cret" },
+    ],
+  ])("saves %s typed as %s", (field, value, written) => {
     renderPage();
     change("Captcha");
 
-    fireEvent.change(screen.getByLabelText(/site key/i), { target: { value: "new-site" } });
+    fireEvent.change(screen.getByLabelText(field), { target: { value } });
     fireEvent.click(save());
 
-    expect(captchaMutate).toHaveBeenCalledWith({ provider: "turnstile", site_key: "new-site" });
-  });
-
-  it("sends a secret that was typed", () => {
-    renderPage();
-    change("Captcha");
-
-    fireEvent.change(screen.getByLabelText(/secret key/i), { target: { value: "s3cret" } });
-    fireEvent.click(save());
-
-    expect(captchaMutate).toHaveBeenCalledWith({
-      provider: "turnstile",
-      site_key: "site-key",
-      secret_key: "s3cret",
-    });
+    expect(captchaMutate).toHaveBeenCalledWith(written);
   });
 
   it("says when a provider is chosen but the captcha is not on", () => {
     captcha = { ...baseCaptcha, has_secret_key: false, enforcing: false };
     renderPage();
+    expect(
+      screen.getByText(/not on until its site key and secret key are saved/)
+    ).toBeInTheDocument();
     change("Captcha");
 
     expect(screen.getByText(/comes on once/i)).toBeInTheDocument();

@@ -50,18 +50,21 @@ beforeEach(() => {
 });
 
 describe("PluginScopesPanel", () => {
-  it("includes the read when a change is granted", async () => {
-    renderPage(() => <PluginScopesPanel plugin={plugin()} />);
+  it("includes the read when a change is granted, and sends the whole set, keeping what was already granted", async () => {
+    renderPage(() => <PluginScopesPanel plugin={plugin({ granted_scopes: ["comments:read"] })} />);
 
+    const save = await screen.findByRole("button", { name: "Save" });
+    // Nothing changed yet.
+    expect(save).toBeDisabled();
     const projects = await row("Projects");
     projects.getByLabelText("Read and change").click();
 
     await waitFor(() => expect(projects.getByLabelText("Read")).toBeChecked());
     expect(projects.getByLabelText("Read and change")).toBeChecked();
 
-    screen.getByRole("button", { name: "Save" }).click();
+    save.click();
     await waitFor(() => expect(sent).toHaveLength(1));
-    expect([...sent[0]].sort()).toEqual(["projects:read", "projects:write"]);
+    expect([...sent[0]].sort()).toEqual(["comments:read", "projects:read", "projects:write"]);
   });
 
   it("says acting as a moderator or an admin plainly, on rows of their own", async () => {
@@ -117,20 +120,6 @@ describe("PluginScopesPanel", () => {
     expect(projects.getByLabelText("Read and change")).toBeDisabled();
     expect(projects.getByText("This server doesn't allow it")).toBeTruthy();
     expect(projects.getByLabelText("Read")).toBeEnabled();
-  });
-
-  it("sends the whole set, keeping what was already granted", async () => {
-    renderPage(() => <PluginScopesPanel plugin={plugin({ granted_scopes: ["comments:read"] })} />);
-
-    const save = await screen.findByRole("button", { name: "Save" });
-    // Nothing changed yet.
-    expect(save).toBeDisabled();
-
-    (await row("Projects")).getByLabelText("Read").click();
-    await waitFor(() => expect(save).toBeEnabled());
-    save.click();
-    await waitFor(() => expect(sent).toHaveLength(1));
-    expect([...sent[0]].sort()).toEqual(["comments:read", "projects:read"]);
   });
 
   it("offers the use of another plug-in as a row of its own", async () => {

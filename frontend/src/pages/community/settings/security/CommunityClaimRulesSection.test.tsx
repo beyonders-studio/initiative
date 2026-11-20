@@ -119,19 +119,14 @@ describe("CommunityClaimRulesSection", () => {
     expect(await screen.findByLabelText(/in that initiative/i)).toBeInTheDocument();
   });
 
-  it("says when a provider reports no groups, rather than hiding it", async () => {
+  it("edits a rule in the dialog it was added in, its provider shown rather than offered", async () => {
+    const user = userEvent.setup();
     reportingIds = [];
     rules = [ownRule];
     render();
 
-    expect(screen.getByText("eng-platform")).toBeInTheDocument();
+    // A provider that reports no groups says so, rather than hiding the rule.
     expect(screen.getByText(/no groups reported/i)).toBeInTheDocument();
-  });
-
-  it("edits a rule in the dialog it was added in, its provider shown rather than offered", async () => {
-    const user = userEvent.setup();
-    rules = [ownRule];
-    render();
 
     await user.click(screen.getByRole("button", { name: "Actions for eng-platform" }));
     await user.click(screen.getByRole("menuitem", { name: "Edit" }));

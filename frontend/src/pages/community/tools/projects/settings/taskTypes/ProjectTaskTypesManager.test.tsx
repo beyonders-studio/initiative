@@ -5,17 +5,13 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { buildProject, buildTaskType } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { TaskTypeGalleryGroup, TaskTypeRead } from "@/api/generated/initiativeAPI.schemas";
-
-vi.mock("@/lib/mascotToast", () => ({
-  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
-}));
 
 import { ProjectTaskTypesManager } from "./ProjectTaskTypesManager";
 
@@ -30,7 +26,6 @@ const buildTypes = (): TaskTypeRead[] => [
   buildTaskType({ id: 4, project_id: PROJECT_ID, name: "Milestone", position: 3, icon: "flag" }),
 ];
 
-/** Records the body of every request one route of the types API receives. */
 /** Two of the ready-made types: one that brings a field, and one that does not. */
 const GALLERY: TaskTypeGalleryGroup[] = [
   {
@@ -67,6 +62,7 @@ const GALLERY: TaskTypeGalleryGroup[] = [
   },
 ];
 
+/** Records the body of every request one route of the types API receives. */
 const capture = (
   method: "post" | "patch" | "delete" | "put",
   path: string,
@@ -117,11 +113,7 @@ const rowFor = async (name: string) => {
 };
 
 describe("ProjectTaskTypesManager", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("lists the project's types in order, with the default marked", async () => {
+  it("lists the project's types in order, with the default marked and a link to each page", async () => {
     renderManager();
 
     const names = await screen.findAllByRole("textbox", { name: /^name$/i });
@@ -133,6 +125,11 @@ describe("ProjectTaskTypesManager", () => {
     ]);
     expect(screen.getByRole("checkbox", { name: /make task the default/i })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: /make bug the default/i })).not.toBeChecked();
+
+    const link = screen.getByRole("link", { name: /edit the page for bug/i });
+    const href = decodeURIComponent(link.getAttribute("href") ?? "");
+    expect(href).toContain(`/i/${INITIATIVE_ID}/projects/${PROJECT_ID}/layouts?`);
+    expect(new URLSearchParams(href.split("?")[1]).get("layout")).toBe("task:2");
   });
 
   it("adds a type started from another", async () => {
@@ -190,7 +187,7 @@ describe("ProjectTaskTypesManager", () => {
     expect(page.definition.side[0].children?.at(-1)?.props?.field).toBe("property:7");
   });
 
-  it("adds a blank type, with no page of its own", async () => {
+  it("adds a blank type, with no page of its own, under a name the project hasn't", async () => {
     const creates = capture("post", "/projects/:projectId/task-types/", () =>
       HttpResponse.json({ ...buildTaskType({ id: 9, name: "Errand" }), field_ids: [] })
     );
@@ -200,6 +197,11 @@ describe("ProjectTaskTypesManager", () => {
 
     await user.click(await screen.findByRole("button", { name: /add type/i }));
     const dialog = await screen.findByRole("dialog");
+    // A name the project already has is refused, whatever its case.
+    await user.type(within(dialog).getByLabelText(/^name$/i), "bug");
+    expect(within(dialog).getByText(/already has a type with that name/i)).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: /^add$/i })).toBeDisabled();
+    await user.clear(within(dialog).getByLabelText(/^name$/i));
     await user.type(within(dialog).getByLabelText(/^name$/i), "Errand");
     await user.click(within(dialog).getByRole("button", { name: /^add$/i }));
 
@@ -317,18 +319,6 @@ describe("ProjectTaskTypesManager", () => {
     expect(copies[0].body).toEqual({ source_project_id: 7, type_ids: [12] });
   });
 
-  it("refuses a name the project already has, whatever its case", async () => {
-    renderManager();
-    const user = userEvent.setup();
-
-    await user.click(await screen.findByRole("button", { name: /add type/i }));
-    const dialog = await screen.findByRole("dialog");
-    await user.type(within(dialog).getByLabelText(/^name$/i), "bug");
-
-    expect(within(dialog).getByText(/already has a type with that name/i)).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: /^add$/i })).toBeDisabled();
-  });
-
   it("renames a type when its changes are saved", async () => {
     const updates = capture("patch", "/projects/:projectId/task-types/:typeId", () =>
       HttpResponse.json(buildTaskType({ id: 3, name: "Proposal" }))
@@ -433,15 +423,6 @@ describe("ProjectTaskTypesManager", () => {
     expect(await screen.findByText(/only type/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^delete$/i })).toBeDisabled();
     expect(deletes).toHaveLength(0);
-  });
-
-  it("opens the layout editor on a type's page", async () => {
-    renderManager();
-
-    const link = await screen.findByRole("link", { name: /edit the page for bug/i });
-    const href = decodeURIComponent(link.getAttribute("href") ?? "");
-    expect(href).toContain(`/i/${INITIATIVE_ID}/projects/${PROJECT_ID}/layouts?`);
-    expect(new URLSearchParams(href.split("?")[1]).get("layout")).toBe("task:2");
   });
 
   it("is read-only for someone who cannot edit the project", async () => {

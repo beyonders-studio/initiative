@@ -315,6 +315,21 @@ describe("CommunitiesPage", () => {
       expect(screen.getAllByText("No limit").length).toBeGreaterThan(0);
       // Nothing in the table is an editor any more.
       expect(screen.queryByLabelText("Storage limit")).toBeNull();
+      // Each community's current status.
+      expect(screen.getByLabelText("Status for Capped Community")).toHaveTextContent("Active");
+      expect(screen.getByLabelText("Status for Full Community")).toHaveTextContent("Suspended");
+      // A deleted one shows a tag instead: deleted is not a status you pick, so
+      // the row that holds it offers nothing to pick with.
+      expect(screen.getByText("Deleted")).toBeInTheDocument();
+      expect(screen.queryByLabelText("Status for Gone Community")).not.toBeInTheDocument();
+      // The billing button is labelled with the community's plan, verbatim; no
+      // plan named by billing -> neutral label, never an invented tier.
+      expect(screen.getByLabelText("Open billing for Capped Community")).toHaveTextContent(
+        "Bespoke Plan"
+      );
+      expect(screen.getByLabelText("Open billing for Open Community")).toHaveTextContent("No plan");
+      // The row's plug-ins are left out for a reader not moderating it.
+      expect(screen.queryByRole("button", { name: /^Plug-ins of/ })).toBeNull();
     });
   });
 
@@ -359,10 +374,15 @@ describe("CommunitiesPage", () => {
       ],
     },
   ])("$what", ({ input, stored, typed, saves, cleared, rejects }) => {
-    it("pre-fills the cap that is stored", async () => {
+    it("pre-fills the cap that is stored, saves nothing unchanged, and saves clearing it as no limit", async () => {
       await openSheet("Capped Community");
 
       expect(input().value).toBe(stored);
+      fireEvent.blur(input());
+      expect(mutate).not.toHaveBeenCalled();
+
+      typeAndLeave(input(), "");
+      expect(mutate).toHaveBeenCalledWith({ communityId: 7, data: cleared }, expect.anything());
     });
 
     it("auto-saves a new cap on blur, converting it to what the API stores", async () => {
@@ -372,22 +392,6 @@ describe("CommunitiesPage", () => {
       typeAndLeave(input(), typed);
 
       expect(mutate).toHaveBeenCalledWith({ communityId: 8, data: saves }, expect.anything());
-    });
-
-    it("does not save when the value is left unchanged", async () => {
-      await openSheet("Capped Community");
-
-      fireEvent.blur(input());
-
-      expect(mutate).not.toHaveBeenCalled();
-    });
-
-    it("saves clearing the cap as no limit at all", async () => {
-      await openSheet("Capped Community");
-
-      typeAndLeave(input(), "");
-
-      expect(mutate).toHaveBeenCalledWith({ communityId: 7, data: cleared }, expect.anything());
     });
 
     it.each(rejects)("reverts %s without saving", async (_label, value) => {
@@ -404,14 +408,6 @@ describe("CommunitiesPage", () => {
     const statusControl = (communityName: string) =>
       screen.getByLabelText(`Status for ${communityName}`);
 
-    it("shows each community's current status", async () => {
-      renderPage();
-
-      expect(await screen.findByText("Capped Community")).toBeInTheDocument();
-      expect(statusControl("Capped Community")).toHaveTextContent("Active");
-      expect(statusControl("Full Community")).toHaveTextContent("Suspended");
-    });
-
     it("applies a non-suspend change immediately (no confirm)", async () => {
       const user = mounted();
       await screen.findByText("Capped Community");
@@ -422,33 +418,22 @@ describe("CommunitiesPage", () => {
       expect(mutate).toHaveBeenCalledWith({ communityId: 7, data: { status: "read_only" } });
     });
 
-    it("gates suspend behind a confirm dialog", async () => {
+    it.each([
+      ["Suspended", "Suspend Capped Community?", "Suspend community", "suspended"],
+      ["On hold", "Put Capped Community on hold?", "Put on hold", "on_hold"],
+    ])("gates %s behind a confirm dialog", async (option, question, confirm, status) => {
       const user = mounted();
       await screen.findByText("Capped Community");
 
       await user.click(statusControl("Capped Community"));
-      await user.click(await screen.findByRole("option", { name: "Suspended" }));
+      await user.click(await screen.findByRole("option", { name: option }));
 
       // Not applied yet — the confirm dialog is shown first.
       expect(mutate).not.toHaveBeenCalled();
-      expect(await screen.findByText("Suspend Capped Community?")).toBeInTheDocument();
+      expect(await screen.findByText(question)).toBeInTheDocument();
 
-      await user.click(screen.getByRole("button", { name: "Suspend community" }));
-      expect(mutate).toHaveBeenCalledWith({ communityId: 7, data: { status: "suspended" } });
-    });
-
-    it("gates a hold behind its own confirm dialog", async () => {
-      const user = mounted();
-      await screen.findByText("Capped Community");
-
-      await user.click(statusControl("Capped Community"));
-      await user.click(await screen.findByRole("option", { name: "On hold" }));
-
-      expect(mutate).not.toHaveBeenCalled();
-      expect(await screen.findByText("Put Capped Community on hold?")).toBeInTheDocument();
-
-      await user.click(screen.getByRole("button", { name: "Put on hold" }));
-      expect(mutate).toHaveBeenCalledWith({ communityId: 7, data: { status: "on_hold" } });
+      await user.click(screen.getByRole("button", { name: confirm }));
+      expect(mutate).toHaveBeenCalledWith({ communityId: 7, data: { status } });
     });
   });
 
@@ -584,19 +569,12 @@ describe("CommunitiesPage", () => {
       expect(screen.queryByText(/who it counts as its own/i)).not.toBeInTheDocument();
     });
 
-    it("shows the values and what agreeing would do", async () => {
-      narrowings = claiming(false);
-      await openSheet("Capped Community");
-
-      expect(screen.getByText(/hd is acme\.example/i)).toBeInTheDocument();
-      expect(screen.getByText(/join on sight/i)).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /^agree$/i })).toBeEnabled();
-    });
-
-    it("agrees that the values are theirs", async () => {
+    it("shows the values and what agreeing would do, and agrees that they are theirs", async () => {
       narrowings = claiming(false);
       const user = await openSheet("Capped Community");
 
+      expect(screen.getByText(/hd is acme\.example/i)).toBeInTheDocument();
+      expect(screen.getByText(/join on sight/i)).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: /^agree$/i }));
 
       expect(agreeNarrowing).toHaveBeenCalledWith({ connectionId: 3, agreed: true });
@@ -738,27 +716,9 @@ describe("CommunitiesPage", () => {
       expect(within(sheet).getByRole("button", { name: "Suspend GitHub" })).toBeInTheDocument();
       expect(within(sheet).queryByLabelText("Status of GitHub")).toBeNull();
     });
-
-    it("leaves the row's plug-ins out for a reader not moderating it", async () => {
-      renderPage();
-
-      expect(await screen.findByText("Capped Community")).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /^Plug-ins of/ })).toBeNull();
-    });
   });
 
   describe("billing column", () => {
-    it("labels each button with the community's plan, verbatim", async () => {
-      renderPage();
-
-      expect(await screen.findByText("Capped Community")).toBeInTheDocument();
-      expect(screen.getByLabelText("Open billing for Capped Community")).toHaveTextContent(
-        "Bespoke Plan"
-      );
-      // No plan named by billing -> neutral label, never an invented tier.
-      expect(screen.getByLabelText("Open billing for Open Community")).toHaveTextContent("No plan");
-    });
-
     it.each([
       ["no billing portal is configured", null],
       [
@@ -819,15 +779,24 @@ describe("CommunitiesPage", () => {
       };
     });
 
-    it("shows the plan and does not let it be set", async () => {
-      await openSheet("Capped Community");
+    it("shows the plan, does not let it be set, and opens the operator console to change it", async () => {
+      const location = { href: "" };
+      const tab = { opener: {} as unknown, location, close: vi.fn() };
+      const openSpy = vi.spyOn(window, "open").mockReturnValue(tab as unknown as Window);
+      mintHandoff.mockResolvedValue({ handoff_token: "tok-9", expires_in_seconds: 60 });
+      const user = await openSheet("Capped Community");
 
       expect(userLimitInput()).toBeDisabled();
       expect(storageInput()).toBeDisabled();
       expect(
         screen.getByText("Billing sets this community's limits and features.")
       ).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Change in billing" })).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Change in billing" }));
+
+      expect(mintHandoff).toHaveBeenCalledWith(7);
+      expect(location.href.split("#")[0]).toBe("https://billing.example.com/operator?lang=en");
+
+      openSpy.mockRestore();
     });
 
     it("shows each plug-in's status as text, and still suspends", async () => {
@@ -837,21 +806,6 @@ describe("CommunitiesPage", () => {
 
       expect(screen.queryByLabelText("Status of GitHub")).toBeNull();
       expect(screen.getByRole("button", { name: "Suspend GitHub" })).toBeInTheDocument();
-    });
-
-    it("opens the operator console to change it", async () => {
-      const location = { href: "" };
-      const tab = { opener: {} as unknown, location, close: vi.fn() };
-      const openSpy = vi.spyOn(window, "open").mockReturnValue(tab as unknown as Window);
-      mintHandoff.mockResolvedValue({ handoff_token: "tok-9", expires_in_seconds: 60 });
-
-      const user = await openSheet("Capped Community");
-      await user.click(screen.getByRole("button", { name: "Change in billing" }));
-
-      expect(mintHandoff).toHaveBeenCalledWith(7);
-      expect(location.href.split("#")[0]).toBe("https://billing.example.com/operator?lang=en");
-
-      openSpy.mockRestore();
     });
   });
 
@@ -903,20 +857,8 @@ describe("CommunitiesPage", () => {
   });
 
   describe("a deleted community", () => {
-    it("shows a tag instead of the status control", async () => {
-      renderPage();
-
-      expect(await screen.findByText("Gone Community")).toBeInTheDocument();
-      expect(screen.getByText("Deleted")).toBeInTheDocument();
-      // No control at all: deleted is not a status you pick, so the row that
-      // holds it offers nothing to pick with.
-      expect(screen.queryByLabelText("Status for Gone Community")).not.toBeInTheDocument();
-      // ...while a live community still has its dropdown.
-      expect(screen.getByLabelText("Status for Capped Community")).toBeInTheDocument();
-    });
-
-    it("offers a restore with the date everything is destroyed on", async () => {
-      await openSheet("Gone Community");
+    it("offers a restore with the date everything is destroyed on, at the status picked", async () => {
+      const user = await openSheet("Gone Community");
 
       // The purge date is an instant, not a calendar day, so it is drawn in
       // the reader's own timezone — computed here the same way rather than
@@ -932,10 +874,7 @@ describe("CommunitiesPage", () => {
       // worth setting on a community nobody can reach.
       expect(userLimitInput()).toBeDisabled();
       expect(storageInput()).toBeDisabled();
-    });
 
-    it("restores it at the status the operator picks", async () => {
-      const user = await openSheet("Gone Community");
       await user.click(screen.getByRole("button", { name: "Restore community" }));
 
       // This community still has somebody to run it, so the seat step is

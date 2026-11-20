@@ -11,17 +11,13 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { buildCommunity, buildInitiative } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import type { InitiativeRead } from "@/api/generated/initiativeAPI.schemas";
-
-vi.mock("@/lib/mascotToast", () => ({
-  toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
-}));
 
 import { CommunityAutoJoinPrompt } from "./CommunityAutoJoinPrompt";
 
@@ -51,13 +47,9 @@ const renderPrompt = () =>
     },
   });
 
-beforeEach(() => {
-  vi.clearAllMocks();
-});
-
 describe("CommunityAutoJoinPrompt", () => {
-  it("names the initiatives a newcomer could be landed in", async () => {
-    stubInitiatives([
+  it("names the initiatives a newcomer could be landed in, then opens the picked one and flags it, in one request", async () => {
+    const patches = stubInitiatives([
       buildInitiative({ id: 8, name: "Apollo" }),
       buildInitiative({ id: 9, name: "Borealis" }),
     ]);
@@ -66,39 +58,17 @@ describe("CommunityAutoJoinPrompt", () => {
 
     expect(await screen.findByText(PROMPT_TITLE)).toBeVisible();
     expect(screen.getByRole("radio", { name: "Apollo" })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "Borealis" })).toBeInTheDocument();
-  });
+    // The people already here are not swept in.
+    expect(screen.getByText(/Members already here are not added/)).toBeVisible();
+    // Nothing to act on until an initiative is picked.
+    expect(screen.getByRole("button", { name: ACTION })).toBeDisabled();
 
-  it("spells out that the people already here are not swept in", async () => {
-    stubInitiatives([buildInitiative({ id: 8, name: "Apollo" })]);
-
-    renderPrompt();
-
-    expect(await screen.findByText(/Members already here are not added/)).toBeVisible();
-  });
-
-  it("opens the picked initiative and flags it, in one request", async () => {
-    const patches = stubInitiatives([
-      buildInitiative({ id: 8, name: "Apollo" }),
-      buildInitiative({ id: 9, name: "Borealis" }),
-    ]);
-
-    renderPrompt();
-
-    await userEvent.click(await screen.findByRole("radio", { name: "Borealis" }));
+    await userEvent.click(screen.getByRole("radio", { name: "Borealis" }));
     await userEvent.click(screen.getByRole("button", { name: ACTION }));
 
     await waitFor(() => expect(patches).toHaveLength(1));
     // Both halves together: the server refuses auto-join on anything but `open`.
     expect(patches[0]).toEqual({ id: "9", body: { join_policy: "open", auto_join: true } });
-  });
-
-  it("will not act until an initiative is picked", async () => {
-    stubInitiatives([buildInitiative({ id: 8, name: "Apollo" })]);
-
-    renderPrompt();
-
-    expect(await screen.findByRole("button", { name: ACTION })).toBeDisabled();
   });
 
   it("says nothing once the community has somewhere to land people", async () => {

@@ -106,10 +106,6 @@ describe("AuthProvidersSection", () => {
       "Edit",
       "Delete",
     ]);
-  });
-
-  it("shows each provider the address its IdP sends the browser back to", () => {
-    renderWithProviders(<AuthProvidersSection />);
 
     // The address follows the slug, and this row is where the page states it —
     // which is what an operator registers with their IdP.
@@ -156,40 +152,6 @@ describe("AuthProvidersSection", () => {
       expect(screen.getByText("https://keycloak.example.com/realms/main")).toBeInTheDocument();
     });
 
-    it("will not go on until the address has answered", async () => {
-      renderWithProviders(<AuthProvidersSection />);
-      openWizard();
-
-      await pickPreset("Google");
-
-      // Google needs nothing filling in, so Verify is available immediately —
-      // but the way forward is not, because nothing has answered yet.
-      expect(screen.getByRole("button", { name: "Verify" })).toBeEnabled();
-      expect(screen.getByRole("button", { name: /Next: credentials/ })).toBeDisabled();
-    });
-
-    it("reports what it found and fills the scopes in from it", async () => {
-      verifyWith(reachable);
-      renderWithProviders(<AuthProvidersSection />);
-      openWizard();
-
-      await pickPreset("Google");
-      fireEvent.click(screen.getByRole("button", { name: "Verify" }));
-
-      expect(await screen.findByText("Reachable")).toBeInTheDocument();
-      expect(screen.getByText("https://id.acme.example/token")).toBeInTheDocument();
-
-      fireEvent.click(screen.getByRole("button", { name: /Next: credentials/ }));
-      fireEvent.change(screen.getByLabelText("Client ID"), { target: { value: "c" } });
-      fireEvent.click(screen.getByRole("button", { name: /Next: how it behaves/ }));
-
-      // `groups` was offered, `offline_access` was not, so one is taken and
-      // the other is not invented.
-      expect((screen.getByLabelText("Scopes") as HTMLInputElement).value).toBe(
-        "openid email profile groups"
-      );
-    });
-
     it("says what went wrong in the reader's language, not the server's", async () => {
       verifyWith({
         ...reachable,
@@ -229,14 +191,19 @@ describe("AuthProvidersSection", () => {
       expect(screen.getByRole("button", { name: /Next: credentials/ })).toBeDisabled();
     });
 
-    it("connects a provider, carrying the mark its preset chose", async () => {
+    it("connects a provider once its address has answered, carrying the mark its preset chose", async () => {
       verifyWith(reachable);
       renderWithProviders(<AuthProvidersSection />);
       openWizard();
 
       await pickPreset("Google");
+      // Google needs nothing filling in, so Verify is available immediately —
+      // but the way forward is not, because nothing has answered yet.
+      expect(screen.getByRole("button", { name: /Next: credentials/ })).toBeDisabled();
       fireEvent.click(screen.getByRole("button", { name: "Verify" }));
-      await screen.findByText("Reachable");
+      // It reports what it found.
+      expect(await screen.findByText("Reachable")).toBeInTheDocument();
+      expect(screen.getByText("https://id.acme.example/token")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: /Next: credentials/ }));
 
       // The server's own answer, built from APP_URL — not this page's origin.
@@ -251,6 +218,21 @@ describe("AuthProvidersSection", () => {
         target: { value: "acme-secret" },
       });
       fireEvent.click(screen.getByRole("button", { name: /Next: how it behaves/ }));
+
+      // The scopes are filled in from what it found: `groups` was offered,
+      // `offline_access` was not, so one is taken and the other is not invented.
+      expect((screen.getByLabelText("Scopes") as HTMLInputElement).value).toBe(
+        "openid email profile groups"
+      );
+
+      // A slug the server would refuse is refused here.
+      fireEvent.change(screen.getByLabelText("Slug"), { target: { value: "bad-" } });
+      fireEvent.click(screen.getByRole("button", { name: "Connect provider" }));
+      expect(createMutate).not.toHaveBeenCalled();
+      expect(screen.getByText(/no leading or trailing dash/i)).toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText("Slug"), { target: { value: "google" } });
+      expect(screen.queryByText(/no leading or trailing dash/i)).not.toBeInTheDocument();
+
       fireEvent.click(screen.getByRole("button", { name: "Connect provider" }));
 
       expect(createMutate).toHaveBeenCalledTimes(1);
@@ -296,34 +278,17 @@ describe("AuthProvidersSection", () => {
       expect(screen.queryByText("Reachable")).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Next: credentials/ })).toBeDisabled();
     });
-
-    it("refuses a slug the server would refuse", async () => {
-      verifyWith(reachable);
-      renderWithProviders(<AuthProvidersSection />);
-      openWizard();
-
-      await pickPreset("Google");
-      fireEvent.click(screen.getByRole("button", { name: "Verify" }));
-      await screen.findByText("Reachable");
-      fireEvent.click(screen.getByRole("button", { name: /Next: credentials/ }));
-      fireEvent.change(screen.getByLabelText("Client ID"), { target: { value: "c" } });
-      fireEvent.click(screen.getByRole("button", { name: /Next: how it behaves/ }));
-
-      fireEvent.change(screen.getByLabelText("Slug"), { target: { value: "bad-" } });
-      fireEvent.click(screen.getByRole("button", { name: "Connect provider" }));
-
-      expect(createMutate).not.toHaveBeenCalled();
-      expect(screen.getByText(/no leading or trailing dash/i)).toBeInTheDocument();
-
-      fireEvent.change(screen.getByLabelText("Slug"), { target: { value: "bad" } });
-      expect(screen.queryByText(/no leading or trailing dash/i)).not.toBeInTheDocument();
-    });
   });
 
-  it("keeps the stored secret when the edit form leaves it blank", async () => {
+  it("verifies from the edit form without saving, and keeps the stored secret left blank", async () => {
+    verifyWith(reachable);
     renderWithProviders(<AuthProvidersSection />);
 
     await choose("Corp SSO", "Edit");
+    fireEvent.click(await screen.findByRole("button", { name: "Verify" }));
+    expect(await screen.findByText("Reachable")).toBeInTheDocument();
+    expect(updateMutate).not.toHaveBeenCalled();
+
     const secret = (await screen.findByLabelText("Client secret")) as HTMLInputElement;
     expect(secret.value).toBe("");
     expect(secret.placeholder).toMatch(/keep the current secret/i);
@@ -337,17 +302,6 @@ describe("AuthProvidersSection", () => {
     expect(call.providerId).toBe(2);
     expect(call.data.display_name).toBe("Corp Renamed");
     expect("client_secret" in call.data).toBe(false);
-  });
-
-  it("verifies from the edit form too, without saving anything", async () => {
-    verifyWith(reachable);
-    renderWithProviders(<AuthProvidersSection />);
-
-    await choose("Corp SSO", "Edit");
-    fireEvent.click(await screen.findByRole("button", { name: "Verify" }));
-
-    expect(await screen.findByText("Reachable")).toBeInTheDocument();
-    expect(updateMutate).not.toHaveBeenCalled();
   });
 
   it("deletes after confirmation", async () => {

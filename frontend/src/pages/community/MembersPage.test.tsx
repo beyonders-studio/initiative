@@ -9,55 +9,15 @@
 import { QueryClient } from "@tanstack/react-query";
 import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HttpResponse } from "msw";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { HttpResponse, http } from "msw";
+import { beforeEach, describe, expect, it } from "vitest";
 
-import { buildCommunity } from "@/__tests__/factories";
+import { buildCommunity, buildUser } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import { getListCustomRolesQueryKey } from "@/api/generated/custom-roles/custom-roles";
 import type { CommunityRole } from "@/api/generated/initiativeAPI.schemas";
-
-// The reader, so a row can be told apart from their own.
-vi.mock("@/hooks/useAuth", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  useAuth: () => ({ user: { id: 99 } }),
-}));
-
-const mocks = vi.hoisted(() => ({
-  members: vi.fn(),
-  permission: vi.fn(),
-  connections: vi.fn(),
-  permissions: vi.fn(),
-  ignored: vi.fn(),
-  ignore: vi.fn(),
-  setOwnName: vi.fn(),
-  setRung: vi.fn(),
-  createInvite: vi.fn(),
-}));
-
-vi.mock("@/api/generated/communities/communities", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  setOwnDisplayName: mocks.setOwnName,
-  updateCommunityMembership: mocks.setRung,
-  createCommunityInvite: mocks.createInvite,
-  useListCommunityInvites: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
-}));
-
-vi.mock("@/hooks/useUsers", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  useUserSearch: (options: Record<string, unknown>) => mocks.members(options),
-}));
-vi.mock("@/hooks/useDirectMessages", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  useDmPermissions: (ids: number[]) => mocks.permissions(ids),
-  useDmPermission: () => mocks.permission(),
-  useConnections: () => mocks.connections(),
-  useIgnoredAccounts: () => mocks.ignored(),
-  useIgnoreAccount: () => ({ mutate: mocks.ignore, isPending: false }),
-  useMessageRequests: () => ({ data: { accepted: [], incoming: [], outgoing: [] } }),
-}));
 
 import { MembersPage } from "./MembersPage";
 
@@ -75,11 +35,35 @@ const person = (id: number, username: string, overrides: Record<string, unknown>
   ...overrides,
 });
 
+/** Every roster read, by its address. */
+let searched: URL[] = [];
+
 const answer = (items: ReturnType<typeof person>[], total = items.length) =>
-  mocks.members.mockReturnValue({
-    data: { items, total_count: total, page: 1, page_size: 25, has_next: false, has_prev: false },
-    isError: false,
-  });
+  server.use(
+    communityHttp.get("/users/search", ({ request }) => {
+      searched.push(new URL(request.url));
+      return HttpResponse.json({
+        items,
+        total_count: total,
+        page: 1,
+        page_size: 25,
+        has_next: false,
+        has_prev: false,
+      });
+    })
+  );
+
+/** Records each body sent to `method path`, answering `reply`. */
+const capture = (method: "post" | "put" | "patch", path: string, reply: object = {}) => {
+  const sent: { url: string; body: unknown }[] = [];
+  server.use(
+    http[method](path, async ({ request }) => {
+      sent.push({ url: new URL(request.url).pathname, body: await request.json() });
+      return HttpResponse.json(reply);
+    })
+  );
+  return sent;
+};
 
 const setup = (
   displayName: string | null = null,
@@ -98,6 +82,7 @@ const setup = (
   return renderPage(() => <MembersPage />, {
     initialRoute: "/c/$communityId/members",
     routeParams: { communityId: "7" },
+    auth: { user: buildUser({ id: 99 }) },
     communities: { communities: [community], activeCommunityId: 7, activeCommunity: community },
     queryClient,
   });
@@ -111,36 +96,43 @@ const settled = async ({ queryClient }: ReturnType<typeof setup>) => {
 };
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  mocks.permission.mockReturnValue({ data: { permission: "denied", may_connect: false } });
-  mocks.permissions.mockReturnValue({ data: { permissions: {} } });
-  mocks.connections.mockReturnValue({ data: { accepted: [], incoming: [], outgoing: [] } });
-  mocks.ignored.mockReturnValue({ data: { items: [] } });
+  searched = [];
   answer([]);
 });
 
 describe("a community's members page", () => {
-  it("asks the community's own roster, not the list of people it may message", async () => {
+  it("asks the community's own roster, and lists everyone in it, reachable or not", async () => {
     answer([person(1, "ada")]);
-    setup();
+    await settled(setup());
 
-    expect(await screen.findByText("ada")).toBeInTheDocument();
-    expect(mocks.members).toHaveBeenCalledWith(
-      expect.objectContaining({ communityIdOverride: 7, page: 1, selfFirst: true })
-    );
-  });
-
-  it("sends a row to that person", async () => {
-    answer([person(1, "ada")]);
-    setup();
-
+    // A row leads to that person.
     expect((await screen.findByText("ada")).closest("a")).toHaveAttribute("href", "/u/ada1234");
+    const url = searched.at(-1);
+    expect(url?.pathname).toBe("/api/v1/c/7/users/search");
+    expect(url?.searchParams.get("page")).toBe("1");
+    expect(url?.searchParams.get("self_first")).toBe("true");
+    // The point of reading the roster rather than the people aggregate: a
+    // members page that hid everyone unreachable would be missing members.
+    // Somebody who takes no messages has nothing to click.
+    expect(screen.queryByRole("link", { name: /message/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /ask to message/i })).toBeNull();
+    // And no connect button either: the server would refuse that too, and a
+    // roster is the one place a refusal is not worth offering.
+    expect(screen.queryByRole("button", { name: /^connect$/i })).toBeNull();
+
+    // Everything else a person can be sits behind the overflow. Ignoring above
+    // all: a roster is the likeliest place to want it, and it used to mean
+    // knowing somebody's exact handle and opening Settings.
+    await userEvent.click(screen.getByRole("button", { name: /actions for ada/i }));
+    expect(await screen.findByRole("menuitem", { name: /^ignore$/i })).toBeInTheDocument();
   });
 
   it("offers the conversation where the server says there is one", async () => {
-    mocks.permissions.mockReturnValue({
-      data: { permissions: { "1": { permission: "open", may_connect: true } } },
-    });
+    server.use(
+      http.post("/api/v1/me/dm-permissions", () =>
+        HttpResponse.json({ permissions: { "1": { permission: "open", may_connect: true } } })
+      )
+    );
     answer([person(1, "ada")]);
     setup();
 
@@ -155,20 +147,6 @@ describe("a community's members page", () => {
     setup();
 
     expect(await screen.findByText(/42 members/i)).toBeInTheDocument();
-  });
-
-  it("lists somebody who takes no messages, with nothing to click", async () => {
-    // The point of reading the roster rather than the people aggregate: a
-    // members page that hid everyone unreachable would be missing members.
-    answer([person(1, "ada")]);
-    setup();
-
-    expect(await screen.findByText("ada")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /message/i })).toBeNull();
-    expect(screen.queryByRole("button", { name: /ask to message/i })).toBeNull();
-    // And no connect button either: the server would refuse that too, and a
-    // roster is the one place a refusal is not worth offering.
-    expect(screen.queryByRole("button", { name: /^connect$/i })).toBeNull();
   });
 
   it("answers every keystroke but waits for typing to stop", async () => {
@@ -204,24 +182,14 @@ describe("a community's members page", () => {
     expect((await screen.findByText("bram")).closest("a")).not.toHaveTextContent("Admin");
   });
 
-  it("offers everything else a person can be, behind the overflow", async () => {
-    // Ignoring above all: a roster is the likeliest place to want it, and it
-    // used to mean knowing somebody's exact handle and opening Settings.
-    answer([person(1, "ada")]);
-    setup();
-
-    await userEvent.click(await screen.findByRole("button", { name: /actions for ada/i }));
-
-    expect(await screen.findByRole("menuitem", { name: /^ignore$/i })).toBeInTheDocument();
-  });
-
   it("asks about the whole page at once", async () => {
     // Asked per row, this is a request per row -- a hundred on a full page.
+    const asked = capture("post", "/api/v1/me/dm-permissions", { permissions: {} });
     answer([person(1, "ada"), person(2, "bram")]);
     setup();
 
     await screen.findByText("ada");
-    expect(mocks.permissions).toHaveBeenCalledWith([1, 2]);
+    await waitFor(() => expect(asked.map(({ body }) => body)).toEqual([{ user_ids: [1, 2] }]));
   });
 
   it("lets the address change under it without pushing back", async () => {
@@ -257,7 +225,7 @@ describe("a community's members page", () => {
   });
 
   it("sets your own name here, wherever your row is, starting from the current one", async () => {
-    mocks.setOwnName.mockResolvedValue(undefined);
+    const sent = capture("put", "/api/v1/communities/:id/membership/display-name");
     // The reader is not on this page of the roster at all.
     answer([person(1, "ada")], 60);
     setup("Ana");
@@ -270,12 +238,14 @@ describe("a community's members page", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() =>
-      expect(mocks.setOwnName).toHaveBeenCalledWith(7, { display_name: "Ana B" })
+      expect(sent).toEqual([
+        { url: "/api/v1/communities/7/membership/display-name", body: { display_name: "Ana B" } },
+      ])
     );
   });
 
   it("clears your name when it is left empty", async () => {
-    mocks.setOwnName.mockResolvedValue(undefined);
+    const sent = capture("put", "/api/v1/communities/:id/membership/display-name");
     answer([person(99, "me")]);
     setup("Ana");
 
@@ -283,7 +253,7 @@ describe("a community's members page", () => {
     await userEvent.clear(await screen.findByLabelText("Display name"));
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    await waitFor(() => expect(mocks.setOwnName).toHaveBeenCalledWith(7, { display_name: null }));
+    await waitFor(() => expect(sent.map(({ body }) => body)).toEqual([{ display_name: null }]));
   });
 
   it("runs what a custom role holds from here: invites, and members below admin", async () => {
@@ -297,16 +267,18 @@ describe("a community's members page", () => {
           { id: 1, name: "Doors", base_rung: "member", surfaces: ["invites"] },
           { id: 2, name: "Roll", base_rung: "admin", surfaces: ["members"] },
         ])
-      )
+      ),
+      http.get("/api/v1/communities/:id/invites", () => HttpResponse.json([]))
     );
-    mocks.createInvite.mockResolvedValue({ id: 5, code: "door" });
+    const invites = capture("post", "/api/v1/communities/:id/invites", { id: 5, code: "door" });
     answer([person(1, "ada"), person(2, "bram", { community_role: "admin" })]);
     await settled(setup());
 
     await userEvent.click(await screen.findByRole("button", { name: "Invite members" }));
     await userEvent.click(await screen.findByRole("button", { name: "Generate invite" }));
     expect(await screen.findByText(/\/invite\/door$/)).toBeInTheDocument();
-    expect(mocks.createInvite).toHaveBeenCalledWith(7, expect.objectContaining({ max_uses: 1 }));
+    expect(invites[0].url).toBe("/api/v1/communities/7/invites");
+    expect(invites[0].body).toMatchObject({ max_uses: 1 });
     await userEvent.keyboard("{Escape}");
 
     await userEvent.click(screen.getByRole("button", { name: /actions for ada/i }));
@@ -326,7 +298,7 @@ describe("a community's members page", () => {
   });
 
   it("lets an admin change a member's rung, and gives no custom role while they are off", async () => {
-    mocks.setRung.mockResolvedValue(undefined);
+    const rungs = capture("patch", "/api/v1/communities/:id/members/:userId");
     answer([person(1, "ada")]);
     // Custom roles are switched off here, and another page has already read
     // this community's into the cache, which keeps them.
@@ -341,11 +313,13 @@ describe("a community's members page", () => {
     expect(screen.queryByRole("menuitem", { name: "Custom role" })).toBeNull();
     await userEvent.click(await screen.findByRole("menuitemradio", { name: "Admin" }));
 
-    await waitFor(() => expect(mocks.setRung).toHaveBeenCalledWith(7, 1, { role: "admin" }));
+    await waitFor(() =>
+      expect(rungs).toEqual([{ url: "/api/v1/communities/7/members/1", body: { role: "admin" } }])
+    );
   });
 
   it("says so when the roster cannot be read", async () => {
-    mocks.members.mockReturnValue({ data: undefined, isError: true });
+    server.use(communityHttp.get("/users/search", () => new HttpResponse(null, { status: 500 })));
     setup();
 
     expect(await screen.findByText(/could not be loaded/i)).toBeInTheDocument();

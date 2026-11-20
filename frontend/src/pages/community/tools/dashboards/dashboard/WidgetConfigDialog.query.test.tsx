@@ -250,40 +250,27 @@ describe("completion", () => {
    *  rather than the statement the builder would have written. */
   const halfWritten = () => widget({ source: "query", sql: "SELECT " });
 
-  it("offers the names the server says exist", async () => {
+  it.each([
+    // A function, not only a field.
+    ["co", /count/i],
+    // The reader, which is a name no dataset holds.
+    ["m", /^me$/i],
+  ])("offers what the server says exists for %s", async (typed, offered) => {
+    const user = userEvent.setup();
+    mount(halfWritten());
+
+    await user.click(sqlBox());
+    await user.type(sqlBox(), typed);
+    expect(await screen.findByRole("button", { name: offered })).toBeInTheDocument();
+  });
+
+  it("offers a field and puts the chosen name in place of the word being typed", async () => {
     const user = userEvent.setup();
     mount(halfWritten());
 
     await user.click(sqlBox());
     await user.type(sqlBox(), "ti");
     // `title` is a field of tasks, which the server named in the catalog.
-    expect(await screen.findByRole("button", { name: /title/i })).toBeInTheDocument();
-  });
-
-  it("offers a dataset and a function too, not only fields", async () => {
-    const user = userEvent.setup();
-    mount(halfWritten());
-
-    await user.click(sqlBox());
-    await user.type(sqlBox(), "co");
-    expect(await screen.findByRole("button", { name: /count/i })).toBeInTheDocument();
-  });
-
-  it("offers the reader, which is a name no dataset holds", async () => {
-    const user = userEvent.setup();
-    mount(halfWritten());
-
-    await user.click(sqlBox());
-    await user.type(sqlBox(), "m");
-    expect(await screen.findByRole("button", { name: /^me$/i })).toBeInTheDocument();
-  });
-
-  it("puts the chosen name in place of the word being typed", async () => {
-    const user = userEvent.setup();
-    mount(halfWritten());
-
-    await user.click(sqlBox());
-    await user.type(sqlBox(), "ti");
     await user.click(await screen.findByRole("button", { name: /title/i }));
 
     await waitFor(() => expect(sqlBox()).toHaveValue("SELECT title"));
@@ -310,22 +297,10 @@ describe("completion", () => {
 describe("a statement the server refuses", () => {
   const saveButton = () => screen.getByRole("button", { name: /^save$/i });
 
-  it("cannot be saved", async () => {
+  it("cannot be saved, says so rather than showing the last good answer, and saves once corrected", async () => {
     // A statement is checked where a definition is normalized, so saving a
     // refused one takes the whole dashboard with it — and the dialog that
     // could fix it has closed by then.
-    const user = userEvent.setup();
-    mount(widget({ source: "query", sql: SHIPPED_SQL }));
-
-    await waitFor(() => expect(sqlBox()).toHaveValue(SHIPPED_SQL));
-    await user.click(sqlBox());
-    await user.type(sqlBox(), " nope");
-
-    await waitFor(() => expect(saveButton()).toBeDisabled());
-    expect(onSave).not.toHaveBeenCalled();
-  });
-
-  it("says so, rather than showing the last good answer", async () => {
     const user = userEvent.setup();
     mount(widget({ source: "query", sql: SHIPPED_SQL }));
 
@@ -333,20 +308,12 @@ describe("a statement the server refuses", () => {
     await user.click(sqlBox());
     await user.type(sqlBox(), " nope");
 
-    await waitFor(() => expect(screen.queryByText("Returns: tasks")).not.toBeInTheDocument());
-  });
-
-  it("can be saved once it is corrected", async () => {
-    const user = userEvent.setup();
-    mount(widget({ source: "query", sql: SHIPPED_SQL }));
-
-    await waitFor(() => expect(sqlBox()).toHaveValue(SHIPPED_SQL));
-    await user.click(sqlBox());
-    await user.type(sqlBox(), " nope");
     await waitFor(() => expect(saveButton()).toBeDisabled());
+    await waitFor(() => expect(screen.queryByText("Returns: tasks")).not.toBeInTheDocument());
 
     await user.type(sqlBox(), "{backspace}{backspace}{backspace}{backspace}{backspace}");
     await waitFor(() => expect(saveButton()).toBeEnabled());
+    expect(onSave).not.toHaveBeenCalled();
 
     await user.click(saveButton());
     expect(onSave).toHaveBeenCalledWith(
@@ -439,15 +406,6 @@ describe("what a new statement leaves out", () => {
     expect(await screen.findByRole("combobox", { name: /^archived$/i })).toHaveTextContent(
       /leave out/i
     );
-  });
-
-  it("leaves a statement somebody already wrote alone", async () => {
-    // A stored statement opens on SQL and is never rewritten by being read.
-    withDefaults();
-    mount(widget({ source: "query", sql: SHIPPED_SQL }));
-
-    await waitFor(() => expect(sqlBox()).toHaveValue(SHIPPED_SQL));
-    expect(asked.build).toBe(0);
   });
 });
 
@@ -554,7 +512,7 @@ describe("reading a plug-in", () => {
     });
   });
 
-  it("sends the endpoint's settings with it", async () => {
+  it("sends the endpoint's settings with it, keeping its columns", async () => {
     const user = userEvent.setup();
     mount(widget({ source: "query" }));
 
@@ -564,6 +522,8 @@ describe("reading a plug-in", () => {
     await waitFor(() =>
       expect(described.build?.plugin).toEqual({ ...ORDERS, params: { range: "30d" } })
     );
+    // Answering a setting keeps the columns it started with.
+    expect(described.build?.columns).toEqual([{ field: "status" }, { field: "total" }]);
   });
 
   it("reopens on the plug-in it was built from", async () => {

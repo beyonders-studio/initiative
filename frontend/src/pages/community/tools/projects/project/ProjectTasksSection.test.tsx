@@ -177,34 +177,23 @@ const urlLayout = (router: ReturnType<typeof section>["router"]) =>
 const urlPreset = (router: ReturnType<typeof section>["router"]) =>
   (router.state.location.search as { preset?: string }).preset;
 
+/** The table is virtualized, and jsdom gives every element a zero height,
+ *  which windows it down to no rows at all. The virtualizer sizes the app's
+ *  scroller by its client box and each row by its offset box. */
+const sizeTheTable = () => {
+  vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(800);
+  vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(1200);
+  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(800);
+  vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(1200);
+};
+
 beforeEach(() => {
   captureTaskRequests();
   withLayouts({});
 });
 
 describe("ProjectTasksSection layouts", () => {
-  it("offers the project's layouts, and opens on the one it opens on", async () => {
-    withLayouts({
-      layouts: [
-        { kind: "table", is_default: false, hidden: false, definition: {}, updated_at: null },
-        { kind: "board", is_default: true, hidden: false, definition: {}, updated_at: null },
-      ],
-    });
-    const user = userEvent.setup();
-    section();
-
-    await waitFor(async () => expect(await layoutSwitcher()).toHaveTextContent("Board"));
-    await user.click(await layoutSwitcher());
-    // Only layouts: the presets lead the filter panel.
-    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
-      "Table",
-      "Board",
-      "Gantt",
-      "Calendar",
-    ]);
-  });
-
-  it("offers a calendar a project shows, and draws its tasks on it", async () => {
+  it("offers the project's layouts, and opens on its default, a calendar with its tasks", async () => {
     withLayouts({
       layouts: [
         { kind: "table", is_default: false, hidden: false, definition: {}, updated_at: null },
@@ -525,31 +514,25 @@ describe("ProjectTasksSection a person's filters", () => {
     );
   });
 
-  it("drops a remembered tag that no longer exists rather than emptying the list", async () => {
+  it.each([
     // A deleted tag does not quietly stop narrowing: sent as `tag_ids in (999)`
     // it matches nothing, so the list goes empty and the control that would
     // explain why has no option left to render.
-    withTags([7]);
-    rememberView({ layout: "table", filters: { table: { tag_ids: [999] } } });
+    ["no longer exists", () => withTags([7]), 999],
+    // An id that cannot be checked may be hiding every task in the project.
+    [
+      "cannot be checked, as the tag list fails",
+      () => server.use(communityHttp.get("/tags/", () => new HttpResponse(null, { status: 500 }))),
+      7,
+    ],
+  ])("drops a remembered tag that %s rather than emptying the list", async (_, tags, tagId) => {
+    tags();
+    rememberView({ layout: "table", filters: { table: { tag_ids: [tagId] } } });
     section();
 
     // Both in one tick: the first request goes out before the tag list has
     // loaded, when there is nothing yet to prune against, and an empty
     // `lastConditions` would satisfy the negative assertion on its own.
-    await waitFor(() => {
-      expect(fieldsUsed()).toContain("project_id");
-      expect(fieldsUsed()).not.toContain("tag_ids");
-    });
-  });
-
-  it("stops trusting a remembered tag when the tag list cannot be loaded", async () => {
-    // An id that cannot be checked may be hiding every task in the project.
-    // Showing more than was asked for is recoverable; an unexplained empty
-    // list is not.
-    server.use(communityHttp.get("/tags/", () => new HttpResponse(null, { status: 500 })));
-    rememberView({ layout: "table", filters: { table: { tag_ids: [7] } } });
-    section();
-
     await waitFor(() => {
       expect(fieldsUsed()).toContain("project_id");
       expect(fieldsUsed()).not.toContain("tag_ids");
@@ -638,16 +621,11 @@ describe("ProjectTasksSection ticking tasks off", () => {
   beforeEach(() => {
     replies = [];
     vi.mocked(fireTaskCompletionFeedback).mockClear();
-    // The table is virtualized, and jsdom gives every element a zero height,
-    // which windows it down to no rows at all. The virtualizer sizes the
-    // app's scroller by its client box and each row by its offset box.
-    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(800);
-    vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(1200);
-    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(800);
-    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(1200);
+    sizeTheTable();
   });
 
-  it("ticks the box and celebrates before the server answers", async () => {
+  it("ticks the box and celebrates before the server answers, without a toast", async () => {
+    const success = vi.spyOn(toast, "success");
     table(1);
     const user = userEvent.setup();
     await user.click(await doneBox("Chore 1"));
@@ -661,6 +639,9 @@ describe("ProjectTasksSection ticking tasks off", () => {
     expect(await doneBox("Chore 1")).toBeChecked();
     // Once, at the click, not again when the reply lands.
     expect(fireTaskCompletionFeedback).toHaveBeenCalledTimes(1);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(success).not.toHaveBeenCalled();
+    success.mockRestore();
   });
 
   it("leaves the other boxes open while one is on its way", async () => {
@@ -676,21 +657,6 @@ describe("ProjectTasksSection ticking tasks off", () => {
     await waitFor(() => expect(replies).toHaveLength(2));
     expect(await doneBox("Chore 1")).toBeChecked();
     expect(await doneBox("Chore 2")).toBeChecked();
-  });
-
-  it("does not toast each tick", async () => {
-    const success = vi.spyOn(toast, "success");
-    table(1);
-    const user = userEvent.setup();
-
-    await user.click(await doneBox("Chore 1"));
-    await waitFor(() => expect(replies).toHaveLength(1));
-    answer(0, await doneReply(1));
-
-    await waitFor(() => expect(fireTaskCompletionFeedback).toHaveBeenCalled());
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(success).not.toHaveBeenCalled();
-    success.mockRestore();
   });
 
   it("puts the box back when the change fails", async () => {
@@ -728,15 +694,7 @@ describe("ProjectTasksSection ticking tasks off", () => {
 });
 
 describe("ProjectTasksSection table", () => {
-  beforeEach(() => {
-    // The table is virtualized, and jsdom gives every element a zero height,
-    // which windows it down to no rows at all. The virtualizer sizes the
-    // app's scroller by its client box and each row by its offset box.
-    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(800);
-    vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(1200);
-    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(800);
-    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(1200);
-  });
+  beforeEach(sizeTheTable);
 
   it("draws a row from the task's fields, as the board's card does", async () => {
     const task = buildTask({
@@ -760,7 +718,7 @@ describe("ProjectTasksSection table", () => {
     expect(within(row).getByText("2")).toBeInTheDocument();
   });
 
-  it("lets go of a selection when the layout changes", async () => {
+  it("offers to export a selection first, and lets go of it when the layout changes", async () => {
     server.use(
       communityHttp.get("/tasks/", () =>
         HttpResponse.json(buildTaskListResponse([buildTask({ title: "Chore 1" })]))
@@ -772,6 +730,12 @@ describe("ProjectTasksSection table", () => {
     await user.click(await screen.findByRole("button", { name: /^select$/i }));
     await user.click(await screen.findByRole("checkbox", { name: /select row/i }));
     expect(await screen.findByText(/1 task selected/i)).toBeInTheDocument();
+    // Export Selected leads the selection's actions.
+    expect(
+      screen
+        .getByRole("button", { name: "Export Selected" })
+        .compareDocumentPosition(screen.getByRole("button", { name: /edit tags/i }))
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 
     await pickLayout(user, "Board");
 

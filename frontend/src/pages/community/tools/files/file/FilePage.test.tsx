@@ -130,7 +130,11 @@ describe("renaming a file", () => {
     expect(patches[0]).toMatchObject({ name: "Renamed" });
   });
 
-  it("autosaves the name once the field is let go", async () => {
+  it.each([
+    [false, 3000],
+    [true, 11_000],
+  ])("autosaves the name once the field is let go (collaborating: %s)", async (live, wait) => {
+    collaborating.value = live;
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderDoc();
@@ -140,7 +144,7 @@ describe("renaming a file", () => {
     await user.type(input, "Renamed");
     await user.tab();
 
-    await vi.advanceTimersByTimeAsync(3000);
+    await vi.advanceTimersByTimeAsync(wait);
 
     await waitFor(() => expect(patches).toHaveLength(1));
     expect(patches[0]).toMatchObject({ name: "Renamed" });
@@ -193,39 +197,27 @@ describe("renaming a file", () => {
     expect(patches).toEqual([]);
   });
 
-  it("saves a rename with the Save button while collaborating", async () => {
-    // The room owns the body while it is live and refuses one sent by PATCH,
-    // so the Save button sends only the name; the room renders the body.
-    collaborating.value = true;
-    const user = userEvent.setup();
-    renderDoc();
+  // The room owns the body while it is live and refuses one sent by PATCH, so
+  // a save sends only the name; the room renders the body.
+  it.each(["the Save button", "Ctrl+S"])(
+    "saves a rename with %s while collaborating",
+    async (how) => {
+      collaborating.value = true;
+      const user = userEvent.setup();
+      renderDoc();
 
-    const input = await screen.findByDisplayValue("Original");
-    await user.click(await screen.findByRole("button", { name: "edit the body" }));
-    await user.clear(input);
-    await user.type(input, "Renamed");
-    await user.click(screen.getByRole("button", { name: "Save" }));
+      const input = await screen.findByDisplayValue("Original");
+      await user.click(await screen.findByRole("button", { name: "edit the body" }));
+      await user.clear(input);
+      await user.type(input, "Renamed");
+      if (how === "Ctrl+S") await user.keyboard("{Control>}s{/Control}");
+      else await user.click(screen.getByRole("button", { name: "Save" }));
 
-    await waitFor(() => expect(patches).toHaveLength(1));
-    expect(patches[0]).toMatchObject({ name: "Renamed" });
-    expect(patches[0]).not.toHaveProperty("content");
-  });
-
-  it("saves a rename with Ctrl+S while collaborating", async () => {
-    collaborating.value = true;
-    const user = userEvent.setup();
-    renderDoc();
-
-    const input = await screen.findByDisplayValue("Original");
-    await user.click(await screen.findByRole("button", { name: "edit the body" }));
-    await user.clear(input);
-    await user.type(input, "Renamed");
-    await user.keyboard("{Control>}s{/Control}");
-
-    await waitFor(() => expect(patches).toHaveLength(1));
-    expect(patches[0]).toMatchObject({ name: "Renamed" });
-    expect(patches[0]).not.toHaveProperty("content");
-  });
+      await waitFor(() => expect(patches).toHaveLength(1));
+      expect(patches[0]).toMatchObject({ name: "Renamed" });
+      expect(patches[0]).not.toHaveProperty("content");
+    }
+  );
 
   it("saves a rename with Ctrl+S when not collaborating", async () => {
     const user = userEvent.setup();
@@ -239,23 +231,6 @@ describe("renaming a file", () => {
 
     await waitFor(() => expect(patches).toHaveLength(1));
     expect(patches[0]).toMatchObject({ name: "Renamed", content: editedBody });
-  });
-
-  it("still autosaves a rename while collaborating", async () => {
-    collaborating.value = true;
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    renderDoc();
-
-    const input = await screen.findByDisplayValue("Original");
-    await user.clear(input);
-    await user.type(input, "Renamed");
-    await user.tab();
-
-    await vi.advanceTimersByTimeAsync(11_000);
-
-    await waitFor(() => expect(patches).toHaveLength(1));
-    expect(patches[0]).toMatchObject({ name: "Renamed" });
   });
 });
 
@@ -323,7 +298,7 @@ describe("opening a whiteboard", () => {
 });
 
 describe("losing the connection to a room", () => {
-  it("tells an offline reader their edits will sync, though the socket is down", async () => {
+  it("tells an offline reader their edits will sync, and leaves a lost room to that", async () => {
     network.online = false;
     renderDoc();
     await screen.findByRole("button", { name: "edit the body" });
@@ -332,12 +307,6 @@ describe("losing the connection to a room", () => {
       "You're offline — edits will sync when you reconnect.",
       expect.objectContaining({ id: "editor-offline" })
     );
-  });
-
-  it("leaves a lost room to the offline warning while offline", async () => {
-    network.online = false;
-    renderDoc();
-    await screen.findByRole("button", { name: "edit the body" });
 
     act(() => collaboration.onError?.(new CollaborationError("Connection lost.", true)));
 

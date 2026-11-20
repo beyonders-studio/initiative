@@ -48,24 +48,12 @@ describe("AddressManager", () => {
     mocks.list.mockReturnValue(listing(buildUserEmail()));
   });
 
-  it("shows the addresses the account holds, primary first", () => {
+  it("shows the addresses the account holds, primary first, removable and promotable by the rules", () => {
     mocks.list.mockReturnValue(
       listing(
-        buildUserEmail({ email: "second@example.com", is_primary: false }),
-        buildUserEmail({ email: "primary@example.com", is_primary: true })
-      )
-    );
-
-    renderWithProviders(<AddressManager />);
-
-    const shown = screen.getAllByText(/@example\.com$/).map((node) => node.textContent);
-    expect(shown).toEqual(["primary@example.com", "second@example.com"]);
-  });
-
-  it("does not show an address a provider minted", () => {
-    mocks.list.mockReturnValue(
-      listing(
-        buildUserEmail(),
+        buildUserEmail({ email: "second@example.com", verified: true, is_primary: false }),
+        buildUserEmail({ email: "primary@example.com", is_primary: true }),
+        buildUserEmail({ email: "unproven@example.com", verified: false, is_primary: false }),
         buildUserEmail({
           email: "abc123@oidc.local",
           verified: false,
@@ -77,23 +65,16 @@ describe("AddressManager", () => {
 
     renderWithProviders(<AddressManager />);
 
+    const shown = screen.getAllByText(/@example\.com$/).map((node) => node.textContent);
+    expect(shown).toEqual(["primary@example.com", "second@example.com", "unproven@example.com"]);
+    // An address a provider minted is not shown at all.
     expect(screen.queryByText("abc123@oidc.local")).not.toBeInTheDocument();
-  });
-
-  it("does not remove the primary while it is the primary", () => {
-    mocks.list.mockReturnValue(
-      listing(
-        buildUserEmail({ email: "primary@example.com" }),
-        buildUserEmail({ email: "second@example.com", verified: true, is_primary: false })
-      )
-    );
-
-    renderWithProviders(<AddressManager />);
-
-    // Another has to take its place first.
+    // The primary does not go while it is the primary: another takes its place first.
     expect(screen.getByLabelText(/primary@example\.com/)).toBeDisabled();
     // The second one is proven and is not the only one, so it goes.
     expect(screen.getByLabelText(/second@example\.com/)).toBeEnabled();
+    // Primary is offered only on the one other address that could take the mail.
+    expect(screen.getAllByRole("button", { name: /make primary/i })).toHaveLength(1);
   });
 
   it("does not remove the only proven address, primary or not", () => {
@@ -110,25 +91,6 @@ describe("AddressManager", () => {
     renderWithProviders(<AddressManager />);
 
     expect(screen.getByLabelText(/proven@example\.com/)).toBeDisabled();
-  });
-
-  it("offers primary only on an address that has been proven", () => {
-    mocks.list.mockReturnValue(
-      listing(
-        buildUserEmail(),
-        buildUserEmail({
-          email: "unproven@example.com",
-          verified: false,
-          is_primary: false,
-        }),
-        buildUserEmail({ email: "proven@example.com", verified: true, is_primary: false })
-      )
-    );
-
-    renderWithProviders(<AddressManager />);
-
-    // One button, for the one address that could take the mail.
-    expect(screen.getAllByRole("button", { name: /make primary/i })).toHaveLength(1);
   });
 
   it("says so when the list could not be read, rather than showing none", () => {

@@ -75,14 +75,6 @@ describe("CommunityAuthProvidersSection", () => {
     updateConnection.mockReset();
   });
 
-  it("marks an inherited arrangement as the server's, naming its claim", () => {
-    connections = [row({ id: null, inherited: true, claim: "tid", claim_values: ["acme-tenant"] })];
-    render();
-
-    expect(screen.getByText("From your server")).toBeInTheDocument();
-    expect(screen.getByText("Microsoft Entra tenant: acme-tenant")).toBeInTheDocument();
-  });
-
   it("says a connection of its own is on, and that new arrivals join", () => {
     connections = [
       row({ claim: "hd", claim_values: ["acme.com"], auto_join: true, narrowing_approved: true }),
@@ -98,18 +90,18 @@ describe("CommunityAuthProvidersSection", () => {
     expect(screen.getByRole("button", { name: "Copy" })).toBeInTheDocument();
   });
 
-  it("offers to take an inherited arrangement over, rather than to switch it off", () => {
-    connections = [row({ id: null, inherited: true })];
-    render();
-
-    expect(screen.getByRole("button", { name: /make it ours/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Actions for Entra" })).not.toBeInTheDocument();
-  });
-
-  it("opens the wizard on the arrangement it is taking over", async () => {
+  it("marks an inherited arrangement as the server's, and opens the wizard on it to take it over", async () => {
     const user = userEvent.setup();
     connections = [row({ id: null, inherited: true, claim: "tid", claim_values: ["acme-tenant"] })];
     render();
+
+    expect(screen.getByText("From your server")).toBeInTheDocument();
+    expect(screen.getByText("Microsoft Entra tenant: acme-tenant")).toBeInTheDocument();
+    // Nothing of the community's own to switch off.
+    expect(screen.queryByRole("button", { name: "Actions for Entra" })).not.toBeInTheDocument();
+    // Taking an inherited arrangement over is a connect, so the provider has
+    // to stay choosable — only what the community said itself is filtered out.
+    expect(screen.getByRole("button", { name: /connect a provider/i })).toBeEnabled();
 
     await user.click(screen.getByRole("button", { name: /make it ours/i }));
 
@@ -157,14 +149,5 @@ describe("CommunityAuthProvidersSection", () => {
       connectionId: 5,
       data: { accepts_provider_placement: true },
     });
-  });
-
-  it("still offers a provider it only inherits in the picker", () => {
-    connections = [row({ id: null, inherited: true })];
-    render();
-
-    // Taking an inherited arrangement over is a connect, so the provider has
-    // to stay choosable — only what the community said itself is filtered out.
-    expect(screen.getByRole("button", { name: /connect a provider/i })).toBeEnabled();
   });
 });

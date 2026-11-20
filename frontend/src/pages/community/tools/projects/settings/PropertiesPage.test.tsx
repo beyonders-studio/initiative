@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { buildProject, buildPropertyDefinition, readerCan } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
@@ -9,10 +9,6 @@ import { definitionsHandler } from "@/__tests__/helpers/handlers/property.handle
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { ProjectRead, PropertyDefinitionCreate } from "@/api/generated/initiativeAPI.schemas";
-
-vi.mock("@/lib/mascotToast", () => ({
-  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
-}));
 
 import { PropertiesPage } from "./PropertiesPage";
 

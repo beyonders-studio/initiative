@@ -10,9 +10,6 @@ import { renderWithProviders } from "@/__tests__/helpers/render";
 import { NotificationsPage } from "./NotificationsPage";
 
 vi.mock("@/lib/csv", () => ({ downloadBlob: vi.fn() }));
-vi.mock("@/lib/mascotToast", () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
-}));
 
 import { downloadBlob } from "@/lib/csv";
 
