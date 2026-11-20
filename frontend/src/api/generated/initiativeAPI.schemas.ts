@@ -14422,6 +14422,13 @@ export type ListPluginToolRowsParams = {
   parent_id?: number | null;
   /** List archived rows instead */
   archived?: boolean;
+  /** Only rows whose text matches, read from the index the search page reads. */
+  search?: string | null;
+  /** Only rows carrying any of these tags */
+  tag_ids?: number[] | null;
+  /** A declared field, or name, created_at or updated_at, to list them by in place of their own order */
+  sort_by?: string | null;
+  sort_dir?: SortDir;
   /** Also send each row's first items of each item table under it, read for the whole page at once. */
   include_preview?: boolean;
   /** @minimum 1 */

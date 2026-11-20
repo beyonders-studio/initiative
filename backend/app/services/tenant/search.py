@@ -35,7 +35,7 @@ from app.core.errors import CodedError
 from app.core.messages import KindMessages, PluginMessages
 from app.core.plugin_scopes import tool_resource
 from app.core.tool_set import BUILTIN_TOOLS, ToolRecord, ToolSet
-from app.core.tools import Tool, kind_refusal
+from app.core.tools import Kind, Tool, kind_refusal
 from app.db.authorization import standing_arg
 from app.db.guild_standing import ActorContext, InstallContext
 from app.db.plugin_rls import SEARCH_ENTRY_READ_SCOPE
@@ -779,7 +779,7 @@ def _prefix_tokens(text: str) -> list[str]:
 
 
 def tool_search_clause(
-    tool: Tool | ToolRecord,
+    tool: Tool | ToolRecord | Kind,
     id_col: ColumnElement[int],
     search: str | None,
     context: ActorContext,
