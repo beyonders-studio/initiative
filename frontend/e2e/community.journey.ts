@@ -111,7 +111,8 @@ test("the first owner builds a community and finds it again", async ({ page }) =
   await task.getByRole("button", { name: "Create task" }).click();
   await expect(page.getByRole("main").getByText("Order the flour")).toBeVisible();
 
-  await page.getByRole("button", { name: new RegExp(`Online ${owner.username}`) }).click();
+  // Named by the avatar's initials, then the handle.
+  await page.getByRole("button", { name: new RegExp(`${owner.username}#\\d{4}$`) }).click();
   await page.getByRole("menuitem", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/(login|welcome)/);
 
