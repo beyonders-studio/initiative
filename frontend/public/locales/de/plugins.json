@@ -388,6 +388,7 @@
         "masonry": "Jeder Eintrag als Karte, jede so hoch, wie sie ist.",
         "table": "Jeder Eintrag als Zeile, seine Felder in Spalten."
       }
-    }
+    },
+    "accessSettings": "Zugriffseinstellungen"
   }
 }
