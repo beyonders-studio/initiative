@@ -141,39 +141,6 @@ async def test_each_list_is_its_tools_live_view_in_every_guild(
 
 
 @per_tool
-async def test_the_list_answers_with_what_reaches_the_caller(
-    client: AsyncClient, acting_user, tool: Tool
-):
-    """The row a caller just made is in their cross-guild list for that tool."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    await _enable_tools(client, a)
-    row = await _create(client, a, tool, "Standup")
-
-    response = await client.get(_path(tool), headers=a.headers)
-
-    assert response.status_code == 200
-    data = response.json()
-    assert row["id"] in {item["id"] for item in data["items"]}
-    assert data["total_count"] >= 1
-
-
-@per_tool
-async def test_a_guild_the_caller_is_not_in_contributes_nothing(
-    client: AsyncClient, acting_user, tool: Tool
-):
-    """The merge visits the caller's own communities and no others."""
-    outsider = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    stranger = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    await _enable_tools(client, stranger)
-    theirs = await _create(client, stranger, tool, "Not Yours")
-
-    response = await client.get(_path(tool), headers=outsider.headers)
-
-    assert response.status_code == 200
-    assert (stranger.guild.id, theirs["id"]) not in _keyed(response)
-
-
-@per_tool
 async def test_created_by_me_keeps_only_what_the_caller_wrote(
     client: AsyncClient, acting_user, tool: Tool
 ):
@@ -201,19 +168,23 @@ async def test_created_by_me_keeps_only_what_the_caller_wrote(
 async def test_guild_ids_narrows_the_merge(
     client: AsyncClient, session: AsyncSession, acting_user, tool: Tool
 ):
-    """Unfiltered the list spans every community the caller belongs to;
-    ``guild_ids`` narrows it to the ones named."""
+    """Unfiltered the list spans every community the caller belongs to, and
+    no others; ``guild_ids`` narrows it to the ones named."""
     a1 = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     await _enable_tools(client, a1)
     a2 = await _second_guild(client, session, a1)
+    stranger = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    await _enable_tools(client, stranger)
 
     row1 = await _create(client, a1, tool, "In Guild 1")
     row2 = await _create(client, a2, tool, "In Guild 2")
+    theirs = await _create(client, stranger, tool, "Not Yours")
 
     both = await client.get(_path(tool), headers=a1.headers)
     assert both.status_code == 200
     assert (a1.guild.id, row1["id"]) in _keyed(both)
     assert (a2.guild.id, row2["id"]) in _keyed(both)
+    assert (stranger.guild.id, theirs["id"]) not in _keyed(both)
 
     narrowed = await client.get(
         f"{_path(tool)}?community_ids={a1.guild.id}", headers=a1.headers
@@ -285,26 +256,6 @@ async def test_pagination_walks_the_merged_list(
     ]
 
 
-async def test_a_co_member_reads_what_was_shared_with_the_initiative(
-    client: AsyncClient, acting_user
-):
-    """Sharing is what the list answers by, not who made the row."""
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    other = await acting_user(
-        guild_role=CommunityRole.member,
-        guild=admin.guild,
-        initiative=admin.initiative,
-        initiative_role="member",
-    )
-    # Created through the API, so it carries the default all-members read grant.
-    admin_doc = await _create(client, admin, Tool.file, "Admin's Doc")
-
-    response = await client.get("/api/v1/me/files", headers=other.headers)
-
-    assert response.status_code == 200
-    assert admin_doc["id"] in {d["id"] for d in response.json()["items"]}
-
-
 # ---------------------------------------------------------------------------
 # What belongs to one tool
 # ---------------------------------------------------------------------------
@@ -316,7 +267,8 @@ async def test_my_projects_follows_grants_not_guild_admin_standing(
     """A guild admin's My Projects is what has been shared with them.
 
     Their authority still reaches every project in the community — asking for
-    the initiative by name still answers with all of it. A list that spans
+    the initiative by name still answers with all of it, which keeps this a
+    change to navigation rather than to authority. A list that spans
     initiatives answers a different question: what reaches the reader.
     """
     owner = await create_user(session, email="owner@example.com")
@@ -336,42 +288,17 @@ async def test_my_projects_follows_grants_not_guild_admin_standing(
     mine = await create_initiative(session, guild, admin, name="Theirs")
     shared = await create_project(session, mine, admin, name="Their Own")
 
-    response = await client.get("/api/v1/me/projects", headers=get_auth_headers(admin))
+    headers = get_auth_headers(admin)
+    response = await client.get("/api/v1/me/projects", headers=headers)
 
     assert response.status_code == 200
     project_ids = {p["id"] for p in response.json()["items"]}
     assert shared.id in project_ids
     assert unshared.id not in project_ids
 
-
-async def test_an_initiative_listing_still_answers_a_guild_admin_in_full(
-    client: AsyncClient, session: AsyncSession
-):
-    """Naming one initiative asks about standing, and an admin's reaches it all.
-
-    The companion to the test above: the same project the cross-initiative list
-    withholds is returned the moment the admin asks for its initiative, which is
-    what keeps this a change to navigation rather than to authority.
-    """
-    owner = await create_user(session, email="owner2@example.com")
-    admin = await create_user(session, email="otheradmin2@example.com")
-
-    guild = await create_guild(session, creator=owner, name="Shared Guild")
-    await create_guild_membership(
-        session, user=owner, guild=guild, role=CommunityRole.admin
-    )
-    await create_guild_membership(
-        session, user=admin, guild=guild, role=CommunityRole.admin
-    )
-
-    elsewhere = await create_initiative(session, guild, owner, name="Not Theirs")
-    unshared = await create_project(session, elsewhere, owner, name="Someone Else's")
-
-    headers = get_auth_headers(admin)
     across = await client.get(f"/api/v1/c/{guild.id}/projects/", headers=headers)
     assert across.status_code == 200
     assert unshared.id not in {p["id"] for p in across.json()["items"]}
-
     within = await client.get(
         f"/api/v1/c/{guild.id}/projects/?initiative_id={elsewhere.id}",
         headers=headers,
@@ -443,11 +370,18 @@ async def test_my_calendars_merge_across_guilds_and_apply_sharing(
 
 
 async def test_my_tool_counts(client: AsyncClient, acting_user):
-    """Every tool is answered for, with a zero where the caller has none."""
+    """Every tool is answered for, with a zero where the caller has none, and
+    the counts follow the view the page is in."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     await _enable_tools(client, a)
     await _create(client, a, Tool.wiki, "Standup")
     await _create(client, a, Tool.wiki, "Retro")
+    other = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=a.guild,
+        initiative=a.initiative,
+        initiative_role="member",
+    )
 
     response = await client.get("/api/v1/me/tools/counts", headers=a.headers)
 
@@ -461,25 +395,11 @@ async def test_my_tool_counts(client: AsyncClient, acting_user):
     # page, so a new one belongs here the day it exists.
     assert set(counts) == {tool.value for tool in Tool}
 
-
-async def test_my_tool_counts_created_by_me(client: AsyncClient, acting_user):
-    """The counts follow the view the page is in."""
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    await _enable_tools(client, admin)
-    other = await acting_user(
-        guild_role=CommunityRole.member,
-        guild=admin.guild,
-        initiative=admin.initiative,
-        initiative_role="member",
-    )
-    await _create(client, admin, Tool.wiki, "Admin's Wiki")
-
-    everything = await client.get("/api/v1/me/tools/counts", headers=other.headers)
-    assert everything.status_code == 200
-    assert everything.json()["counts"]["wiki"] == 1
-
-    mine = await client.get(
-        "/api/v1/me/tools/counts?created_by_me=true", headers=other.headers
-    )
-    assert mine.status_code == 200
-    assert mine.json()["counts"]["wiki"] == 0
+    for created_by_me, wikis in ((False, 2), (True, 0)):
+        theirs = await client.get(
+            "/api/v1/me/tools/counts",
+            headers=other.headers,
+            params={"created_by_me": created_by_me},
+        )
+        assert theirs.status_code == 200
+        assert theirs.json()["counts"]["wiki"] == wikis

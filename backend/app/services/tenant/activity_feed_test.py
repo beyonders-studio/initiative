@@ -74,8 +74,15 @@ async def test_an_entry_is_an_item_and_what_people_did_to_it(
     session, acting_user, reading_as
 ):
     """A comment counts for the task it is on; the people are named latest
-    first; the reader's own changes make no entry; a reaction makes none."""
+    first; the reader's own changes make no entry; a reaction makes none; a
+    member the project is not shared with sees none of it."""
     a, b = await _start(session, acting_user)
+    outsider = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=a.guild,
+        initiative=a.initiative,
+        initiative_role="member",
+    )
     task = await create_task(session, a.project, title="Book the hall")
     await _by(session, a.guild.id, b.user.id)
     await create_comment(session, a.user, task=task)
@@ -93,6 +100,7 @@ async def test_an_entry_is_an_item_and_what_people_did_to_it(
 
     (entry,) = await _feed(reading_as, a)
     assert entry.verbs == ["created"] and entry.actor_count == 1
+    assert await _feed(reading_as, outsider) == []
 
     await _log(
         session,
@@ -100,21 +108,6 @@ async def test_an_entry_is_an_item_and_what_people_did_to_it(
         "UPDATE event_outbox SET action = 'updated', changed = '{reactions}'",
     )
     assert await _feed(reading_as, a) == []
-
-
-async def test_only_what_the_reader_can_open(session, acting_user, reading_as):
-    """A member the project is not shared with sees none of it."""
-    a, _b = await _start(session, acting_user)
-    outsider = await acting_user(
-        guild_role=CommunityRole.member,
-        guild=a.guild,
-        initiative=a.initiative,
-        initiative_role="member",
-    )
-    await create_task(session, a.project)
-    await _by(session, a.guild.id, a.user.id)
-
-    assert await _feed(reading_as, outsider) == []
 
 
 async def test_views_and_narrowing(session, acting_user, reading_as):

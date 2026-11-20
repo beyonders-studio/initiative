@@ -244,8 +244,3 @@ class Related:
 def is_symmetric(relationship_type: RelationshipType) -> bool:
     """Whether this relation is stored once per unordered pair."""
     return SPECS[relationship_type].symmetric
-
-
-def is_transitive(relationship_type: RelationshipType) -> bool:
-    """Whether a walk along this relation may go past one hop."""
-    return SPECS[relationship_type].transitive

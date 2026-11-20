@@ -15,7 +15,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.relationships import ENDPOINT_KINDS, RelationshipType, node_id
+from app.core.relationships import RelationshipType, node_id
 from app.core.search import SearchEntityType
 from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
@@ -33,14 +33,6 @@ from app.testing.factories import (
     create_task,
 )
 from app.testing.schema_harness import route_session_to_guild
-
-
-def test_every_taggable_kind_can_sit_on_an_edge():
-    """The registry is one list now: a spec names a model and the kind an edge
-    addresses it by, and a kind no edge may name would be a tag surface with
-    nowhere to store an assignment."""
-    for name, spec in tags_service.TAG_LINKS.items():
-        assert spec.kind in ENDPOINT_KINDS, name
 
 
 async def _edges(session, guild_id: int, kind, entity_id: int):

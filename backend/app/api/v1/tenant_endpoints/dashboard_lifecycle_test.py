@@ -69,7 +69,7 @@ async def test_deleted_work_is_never_counted(client, session, acting_user):
     assert await count_tasks(client, actor, []) == [[2]]
 
 
-async def test_archived_work_is_left_out_included_or_all_there_is(
+async def test_archived_work_and_templates_are_left_out_included_or_all_there_is(
     client, session, acting_user
 ):
     actor, _, _, shelved = await an_initiative(session, acting_user)
@@ -78,17 +78,8 @@ async def test_archived_work_is_left_out_included_or_all_there_is(
     )
     assert archived.status_code == 200, archived.text
 
-    assert await count_tasks(client, actor, [NOT_ARCHIVED]) == [[3]]
     assert await count_tasks(client, actor, []) == [[4]]
-    only = {**NOT_ARCHIVED, "value": False}
-    assert await count_tasks(client, actor, [only]) == [[1]]
-
-
-async def test_templates_are_left_out_included_or_all_there_is(
-    client, session, acting_user
-):
-    actor, *_ = await an_initiative(session, acting_user)
-    assert await count_tasks(client, actor, [NOT_TEMPLATE]) == [[3]]
-    assert await count_tasks(client, actor, []) == [[4]]
-    only = {**NOT_TEMPLATE, "value": True}
-    assert await count_tasks(client, actor, [only]) == [[1]]
+    for condition, only in ((NOT_ARCHIVED, False), (NOT_TEMPLATE, True)):
+        assert await count_tasks(client, actor, [condition]) == [[3]]
+        flipped = {**condition, "value": only}
+        assert await count_tasks(client, actor, [flipped]) == [[1]]

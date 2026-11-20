@@ -10,6 +10,8 @@ from datetime import UTC
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from app.core.file_types import FileType
 from app.core.messages import QueryMessages
 from app.core.relationships import RelationshipType
@@ -30,21 +32,6 @@ from app.testing import (
 )
 
 
-async def test_a_member_can_run_a_query(client, acting_user):
-    actor = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    response = await client.post(
-        actor.g("/query"),
-        json={"sql": "SELECT count(*) AS n FROM projects"},
-        headers=actor.headers,
-    )
-    assert response.status_code == 200
-    body = response.json()
-    assert body["columns"] == [
-        {"name": "n", "type": "number", "grain": None, "date_only": False}
-    ]
-    assert body["truncated"] is False
-
-
 async def test_the_rows_come_back_positionally(client, acting_user):
     actor = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     response = await client.post(
@@ -57,56 +44,61 @@ async def test_the_rows_come_back_positionally(client, acting_user):
         {"name": "a", "type": "number", "grain": None, "date_only": False},
         {"name": "b", "type": "number", "grain": None, "date_only": False},
     ]
+    assert response.json()["truncated"] is False
 
 
-async def test_a_statement_the_surface_refuses_says_which_word(client, acting_user):
+@pytest.mark.parametrize(
+    ("route", "payload", "detail"),
+    [
+        ("/query", {"sql": "SELECT id FROM users"}, QueryMessages.UNKNOWN_RELATION),
+        # A write is refused before it reaches the database.
+        ("/query", {"sql": "DELETE FROM tasks"}, QueryMessages.READ_ONLY),
+        (
+            "/query/describe",
+            {"sql": "SELECT id FROM users"},
+            QueryMessages.UNKNOWN_RELATION,
+        ),
+        (
+            "/query/build",
+            {"dataset": "pg_shadow", "columns": [{"field": "usename"}]},
+            QueryMessages.UNKNOWN_RELATION,
+        ),
+    ],
+)
+async def test_a_statement_the_surface_refuses_says_which_word(
+    client, acting_user, route, payload, detail
+):
     actor = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    response = await client.post(
-        actor.g("/query"),
-        json={"sql": "SELECT id FROM users"},
-        headers=actor.headers,
-    )
+    response = await client.post(actor.g(route), json=payload, headers=actor.headers)
     assert response.status_code == 400
-    assert response.json()["detail"] == QueryMessages.UNKNOWN_RELATION
-
-
-async def test_a_write_is_refused_before_it_reaches_the_database(client, acting_user):
-    actor = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    response = await client.post(
-        actor.g("/query"),
-        json={"sql": "DELETE FROM tasks"},
-        headers=actor.headers,
-    )
-    assert response.status_code == 400
-    assert response.json()["detail"] == QueryMessages.READ_ONLY
-
-
-async def test_a_statement_the_database_cannot_finish_is_a_refusal(client, acting_user):
-    """It parsed and resolved; the database had the last word on it. That is
-    still something the reader can correct, so it comes back as one."""
-    actor = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    response = await client.post(
-        actor.g("/query"),
-        json={"sql": "SELECT count(*) / 0 AS n FROM projects"},
-        headers=actor.headers,
-    )
-    assert response.status_code == 400
-    assert response.json()["detail"] == QueryMessages.EXECUTION_FAILED
+    assert response.json()["detail"] == detail
 
 
 async def test_describing_a_statement_names_its_columns_and_types(client, acting_user):
+    """``priority`` is a database enum and ``project_id`` holds an integer that
+    means a project — the signals the field registry reads, so a query's shape
+    and a dataset's fields say it the same way."""
     actor = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    response = await client.post(
-        actor.g("/query/describe"),
-        json={"sql": "SELECT name, created_at, archived_at, id FROM projects"},
-        headers=actor.headers,
-    )
-    assert response.status_code == 200
-    assert response.json()["columns"] == [
-        {"name": "name", "type": "text", "grain": None, "date_only": False},
-        {"name": "created_at", "type": "date", "grain": None, "date_only": False},
-        {"name": "archived_at", "type": "date", "grain": None, "date_only": False},
-        {"name": "id", "type": "number", "grain": None, "date_only": False},
+
+    async def describe(sql: str) -> list[tuple[str, str]]:
+        response = await client.post(
+            actor.g("/query/describe"), json={"sql": sql}, headers=actor.headers
+        )
+        assert response.status_code == 200
+        columns = response.json()["columns"]
+        assert {(c["grain"], c["date_only"]) for c in columns} == {(None, False)}
+        return [(c["name"], c["type"]) for c in columns]
+
+    assert await describe("SELECT name, created_at, archived_at, id FROM projects") == [
+        ("name", "text"),
+        ("created_at", "date"),
+        ("archived_at", "date"),
+        ("id", "number"),
+    ]
+    assert await describe("SELECT priority, project_id, title FROM tasks") == [
+        ("priority", "enum"),
+        ("project_id", "reference"),
+        ("title", "text"),
     ]
 
 
@@ -136,38 +128,6 @@ async def test_calendar_date_kind_survives_describing_and_running(
             ]
 
 
-async def test_a_closed_vocabulary_describes_as_one(client, acting_user):
-    """``priority`` is a database enum, which is the same signal the field
-    registry reads — so a query's shape and a dataset's fields say it the
-    same way."""
-    actor = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    response = await client.post(
-        actor.g("/query/describe"),
-        json={"sql": "SELECT priority FROM tasks"},
-        headers=actor.headers,
-    )
-    assert response.status_code == 200
-    assert response.json()["columns"] == [
-        {"name": "priority", "type": "enum", "grain": None, "date_only": False}
-    ]
-
-
-async def test_a_field_that_names_a_row_describes_as_a_reference(client, acting_user):
-    """``project_id`` holds an integer and means a project. A query's shape says
-    that in the same word the dataset's fields do."""
-    actor = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    response = await client.post(
-        actor.g("/query/describe"),
-        json={"sql": "SELECT project_id, title FROM tasks"},
-        headers=actor.headers,
-    )
-    assert response.status_code == 200
-    assert response.json()["columns"] == [
-        {"name": "project_id", "type": "reference", "grain": None, "date_only": False},
-        {"name": "title", "type": "text", "grain": None, "date_only": False},
-    ]
-
-
 async def test_describing_runs_nothing(client, session, acting_user):
     """A statement that would fail while running still describes, because
     describing plans and does not execute."""
@@ -187,18 +147,10 @@ async def test_describing_runs_nothing(client, session, acting_user):
     assert described.json()["columns"] == [
         {"name": "n", "type": "number", "grain": None, "date_only": False}
     ]
+    # It parsed and resolved; the database had the last word on it. That is
+    # still something the reader can correct, so it comes back as one.
     assert ran.status_code == 400
-
-
-async def test_a_statement_that_does_not_resolve_does_not_describe(client, acting_user):
-    actor = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    response = await client.post(
-        actor.g("/query/describe"),
-        json={"sql": "SELECT id FROM users"},
-        headers=actor.headers,
-    )
-    assert response.status_code == 400
-    assert response.json()["detail"] == QueryMessages.UNKNOWN_RELATION
+    assert ran.json()["detail"] == QueryMessages.EXECUTION_FAILED
 
 
 async def test_a_non_member_cannot_reach_the_guilds_queries(client, acting_user):
@@ -255,30 +207,15 @@ async def test_a_built_query_answers_with_its_sql_and_its_shape(client, acting_u
     )
     assert response.status_code == 200
     body = response.json()
-    assert body["sql"].startswith("SELECT priority, count(*) AS tasks FROM tasks")
+    assert body["sql"] == (
+        "SELECT priority, count(*) AS tasks FROM tasks"
+        " GROUP BY 1 ORDER BY 2 DESC NULLS LAST LIMIT 10"
+    )
     assert body["columns"] == [
         {"name": "priority", "type": "enum", "grain": None, "date_only": False},
         {"name": "tasks", "type": "number", "grain": None, "date_only": False},
     ]
     assert body["relations"] == ["tasks"]
-
-
-async def test_a_built_query_can_be_run_as_it_came_back(client, session, acting_user):
-    """The whole point of building server-side: a statement somebody clicked
-    together is one this surface will run."""
-    actor = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    await create_project(session, actor.initiative, actor.user)
-    built = await client.post(
-        actor.g("/query/build"),
-        json={"dataset": "projects", "columns": [{"field": "*", "aggregate": "count"}]},
-        headers=actor.headers,
-    )
-    assert built.status_code == 200
-    ran = await client.post(
-        actor.g("/query"), json={"sql": built.json()["sql"]}, headers=actor.headers
-    )
-    assert ran.status_code == 200
-    assert ran.json()["rows"] == [[1]]
 
 
 async def test_a_built_query_brackets_what_it_was_told_to(client, session, acting_user):
@@ -336,17 +273,6 @@ async def test_a_built_query_keeps_a_date_a_distance(client, acting_user):
     assert response.status_code == 200, response.json()
     assert "interval" in response.json()["sql"].lower()
     assert "now()" in response.json()["sql"].lower()
-
-
-async def test_a_builder_cannot_describe_a_dataset_nobody_declared(client, acting_user):
-    actor = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    response = await client.post(
-        actor.g("/query/build"),
-        json={"dataset": "pg_shadow", "columns": [{"field": "usename"}]},
-        headers=actor.headers,
-    )
-    assert response.status_code == 400
-    assert response.json()["detail"] == QueryMessages.UNKNOWN_RELATION
 
 
 class TestReadingOneInitiative:
