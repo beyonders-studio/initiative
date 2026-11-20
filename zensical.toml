@@ -76,6 +76,7 @@ nav = [
     ] },
     "en/guides/plugins-and-marketplace.md",
     "en/guides/managing-plugins.md",
+    "en/guides/github.md",
     "en/guides/tags.md",
     "en/guides/your-space.md",
     "en/guides/messages.md",

@@ -60,6 +60,8 @@ A plug-in reads and changes things only in the initiatives it works in.
 
 Each change saves straight away. With no initiatives chosen, the plug-in reaches nothing inside initiatives at all.
 
+For a plug-in that adds a [tool](plugins-and-marketplace.md#use-a-tool-a-plug-in-added), this is where the tool appears. Take an initiative off the list and the tool vanishes from it, with everything in it kept; put the initiative back and it all reappears.
+
 Who uses it in each initiative is that initiative's call, the way its tools are: **Roles** beside an initiative opens its Roles screen, where its managers decide (see [Plug-ins on a role](../sharing/initiative-roles.md#plug-ins-on-a-role)). Its managers and community admins can always use it there. What a plug-in adds to Community settings follows the [custom roles](running-a-community.md#custom-roles) your admins hold.
 
 ## See who has connected, and stop them
@@ -83,6 +85,8 @@ A version that wants **more** than you agreed to (something new to reach, or a n
 3. Select **Accept and update**, or **Decline**.
 
 Declining keeps the plug-in as it is, on the version it's running.
+
+A plug-in that adds a tool also waits for you when a version adds to the tool: a new kind of thing inside it, a field, a choice in a list, or an action. A new major version can take a field or a choice away too, and then it says so, like **Remove the field “notes” and delete what it holds**. **Accept, update and delete what it drops** is the button for that one, and what the field held is gone once you select it.
 
 To read every update before it lands, turn off **Update automatically** in the plug-in's settings. Each new version then waits for you to select its button, like **Update to 2.1.0**. When there's nothing new, it says **Up to date**.
 
@@ -109,6 +113,26 @@ What happens next:
 **Also erase its data** asks the plug-in to delete everything it holds about your community. Once it has, its names for your community and its members are forgotten, and adding it back starts afresh. You can't add it back until it has answered. A plug-in that never answers is given about four days, and then its names are forgotten anyway.
 
 A plug-in is also told when your community is put on hold, and pauses its own work until the community is back. If a community is deleted for good, every plug-in that knew it is asked to erase what it holds first.
+
+### Remove a plug-in that adds a tool { #remove-a-tool-plug-in }
+
+A tool's contents belong to your community rather than to the plug-in, so removing one works differently: nothing goes to the trash, and the plug-in has nothing of yours to erase. Instead you agree to everything in the tool being deleted 30 days later.
+
+1. In **Community Settings → Integrations**, select **Remove** on the plug-in's row.
+2. Read what it says will happen.
+3. Select **Remove and delete in 30 days**.
+
+The tool disappears from every initiative straight away. For the next 30 days everything in it is kept out of sight. After that it's deleted for good: every item, and the comments, links, tags and sharing on them.
+
+### Bring back a tool you removed
+
+Changed your mind? Add the plug-in again within the 30 days and the deletion is called off.
+
+1. Select **Add a plug-in** at the bottom of the **Plug-ins** section in the sidebar.
+2. Open the plug-in's listing.
+3. Select **Add to community**, and then **Add to community** again in the dialog.
+
+The tool comes back in the initiatives it was in, with everything in it. Added after the 30 days, it starts out empty.
 
 ## Let a plug-in own things
 

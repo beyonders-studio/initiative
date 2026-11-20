@@ -8,6 +8,8 @@ Communities add plug-ins from the marketplace. Whether a plug-in can run on your
 
 Most plug-ins need nothing from you. The rest need an address, a key or a few values from another service, and this page is where those go.
 
+Plug-ins are also how a server stays lean. A tool only some groups use, [Counters](../guides/counters.md) first, comes as a tool plug-in, and a tool plug-in's tables exist only in the communities that added it. A server whose communities never count anything carries no counter tables at all.
+
 ## Where plug-ins come from
 
 | Source | What it is |
@@ -51,15 +53,30 @@ Registry signatures expire on purpose: the newest one lasts a day. A server that
 
     A build whose shipped root is a placeholder has no registry to follow. The panel says so, and no background check runs.
 
-## The two kinds of plug-in
+## What runs for each kind of plug-in
 
-| | Runs inside Initiative | Runs as a container |
-|---|---|---|
-| What runs | Nothing extra. Initiative makes the plug-in's calls itself, from its manifest. | The plug-in's own program, beside Initiative. |
-| What it needs from you | Its vendor values, if it talks to another service. | Where it answers, the keys it signs with, and any vendor values. |
-| Its row says | *Initiative makes this plug-in's calls itself.* | *Container image:* and the image it runs. |
+| | A tool plug-in | Runs inside Initiative | Runs as a container |
+|---|---|---|---|
+| What runs | Nothing. Initiative builds the tool from the plug-in's declaration, in each community that adds it. | Nothing extra. Initiative makes the plug-in's calls itself, from its manifest. | The plug-in's own program, beside Initiative. |
+| What it needs from you | Nothing. | Its vendor values, if it talks to another service. | Where it answers, the keys it signs with, and any vendor values. |
+| For example | Counters | GitHub | A plug-in with pages of its own, or a service answering what its manifest declares |
 
 A row is **Live** once it has everything it needs, and only then are communities offered it. Until then it shows **Not live** with a line saying what's missing, and no community sees it on the Plug-ins shelf.
+
+### A tool plug-in
+
+There's nothing to set up. Once its listing arrives, communities can add it, and each community that does gets the tool's tables in its own schema. Removing it from a community hides the tool at once and deletes its contents 30 days later, a window the community's superadmin agrees to when removing it; adding it back within the window brings everything back. Turning on **Install in every community** for a tool plug-in adds it nowhere: each community adds a tool itself.
+
+[Counters](../guides/counters.md) ships with Initiative as `core.counters`, so a server with registry updates switched off offers it too.
+
+??? techspec "Where a tool plug-in's data lives"
+    | What | Where |
+    |---|---|
+    | Its tables | In each installing community's `guild_<id>` schema only, named `p_`, the plug-in's listing uid in lower case, `_` and the table's declared key (`p_tsjvtcm0s7gv2x_counter_group`). No other community, and not `guild_template`, has them. |
+    | Its columns | The ones every built-in tool table has, plus one typed column per declared field. |
+    | Its row security | Rendered from the same records as a built-in tool's, so the initiative boundary, sharing, holds and the trash apply to it unchanged. The community's provisioning stamp names the installed tools it was rendered with, so the start-up backfill re-renders a community whose tools changed. |
+    | Its kinds | The declared key, `.` and the uid in lower case (`counter_group.tsjvtcm0s7gv2x`). Each kind's numeric code is recorded in `public.plugin_kind_codes` when a version declaring it is registered. That row names the kind and its code and nothing about any community. |
+    | Removal | The install is marked deleted at once. After `30` days the deletion sweep deletes its rows and everything naming them (links, comments, tags, search entries, permissions), and the community's next provisioning drops its tables. |
 
 ### A plug-in that runs inside Initiative
 
@@ -75,6 +92,22 @@ If it talks to another service, its row has a **Vendor client** section for the 
 
 !!! tip "The GitHub plug-in fills all of that in for you"
     Its row has **Create the GitHub App**. Choose who owns the app: **Your GitHub account**, or **A GitHub organization** you're an owner of, giving its name as it appears in its address. Then select **Create the GitHub App**. GitHub opens with the plug-in's permissions, events and your server's addresses already filled in. Confirm it there, and GitHub sends all six values back to Initiative. You type and copy none of them.
+
+??? techspec "What the GitHub App needs"
+    A GitHub App keeps the permissions and events it was created with, so one made by hand, or made before the plug-in asked for more, needs these set on GitHub under its **Permissions & events**. Each organization's owner then accepts the change on GitHub, which asks them. `{APP_URL}` is Initiative's public address.
+
+    | Setting | Value |
+    |---|---|
+    | Callback URL | `{APP_URL}/api/v1/plugin-connections/callback` |
+    | Setup URL | `{APP_URL}/api/v1/plugin-connections/setup` |
+    | Webhook URL | `{APP_URL}/api/v1/plugin-hooks/beyonders-studio.github` |
+    | Expire user authorization tokens | On |
+    | Request user authorization (OAuth) during installation | Off |
+    | Repository permissions | Issues: read and write · Pull requests: read and write · Contents: read and write · Checks: read · Commit statuses: read · Dependabot alerts: read · Metadata: read |
+    | Organization permissions | Members: read · Projects: read and write |
+    | Events | Issues · Pull request · Release · Create · Delete · Pull request review · Check suite |
+
+    The plug-in asks GitHub for every installation token with read access, plus write access to issues and pull requests for the writes it makes as the organization and, on an organization, its Projects permission. No installation token can change a repository's contents. Branches started from a task are created with the member's own account. What the plug-in does with all of it is on [GitHub](../guides/github.md).
 
 ### A plug-in that runs as a container
 
