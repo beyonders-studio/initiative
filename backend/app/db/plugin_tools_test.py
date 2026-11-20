@@ -418,10 +418,7 @@ async def test_the_tool_is_there_where_it_is_placed(
         context = await route_as(reader, user_id=seat.user.id, guild_id=seat.guild.id)
         await reader.rollback()
         on = {pair for pair in context.enabled_tools if pair.endswith(_KIND)}
-        assert on == {f"{i}:{_KIND}" for i in placed or [first]} | {
-            f"*:{_KIND}",
-            f"+:{_KIND}",
-        }
+        assert on == {f"{i}:{_KIND}" for i in placed or [first]}
         for initiative in (first, later):
             read = await client.get(
                 seat.g(f"/initiatives/{initiative}"), headers=seat.headers
@@ -692,7 +689,7 @@ async def test_turning_a_tool_plugin_off_is_its_switch(
         reader = await role_session("app_user")
         context = await route_as(reader, user_id=user_id, guild_id=guild_id)
         assert (pair in context.enabled_tools) is enabled
-        assert {f"*:{_KIND}", f"+:{_KIND}"} <= set(context.enabled_tools)
+        assert context.open_tools == (_KIND,)
         await reader.rollback()
 
 

@@ -73,7 +73,7 @@ from app.services.tenant import ownership as ownership_service
 from app.services.tenant import posts as posts_service
 from app.services.tenant import share_requests as share_requests_service
 from app.services.tenant import wikis as wikis_service
-from app.services.tenant.initiative_tools import tool_on
+from app.services.tenant.initiative_tools import switch, tool_on_in
 
 CurrentUserDep = Annotated[User, Depends(get_current_active_user)]
 
@@ -159,8 +159,8 @@ def governing_tool(table: str) -> Tool:
     return path[0]
 
 
-def require_tool_enabled(
-    kind: Tool | ToolRecord, initiative: Any, context: ActorContext
+async def require_tool_enabled(
+    session: Any, kind: Tool | ToolRecord, initiative: Any
 ) -> None:
     """Raise 403 unless ``initiative`` has ``kind``'s master switch on.
 
@@ -173,7 +173,7 @@ def require_tool_enabled(
     switch leg. This runs first so the answer is a named 403 rather than a row
     that silently fails to appear.
     """
-    if not tool_on(context, initiative, kind):
+    if not await tool_on_in(session, initiative, kind):
         raise kind.disabled()
 
 
@@ -229,7 +229,7 @@ async def prepare_create(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=InitiativeMessages.NOT_FOUND,
         )
-    require_tool_enabled(kind, initiative, guild_context)
+    await require_tool_enabled(session, kind, initiative)
     await require_create(session, kind, initiative, user, guild_context)
     return initiative
 
@@ -409,7 +409,7 @@ def authorize(
     ``access="write"`` is an edit."""
     cfg = RESOURCE_ACCESS[kind]
     initiative = getattr(row, "initiative", None)
-    if initiative is not None and not tool_on(context, initiative, kind):
+    if initiative is not None and not switch(context, initiative, kind):
         raise kind.disabled()
     permissions_service.require_access(
         permissions_service.DAC_RESOURCES[cfg.dac_kind],
@@ -522,7 +522,7 @@ async def require_may_change(
             status_code=status.HTTP_409_CONFLICT,
             detail=CommonMessages.CONTENT_IS_FROZEN,
         )
-    require_tool_enabled(kind.tool, row.initiative, context)
+    await require_tool_enabled(session, kind.tool, row.initiative)
     await require_create(session, kind.tool, row.initiative, user, context)
 
 
@@ -601,7 +601,7 @@ async def load_kind(
             raise kind_refusal(kind, KindMessages.NOT_FOUND, 404)
         # Its tool on in the row's initiative, as a built-in tool's is.
         await plugin_tool_rows.require_on(
-            session, guild_context, located, int(row.tool["initiative_id"])
+            session, located, int(row.tool["initiative_id"])
         )
         permissions_service.require_access(
             permissions_service.DacResource(located.tool),

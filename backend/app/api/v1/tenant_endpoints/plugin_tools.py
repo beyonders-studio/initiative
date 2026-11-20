@@ -132,7 +132,7 @@ async def read_plugin_tool(
     fields they ask for. Not found where it is on in no initiative the
     caller reaches."""
     located = rows_service.located_kind(routed_tools(session), kind)
-    if not rows_service.placed_anywhere(context, located):
+    if not await rows_service.placed_anywhere(session, context, located):
         raise located.tool.not_found()
     return rows_service.declaration(located)
 
@@ -159,7 +159,7 @@ async def list_plugin_tool_rows(
     if rows_service.parent_column(located) is None:
         if initiative_id is None or parent_id is not None:
             raise rows_service.refuse_placement()
-        await rows_service.require_on(session, context, located, initiative_id)
+        await rows_service.require_on(session, located, initiative_id)
         under = initiative_id
     else:
         if parent_id is None or initiative_id is not None:

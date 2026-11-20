@@ -83,7 +83,7 @@ from app.services.permissions import (
 from app.services.tenant import content_references, descriptions
 from app.services.tenant import tags as tags_service
 from app.services.tenant.descriptions import newly_mentioned
-from app.services.tenant.initiative_tools import tool_on
+from app.services.tenant.initiative_tools import tool_on_in, tool_on_sql
 from app.services.tenant.relationships import Endpoint
 
 #: The largest number a number or counter field's column holds.
@@ -186,21 +186,26 @@ def declaration(located: Located) -> PluginToolRead:
     )
 
 
-def placed_anywhere(context: ActorContext, located: Located) -> bool:
+async def placed_anywhere(
+    session: AsyncSession, context: ActorContext, located: Located
+) -> bool:
     """Whether ``located``'s tool is on in some initiative the reader
-    reaches: switched on there and its install placed there."""
-    for pair in context.enabled_tools:
-        initiative, _, kind = pair.partition(":")
-        if kind == located.tool.kind and initiative.isdigit():
-            return True
-    return False
+    reaches: one they are in, by the standing's pairs, or for a reader who
+    reaches every initiative, any initiative it is on in."""
+    kind = located.tool.kind
+    if any(pair.endswith(f":{kind}") for pair in context.enabled_tools):
+        return True
+    if not (context.is_admin or context.pam_read) or kind not in context.open_tools:
+        return False
+    on = select(Initiative.id).where(tool_on_sql(located.tool))
+    return bool(await session.scalar(sa.select(on.exists())))
 
 
 # --- gates -------------------------------------------------------------------
 
 
 async def require_on(
-    session: AsyncSession, context: ActorContext, located: Located, initiative_id: int
+    session: AsyncSession, located: Located, initiative_id: int
 ) -> Initiative:
     """The initiative ``initiative_id`` names, once ``located``'s tool is on in
     it, as a built-in tool's routes ask: its switch on there, and its install
@@ -212,7 +217,7 @@ async def require_on(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=InitiativeMessages.NOT_FOUND,
         )
-    if not tool_on(context, initiative, located.tool):
+    if not await tool_on_in(session, initiative, located.tool):
         raise located.tool.disabled()
     return initiative
 
@@ -233,7 +238,7 @@ async def load_authorized(
     row = await load_row(session, located, tools, row_id, for_update=action is not None)
     if row is None:
         raise located.tool.not_found()
-    await require_on(session, context, located, int(row.tool["initiative_id"]))
+    await require_on(session, located, int(row.tool["initiative_id"]))
     require_access(DacResource(located.tool), row, context=context, action=action)
     return row
 

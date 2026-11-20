@@ -34,6 +34,7 @@ from app.testing import (
     create_tag,
     create_task,
     create_user,
+    install_tool_plugin,
     route_session_to_guild,
 )
 from conftest import TEST_DATABASE_URL
@@ -42,8 +43,9 @@ pytestmark = pytest.mark.budget
 
 #: Parsed policies, per community, per database connection that has served it.
 #: Postgres keeps them until the table changes, so a pooled connection holds one
-#: of these for every community it has served. 5.70 MB on 2026-11-11.
-POLICY_MEMORY_PER_COMMUNITY = 5_888 * 1024
+#: of these for every community it has served. 5.77 MB on 2026-11-20, 232 KB of
+#: it the test tool plug-in's two tables.
+POLICY_MEMORY_PER_COMMUNITY = 5_952 * 1024
 
 #: The same for one table. 264 KB (``metadata_values``) on 2026-10-27.
 POLICY_MEMORY_PER_TABLE = 280 * 1024
@@ -54,10 +56,14 @@ _POLICY_MEMORY = (
 )
 
 
-async def test_a_communitys_policies_fit_their_memory(session: AsyncSession):
-    guild = await create_guild(session)
-    await session.commit()
-    schema = guild_schema_name(guild.id)
+async def test_a_communitys_policies_fit_their_memory(
+    client, session: AsyncSession, acting_user
+):
+    """Counted with a tool plug-in installed, whose tables are the
+    community's too."""
+    seat = await acting_user(guild_role=CommunityRole.superadmin)
+    await install_tool_plugin(client, session, seat)
+    schema = guild_schema_name(seat.guild.id)
 
     # A connection of its own, so nothing another test loaded is counted.
     conn = await asyncpg.connect(TEST_DATABASE_URL.replace("+asyncpg", "", 1))

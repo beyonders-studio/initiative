@@ -180,39 +180,34 @@ async def forget_tool(session: AsyncSession, kinds: Sequence[str]) -> None:
     )
 
 
-def tool_on(context: ActorContext, initiative: Any, tool: Tool | ToolRecord) -> bool:
-    """Whether ``tool`` is on in ``initiative``, by the request's standing. A
-    tool plug-in's is its pair in ``enabled_tools``, which holds its switch,
-    its install's and its placement in every initiative the reader reaches."""
-    if isinstance(tool, ToolRecord) and tool.installed:
-        return f"{initiative.id}:{tool.kind}" in context.enabled_tools
-    return switch(context, initiative, tool)
-
-
 async def tool_on_in(
     session: AsyncSession, initiative: Any, tool: Tool | ToolRecord
 ) -> bool:
-    """:func:`tool_on` for a caller holding only a session: by its standing
-    where it has one, and by the community's row where it does not (the
-    system's own reads), a tool plug-in's as :func:`tool_on_sql` reads it."""
+    """Whether ``tool`` is on in ``initiative``: its :func:`switch` by the
+    session's standing where it has one, and by the community's row where it
+    does not (the system's own reads). A tool plug-in's is also its tool
+    being there for the reader, and its install's placement, as
+    :func:`tool_on_sql` reads it."""
     context = actor_context(session)
-    if context is not None:
-        return tool_on(context, initiative, tool)
     if isinstance(tool, ToolRecord) and tool.installed:
+        if context is not None and tool.kind not in context.open_tools:
+            return False
         return bool(
             await session.scalar(
                 select(tool_on_sql(tool)).where(Initiative.id == initiative.id)
             )
         )
+    if context is not None:
+        return switch(context, initiative, tool)
     row, where = _community(f"{INITIATIVE_TOOL_PREFIX}{tool.value}")
-    switch = await session.scalar(select(row.enabled).where(where))
-    if switch is None:
+    community = await session.scalar(select(row.enabled).where(where))
+    if community is None:
         return own_switch(initiative, tool)
-    return switch
+    return community
 
 
 def tool_on_sql(tool: Tool | ToolRecord) -> ColumnElement[bool]:
-    """:func:`tool_on` over ``initiatives`` rows, for a query's filter. The
+    """:func:`tool_on_in` over ``initiatives`` rows, for a query's filter. The
     community's row is read once for the statement. A tool plug-in's is on
     only where its install is switched on and placed, as the standing's
     pairs say; its install's state is asked by its rows' own policies."""

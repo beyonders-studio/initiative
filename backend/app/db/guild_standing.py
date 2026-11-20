@@ -338,61 +338,49 @@ tool_states AS MATERIALIZED (
 )"""
 
 
-def _enabled_tools(tools: ToolSet, initiatives: str, everywhere: str = "false") -> str:
+def _enabled_tools(tools: ToolSet, initiatives: str) -> str:
     """``app.enabled_tools``: each ``<initiative>:<tool>`` pair whose switch is
-    on in an initiative of ``initiatives`` (a sub-select of ids). With tool
-    plug-ins, a tool whose install the community switched off or whose
-    state hides it has no pair, nor has one in an initiative its install is
-    not placed in, and each that is there carries the pairs
-    ``app.db.initiative_rls.tool_present`` asks for (:data:`gucs.TOOL_OPEN`,
-    :data:`gucs.TOOL_WRITES`).
-
-    Where ``everywhere`` (a SQL condition) holds, the reader reaches every
-    initiative, and a tool plug-in's pairs cover every initiative: they are
-    where ``tool_on`` reads whether its install is placed there."""
-    if not tools.installed:
-        return f"""COALESCE((
+    on in an initiative of ``initiatives`` (a sub-select of ids). A tool
+    plug-in's has one only where its install is placed, its install is
+    switched on and its state leaves its tool there."""
+    placed = ""
+    if tools.installed:
+        installed = sql_values(record.kind for record in tools.installed)
+        placed = f"""
+        AND (t.tool NOT IN ({installed}) OR (t.tool, i.id) IN (
+          SELECT ts.kind, pp.initiative_id FROM tool_states ts
+          JOIN plugin_placements pp ON pp.install_id = ts.install_id
+          WHERE ts.switched_on AND pp.initiative_id IN ({initiatives})))"""
+    return f"""COALESCE((
       SELECT string_agg(DISTINCT i.id || ':' || t.tool, ',')
       FROM initiatives i
       CROSS JOIN LATERAL {_tool_switches(tools)} AS t(tool, enabled)
       WHERE {_TOOL_ON}
-        AND i.id IN ({initiatives})
+        AND i.id IN ({initiatives}){placed}
     ), '')"""
-    installed = sql_values(record.kind for record in tools.installed)
-    opens, writes = (
-        pair.replace("{kind}", "' || ts.kind || '")
-        for pair in (gucs.TOOL_OPEN, gucs.TOOL_WRITES)
+
+
+def _tool_kinds(state: str) -> _Expr:
+    """``app.open_tools`` or ``app.writable_tools``: the kinds of the tool
+    plug-ins whose ``tool_states`` row says ``state``."""
+    return lambda tools: (
+        f"""COALESCE((
+      SELECT string_agg(ts.kind, ',' ORDER BY ts.kind) FROM tool_states ts
+      WHERE ts.{state}
+    ), '')"""
+        if tools.installed
+        else "''"
     )
-    return f"""COALESCE((
-      SELECT string_agg(DISTINCT p.pair, ',')
-      FROM (
-      SELECT i.id || ':' || t.tool AS pair
-      FROM initiatives i
-      CROSS JOIN LATERAL {_tool_switches(tools)} AS t(tool, enabled)
-      WHERE {_TOOL_ON}
-        AND (i.id IN ({initiatives})
-          OR ({everywhere} AND t.tool IN ({installed})))
-        AND t.tool NOT IN (
-          SELECT ts.kind FROM tool_states ts
-          WHERE NOT ts.switched_on OR NOT EXISTS (
-            SELECT 1 FROM plugin_placements pp
-            WHERE pp.install_id = ts.install_id AND pp.initiative_id = i.id))
-      UNION ALL
-      SELECT '{opens}' FROM tool_states ts WHERE ts.opens
-      UNION ALL
-      SELECT '{writes}' FROM tool_states ts WHERE ts.writes
-      ) p
-    ), '')"""
 
 
 def tools_on_sql(tools: ToolSet) -> str:
     """Each ``<initiative>:<tool>`` pair where a tool is on in the routed
-    community, by the terms ``app.enabled_tools`` is written by, for a reader
-    reaching every initiative: one string, as that key holds it. Read with no
-    person, by what reads the community as itself (the delivery of its
-    webhooks)."""
+    community, among the initiatives ``:initiatives`` (an array of ids) names,
+    by the terms ``app.enabled_tools`` is written by: one string, as that key
+    holds it. Read with no person, by what reads the community as itself (the
+    delivery of its webhooks)."""
     return f"""WITH {_COMMUNITY_DEFAULTS_CTE}{_tool_states(tools)}
-SELECT {_enabled_tools(tools, "SELECT id FROM initiatives", "true")}"""
+SELECT {_enabled_tools(tools, "SELECT unnest(CAST(:initiatives AS integer[]))")}"""
 
 
 def _held_surfaces(membership: str) -> str:
@@ -413,15 +401,6 @@ def _held_surfaces(membership: str) -> str:
         ON r.id = cm.role_id AND r.base_rung = m.role::text
     ), '')"""
 
-
-#: The community's admins and content grantees, who reach every initiative
-#: in it, as ``app.guild_admin`` and ``app.pam_read`` say.
-_REACHES_EVERY_INITIATIVE = f"""(
-          EXISTS (SELECT 1 FROM my_membership m WHERE m.role IN ({_ADMIN_RUNGS_SQL}))
-          OR EXISTS (
-            SELECT 1 FROM my_grants g
-            WHERE g.purpose = '{AccessGrantPurpose.content.value}'
-          ))"""
 
 #: What the person statement writes: each standing key and its expression.
 _PERSON_STANDING: dict[gucs.Guc, _Expr] = {
@@ -543,8 +522,9 @@ _PERSON_STANDING: dict[gucs.Guc, _Expr] = {
           UNION ALL
           SELECT it.initiative_id FROM my_items it
         """,
-        _REACHES_EVERY_INITIATIVE,
     ),
+    gucs.OPEN_TOOLS: _tool_kinds("opens"),
+    gucs.WRITABLE_TOOLS: _tool_kinds("writes"),
     gucs.OVERRIDE_INITIATIVES: """COALESCE((
       SELECT string_agg(DISTINCT mi.initiative_id::text, ',')
       FROM my_initiatives mi
@@ -734,6 +714,8 @@ _INSTALL_STANDING: dict[gucs.Guc, _Expr] = {
     gucs.ENABLED_TOOLS: lambda tools: _enabled_tools(
         tools, "SELECT p.initiative_id FROM placed p"
     ),
+    gucs.OPEN_TOOLS: _tool_kinds("opens"),
+    gucs.WRITABLE_TOOLS: _tool_kinds("writes"),
     gucs.OVERRIDE_INITIATIVES: """COALESCE((
       SELECT string_agg(DISTINCT o.initiative_id::text, ',')
       FROM (
@@ -1107,6 +1089,10 @@ class GuildContext:
     role_denies: tuple[str, ...] = ()
     #: ``"<initiative_id>:<tool>"`` where the initiative's switch is on.
     enabled_tools: tuple[str, ...] = ()
+    #: The tool plug-ins' kinds whose tool is there for the community, and
+    #: those of them that may be written.
+    open_tools: tuple[str, ...] = ()
+    writable_tools: tuple[str, ...] = ()
     #: ``"<tool>=on"`` / ``"<tool>=off"`` where the community set a tool's
     #: switch for every initiative (:meth:`community_tool`).
     community_tools: tuple[str, ...] = ()
@@ -1385,6 +1371,10 @@ class InstallContext:
     role_denies: tuple[str, ...] = ()
     #: ``"<initiative_id>:<tool>"`` where the initiative's switch is on.
     enabled_tools: tuple[str, ...] = ()
+    #: The tool plug-ins' kinds whose tool is there for the community, and
+    #: those of them that may be written.
+    open_tools: tuple[str, ...] = ()
+    writable_tools: tuple[str, ...] = ()
     #: ``"<tool>=on"`` / ``"<tool>=off"`` where the community set a tool's
     #: switch for every initiative (:meth:`community_tool`).
     community_tools: tuple[str, ...] = ()
