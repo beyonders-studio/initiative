@@ -3945,7 +3945,7 @@ async def test_a_tool_plugins_tool_exports_and_backs_up_from_its_declaration(
                 counter_group_id=group_id,
                 name=name,
                 count=count,
-                view_mode="progress_bar",
+                view_mode="bar",
                 position=position,
                 created_by=a.user.id,
                 created_by_kind="member",
