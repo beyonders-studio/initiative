@@ -103,6 +103,7 @@
       "assets": "{{restored}} Dateien wiederhergestellt, {{deduped}} bereits vorhanden",
       "unmatchedHandles": "Einige Personen wurden nicht zugeordnet. Niemand hier passt zu ihnen, oder du kannst sie dieser Initiative nicht hinzufügen: {{handles}}",
       "failedEntries": "Nicht importierte Elemente:",
+      "skippedEntries": "Ausgelassene Elemente:",
       "nothing": "Es wurde nichts importiert.",
       "failedRows_one": "{{count}} Zeile wurde ausgelassen:",
       "failedRows_other": "{{count}} Zeilen wurden ausgelassen:",

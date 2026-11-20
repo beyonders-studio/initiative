@@ -61,6 +61,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.messages import ImportEngineMessages
 from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.core.tools import Tool
 from app.db.guild_ddl import _WRITTEN_BY
@@ -1578,7 +1579,9 @@ async def test_exports_and_counts_keep_a_tool_plugins_rows_in_their_initiative(
     its moderator, a moderator of B and a member of no initiative, are
     exported, counted and read as a dashboard dataset by A's moderator, and
     by neither of the others: its export is not found, and their counts,
-    backups and statements hold none of it."""
+    backups and statements hold none of it. Its export is imported into A by
+    A's moderator once the tool is placed there, and into an initiative the
+    importer is not in by nobody."""
     admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     guild = admin.guild
     initiative_b = await create_initiative(session, guild, admin.user)
@@ -1591,7 +1594,7 @@ async def test_exports_and_counts_keep_a_tool_plugins_rows_in_their_initiative(
     outsider = await acting_user(guild=guild)
     await session.commit()
     seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
-    await install_tool_plugin(client, session, seat)
+    install = await install_tool_plugin(client, session, seat)
     tools = await provisioned_tools(guild.id)
     tool = tools.installed[0]
     await route_session_to_guild(session, guild.id)
@@ -1662,7 +1665,9 @@ async def test_exports_and_counts_keep_a_tool_plugins_rows_in_their_initiative(
     assert response.status_code == 200, response.text
     exported = response.json()
     assert exported["type"] == f"initiative-{tool.kind}"
-    assert [counter["name"] for counter in exported["counter"]] == [item_row["name"]]
+    assert [counter["name"] for counter in exported["items"]["counter"]] == [
+        item_row["name"]
+    ]
     response = await client.get(
         moderator_a.g(f"/exports/{tool.kind}"),
         headers=moderator_a.headers,
@@ -1696,6 +1701,29 @@ async def test_exports_and_counts_keep_a_tool_plugins_rows_in_their_initiative(
         params={"scope": "initiative", "initiative_id": a},
     )
     assert response.json()["tools"][tool.kind]["count"] == 1, response.text
+
+    async def restore(actor: Actor, initiative_id: int) -> tuple[int, str | None]:
+        response = await client.post(
+            actor.g("/imports/envelope"),
+            headers=actor.headers,
+            json={"initiative_id": initiative_id, "envelope": exported},
+        )
+        return response.status_code, response.json().get("detail")
+
+    refused = (404, ImportEngineMessages.IMPORT_INVALID_PARAMS)
+    for actor in (moderator_b, outsider):
+        assert await restore(actor, a) == refused, actor
+    assert await restore(moderator_a, b) == refused
+    response = await client.patch(
+        seat.g(f"/plugins/{install['id']}"),
+        headers=seat.headers,
+        json={"placed_initiative_ids": [a, b]},
+    )
+    assert response.status_code == 200, response.text
+    for actor in (moderator_b, outsider):
+        assert await restore(actor, a) == refused, actor
+    assert await restore(moderator_a, b) == refused
+    assert (await restore(moderator_a, a))[0] == 201
 
 
 async def test_sharing_holds_and_responses_keep_a_tool_plugins_rows_in_their_initiative(

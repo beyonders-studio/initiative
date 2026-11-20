@@ -331,6 +331,7 @@
   "IMPORT_JOB_NOT_FOUND": "Import introuvable.",
   "IMPORT_NOT_CANCELLABLE": "Cet import ne peut plus être annulé.",
   "IMPORT_TOOL_DISABLED": "Cet outil n'est pas activé dans l'initiative choisie.",
+  "IMPORT_TOOL_NOT_PLACED": "L'outil de ce plug-in n'est pas placé dans cette initiative, son contenu a donc été laissé de côté.",
   "IMPORT_SOURCE_UNREACHABLE": "Nous n'avons pas pu joindre ce site. Vérifiez l'adresse et réessayez.",
   "IMPORT_SOURCE_AUTH": "Ce site a refusé les identifiants. Vérifiez l'adresse e-mail et le jeton d'API.",
   "IMPORT_SOURCE_RATE_LIMITED": "Ce site nous a demandé de ralentir. Réessayez dans quelques minutes.",

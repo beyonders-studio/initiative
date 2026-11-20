@@ -47,6 +47,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.audit_events import AuditEventType
 from app.core.messages import GuildPluginMessages
 from app.core.plugin_scopes import ordered_scopes, plugin_scope, plugin_scope_target
+from app.core.tool_set import ToolRecord
 from app.core.tools import Tool
 from app.db.guild_standing import GuildContext
 from app.db.session import routed_guild_id
@@ -971,6 +972,24 @@ async def placed_initiative_ids(session: AsyncSession, install_id: int) -> set[i
         )
     )
     return set(rows.all())
+
+
+async def tool_placed(
+    session: AsyncSession, tool: ToolRecord, initiative_id: int
+) -> bool:
+    """Whether the install bringing the tool plug-in's ``tool`` is placed in
+    the initiative: where its tool can be used."""
+    uid = tool.kind.partition(".")[2].upper()
+    return (
+        await session.exec(
+            select(PluginPlacement.initiative_id)
+            .join(GuildPlugin, col(GuildPlugin.id) == PluginPlacement.install_id)
+            .where(
+                GuildPlugin.listing_uid == uid,
+                PluginPlacement.initiative_id == initiative_id,
+            )
+        )
+    ).first() is not None
 
 
 async def is_placed(

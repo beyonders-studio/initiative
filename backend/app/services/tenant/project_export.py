@@ -45,7 +45,7 @@ from app.models.tenant.project import Project
 from app.models.tenant.relationship import EntityRelationship
 from app.models.tenant.tag import Tag
 from app.models.tenant.task import Task, TaskStatus
-from app.schemas.tenant.import_envelopes import EnvelopePropertyValue
+from app.schemas.tenant.import_envelopes import EnvelopeLink, EnvelopePropertyValue
 from app.schemas.tenant.project_export import (
     ProjectExportChecklistItem,
     ProjectExportComment,
@@ -55,7 +55,6 @@ from app.schemas.tenant.project_export import (
     ProjectExportPropertyDefinition,
     ProjectExportTag,
     ProjectExportTask,
-    ProjectExportTaskLink,
     ProjectExportTaskStatus,
     ProjectExportTaskType,
 )
@@ -353,10 +352,11 @@ async def build_project_export(
     )
 
 
-#: Edge kinds a task envelope carries. ``tagged_with`` is already the task's
-#: ``tags`` and ``references`` is derived from bodies on save rather than
-#: asserted, so neither is something a restore should re-assert from here.
-_EXPORTED_LINK_TYPES: tuple[RelationshipType, ...] = (
+#: Edge kinds a task envelope carries, and a tool plug-in's row's.
+#: ``tagged_with`` is already the row's ``tags`` and ``references`` is derived
+#: from bodies on save rather than asserted, so neither is something a restore
+#: should re-assert from here.
+EXPORTED_LINK_TYPES: tuple[RelationshipType, ...] = (
     RelationshipType.depends_on,
     RelationshipType.part_of,
     RelationshipType.related_to,
@@ -431,7 +431,7 @@ async def _load_comments(
 
 async def _load_links(
     session: AsyncSession, task_ids: list[int]
-) -> dict[int, list[ProjectExportTaskLink]]:
+) -> dict[int, list[EnvelopeLink]]:
     """The edges these tasks assert, from the task's side.
 
     Only edges *stored* with one of these tasks as the source are read, so an
@@ -451,18 +451,18 @@ async def _load_links(
             select(EntityRelationship).where(
                 EntityRelationship.source_node.in_(source_nodes),
                 EntityRelationship.relationship_type.in_(
-                    [t.value for t in _EXPORTED_LINK_TYPES]
+                    [t.value for t in EXPORTED_LINK_TYPES]
                 ),
                 EntityRelationship.removed_at.is_(None),
             )
         )
     ).all()
-    by_task: dict[int, list[ProjectExportTaskLink]] = {}
+    by_task: dict[int, list[EnvelopeLink]] = {}
     for row in rows:
         if row.target_type not in _LINKABLE_TARGETS:
             continue
         by_task.setdefault(row.source_id, []).append(
-            ProjectExportTaskLink(
+            EnvelopeLink(
                 type=RelationshipType(row.relationship_type),
                 target_external_ref=_entity_ref(row.target_type, row.target_id),
             )

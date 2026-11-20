@@ -1092,6 +1092,9 @@ class ImportEngineMessages:
     IMPORT_CREATOR_INACTIVE = "IMPORT_CREATOR_INACTIVE"
     IMPORT_PERMISSION_REQUIRED = "IMPORT_PERMISSION_REQUIRED"
     IMPORT_TOOL_DISABLED = "IMPORT_TOOL_DISABLED"
+    #: A tool plug-in's content restored into a new initiative its plug-in
+    #: could not be placed in.
+    IMPORT_TOOL_NOT_PLACED = "IMPORT_TOOL_NOT_PLACED"
     #: A zip that does not hold exactly one export at its top level.
     IMPORT_ARCHIVE_NO_ENVELOPE = "IMPORT_ARCHIVE_NO_ENVELOPE"
     #: An export of a different tool than the one it was imported from.

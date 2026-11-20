@@ -37,19 +37,23 @@ from pathlib import Path
 from typing import Any, BinaryIO
 
 from pydantic import ConfigDict
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.audit_events import AuditEventType
 from app.core.messages import ImportEngineMessages
 from app.core.references import format_ref
 from app.core.relationships import RelationshipType
+from app.core.rules import SURFACE_PLUGINS
 from app.core.search import SearchEntityType
+from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.core.tools import BULK_EXPORT_TOOLS, Tool, tool_envelope_type
 from app.db import gucs
-from app.db.session import raise_flag, routed_guild_id
+from app.db.session import raise_flag, routed_guild_id, routed_tools
 from app.models.platform.user import User
 from app.models.tenant._mixins import ActorKind
 from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
+from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.schemas.base import SanitizedBaseModel
@@ -68,6 +72,8 @@ from app.schemas.tenant.import_job import (
     EntryResult,
 )
 from app.schemas.tenant.project_export import ProjectExportPropertyDefinition
+from app.services import audit as audit_service
+from app.services.export.adapters.installed import envelope_type
 from app.services.import_engine import engine as import_engine
 from app.services.import_engine import limits as import_limits
 from app.services.import_engine.archive_assets import (
@@ -234,6 +240,7 @@ def plan_backup(
     existing_initiative_names: set[str],
     member_ids_by_handle: dict[str, int] | None = None,
     fetched: bool = False,
+    tools: ToolSet = BUILTIN_TOOLS,
 ) -> BackupImportPlan:
     """The confirm-screen summary. Reads only the manifest — cheap enough to
     run inside the upload request.
@@ -247,8 +254,9 @@ def plan_backup(
     ``fetched`` is as for :func:`zip_bounds.json_cap`. Blocking; run it in a
     thread from async code.
     """
-    from app.services.import_engine.importers import IMPORTERS
+    from app.services.import_engine.importers import importers_for
 
+    importers = importers_for(tools)
     with open_zip(payload, bundle=True) as archive:
         manifest = read_manifest(archive, fetched=fetched)
 
@@ -258,7 +266,7 @@ def plan_backup(
             for entry in manifest.entries
             if entry.type != "file"
             and entry.type not in _STRUCTURAL_TYPES
-            and entry.type not in IMPORTERS
+            and entry.type not in importers
         }
     )
     # Suffix previews compound: two imported initiatives can collide with
@@ -341,6 +349,7 @@ async def stage_backup_job(
         payload,
         existing_initiative_names=existing_names,
         member_ids_by_handle=roster,
+        tools=routed_tools(session),
     )
     await import_engine.count_active_jobs_locked(session, user=user)
     if payload_ref is None:
@@ -421,7 +430,7 @@ async def apply_backup(
     the initiative's members to edit."""
     from app.api.deps import establish_guild_access
     from app.models.platform.guild import CommunityRole
-    from app.services.import_engine.importers import IMPORTERS
+    from app.services.import_engine.importers import importers_for
     from app.services.platform import guilds as guilds_service
     from app.services.tenant import initiatives as initiatives_service
 
@@ -496,6 +505,7 @@ async def apply_backup(
         for mi in manifest.initiatives:
             # System sentinel: user-attributed job, gate passed at enqueue.
             await establish_guild_access(session, user, guild_id, on_behalf=True)
+            importers = importers_for(routed_tools(session))
             entries_here = entries_by_initiative.get(mi.id, [])
             if mi.target_initiative_id is not None:
                 initiative = await _resolve_target_initiative(
@@ -525,6 +535,16 @@ async def apply_backup(
                     "name": initiative.name,
                 }
             )
+            # A new initiative has no tool plug-in placed in it. Those whose
+            # content the bundle holds are placed there where the person
+            # restoring may place them, and their entries are skipped where not.
+            unplaced = (
+                await _place_tool_plugins(
+                    session, user, guild_id, initiative.id, entries_here, include
+                )
+                if mi.target_initiative_id is None
+                else set()
+            )
 
             entries = sorted(
                 entries_here,
@@ -552,19 +572,30 @@ async def apply_backup(
                         )
                     ).one()
                     since_refresh = 0
-                outcome = await _apply_entry(
-                    session,
-                    archive=archive,
-                    entry=entry,
-                    initiative=initiative,
-                    user=user,
-                    include=include,
-                    importers=IMPORTERS,
-                    assets_by_key=assets_by_key,
-                    result=result,
-                    context=context,
-                    max_json_bytes=max_json_bytes,
-                    shift_days=shift_days,
+                outcome = (
+                    EntryResult(
+                        path=entry.path,
+                        tool=entry.tool,
+                        type=entry.type,
+                        title=entry.title,
+                        status="skipped",
+                        error=ImportEngineMessages.IMPORT_TOOL_NOT_PLACED,
+                    )
+                    if entry.type in unplaced
+                    else await _apply_entry(
+                        session,
+                        archive=archive,
+                        entry=entry,
+                        initiative=initiative,
+                        user=user,
+                        include=include,
+                        importers=importers,
+                        assets_by_key=assets_by_key,
+                        result=result,
+                        context=context,
+                        max_json_bytes=max_json_bytes,
+                        shift_days=shift_days,
+                    )
                 )
                 result.entries.append(outcome)
                 bucket = result.per_tool.setdefault(
@@ -593,6 +624,79 @@ async def apply_backup(
         await session.commit()
 
         return result
+
+
+async def _place_tool_plugins(
+    session: AsyncSession,
+    user: User,
+    guild_id: int,
+    initiative_id: int,
+    entries: list[ManifestEntry],
+    include: dict[str, bool] | None,
+) -> set[str]:
+    """Place each tool plug-in whose content ``entries`` hold in the
+    initiative a restore just made, where ``user`` may set where a plug-in is
+    placed: the seat, writing, while the deployment leaves plug-ins open to the
+    community, as the plug-in's placement setting asks. Answers the envelope
+    types left unplaced: all of them where ``user`` may not.
+
+    The seat's own routing writes the placements, and the restore's is taken
+    back after, its standing counting the tools placed."""
+    from app.api.deps import GuildAccessError, establish_guild_access
+    from app.services.tenant import guild_plugins as guild_plugins_service
+
+    held = {
+        envelope_type(tool): tool
+        for tool in routed_tools(session).installed
+        if any(
+            entry.type == envelope_type(tool)
+            and (include is None or include.get(entry.tool, True))
+            for entry in entries
+        )
+    }
+    if not held:
+        return set()
+    try:
+        seat = await establish_guild_access(
+            session, user, guild_id, on_behalf=True, for_settings=True, for_seat=True
+        )
+    except GuildAccessError:
+        seat = None
+    may_place = (
+        seat is not None
+        and seat.guild_seat
+        and seat.grant_writes
+        and SURFACE_PLUGINS not in seat.closed_surfaces
+    )
+    if may_place:
+        uids = {tool.kind.partition(".")[2].upper() for tool in held.values()}
+        plugins = await session.exec(
+            select(GuildPlugin).where(col(GuildPlugin.listing_uid).in_(uids))
+        )
+        for plugin in plugins.all():
+            before = await guild_plugins_service.placed_initiative_ids(
+                session, plugin.id
+            )
+            await guild_plugins_service.set_placed_initiatives(
+                session, plugin, before | {initiative_id}
+            )
+            await audit_service.record(
+                session,
+                event_type=AuditEventType.PLUGIN_UPDATED,
+                actor_user_id=user.id,
+                guild_id=guild_id,
+                target_type="plugin",
+                target_id=plugin.id,
+                detail={
+                    "area": "settings",
+                    **audit_service.changed_fields(
+                        {"placed_initiative_ids": sorted(before)},
+                        {"placed_initiative_ids": sorted(before | {initiative_id})},
+                    ),
+                },
+            )
+    await establish_guild_access(session, user, guild_id, on_behalf=True)
+    return set() if may_place else set(held)
 
 
 async def _share_with_members(session: AsyncSession, initiative_id: int) -> None:
@@ -669,8 +773,9 @@ async def _resolve_target_initiative(
     by the include map is not going to be written, and demanding a permission
     for it would refuse an import that was never going to need it.
     """
-    from app.services.import_engine.importers import IMPORTERS
+    from app.services.import_engine.importers import importers_for
 
+    importers = importers_for(routed_tools(session))
     initiative = None
     seen: set[str] = set()
     for entry in entries:
@@ -684,7 +789,7 @@ async def _resolve_target_initiative(
         if envelope_type in seen:
             continue
         seen.add(envelope_type)
-        importer = IMPORTERS.get(envelope_type)
+        importer = importers.get(envelope_type)
         if importer is None:
             # An unknown type is skipped at apply time with a code in the
             # report; it names no permission to check here.
@@ -704,7 +809,7 @@ async def _resolve_target_initiative(
             session,
             guild_id=guild_id,
             initiative_id=target_initiative_id,
-            importer=IMPORTERS[tool_envelope_type(Tool.file)],
+            importer=importers[tool_envelope_type(Tool.file)],
             user=user,
         )
     return initiative

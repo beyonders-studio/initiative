@@ -20,6 +20,7 @@ from typing import Any, Literal, get_args
 
 from pydantic import ConfigDict, Field, model_validator
 
+from app.core.relationships import RelationshipType
 from app.core.tools import Tool, tool_envelope_type
 from app.models.tenant.metadata import MetadataType
 from app.models.tenant.wiki import WikiPageOrder, WikiReadingWidth
@@ -84,6 +85,48 @@ class EnvelopePropertyValue(SanitizedBaseModel):
     #: A value of its project's metadata, not of one of the initiative's
     #: properties.
     project: bool = False
+
+
+class EnvelopeLink(SanitizedBaseModel):
+    """An edge a row asserts, named by the far end's ``external_ref``.
+
+    Refs rather than ids because the far end may not exist yet — it can be in
+    a later entry of the same backup, or in a different envelope entirely. The
+    job's deferred pass resolves every ref once the last entry has flushed
+    (``import_engine.links``), so the order entries apply in does not matter.
+    """
+
+    type: RelationshipType
+    target_external_ref: str
+
+
+class InstalledToolRow(SanitizedBaseModel):
+    """A tool plug-in's row, or an item, as ``export/adapters/installed.py``
+    writes it: its declared fields by key under ``fields``, a person by
+    handle, and the items under it by their table's key under ``items``. What
+    a field holds is held to the declaration when it is written
+    (``plugin_tool_rows.column_values``), not here, since the declaration is
+    the community's."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    name: str
+    position: float | None = None
+    external_ref: str | None = None
+    fields: dict[str, Any] = {}
+    #: The handles its text fields mention as ``@<handle>``.
+    mention_handles: list[str] = []
+    tags: list[str] = []
+    properties: list[EnvelopePropertyValue] = []
+    links: list[EnvelopeLink] = []
+    items: dict[str, list[InstalledToolRow]] = {}
+
+
+class InstalledToolEnvelope(_EnvelopeBase, InstalledToolRow):
+    """An installed tool's row and everything under it: ``initiative-<kind>``,
+    the kind being the community's."""
+
+    type: str
 
 
 class FileEnvelope(_EnvelopeBase):
@@ -435,7 +478,10 @@ def _envelopes_by_type() -> dict[str, type[_EnvelopeBase]]:
     # The project's envelope is a schema of its own, which reads this module.
     from app.schemas.tenant import project_export  # noqa: F401
 
+    # A tool plug-in's envelope names its type as the community's tool set
+    # does, not as a literal.
     return {
-        get_args(model.model_fields["type"].annotation)[0]: model
+        named[0]: model
         for model in _EnvelopeBase.__subclasses__()
+        if (named := get_args(model.model_fields["type"].annotation))
     }

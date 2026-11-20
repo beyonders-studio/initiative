@@ -540,17 +540,23 @@ def test_importers_cover_exactly_the_portable_tools():
 
 def test_envelope_schemas_answer_to_the_tool_envelope_types():
     """Each portable tool's envelope schema holds its ``type`` to the tool's
-    ``tool_envelope_type``, and every envelope schema is one tool's: the export
-    writes a tool's envelope from that schema, and the importer reads it back
-    with it."""
+    ``tool_envelope_type``, and every envelope schema is one tool's, or every
+    tool plug-in's: the export writes a tool's envelope from that schema, and
+    the importer reads it back with it."""
     from typing import get_args
 
     from app.core.tools import BULK_EXPORT_TOOLS, tool_envelope_type
-    from app.schemas.tenant.import_envelopes import _EnvelopeBase, tool_envelope
+    from app.schemas.tenant.import_envelopes import (
+        InstalledToolEnvelope,
+        _EnvelopeBase,
+        tool_envelope,
+    )
 
     models = {tool: tool_envelope(tool) for tool in BULK_EXPORT_TOOLS}
     for tool, model in models.items():
         assert get_args(model.model_fields["type"].annotation) == (
             tool_envelope_type(tool),
         ), tool.value
-    assert set(models.values()) == set(_EnvelopeBase.__subclasses__())
+    assert {*models.values(), InstalledToolEnvelope} == set(
+        _EnvelopeBase.__subclasses__()
+    )

@@ -3970,8 +3970,11 @@ async def test_a_tool_plugins_tool_exports_and_backs_up_from_its_declaration(
     )
     assert envelope["type"] == f"initiative-{tool.kind}"
     assert envelope["name"] == "Party Gold"
-    assert envelope["description"] == "Coins"
-    assert [(c["name"], c["count"], c["step"]) for c in envelope["counter"]] == [
+    assert envelope["fields"] == {"description": "Coins"}
+    assert [
+        (c["name"], c["fields"]["count"], c["fields"]["step"])
+        for c in envelope["items"]["counter"]
+    ] == [
         ("Gold", 12, 1),
         ("Silver", 3.5, 1),
     ]
@@ -4010,7 +4013,8 @@ async def test_a_tool_plugins_tool_exports_and_backs_up_from_its_declaration(
     (entry,) = (e for e in manifest["entries"] if e["tool"] == tool.kind)
     assert entry["type"] == f"initiative-{tool.kind}"
     assert f"/{tool.kind}/" in entry["path"]
-    assert json.loads(archive.read(entry["path"]))["counter"][0]["name"] == "Gold"
+    carried = json.loads(archive.read(entry["path"]))
+    assert carried["items"]["counter"][0]["name"] == "Gold"
 
     resp = await _export(
         client,

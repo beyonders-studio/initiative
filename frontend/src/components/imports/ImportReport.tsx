@@ -43,6 +43,7 @@ export function ImportReport({ job }: { job: Pick<DataJobRead, "status" | "error
 
   const result = (job.result ?? {}) as BackupResult & EnvelopeResult;
   const failedEntries = (result.entries ?? []).filter((e) => e.status === "failed");
+  const skippedEntries = (result.entries ?? []).filter((e) => e.status === "skipped" && e.error);
 
   return (
     <div className="space-y-3 text-sm">
@@ -125,6 +126,22 @@ export function ImportReport({ job }: { job: Pick<DataJobRead, "status" | "error
             {failedEntries.map((entry) => (
               <li key={`${entry.tool}-${entry.title}`}>
                 {entry.title} ({entry.tool})
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {skippedEntries.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs">{t("wizard.report.skippedEntries")}</p>
+          <ul className="space-y-0.5 text-muted-foreground text-xs">
+            {skippedEntries.map((entry) => (
+              <li key={`${entry.tool}-${entry.title}`}>
+                {entry.title} —{" "}
+                {getErrorMessage(
+                  { response: { data: { detail: entry.error } } },
+                  "imports:job.failed"
+                )}
               </li>
             ))}
           </ul>

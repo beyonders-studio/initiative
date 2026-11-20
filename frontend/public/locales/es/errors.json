@@ -331,6 +331,7 @@
   "IMPORT_JOB_NOT_FOUND": "Importación no encontrada.",
   "IMPORT_NOT_CANCELLABLE": "Esta importación ya no se puede cancelar.",
   "IMPORT_TOOL_DISABLED": "Esa herramienta no está habilitada en la iniciativa elegida.",
+  "IMPORT_TOOL_NOT_PLACED": "La herramienta de ese complemento no está colocada en esta iniciativa, así que su contenido se omitió.",
   "IMPORT_SOURCE_UNREACHABLE": "No pudimos conectar con ese sitio. Comprueba la dirección e inténtalo de nuevo.",
   "IMPORT_SOURCE_AUTH": "Ese sitio rechazó los datos de acceso. Comprueba el correo electrónico y el token de API.",
   "IMPORT_SOURCE_RATE_LIMITED": "Ese sitio nos pidió que fuéramos más despacio. Inténtalo de nuevo en unos minutos.",

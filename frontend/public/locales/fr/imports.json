@@ -103,6 +103,7 @@
       "assets": "{{restored}} fichiers restaurés, {{deduped}} déjà présents",
       "unmatchedHandles": "Certaines personnes n'ont pas été placées. Personne ici ne leur correspond, ou vous ne pouvez pas les ajouter à cette initiative : {{handles}}",
       "failedEntries": "Éléments non importés :",
+      "skippedEntries": "Éléments laissés de côté :",
       "nothing": "Rien n'a été importé.",
       "failedRows_one": "{{count}} ligne a été laissée de côté :",
       "failedRows_other": "{{count}} lignes ont été laissées de côté :",

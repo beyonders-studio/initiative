@@ -48,6 +48,11 @@ def table_of(row: Any) -> Table:
     return row.table if isinstance(row, ToolRow) else row.__table__
 
 
+def text_columns(table: Table) -> list[sa.Column[Any]]:
+    """The columns of a tool plug-in's table its declaration says are text."""
+    return [column for column in table.c if column.info.get("field") == "text"]
+
+
 @dataclass(frozen=True)
 class Located:
     """Where a kind of an installed tool keeps its rows."""
