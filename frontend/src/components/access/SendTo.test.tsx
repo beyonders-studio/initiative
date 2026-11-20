@@ -91,37 +91,27 @@ describe("SendToDialog", () => {
     expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ level: null, note: null }));
   });
 
-  it("copies the link the bell opens, on the server the app is signed in to", async () => {
-    const user = userEvent.setup();
-    await renderDialog(
-      { kind: "task", entityId: 7 },
-      {
-        communities: { activeCommunityId: 4 },
-        server: { getServerOrigin: () => "https://initiative.example.com" },
-      }
-    );
+  // A tool plug-in's row's link is a built-in item's.
+  it.each<[ContentKind, number]>([
+    ["task", 7],
+    ["counter.tsjvtcm0s7gv2x" as ContentKind, 9],
+  ])(
+    "copies the link the bell opens to %s %i, on the server the app is signed in to",
+    async (kind, entityId) => {
+      const user = userEvent.setup();
+      await renderDialog(
+        { kind, entityId },
+        {
+          communities: { activeCommunityId: 4 },
+          server: { getServerOrigin: () => "https://initiative.example.com" },
+        }
+      );
 
-    await user.click(screen.getByRole("button", { name: "Copy link" }));
+      await user.click(screen.getByRole("button", { name: "Copy link" }));
 
-    expect(await navigator.clipboard.readText()).toBe(
-      "https://initiative.example.com/c/4/go/task/7"
-    );
-  });
-
-  it("copies a tool plug-in's row's link as a built-in item's", async () => {
-    const user = userEvent.setup();
-    await renderDialog(
-      { kind: "counter.tsjvtcm0s7gv2x" as ContentKind, entityId: 9 },
-      {
-        communities: { activeCommunityId: 4 },
-        server: { getServerOrigin: () => "https://initiative.example.com" },
-      }
-    );
-
-    await user.click(screen.getByRole("button", { name: "Copy link" }));
-
-    expect(await navigator.clipboard.readText()).toBe(
-      "https://initiative.example.com/c/4/go/counter.tsjvtcm0s7gv2x/9"
-    );
-  });
+      expect(await navigator.clipboard.readText()).toBe(
+        `https://initiative.example.com/c/4/go/${kind}/${entityId}`
+      );
+    }
+  );
 });

@@ -110,9 +110,7 @@ export const shelfDefinition = () => ({
 
 /** An install of a tool plug-in, the reading shelf unless `definition` says
  *  otherwise. */
-export function buildToolPlugin(
-  overrides: Partial<CommunityPluginRead> = {}
-): CommunityPluginRead & { definition: Record<string, unknown> } {
+export function buildToolPlugin(overrides: Partial<CommunityPluginRead> = {}): CommunityPluginRead {
   counter++;
   return {
     id: counter,
@@ -145,7 +143,7 @@ export function buildToolPlugin(
     created_at: "2026-11-01T00:00:00.000Z",
     updated_at: "2026-11-01T00:00:00.000Z",
     ...overrides,
-  } as CommunityPluginRead & { definition: Record<string, unknown> };
+  };
 }
 
 /** A row of a tool plug-in's table, as the generic routes read it. */

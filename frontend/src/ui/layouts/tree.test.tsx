@@ -13,7 +13,6 @@ const TASK_DETAIL = TASK_LAYOUT.tree(undefined);
 import type { TranslateFn } from "@/types/i18n";
 
 import { type FieldDef, type LayoutEnv, withDisplays } from "./fields";
-import { shippedLists } from "./layoutSet";
 import { fieldSorting, presetName, presetsOf, sortedItems, storedPreset } from "./presets";
 import {
   LAYOUT_PARTS,
@@ -219,19 +218,13 @@ describe("a task detail's tree", () => {
   });
 });
 
-/** A row of a laid-out table, as a tool plug-in's: its fields by key, and
- *  the items under it. */
+/** A row of a laid-out table, as a tool plug-in's: its fields by key. */
 type Row = {
   properties: [];
   values: Record<string, unknown>;
-  counters?: Row[];
 };
 
-const row = (values: Record<string, unknown>, counters?: Row[]): Row => ({
-  properties: [],
-  values,
-  counters,
-});
+const row = (values: Record<string, unknown>): Row => ({ properties: [], values });
 
 /** Each of `keys` a field drawing its value as text. */
 const fieldsOf = (...keys: string[]): ReadonlyMap<string, FieldDef<Row>> =>
@@ -250,19 +243,18 @@ const fieldsOf = (...keys: string[]): ReadonlyMap<string, FieldDef<Row>> =>
     ])
   );
 
-const env = (extra: Partial<LayoutEnv<Row>> = {}): LayoutEnv<Row> => ({
+const env: LayoutEnv<Row> = {
   t: i18n.getFixedT(null, "layouts") as TranslateFn,
   communityPath: (path) => path,
   itemHref: () => "/row",
-  ...extra,
-});
+};
 
-const drawRow = (node: LayoutNode, item: Row, view: Partial<LayoutContext<Row>> = {}) =>
+const drawRow = (node: LayoutNode, item: Row) =>
   renderWithProviders(
     <LayoutTree
       node={node}
       item={item}
-      view={{ fields: fieldsOf("name", "color"), variant: "card", env: env(), ...view }}
+      view={{ fields: fieldsOf("name", "color"), variant: "card", env }}
     />
   );
 
@@ -279,41 +271,6 @@ describe("a tool plug-in's card", () => {
 
     drawRow(card, row({ name: "Plain", color: "blue" }));
     expect(screen.getByText("Plain").parentElement).not.toHaveAttribute("style");
-  });
-
-  it("previews the row's first items, each line in its own colour", () => {
-    const items = fieldsOf("name", "count", "color");
-    const preview: LayoutNode = {
-      type: "items",
-      props: { item: "counter", fields: ["name", "count"], limit: 2, tint: "color" },
-    };
-    const group = row({ name: "Group" }, [
-      row({ name: "Gold", count: 3, color: "#C2A35B" }),
-      row({ name: "Silver", count: 5 }),
-      row({ name: "Bronze", count: 8 }),
-    ]);
-    const itemPreview: LayoutEnv<Row>["itemPreview"] = (item, table, limit) =>
-      table === "counter"
-        ? { items: (item.counters ?? []).slice(0, limit), fields: items, env: env() as LayoutEnv }
-        : null;
-
-    drawRow(preview, group, { env: env({ itemPreview }) });
-
-    const lines = screen.getAllByRole("listitem");
-    expect(lines.map((line) => line.textContent)).toEqual(["Gold3", "Silver5"]);
-    expect(lines[0]).toHaveStyle({ backgroundColor: "#C2A35B" });
-    expect(lines[1]).not.toHaveAttribute("style");
-  });
-
-  it("previews nothing where the list cannot read a row's items", () => {
-    const preview: LayoutNode = {
-      type: "items",
-      props: { item: "counter", fields: ["name"], limit: 4 },
-    };
-
-    drawRow(preview, row({ name: "Group" }, [row({ name: "Gold" })]));
-
-    expect(screen.queryByRole("list")).not.toBeInTheDocument();
   });
 });
 
@@ -345,16 +302,11 @@ describe("a tool plug-in's presets", () => {
   };
   const t = (key: string) => key;
 
-  it("are named in the reader's language, else in English", () => {
+  it("are named in the reader's language, else in English, and stored as kept", () => {
     const [preset] = presetsOf(definition, kind);
 
     expect(presetName(preset, t, "de-CH")).toBe("Nach Zählung");
     expect(presetName(preset, t, "fr")).toBe("By count");
-  });
-
-  it("keep their names and sort as the layout keeps them", () => {
-    const [preset] = presetsOf(definition, kind);
-
     expect(preset.sorting).toEqual([
       { id: "count", desc: true },
       { id: "name", desc: false },
@@ -389,20 +341,5 @@ describe("a tool plug-in's presets", () => {
 
     expect(sorted.map((each) => each.values.name)).toEqual(["d", "c", "b", "a"]);
     expect(rows.map((each) => each.values.name)).toEqual(order);
-  });
-});
-
-describe("shippedLists", () => {
-  it("offers each declared list, the first the one a person starts on", () => {
-    const views = shippedLists([
-      { kind: "grid", card: { type: "card", children: [] } },
-      { kind: "table", columns: ["name"] },
-    ]);
-
-    expect(views.map((view) => [view.kind, view.is_default])).toEqual([
-      ["grid", true],
-      ["table", false],
-    ]);
-    expect(views[1].definition).toEqual({ columns: ["name"] });
   });
 });

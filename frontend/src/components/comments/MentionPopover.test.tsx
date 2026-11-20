@@ -2,10 +2,11 @@
  * The list under a half-typed mention is walked with the arrow keys, and the
  * list `[[` offers is no exception.
  */
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { buildInitiative } from "@/__tests__/factories";
+import { renderWithProviders } from "@/__tests__/helpers/render";
 import type { SearchSuggestion } from "@/api/generated/initiativeAPI.schemas";
 import { type ActiveMention, activeMention } from "@/lib/mentions";
 import { linkableToolTypes } from "@/lib/references";
@@ -26,13 +27,10 @@ vi.mock("@/hooks/useSearch", () => ({
 vi.mock("@/hooks/useUsers", () => ({
   useMemberSearch: () => ({ data: undefined, isLoading: false }),
 }));
-// One answer for every render, as the real query's select gives.
-const noTools = { data: [] };
-vi.mock("@/hooks/useCommunityPlugins", () => ({ useCommunityPlugins: () => noTools }));
 
 describe("the mention picker", () => {
   it("moves through what [[ offers with the arrow keys", () => {
-    render(
+    renderWithProviders(
       <MentionPopover
         active={activeMention("see [[") as ActiveMention}
         initiativeId={initiative.id}
