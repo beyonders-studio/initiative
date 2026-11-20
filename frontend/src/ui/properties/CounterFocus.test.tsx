@@ -42,6 +42,10 @@ describe("CounterFocus", () => {
     focus({ disabled: true });
     expect(screen.getByRole("heading", { name: "Lives" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Step Lives/ })).not.toBeInTheDocument();
+    // Read as it is, not greyed out like a control that is off.
+    const count = screen.getByRole("spinbutton", { name: "Lives" });
+    expect(count).toHaveAttribute("readonly");
+    expect(count).toBeEnabled();
   });
 
   it("shows a counter without both bounds as a number", () => {
