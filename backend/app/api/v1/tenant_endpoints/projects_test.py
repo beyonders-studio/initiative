@@ -38,51 +38,6 @@ from app.testing.factories import (
 )
 
 
-async def test_list_projects_as_admin_shows_all(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Test that guild admin can see all projects."""
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    await create_project(session, admin.initiative, admin.user, name="Test Project")
-    await create_project(session, admin.initiative, admin.user, name="Project 2")
-
-    response = await client.get(admin.g("/projects/"), headers=admin.headers)
-
-    assert response.status_code == 200
-    body = response.json()
-    data = body["items"]
-    assert len(data) >= 2
-    assert body["page"] == 1
-    assert body["page_size"] == 0
-    assert body["has_next"] is False
-    assert body["has_prev"] is False
-    assert body["total_count"] >= 2
-
-
-async def test_list_projects_member_sees_initiative_projects(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Test that initiative members see projects in their initiative."""
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    member = await acting_user(
-        guild_role=CommunityRole.member,
-        guild=admin.guild,
-        initiative=admin.initiative,
-        initiative_role="member",
-    )
-
-    project = await create_project(session, admin.initiative, admin.user)
-    # Pure DAC: the member reads it only once it is shared with them.
-    await create_resource_grant(session, project, user=member.user)
-
-    response = await client.get(member.g("/projects/"), headers=member.headers)
-
-    assert response.status_code == 200
-    data = response.json()["items"]
-    project_ids = {p["id"] for p in data}
-    assert project.id in project_ids
-
-
 async def test_people_search_names_who_can_open_the_project(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
@@ -236,31 +191,9 @@ async def test_list_projects_filters_by_initiative(
 
     Every tool page is addressed inside its initiative now, so the list it
     renders must come back already narrowed rather than filtered client-side.
+    Omitting the filter keeps the cross-initiative behaviour the guild home and
+    the sidebar's project tree depend on, as one unpaged window.
     """
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    other_initiative = await create_initiative(session, admin.guild, admin.user)
-    mine = await create_project(session, admin.initiative, admin.user, name="Mine")
-    theirs = await create_project(session, other_initiative, admin.user, name="Theirs")
-
-    response = await client.get(
-        admin.g(f"/projects/?initiative_id={admin.initiative.id}"),
-        headers=admin.headers,
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    project_ids = {p["id"] for p in body["items"]}
-    assert mine.id in project_ids
-    assert theirs.id not in project_ids
-    # The count is narrowed too, or the pager would offer empty pages.
-    assert body["total_count"] == 1
-
-
-async def test_list_projects_without_initiative_spans_them_all(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Omitting the filter keeps the cross-initiative behaviour the guild home
-    and the sidebar's project tree depend on."""
     admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     other_initiative = await create_initiative(session, admin.guild, admin.user)
     mine = await create_project(session, admin.initiative, admin.user, name="Mine")
@@ -269,8 +202,21 @@ async def test_list_projects_without_initiative_spans_them_all(
     response = await client.get(admin.g("/projects/"), headers=admin.headers)
 
     assert response.status_code == 200
-    project_ids = {p["id"] for p in response.json()["items"]}
-    assert {mine.id, theirs.id} <= project_ids
+    body = response.json()
+    assert {p["id"] for p in body["items"]} == {mine.id, theirs.id}
+    assert (body["page"], body["page_size"], body["total_count"]) == (1, 0, 2)
+    assert (body["has_next"], body["has_prev"]) == (False, False)
+
+    response = await client.get(
+        admin.g(f"/projects/?initiative_id={admin.initiative.id}"),
+        headers=admin.headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert {p["id"] for p in body["items"]} == {mine.id}
+    # The count is narrowed too, or the pager would offer empty pages.
+    assert body["total_count"] == 1
 
 
 async def test_list_projects_search_filters_by_name(
@@ -278,48 +224,26 @@ async def test_list_projects_search_filters_by_name(
 ):
     """The ``search`` param matches a word, by prefix, through the index.
 
-    Not a substring match on the name, which is what it used to be and what
-    this said until the index took over: a partial word finds it, and a word
-    from the description would too.
+    Not a substring match on the name: a partial word finds it, and a word
+    from the description would too. Punctuation is not a word, so a bare ``%``
+    has nothing to match — which reads better than the unfiltered list, where
+    the filter looks ignored.
     """
     admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     alpha = await create_project(session, admin.initiative, admin.user, name="Alpha")
-    await create_project(session, admin.initiative, admin.user, name="Beta")
-
-    response = await client.get(
-        admin.g("/projects/?search=alph"), headers=admin.headers
-    )
-
-    assert response.status_code == 200
-    data = response.json()["items"]
-    names = {p["name"] for p in data}
-    assert names == {"Alpha"}
-    assert data[0]["id"] == alpha.id
-
-
-async def test_list_projects_search_with_no_searchable_term_matches_nothing(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Punctuation is not a word, so there is nothing for it to match.
-
-    Searching is indexed now, and an index holds words. A bare ``%`` used to be
-    matched literally as a substring; it now matches nothing — which reads
-    better than the unfiltered list, where the filter looks ignored.
-    """
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     await create_project(session, admin.initiative, admin.user, name="50% done")
-    await create_project(session, admin.initiative, admin.user, name="Beta")
 
-    response = await client.get(admin.g("/projects/?search=%25"), headers=admin.headers)
+    async def found(term: str) -> list[tuple[int, str]]:
+        response = await client.get(
+            admin.g("/projects/"), params={"search": term}, headers=admin.headers
+        )
+        assert response.status_code == 200
+        return [(p["id"], p["name"]) for p in response.json()["items"]]
 
-    assert response.status_code == 200
-    assert response.json()["items"] == []
-
+    assert await found("alph") == [(alpha.id, "Alpha")]
+    assert await found("%") == []
     # The words around it are what finds it.
-    response = await client.get(
-        admin.g("/projects/?search=done"), headers=admin.headers
-    )
-    assert {p["name"] for p in response.json()["items"]} == {"50% done"}
+    assert [name for _, name in await found("done")] == ["50% done"]
 
 
 async def test_list_projects_paginates_in_sql(
@@ -411,24 +335,47 @@ async def test_list_projects_slim_permission_for_member(
 
 
 async def test_create_project(client: AsyncClient, acting_user):
-    """Test creating a new project."""
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-
-    payload = {
-        "name": "New Project",
-        "description": "Project description",
-        "initiative_id": admin.initiative.id,
-    }
+    """An initiative member creates a project. Start/end dates round-trip
+    through create and the list, and both are optional. Omitting ``grants``
+    defaults to Viewer for all initiative members, beside the owner."""
+    member = await acting_user(guild_role=CommunityRole.member, initiative=True)
 
     response = await client.post(
-        admin.g("/projects/"), headers=admin.headers, json=payload
+        member.g("/projects/"),
+        headers=member.headers,
+        json={
+            "name": "Scheduled Project",
+            "description": "Project description",
+            "initiative_id": member.initiative.id,
+            "start_date": "2026-03-02",
+            "end_date": "2026-09-30",
+        },
     )
 
     assert response.status_code == 201
-    data = response.json()
-    assert data["name"] == "New Project"
-    assert data["description"] == "Project description"
-    assert data["initiative"]["id"] == admin.initiative.id
+    created = response.json()
+    assert created["name"] == "Scheduled Project"
+    assert created["description"] == "Project description"
+    assert created["initiative"]["id"] == member.initiative.id
+    assert (created["start_date"], created["end_date"]) == ("2026-03-02", "2026-09-30")
+    assert {
+        (g["level"], g["user_id"], g["all_initiative_members"])
+        for g in created["grants"]
+    } == {("owner", member.user.id, False), ("read", None, True)}
+    assert created["can"]["delete"] is True
+
+    listed = await client.get(member.g("/projects/"), headers=member.headers)
+    assert listed.status_code == 200
+    item = next(p for p in listed.json()["items"] if p["id"] == created["id"])
+    assert (item["start_date"], item["end_date"]) == ("2026-03-02", "2026-09-30")
+
+    undated = await client.post(
+        member.g("/projects/"),
+        headers=member.headers,
+        json={"name": "Undated Project", "initiative_id": member.initiative.id},
+    )
+    assert undated.status_code == 201
+    assert (undated.json()["start_date"], undated.json()["end_date"]) == (None, None)
 
 
 async def test_create_refuses_when_projects_are_switched_off(
@@ -467,51 +414,6 @@ async def test_a_guild_admin_does_not_list_projects_of_a_switched_off_initiative
     listed = await client.get(a.g("/projects/"), headers=a.headers)
     assert listed.status_code == 200
     assert listed.json()["items"] == []
-
-
-async def test_create_project_with_dates(client: AsyncClient, acting_user):
-    """Start/end dates round-trip through create, the detail read, and the list."""
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-
-    payload = {
-        "name": "Scheduled Project",
-        "initiative_id": admin.initiative.id,
-        "start_date": "2026-03-02",
-        "end_date": "2026-09-30",
-    }
-
-    response = await client.post(
-        admin.g("/projects/"), headers=admin.headers, json=payload
-    )
-
-    assert response.status_code == 201
-    created = response.json()
-    assert created["start_date"] == "2026-03-02"
-    assert created["end_date"] == "2026-09-30"
-
-    listed = await client.get(admin.g("/projects/"), headers=admin.headers)
-    assert listed.status_code == 200
-    item = next(p for p in listed.json()["items"] if p["id"] == created["id"])
-    assert item["start_date"] == "2026-03-02"
-    assert item["end_date"] == "2026-09-30"
-
-
-async def test_create_project_without_dates_leaves_them_unset(
-    client: AsyncClient, acting_user
-):
-    """Both dates are optional — omitting them is not an error."""
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-
-    response = await client.post(
-        admin.g("/projects/"),
-        headers=admin.headers,
-        json={"name": "Undated Project", "initiative_id": admin.initiative.id},
-    )
-
-    assert response.status_code == 201
-    data = response.json()
-    assert data["start_date"] is None
-    assert data["end_date"] is None
 
 
 def _as_utc(value: str) -> datetime:
@@ -909,24 +811,6 @@ async def test_update_project_sets_and_clears_dates(
     assert cleared.json()["end_date"] is None
 
 
-async def test_create_project_as_member(client: AsyncClient, acting_user):
-    """Test that initiative members can create projects."""
-    member = await acting_user(guild_role=CommunityRole.member, initiative=True)
-
-    payload = {
-        "name": "Member Project",
-        "initiative_id": member.initiative.id,
-    }
-
-    response = await client.post(
-        member.g("/projects/"), headers=member.headers, json=payload
-    )
-
-    assert response.status_code == 201
-    data = response.json()
-    assert data["name"] == "Member Project"
-
-
 async def test_create_project_not_in_initiative_forbidden(
     client: AsyncClient, acting_user
 ):
@@ -947,27 +831,11 @@ async def test_create_project_not_in_initiative_forbidden(
     assert response.json()["detail"] == "INITIATIVE_NOT_FOUND"
 
 
-async def test_get_project_by_id(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Test getting a project by ID."""
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    project = await create_project(session, admin.initiative, admin.user)
-
-    response = await client.get(
-        admin.g(f"/projects/{project.id}"), headers=admin.headers
-    )
-
-    assert response.status_code == 200
-    data = response.json()
-    assert data["id"] == project.id
-    assert data["name"] == project.name
-
-
 async def test_get_project_includes_task_statuses(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
-    """The detail read carries the project's task statuses, ordered by position."""
+    """The detail read carries the project's task statuses, ordered by
+    position; the list leaves them out."""
     admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     project = await create_project(session, admin.initiative, admin.user)
     done = await create_task_status(
@@ -986,158 +854,74 @@ async def test_get_project_includes_task_statuses(
     )
 
     assert response.status_code == 200
+    assert (response.json()["id"], response.json()["name"]) == (
+        project.id,
+        project.name,
+    )
     statuses = response.json()["task_statuses"]
     # Ordered by position: backlog (0) before done (1).
     assert [s["id"] for s in statuses] == [backlog.id, done.id]
     assert [s["category"] for s in statuses] == ["backlog", "done"]
 
+    # The list projection stays lean: statuses are a detail-read enrichment.
+    listed = await client.get(admin.g("/projects/"), headers=admin.headers)
+    assert listed.status_code == 200
+    assert [item["task_statuses"] for item in listed.json()["items"]] == [[]]
 
-async def test_list_projects_omits_task_statuses(
+
+async def test_updating_and_deleting_a_project(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
-    """The list projection stays lean — statuses are a detail-read enrichment."""
+    """Its owner and a guild admin update and delete a project; a guild member
+    outside the initiative gets 404 (RLS hides the row), as for one that is not
+    there. A required field is omitted to keep it, never nulled."""
     admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    project = await create_project(session, admin.initiative, admin.user)
-    await create_task_status(
-        session, project, name="Done", category=TaskStatusCategory.done
+    owner = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=admin.guild,
+        initiative=admin.initiative,
+        initiative_role="member",
     )
+    outsider = await acting_user(guild_role=CommunityRole.member, guild=admin.guild)
+    project = await create_project(session, admin.initiative, owner.user)
+    other = await create_project(session, admin.initiative, owner.user)
+    url = f"/projects/{project.id}"
 
-    response = await client.get(admin.g("/projects/"), headers=admin.headers)
-
-    assert response.status_code == 200
-    items = response.json()["items"]
-    assert items and all(item["task_statuses"] == [] for item in items)
-
-
-async def test_get_project_not_found(client: AsyncClient, acting_user):
-    """Test getting non-existent project."""
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-
-    response = await client.get(admin.g("/projects/99999"), headers=admin.headers)
-
-    assert response.status_code == 404
-
-
-async def test_update_project_as_owner(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Test that project owner can update project."""
-    owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    project = await create_project(session, owner.initiative, owner.user)
-
-    payload = {"name": "Updated Name", "description": "Updated description"}
+    for method, payload in (("PATCH", {"name": "Hacked Name"}), ("DELETE", None)):
+        response = await client.request(
+            method, outsider.g(url), headers=outsider.headers, json=payload
+        )
+        assert response.status_code == 404, method
+    missing = await client.get(admin.g("/projects/99999"), headers=admin.headers)
+    assert missing.status_code == 404
 
     response = await client.patch(
-        owner.g(f"/projects/{project.id}"), headers=owner.headers, json=payload
+        owner.g(url),
+        headers=owner.headers,
+        json={"name": "Updated Name", "description": "Updated description"},
     )
-
     assert response.status_code == 200
-    data = response.json()
-    assert data["name"] == "Updated Name"
-    assert data["description"] == "Updated description"
-
-    # A required field is omitted to keep it, never nulled.
+    assert (response.json()["name"], response.json()["description"]) == (
+        "Updated Name",
+        "Updated description",
+    )
     for field in ("name", "is_template"):
         response = await client.patch(
-            owner.g(f"/projects/{project.id}"),
-            headers=owner.headers,
-            json={field: None},
+            owner.g(url), headers=owner.headers, json={field: None}
         )
         assert response.status_code == 422, field
-
-
-async def test_update_project_as_admin(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Test that guild admin can update any project."""
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    owner = await acting_user(
-        guild_role=CommunityRole.member,
-        guild=admin.guild,
-        initiative=admin.initiative,
-        initiative_role="member",
-    )
-    project = await create_project(session, admin.initiative, owner.user)
-
-    payload = {"name": "Admin Updated"}
-
     response = await client.patch(
-        admin.g(f"/projects/{project.id}"), headers=admin.headers, json=payload
+        admin.g(url), headers=admin.headers, json={"name": "Admin Updated"}
     )
-
     assert response.status_code == 200
-    data = response.json()
-    assert data["name"] == "Admin Updated"
+    assert response.json()["name"] == "Admin Updated"
 
-
-async def test_update_project_without_permission_forbidden(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Test that users without permission cannot update project."""
-    owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    outsider = await acting_user(guild_role=CommunityRole.member, guild=owner.guild)
-    project = await create_project(session, owner.initiative, owner.user)
-
-    payload = {"name": "Hacked Name"}
-
-    response = await client.patch(
-        outsider.g(f"/projects/{project.id}"), headers=outsider.headers, json=payload
+    deleted = await client.delete(owner.g(url), headers=owner.headers)
+    assert deleted.status_code == 204
+    deleted = await client.delete(
+        admin.g(f"/projects/{other.id}"), headers=admin.headers
     )
-
-    assert (
-        response.status_code == 404
-    )  # RLS hides the content resource from a non-initiative-member (404, not 403)
-
-
-async def test_delete_project_as_owner(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Test that project owner can delete project."""
-    owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    project = await create_project(session, owner.initiative, owner.user)
-
-    response = await client.delete(
-        owner.g(f"/projects/{project.id}"), headers=owner.headers
-    )
-
-    assert response.status_code == 204
-
-
-async def test_delete_project_as_admin(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Test that guild admin can delete any project."""
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    owner = await acting_user(
-        guild_role=CommunityRole.member,
-        guild=admin.guild,
-        initiative=admin.initiative,
-        initiative_role="member",
-    )
-    project = await create_project(session, admin.initiative, owner.user)
-
-    response = await client.delete(
-        admin.g(f"/projects/{project.id}"), headers=admin.headers
-    )
-
-    assert response.status_code == 204
-
-
-async def test_delete_project_without_permission_forbidden(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Test that users without permission cannot delete project."""
-    owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    outsider = await acting_user(guild_role=CommunityRole.member, guild=owner.guild)
-    project = await create_project(session, owner.initiative, owner.user)
-
-    response = await client.delete(
-        outsider.g(f"/projects/{project.id}"), headers=outsider.headers
-    )
-
-    assert (
-        response.status_code == 404
-    )  # RLS hides the content resource from a non-initiative-member (404, not 403)
+    assert deleted.status_code == 204
 
 
 async def test_reordering_puts_the_named_projects_first_and_keeps_the_rest(
@@ -1278,33 +1062,6 @@ async def test_create_project_takes_its_sharing_from_grants(
         ("write", member.user.id, None),
         ("read", None, member_role),
     }
-
-
-async def test_create_project_defaults_to_all_members_viewer(
-    client: AsyncClient, acting_user
-):
-    """Omitting `grants` defaults to Viewer for all initiative members (+ owner)."""
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-
-    payload = {
-        "name": "Project Default Share",
-        "initiative_id": admin.initiative.id,
-    }
-
-    response = await client.post(
-        admin.g("/projects/"), headers=admin.headers, json=payload
-    )
-
-    assert response.status_code == 201
-    data = response.json()
-    # Owner grant + an all-initiative-members Viewer (read) grant.
-    assert any(
-        g["user_id"] == admin.user.id and g["level"] == "owner" for g in data["grants"]
-    )
-    assert any(
-        g["all_initiative_members"] and g["level"] == "read" for g in data["grants"]
-    )
-    assert data["can"]["delete"] is True
 
 
 async def test_resaving_the_all_members_grant_does_not_collide_with_itself(

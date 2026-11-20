@@ -67,11 +67,12 @@ async def test_list_rows_carry_parent_and_progress(
     client: AsyncClient, acting_user, session
 ):
     """A part names its parent; a parent counts how many of its live parts are
-    done, leaving out the archived ones."""
+    done, leaving out the archived ones. A part of two is under the first."""
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     post = await create_task(session, a.project, title="Post")
+    second = await create_task(session, a.project, title="Second")
     done = await create_task(
         session, a.project, title="Script", status_category=TaskStatusCategory.done
     )
@@ -81,6 +82,7 @@ async def test_list_rows_carry_parent_and_progress(
     )
     for part in (done, open_, shelved):
         await _part_of(session, a.guild, part, post)
+    await _part_of(session, a.guild, open_, second)
 
     rows = await _list(client, a)
 
@@ -88,31 +90,20 @@ async def test_list_rows_carry_parent_and_progress(
     assert rows[post.id]["parent"] is None
     assert rows[done.id]["parent"] == {"id": post.id, "title": "Post"}
     assert rows[done.id]["subtask_progress"] is None
-
-
-async def test_a_part_of_two_is_under_the_first(
-    client: AsyncClient, acting_user, session
-):
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    first = await create_task(session, a.project, title="First")
-    second = await create_task(session, a.project, title="Second")
-    part = await create_task(session, a.project)
-    await _part_of(session, a.guild, part, first)
-    await _part_of(session, a.guild, part, second)
-
-    rows = await _list(client, a)
-
-    assert rows[part.id]["parent"]["id"] == first.id
+    assert rows[open_.id]["parent"]["id"] == post.id
     assert rows[second.id]["subtask_progress"] == {"completed": 0, "total": 1}
 
 
 async def test_create_with_a_parent_links_it(client: AsyncClient, acting_user, session):
+    """A new parent replaces every task the task was part of; null takes it
+    out of them."""
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    post = await create_task(session, a.project, title="Post")
+    post, second, third = [
+        await create_task(session, a.project, title=title)
+        for title in ("Post", "Second", "Third")
+    ]
 
     response = await client.post(
         a.g("/tasks/"),
@@ -122,81 +113,56 @@ async def test_create_with_a_parent_links_it(client: AsyncClient, acting_user, s
 
     assert response.status_code == 201, response.text
     assert response.json()["parent"] == {"id": post.id, "title": "Post"}
-    assert await _live_parents(session, a.guild.id, response.json()["id"]) == [post.id]
-
-
-async def test_update_moves_and_clears_the_parent(
-    client: AsyncClient, acting_user, session
-):
-    """A new parent replaces every task the task was part of; null takes it
-    out of them."""
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
+    part_id = response.json()["id"]
+    assert await _live_parents(session, a.guild.id, part_id) == [post.id]
+    await create_relationship(
+        session,
+        a.guild,
+        source=(TASK, part_id),
+        target=(TASK, second.id),
+        relationship_type=RelationshipType.part_of,
     )
-    first, second, third, part = [
-        await create_task(session, a.project) for _ in range(4)
-    ]
-    await _part_of(session, a.guild, part, first)
-    await _part_of(session, a.guild, part, second)
 
     moved = await client.patch(
-        a.g(f"/tasks/{part.id}"), headers=a.headers, json={"parent_task_id": third.id}
+        a.g(f"/tasks/{part_id}"), headers=a.headers, json={"parent_task_id": third.id}
     )
     assert moved.status_code == 200, moved.text
     assert moved.json()["parent"]["id"] == third.id
-    assert await _live_parents(session, a.guild.id, part.id) == [third.id]
+    assert await _live_parents(session, a.guild.id, part_id) == [third.id]
 
     kept = await client.patch(
-        a.g(f"/tasks/{part.id}"), headers=a.headers, json={"title": "Renamed"}
+        a.g(f"/tasks/{part_id}"), headers=a.headers, json={"title": "Renamed"}
     )
     assert kept.json()["parent"]["id"] == third.id
 
     cleared = await client.patch(
-        a.g(f"/tasks/{part.id}"), headers=a.headers, json={"parent_task_id": None}
+        a.g(f"/tasks/{part_id}"), headers=a.headers, json={"parent_task_id": None}
     )
     assert cleared.status_code == 200, cleared.text
     assert cleared.json()["parent"] is None
-    assert await _live_parents(session, a.guild.id, part.id) == []
+    assert await _live_parents(session, a.guild.id, part_id) == []
 
 
 async def test_a_task_is_not_put_under_its_own_part(
     client: AsyncClient, acting_user, session
 ):
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    top, middle, bottom = [await create_task(session, a.project) for _ in range(3)]
-    await _part_of(session, a.guild, middle, top)
-    await _part_of(session, a.guild, bottom, middle)
-
-    for parent in (top.id, bottom.id):
-        response = await client.patch(
-            a.g(f"/tasks/{top.id}"), headers=a.headers, json={"parent_task_id": parent}
-        )
-        assert response.status_code == 400
-        assert response.json()["detail"] == TaskMessages.PARENT_IS_PART
-    assert await _live_parents(session, a.guild.id, top.id) == []
-
-
-async def test_a_loop_is_refused_however_deep_the_chain(
-    client: AsyncClient, acting_user, session
-):
-    """Past the ten hops a relationships walk stops at."""
+    """Nor under itself, and a loop is refused however deep the chain: past
+    the ten hops a relationships walk stops at."""
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     chain = [await create_task(session, a.project) for _ in range(13)]
     for whole, part in itertools.pairwise(chain):
         await _part_of(session, a.guild, part, whole)
+    top = chain[0]
 
-    response = await client.patch(
-        a.g(f"/tasks/{chain[0].id}"),
-        headers=a.headers,
-        json={"parent_task_id": chain[-1].id},
-    )
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == TaskMessages.PARENT_IS_PART
+    for parent in (top.id, chain[2].id, chain[-1].id):
+        response = await client.patch(
+            a.g(f"/tasks/{top.id}"), headers=a.headers, json={"parent_task_id": parent}
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"] == TaskMessages.PARENT_IS_PART
+    assert await _live_parents(session, a.guild.id, top.id) == []
 
 
 async def test_a_parent_in_another_initiative_is_refused(
@@ -257,7 +223,7 @@ async def test_grouped_by_parent_a_parent_leads_its_parts(
 
 async def test_promoting_a_line_makes_a_part(client: AsyncClient, acting_user, session):
     """The line becomes a task of the same project, part of this one, done if
-    it was ticked, and leaves the checklist."""
+    it was ticked, and leaves the checklist. A line it does not hold is 404."""
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
@@ -278,6 +244,12 @@ async def test_promoting_a_line_makes_a_part(client: AsyncClient, acting_user, s
     after = await client.get(a.g(f"/tasks/{post.id}"), headers=a.headers)
     assert [item["text"] for item in after.json()["checklist"]] == ["Concept"]
     assert after.json()["subtask_progress"] == {"completed": 1, "total": 1}
+
+    missing = await client.post(
+        a.g(f"/tasks/{post.id}/checklist/nope/promote"), headers=a.headers
+    )
+    assert missing.status_code == 404
+    assert missing.json()["detail"] == ChecklistMessages.ITEM_NOT_FOUND
 
 
 async def test_promoting_a_line_with_mentions_keeps_its_words(
@@ -335,22 +307,6 @@ async def test_a_line_changed_since_it_was_read_is_kept(session, acting_user):
         ),
     )
     assert [item["text"] for item in removed.one()[0]] == ["Concept"]
-
-
-async def test_promoting_a_missing_line_is_404(
-    client: AsyncClient, acting_user, session
-):
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    post = await create_task(session, a.project, checklist=checklist_items("One"))
-
-    response = await client.post(
-        a.g(f"/tasks/{post.id}/checklist/nope/promote"), headers=a.headers
-    )
-
-    assert response.status_code == 404
-    assert response.json()["detail"] == ChecklistMessages.ITEM_NOT_FOUND
 
 
 async def test_promoting_needs_write_on_the_task(

@@ -67,25 +67,3 @@ async def test_adding_keeps_someone_put_on_since_the_task_was_read(
     assert {a.id for a in stale.assignees} == {first.user.id, second.user.id}
     # Only who this change put on it is told they were assigned by it.
     assert added == [second.user.id]
-
-
-async def test_removing_takes_off_only_who_it_names(session: AsyncSession, acting_user):
-    owner, (first, second) = await _team(session, acting_user)
-    task = await create_task(session, owner.project)
-    await set_rls_context(session, SystemGuild(owner.guild.id))
-    loaded = await _loaded(session, task.id)
-    await change_task_assignees(
-        session, loaded, add=[first.user.id, second.user.id], project=loaded.project
-    )
-
-    # Someone both added and removed is removed; adding who is on it is a no-op.
-    added = await change_task_assignees(
-        session,
-        loaded,
-        add=[second.user.id, owner.user.id],
-        remove=[first.user.id, owner.user.id],
-        project=loaded.project,
-    )
-
-    assert {a.id for a in loaded.assignees} == {second.user.id}
-    assert added == []

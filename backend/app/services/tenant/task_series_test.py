@@ -2,18 +2,14 @@
 
 import json
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from pydantic import ValidationError
 from sqlmodel import select
-from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import TaskMessages
 from app.core.user_display import handle_of
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.task import Task, TaskStatusCategory
-from app.schemas.tenant.task import TaskCreate
 from app.services.tenant import (
     project_export,
     project_import,
@@ -23,6 +19,27 @@ from app.services.tenant import (
 from app.services.tenant.project_grants import get_project_hydrated
 from app.services.tenant.task_series import advance_recurrence_if_needed
 from app.testing import create_task, route_as
+
+
+async def advance(client, a, task_id: int, operation: str) -> dict:
+    """Skip the task, or complete it and read back the series' open task."""
+    if operation == "skip":
+        response = await client.post(a.g(f"/tasks/{task_id}/skip"), headers=a.headers)
+        assert response.status_code == 200, response.text
+        return response.json()
+    response = await client.patch(
+        a.g(f"/tasks/{task_id}"), headers=a.headers, json={"status_category": "done"}
+    )
+    assert response.status_code == 200, response.text
+    conditions = json.dumps(
+        [{"field": "project_id", "op": "eq", "value": a.project.id}]
+    )
+    response = await client.get(
+        a.g(f"/tasks/?conditions={conditions}"), headers=a.headers
+    )
+    assert response.status_code == 200, response.text
+    (current,) = [row for row in response.json()["items"] if row["recurrence"]]
+    return current
 
 
 @pytest.mark.parametrize("operation", ["complete", "skip"])
@@ -52,28 +69,8 @@ async def test_fixed_task_keeps_its_phase_after_an_extra_date(
     )
     task_id = first.id
     for day in expected_dates:
-        if operation == "skip":
-            response = await client.post(
-                a.g(f"/tasks/{task_id}/skip"), headers=a.headers
-            )
-            assert response.status_code == 200, response.text
-            current = response.json()
-        else:
-            response = await client.patch(
-                a.g(f"/tasks/{task_id}"),
-                headers=a.headers,
-                json={"status_category": "done"},
-            )
-            assert response.status_code == 200, response.text
-            conditions = json.dumps(
-                [{"field": "project_id", "op": "eq", "value": a.project.id}]
-            )
-            response = await client.get(
-                a.g(f"/tasks/?conditions={conditions}"), headers=a.headers
-            )
-            assert response.status_code == 200, response.text
-            (current,) = [row for row in response.json()["items"] if row["recurrence"]]
-            task_id = current["id"]
+        current = await advance(client, a, task_id, operation)
+        task_id = current["id"]
         assert datetime.fromisoformat(current["due_date"]) == datetime(
             2026, 10, day, 9, tzinfo=UTC
         )
@@ -88,25 +85,7 @@ async def test_zero_date_span_survives_the_next_task(
     first = await create_task(
         session, a.project, start_date=due, due_date=due, recurrence="RRULE:FREQ=DAILY"
     )
-    if operation == "skip":
-        response = await client.post(a.g(f"/tasks/{first.id}/skip"), headers=a.headers)
-        assert response.status_code == 200, response.text
-        current = response.json()
-    else:
-        response = await client.patch(
-            a.g(f"/tasks/{first.id}"),
-            headers=a.headers,
-            json={"status_category": "done"},
-        )
-        assert response.status_code == 200, response.text
-        conditions = json.dumps(
-            [{"field": "project_id", "op": "eq", "value": a.project.id}]
-        )
-        response = await client.get(
-            a.g(f"/tasks/?conditions={conditions}"), headers=a.headers
-        )
-        assert response.status_code == 200, response.text
-        (current,) = [row for row in response.json()["items"] if row["recurrence"]]
+    current = await advance(client, a, first.id, operation)
     assert current["start_date"] == current["due_date"]
     assert datetime.fromisoformat(current["due_date"]) == datetime(
         2026, 10, 6, 9, tzinfo=UTC
@@ -218,25 +197,7 @@ async def test_task_edits_reanchor_the_effective_series_date(
         a.g(f"/tasks/{first.id}"), headers=a.headers, json=payload
     )
     assert response.status_code == 200, response.text
-    if operation == "skip":
-        response = await client.post(a.g(f"/tasks/{first.id}/skip"), headers=a.headers)
-        assert response.status_code == 200, response.text
-        current = response.json()
-    else:
-        response = await client.patch(
-            a.g(f"/tasks/{first.id}"),
-            headers=a.headers,
-            json={"status_category": "done"},
-        )
-        assert response.status_code == 200, response.text
-        conditions = json.dumps(
-            [{"field": "project_id", "op": "eq", "value": a.project.id}]
-        )
-        response = await client.get(
-            a.g(f"/tasks/?conditions={conditions}"), headers=a.headers
-        )
-        assert response.status_code == 200, response.text
-        (current,) = [row for row in response.json()["items"] if row["recurrence"]]
+    current = await advance(client, a, first.id, operation)
     assert datetime.fromisoformat(current["due_date"]) == expected
 
 
@@ -359,29 +320,9 @@ async def test_advancing_without_a_saved_anchor_preserves_the_original_phase(
     )
     await _remove_saved_anchor(session, task)
     task_id = task.id
-    conditions = json.dumps(
-        [{"field": "project_id", "op": "eq", "value": a.project.id}]
-    )
     for day in (7, 12):
-        if operation == "skip":
-            response = await client.post(
-                a.g(f"/tasks/{task_id}/skip"), headers=a.headers
-            )
-            assert response.status_code == 200, response.text
-            current = response.json()
-        else:
-            response = await client.patch(
-                a.g(f"/tasks/{task_id}"),
-                headers=a.headers,
-                json={"status_category": "done"},
-            )
-            assert response.status_code == 200, response.text
-            response = await client.get(
-                a.g(f"/tasks/?conditions={conditions}"), headers=a.headers
-            )
-            assert response.status_code == 200, response.text
-            (current,) = [row for row in response.json()["items"] if row["recurrence"]]
-            task_id = current["id"]
+        current = await advance(client, a, task_id, operation)
+        task_id = current["id"]
         assert datetime.fromisoformat(current["due_date"]) == datetime(
             2026, 10, day, 9, tzinfo=UTC
         )
@@ -627,48 +568,31 @@ async def test_completion_copies_limit_but_never_stores_daily_state(
     assert task.recurrence is None and task.recurrence_limit is None
 
 
-@pytest.mark.parametrize(
-    "changes",
-    [
+async def test_api_create_effective_patch_duplicate_and_disable(
+    hourly_task, client, session
+):
+    actor, task = hourly_task
+    hourly = {
+        "title": "Routine check",
+        "project_id": actor.project.id,
+        "due_date": "2026-10-20T08:00:00Z",
+        "recurrence": "RRULE:FREQ=HOURLY;INTERVAL=4",
+        "recurrence_strategy": "rolling",
+        "recurrence_limit": 3,
+    }
+    for changes in (
         {"recurrence_strategy": "fixed"},
         {"recurrence_limit": 0},
         {"recurrence_limit": 25},
         {"recurrence_limit": True},
         {"recurrence": "RRULE:FREQ=DAILY"},
         {"due_date": None},
-    ],
-)
-def test_hourly_validation_checks_rule_strategy_due_and_limit(changes):
-    with pytest.raises(ValidationError):
-        TaskCreate.model_validate(
-            {
-                "title": "Routine check",
-                "project_id": 1,
-                "due_date": "2026-10-20T08:00:00Z",
-                "recurrence": "RRULE:FREQ=HOURLY;INTERVAL=4",
-                "recurrence_strategy": "rolling",
-                "recurrence_limit": 3,
-                **changes,
-            }
+    ):
+        response = await client.post(
+            actor.g("/tasks/"), headers=actor.headers, json={**hourly, **changes}
         )
-
-
-async def test_api_create_effective_patch_duplicate_and_disable(
-    hourly_task, client, session
-):
-    actor, task = hourly_task
-    response = await client.post(
-        actor.g("/tasks/"),
-        headers=actor.headers,
-        json={
-            "title": "Routine check",
-            "project_id": actor.project.id,
-            "due_date": "2026-10-20T08:00:00Z",
-            "recurrence": "RRULE:FREQ=HOURLY;INTERVAL=4",
-            "recurrence_strategy": "rolling",
-            "recurrence_limit": 3,
-        },
-    )
+        assert response.status_code == 422, changes
+    response = await client.post(actor.g("/tasks/"), headers=actor.headers, json=hourly)
     assert response.status_code == 201, response.text
     assert response.json()["recurrence_limit"] == 3
     for update in (
@@ -941,12 +865,10 @@ async def test_history_stays_in_request_guild_under_rls(
     assert dates[1] == instant("2026-10-20T22:00")
 
 
-async def test_filtered_daily_anchor_for_every_supported_hourly_interval(hourly_task):
+async def test_filtered_daily_anchor_for_every_supported_hourly_interval(
+    hourly_task, session
+):
     _, task = hourly_task
-    mocked = AsyncMock(spec=AsyncSession)
-    result = MagicMock()
-    result.all.return_value = []
-    mocked.exec.return_value = result
     task.recurrence_limit = 1
     task.due_date = instant("2026-10-19T08:00")
     now = instant("2026-10-19T18:00")
@@ -957,7 +879,9 @@ async def test_filtered_daily_anchor_for_every_supported_hourly_interval(hourly_
         while expected.date() < earliest.date():
             expected += timedelta(days=7)
         expected = max(expected, earliest)
-        dates = await task_series.next_dates(mocked, task, now=now, user_timezone="UTC")
+        dates = await task_series.next_dates(
+            session, task, now=now, user_timezone="UTC"
+        )
         assert dates is not None
         assert dates[1] == expected, interval
 

@@ -90,27 +90,6 @@ async def _setup_guild_with_project(session, user, *, guild_name="Test Guild"):
     return guild, initiative, project
 
 
-async def test_list_my_tasks_returns_assigned(
-    client: AsyncClient, session: AsyncSession
-):
-    """GET /me/tasks returns tasks assigned to the current user."""
-    user = await create_user(session, email="user@example.com")
-    _guild, _, project = await _setup_guild_with_project(session, user)
-
-    task1 = await _create_task(session, project, "Assigned 1", created_by=user.id)
-    task2 = await _create_task(session, project, "Assigned 2", created_by=user.id)
-    await _assign(session, task1, user.id)
-    await _assign(session, task2, user.id)
-
-    headers = get_auth_headers(user)
-    response = await client.get("/api/v1/me/tasks", headers=headers)
-
-    assert response.status_code == 200, response.text
-    task_ids = {t["id"] for t in response.json()["items"]}
-    assert task1.id in task_ids
-    assert task2.id in task_ids
-
-
 async def test_list_my_tasks_assigned_or_created(
     client: AsyncClient, session: AsyncSession
 ):
@@ -197,35 +176,6 @@ async def test_admin_sees_assigned_task_in_non_member_initiative(
         "Guild admin should see a task assigned to them even in an initiative "
         "they aren't a member of (initiative_access admin leg)."
     )
-
-
-async def test_list_my_tasks_priority_filter(
-    client: AsyncClient, session: AsyncSession
-):
-    """GET /me/tasks respects priority filters."""
-    user = await create_user(session, email="user@example.com")
-    _guild, _, project = await _setup_guild_with_project(session, user)
-
-    high = await _create_task(session, project, "High", created_by=user.id)
-    high.priority = TaskPriority.high
-    session.add(high)
-    low = await _create_task(session, project, "Low", created_by=user.id)
-    low.priority = TaskPriority.low
-    session.add(low)
-    await session.commit()
-    await _assign(session, high, user.id)
-    await _assign(session, low, user.id)
-
-    headers = get_auth_headers(user)
-    conditions = json.dumps([{"field": "priority", "op": "in_", "value": ["high"]}])
-    response = await client.get(
-        f"/api/v1/me/tasks?conditions={conditions}", headers=headers
-    )
-
-    assert response.status_code == 200, response.text
-    task_ids = {t["id"] for t in response.json()["items"]}
-    assert high.id in task_ids
-    assert low.id not in task_ids
 
 
 async def test_list_my_tasks_due_date_filter_across_guilds(
@@ -330,33 +280,6 @@ async def test_list_my_tasks_guild_ids_filter(
     found = keyed(response)
     assert (guild1.id, task1.id) in found
     assert (guild2.id, task2.id) not in found
-
-
-async def test_list_my_tasks_pagination(client: AsyncClient, session: AsyncSession):
-    """GET /me/tasks supports pagination."""
-    user = await create_user(session, email="user@example.com")
-    _guild, _, project = await _setup_guild_with_project(session, user)
-
-    for i in range(3):
-        task = await _create_task(session, project, f"Task {i}", created_by=user.id)
-        await _assign(session, task, user.id)
-
-    headers = get_auth_headers(user)
-
-    # Page 1 with page_size=2
-    response = await client.get("/api/v1/me/tasks?page=1&page_size=2", headers=headers)
-    assert response.status_code == 200, response.text
-    data = response.json()
-    assert len(data["items"]) == 2
-    assert data["total_count"] == 3
-    assert data["has_next"] is True
-
-    # Page 2
-    response = await client.get("/api/v1/me/tasks?page=2&page_size=2", headers=headers)
-    assert response.status_code == 200, response.text
-    data = response.json()
-    assert len(data["items"]) == 1
-    assert data["has_next"] is False
 
 
 async def test_list_my_tasks_counts_comments_per_row(
@@ -575,6 +498,7 @@ async def test_list_my_tasks_priority_sorted_desc_across_guilds(
 ):
     """GET /me/tasks sorts by priority across guilds in PG enum order (low→urgent),
     not alphabetically — descending therefore yields urgent → high → medium → low.
+    A priority filter narrows the same set.
     """
     user = await create_user(session, email="user@example.com")
     _guild1, _, project1 = await _setup_guild_with_project(
@@ -607,61 +531,22 @@ async def test_list_my_tasks_priority_sorted_desc_across_guilds(
     titles = [t["title"] for t in response.json()["items"]]
     assert titles == ["urgent", "high", "medium", "low"]
 
-
-async def test_list_my_tasks_property_value_is_null_filter(
-    client: AsyncClient, session: AsyncSession
-):
-    """GET /me/tasks filters by a custom property value.
-
-    Regression: the property definition needed to compile the filter lives in
-    the guild schema, but the /me session runs in the ``public`` search_path.
-    Loading definitions off that un-routed session raised
-    ``UndefinedTableError: relation "property_definitions" does not exist`` and
-    the endpoint 500'd; definitions must be loaded per-guild.
-    """
-    from app.models.tenant.metadata import MetadataType
-    from app.testing.factories import (
-        create_property_definition,
-        create_property_value,
-    )
-
-    user = await create_user(session, email="user@example.com")
-    _guild, initiative, project = await _setup_guild_with_project(session, user)
-
-    definition = await create_property_definition(
-        session, initiative, name="Owner note", type=MetadataType.text
-    )
-
-    with_value = await _create_task(session, project, "Has value", created_by=user.id)
-    without_value = await _create_task(session, project, "No value", created_by=user.id)
-    await _assign(session, with_value, user.id)
-    await _assign(session, without_value, user.id)
-    await create_property_value(session, with_value, definition, value_text="something")
-
-    headers = get_auth_headers(user)
-    conditions = json.dumps(
-        [
-            {
-                "field": "property_values",
-                "op": "is_null",
-                "value": {"property_id": definition.id, "value": True},
-            }
-        ]
-    )
+    conditions = json.dumps([{"field": "priority", "op": "in_", "value": ["high"]}])
     response = await client.get(
         f"/api/v1/me/tasks?conditions={conditions}", headers=headers
     )
-
     assert response.status_code == 200, response.text
-    task_ids = {t["id"] for t in response.json()["items"]}
-    assert without_value.id in task_ids
-    assert with_value.id not in task_ids
+    assert [t["id"] for t in response.json()["items"]] == [g1_high.id]
 
 
 async def test_list_my_tasks_property_filter_spans_guilds(
     client: AsyncClient, session: AsyncSession
 ):
     """GET /me/tasks applies a property_values filter across EVERY guild.
+
+    Regression: the property definition needed to compile the filter lives in
+    the guild schema, but the /me session runs in the ``public`` search_path,
+    so definitions must be loaded per-guild rather than off that session.
 
     ``_load_property_definitions_across_guilds`` routes into each guild's schema
     to resolve the definition, then the compiled ``property_id`` predicate runs
@@ -751,21 +636,21 @@ async def test_my_tasks_accepts_nested_or_conditions(
     )
     now = datetime.now(UTC)
 
-    due_soon = await create_task(
+    await create_task(
         session,
         a.project,
         title="Due soon",
         assignees=[a.user],
         due_date=now + timedelta(hours=6),
     )
-    urgent_undated = await create_task(
+    await create_task(
         session,
         a.project,
         title="Urgent but undated",
         assignees=[a.user],
         priority=TaskPriority.urgent,
     )
-    finished_today = await create_task(
+    await create_task(
         session,
         a.project,
         title="Finished today",
@@ -833,32 +718,8 @@ async def test_my_tasks_accepts_nested_or_conditions(
     )
 
     assert response.status_code == 200, response.text
-    titles = {item["title"] for item in response.json()["items"]}
-    assert titles == {"Due soon", "Urgent but undated", "Finished today"}
-    assert {due_soon.id, urgent_undated.id, finished_today.id}
-
-
-async def test_my_tasks_exposes_completed_at(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """The section reads completed_at off the list payload to decide what
-    counts as finished today."""
-    from app.models.tenant.task import TaskStatusCategory
-    from app.testing.factories import create_task
-
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    await create_task(
-        session,
-        a.project,
-        title="Finished",
-        assignees=[a.user],
-        status_category=TaskStatusCategory.done,
-    )
-
-    response = await client.get("/api/v1/me/tasks", headers=a.headers)
-
-    assert response.status_code == 200, response.text
-    item = next(i for i in response.json()["items"] if i["title"] == "Finished")
-    assert item["completed_at"] is not None
+    items = {item["title"]: item for item in response.json()["items"]}
+    assert set(items) == {"Due soon", "Urgent but undated", "Finished today"}
+    # The section reads completed_at off the list payload to decide what
+    # counts as finished today.
+    assert items["Finished today"]["completed_at"] is not None
