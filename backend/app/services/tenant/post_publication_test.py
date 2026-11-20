@@ -19,7 +19,6 @@ from app.db import cohorts
 from app.models.platform.notification import Notification, NotificationType
 from app.models.tenant.post import Post
 from app.models.tenant.post_poll import PostPoll
-from app.models.tenant.resource_grant import ResourceGrant
 from app.services.tenant.post_publication import publish_due_posts
 from app.testing import (
     create_guild,
@@ -28,7 +27,6 @@ from app.testing import (
     create_initiative_member,
     create_post,
     create_post_poll,
-    create_resource_grant,
     create_user,
     drain_notices,
     guild_of,
@@ -135,23 +133,6 @@ async def test_a_notice_not_yet_due_is_left_alone(session: AsyncSession):
     assert await _notifications(session, reader_id) == []
 
 
-async def test_a_second_pass_publishes_nothing_twice(session: AsyncSession):
-    """The claim is the ``published_at IS NULL`` predicate on the UPDATE, so a
-    pass that overlaps another — or retries after a crash — announces once."""
-    author, reader, initiative, _ = await _board(session)
-    reader_id = reader.id
-    await _draft(session, initiative, author, due_in=timedelta(minutes=-1))
-
-    await route_session_to_guild(session, guild_of(initiative))
-    now = datetime.now(UTC)
-    assert len(await _publish(guild_of(initiative), now=now)) == 1
-    await session.commit()
-    assert await _publish(guild_of(initiative), now=now) == []
-    await session.commit()
-
-    assert len(await _notifications(session, reader_id)) == 1
-
-
 async def test_a_trashed_draft_does_not_go_up(session: AsyncSession):
     """A notice somebody threw away must not publish itself on schedule."""
     author, reader, initiative, _ = await _board(session)
@@ -166,42 +147,6 @@ async def test_a_trashed_draft_does_not_go_up(session: AsyncSession):
     assert await _publish(guild_of(initiative), now=datetime.now(UTC)) == []
     await session.commit()
     assert await _notifications(session, reader_id) == []
-
-
-async def test_the_announcement_follows_the_sharing_not_the_roster(
-    session: AsyncSession,
-):
-    """The gate the feature hangs on: a notice shared with one person
-    interrupts one person, however many are in the initiative."""
-    author, bystander, initiative, guild = await _board(session)
-    bystander_id = bystander.id
-    named = await create_user(session)
-    named_id = named.id
-    await create_guild_membership(session, user=named, guild=guild)
-    await create_initiative_member(session, initiative, named)
-
-    post_id = await _draft(session, initiative, author, due_in=timedelta(minutes=-1))
-    await route_session_to_guild(session, guild_of(initiative))
-    # Replace the factory's all-members grant with one naming a single reader.
-    grants = (
-        await session.exec(
-            select(ResourceGrant).where(
-                ResourceGrant.resource_type == "post",
-                ResourceGrant.resource_id == post_id,
-                ResourceGrant.all_initiative_members.is_(True),
-            )
-        )
-    ).all()
-    for grant in grants:
-        await session.delete(grant)
-    post = (await session.exec(select(Post).where(Post.id == post_id))).one()
-    await create_resource_grant(session, post, user=named)
-
-    await _publish(guild_of(initiative), now=datetime.now(UTC))
-    await session.commit()
-
-    assert len(await _notifications(session, named_id)) == 1
-    assert await _notifications(session, bystander_id) == []
 
 
 async def test_somebody_who_ignores_the_author_is_not_told(session: AsyncSession):

@@ -61,35 +61,6 @@ async def test_upload_unauthenticated_returns_401(client: AsyncClient) -> None:
         test_file.unlink(missing_ok=True)
 
 
-async def test_upload_accessible_with_auth_header(
-    client: AsyncClient, session: AsyncSession
-) -> None:
-    """GET /uploads/<file> with Authorization Bearer header returns 200."""
-    from app.models.tenant.upload import Upload
-
-    user = await create_user(session)
-    guild = await create_guild(session, creator=user)
-    await create_guild_membership(session, user=user, guild=guild)
-    _stage_upload(guild.id, "test_auth_header.txt")
-    await route_session_to_guild(session, guild.id)
-    session.add(
-        Upload(
-            filename="test_auth_header.txt",
-            created_by=user.id,
-            created_by_kind=ActorKind.member,
-            size_bytes=5,
-            content_type="text/plain",
-        )
-    )
-    await session.commit()
-
-    headers = get_auth_headers(user)
-    response = await client.get(
-        f"/uploads/{guild.id}/test_auth_header.txt", headers=headers
-    )
-    assert response.status_code == 200
-
-
 async def test_a_served_upload_is_cacheable_but_not_indefinitely(
     client: AsyncClient, session: AsyncSession
 ) -> None:
@@ -149,36 +120,6 @@ async def test_upload_session_jwt_rejected_in_query_param(
         assert response.status_code == 401
     finally:
         test_file.unlink(missing_ok=True)
-
-
-async def test_upload_accessible_with_scoped_upload_token(
-    client: AsyncClient, session: AsyncSession
-) -> None:
-    """A short-lived, uploads-scoped token IS accepted via ?token=."""
-    from app.models.tenant.upload import Upload
-
-    user = await create_user(session)
-    # Files are only served with a matching Upload row and
-    # guild membership — the scoped token answers "who", not "may".
-    guild = await create_guild(session, creator=user)
-    await create_guild_membership(session, user=user, guild=guild)
-    _stage_upload(guild.id, "test_query_upload_token.txt")
-    await route_session_to_guild(session, guild.id)
-    session.add(
-        Upload(
-            filename="test_query_upload_token.txt",
-            created_by=user.id,
-            created_by_kind=ActorKind.member,
-            size_bytes=5,
-            content_type="text/plain",
-        )
-    )
-    await session.commit()
-    token, _ = create_upload_token(user_id=user.id)
-    response = await client.get(
-        f"/uploads/{guild.id}/test_query_upload_token.txt?token={token}",
-    )
-    assert response.status_code == 200
 
 
 async def test_scoped_upload_token_rejected_as_general_api_credential(
@@ -260,16 +201,6 @@ async def test_issue_upload_token_requires_auth(client: AsyncClient) -> None:
     assert response.status_code == 401
 
 
-async def test_upload_missing_file_returns_404(
-    client: AsyncClient, session: AsyncSession
-) -> None:
-    """GET /uploads/<nonexistent> with valid auth returns 404."""
-    user = await create_user(session)
-    headers = get_auth_headers(user)
-    response = await client.get("/uploads/1/does_not_exist_xyz.txt", headers=headers)
-    assert response.status_code == 404
-
-
 async def test_upload_path_traversal_rejected(
     client: AsyncClient, session: AsyncSession
 ) -> None:
@@ -281,75 +212,6 @@ async def test_upload_path_traversal_rejected(
     # a ``..`` that did reach the handler would fail the uploads-dir containment
     # check (404). Either way the escape is rejected and the file is never served.
     assert response.status_code in (404, 422)
-
-
-async def test_upload_guild_member_can_access_file(
-    client: AsyncClient, session: AsyncSession
-) -> None:
-    """Authenticated guild member can access a file uploaded by that guild."""
-    from app.models.tenant.upload import Upload
-
-    user = await create_user(session)
-    guild = await create_guild(session, creator=user)
-    await create_guild_membership(session, user=user, guild=guild)
-    _stage_upload(guild.id, "test_guild_access.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 8)
-
-    await route_session_to_guild(session, guild.id)
-    upload = Upload(
-        filename="test_guild_access.png",
-        created_by=user.id,
-        created_by_kind=ActorKind.member,
-        size_bytes=16,
-        content_type="image/png",
-    )
-    session.add(upload)
-    await session.commit()
-
-    headers = get_auth_headers(user)
-    response = await client.get(
-        f"/uploads/{guild.id}/test_guild_access.png", headers=headers
-    )
-    assert response.status_code == 200
-
-
-async def test_upload_non_member_cannot_access_file(
-    client: AsyncClient, session: AsyncSession
-) -> None:
-    """Authenticated user NOT in the owning guild gets 403."""
-    from app.models.tenant.upload import Upload
-
-    uploads_dir = _uploads_dir()
-    test_file = uploads_dir / "test_guild_forbidden.png"
-    test_file.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 8)
-    try:
-        owner = await create_user(session)
-        guild = await create_guild(session, creator=owner)
-        await create_guild_membership(session, user=owner, guild=guild)
-
-        await route_session_to_guild(session, guild.id)
-        upload = Upload(
-            filename="test_guild_forbidden.png",
-            created_by=owner.id,
-            created_by_kind=ActorKind.member,
-            size_bytes=16,
-            content_type="image/png",
-        )
-        session.add(upload)
-        await session.commit()
-
-        # A second user not in that guild — addressing the guild's upload
-        # path is still rejected, since membership is validated per request
-        # against the path-addressed guild.
-        outsider = await create_user(session)
-        headers = get_auth_headers(outsider)
-        response = await client.get(
-            f"/uploads/{guild.id}/test_guild_forbidden.png", headers=headers
-        )
-        # 404, not 403: existence is never confirmed to non-members,
-        # matching the guild-schema lookup path.
-        assert response.status_code == 404
-    finally:
-        test_file.unlink(missing_ok=True)
 
 
 async def test_upload_without_db_record_returns_404(

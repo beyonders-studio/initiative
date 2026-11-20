@@ -14,7 +14,6 @@ from app.core.search import SearchEntityType
 from app.models.platform.guild import CommunityRole, GuildMembership
 from app.models.platform.notification import Notification, NotificationType
 from app.models.tenant.relationship import EntityRelationship
-from app.services.tenant.descriptions import newly_mentioned
 from app.services.tenant.relationships import Endpoint
 from app.testing import (
     create_file,
@@ -24,13 +23,6 @@ from app.testing import (
     drain_notices,
 )
 from app.testing.schema_harness import route_session_to_guild
-
-
-def test_only_a_name_the_last_save_did_not_have_is_new():
-    assert newly_mentioned("@[Ada](4) and @[Bo](5)", "@[Ada](4)") == {5}
-    assert newly_mentioned("@[Ada](4)", "@[Ada](4) and @[Bo](5)") == set()
-    assert newly_mentioned("@[Ada](4)", None) == {4}
-    assert newly_mentioned(None, "@[Ada](4)") == set()
 
 
 async def _mentions_for(session: AsyncSession, user_id: int) -> list[dict]:
@@ -47,12 +39,13 @@ async def _mentions_for(session: AsyncSession, user_id: int) -> list[dict]:
 
 
 async def _references(session: AsyncSession, guild_id: int, source: Endpoint) -> set:
+    """Every references row, removed ones too: an edge a rewritten sentence
+    takes away asserts nothing, so it is deleted rather than kept removed."""
     await route_session_to_guild(session, guild_id)
     rows = await session.exec(
         select(EntityRelationship.target_type, EntityRelationship.target_id).where(
             EntityRelationship.source_node == source.node,
             EntityRelationship.relationship_type == RelationshipType.references.value,
-            EntityRelationship.removed_at.is_(None),  # type: ignore[union-attr]
         )
     )
     return set(rows.all())

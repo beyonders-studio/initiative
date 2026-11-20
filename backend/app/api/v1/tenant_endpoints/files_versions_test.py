@@ -300,6 +300,13 @@ async def test_upload_version_non_uploaded_file_rejected(
     assert list_resp.status_code == 400
     assert list_resp.json()["detail"] == "FILE_NOT_AN_UPLOADED_FILE"
 
+    # And deleting one, before any version is looked up.
+    delete_resp = await client.delete(
+        owner.g(f"/files/{native_id}/versions/9999"), headers=owner.headers
+    )
+    assert delete_resp.status_code == 400
+    assert delete_resp.json()["detail"] == "FILE_NOT_AN_UPLOADED_FILE"
+
 
 async def test_upload_version_program_refused(client: AsyncClient, acting_user) -> None:
     """A program is refused with a coded error."""
@@ -560,28 +567,6 @@ async def test_delete_version_non_owner_forbidden(
     assert resp.status_code == 403
 
 
-async def test_delete_version_non_uploaded_file_rejected(
-    client: AsyncClient, acting_user
-) -> None:
-    """Delete is rejected on non-uploaded files with the same code as upload/list."""
-    owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    create = await client.post(
-        owner.g("/files/"),
-        headers=owner.headers,
-        json={"name": "Native doc", "initiative_id": owner.initiative.id},
-    )
-    assert create.status_code == 201
-    native_id = create.json()["id"]
-
-    # Any version_id will do — the type check fires before the version lookup.
-    resp = await client.delete(
-        owner.g(f"/files/{native_id}/versions/9999"),
-        headers=owner.headers,
-    )
-    assert resp.status_code == 400
-    assert resp.json()["detail"] == "FILE_NOT_AN_UPLOADED_FILE"
-
-
 # ---------------------------------------------------------------------------
 # Bounded upload reads: over-limit bodies are rejected with 413 before
 # the whole payload is buffered into memory. The size cap is shrunk via
@@ -592,30 +577,44 @@ async def test_delete_version_non_uploaded_file_rejected(
 _TINY_PDF = b"%PDF-1.4 tiny body for size tests"
 
 
-async def test_upload_file_over_limit_rejected(
+async def test_an_upload_and_a_version_are_taken_up_to_the_cap(
     client: AsyncClient,
     session: AsyncSession,
     acting_user,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """POST /files/upload rejects a body over the cap with 413."""
-    cap = 1024
-    monkeypatch.setattr(attachments_service, "MAX_FILE_SIZE", cap)
-
+    """A body at the cap is taken; one byte over is refused with 413 and
+    leaves nothing behind."""
     owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-
+    # Seed v1 while the cap is still large so the file exists.
+    doc = await _upload_initial_file_doc(client, owner, initiative=owner.initiative)
+    cap = 4096
+    monkeypatch.setattr(attachments_service, "MAX_FILE_SIZE", cap)
+    at_cap = _TINY_PDF + b" " + b"B" * (cap - len(_TINY_PDF) - 1)
     oversized = b"%PDF-1.4 " + b"A" * (cap + 1)
-    resp = await client.post(
-        owner.g("/files/upload"),
-        headers=owner.headers,
-        data={"name": "Too big", "initiative_id": str(owner.initiative.id)},
-        files={"file": ("big.pdf", oversized, "application/pdf")},
-    )
+    assert len(at_cap) == cap
 
-    assert resp.status_code == 413
-    assert resp.json()["detail"] == "FILE_TOO_LARGE"
+    def upload(name: str, body: bytes):
+        return client.post(
+            owner.g("/files/upload"),
+            headers=owner.headers,
+            data={"name": name, "initiative_id": str(owner.initiative.id)},
+            files={"file": (f"{name}.pdf", body, "application/pdf")},
+        )
 
-    # Nothing was persisted.
+    def version(body: bytes):
+        return client.post(
+            owner.g(f"/files/{doc['id']}/versions"),
+            headers=owner.headers,
+            files={"file": ("v.pdf", body, "application/pdf")},
+        )
+
+    taken = await upload("Under cap", at_cap)
+    assert taken.status_code == 201, taken.text
+    assert taken.json()["file_size"] == cap
+    refused = await upload("Too big", oversized)
+    assert refused.status_code == 413
+    assert refused.json()["detail"] == "FILE_TOO_LARGE"
     docs = (
         await session.exec(
             select(File).where(File.initiative_id == owner.initiative.id)
@@ -623,86 +622,16 @@ async def test_upload_file_over_limit_rejected(
     ).all()
     assert all(d.name != "Too big" for d in docs)
 
-
-async def test_upload_file_just_under_limit_succeeds(
-    client: AsyncClient,
-    acting_user,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """POST /files/upload accepts a body at/under the cap."""
-    cap = 4096
-    monkeypatch.setattr(attachments_service, "MAX_FILE_SIZE", cap)
-
-    owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-
-    under = _TINY_PDF + b" " + b"B" * (cap - len(_TINY_PDF) - 1)
-    assert len(under) == cap
-    resp = await client.post(
-        owner.g("/files/upload"),
-        headers=owner.headers,
-        data={"name": "Under cap", "initiative_id": str(owner.initiative.id)},
-        files={"file": ("under.pdf", under, "application/pdf")},
-    )
-
-    assert resp.status_code == 201, resp.text
-    assert resp.json()["file_size"] == cap
-
-
-async def test_upload_file_version_over_limit_rejected(
-    client: AsyncClient,
-    session: AsyncSession,
-    acting_user,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """POST /files/{id}/versions rejects a body over the cap with 413."""
-    owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    # Seed v1 while the cap is still large so the file exists.
-    doc = await _upload_initial_file_doc(client, owner, initiative=owner.initiative)
-
-    cap = 1024
-    monkeypatch.setattr(attachments_service, "MAX_FILE_SIZE", cap)
-
-    oversized = b"%PDF-1.4 " + b"A" * (cap + 1)
-    resp = await client.post(
-        owner.g(f"/files/{doc['id']}/versions"),
-        headers=owner.headers,
-        files={"file": ("big.pdf", oversized, "application/pdf")},
-    )
-
-    assert resp.status_code == 413
-    assert resp.json()["detail"] == "FILE_TOO_LARGE"
-
-    # Only the original v1 exists; the oversized upload created no version.
+    taken = await version(at_cap)
+    assert taken.status_code == 201, taken.text
+    assert (taken.json()["version_number"], taken.json()["file_size"]) == (2, cap)
+    refused = await version(oversized)
+    assert refused.status_code == 413
+    assert refused.json()["detail"] == "FILE_TOO_LARGE"
     versions = (
         await session.exec(select(FileVersion).where(FileVersion.file_id == doc["id"]))
     ).all()
-    assert {v.version_number for v in versions} == {1}
-
-
-async def test_upload_file_version_just_under_limit_succeeds(
-    client: AsyncClient,
-    acting_user,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """POST /files/{id}/versions accepts a body at/under the cap."""
-    owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    doc = await _upload_initial_file_doc(client, owner, initiative=owner.initiative)
-
-    cap = 4096
-    monkeypatch.setattr(attachments_service, "MAX_FILE_SIZE", cap)
-
-    under = _TINY_PDF + b" " + b"B" * (cap - len(_TINY_PDF) - 1)
-    assert len(under) == cap
-    resp = await client.post(
-        owner.g(f"/files/{doc['id']}/versions"),
-        headers=owner.headers,
-        files={"file": ("v2.pdf", under, "application/pdf")},
-    )
-
-    assert resp.status_code == 201, resp.text
-    body = resp.json()
-    assert body["version_number"] == 2
-    assert body["file_size"] == cap
+    assert {v.version_number for v in versions} == {1, 2}
 
 
 #: A real 1x1 PNG — the header reader walks IHDR, so a stub signature is not
