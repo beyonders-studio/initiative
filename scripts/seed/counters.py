@@ -164,7 +164,7 @@ async def seed(c: Community) -> None:
         initiative_id = c.initiatives[d["initiative"]].id
         group_id = await insert(
             c.session,
-            group_at,
+            group_at.table,
             {
                 **column_values(
                     group_at, {"description": d.get("description")}, current=None
@@ -199,7 +199,7 @@ async def seed(c: Community) -> None:
             }
             counter_id = await insert(
                 c.session,
-                counter_at,
+                counter_at.table,
                 {
                     **column_values(counter_at, values, current=None),
                     "counter_group_id": group_id,
