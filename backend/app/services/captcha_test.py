@@ -90,19 +90,28 @@ def _configure(
     monkeypatch.setattr(captcha_config, "current_captcha_config", lambda: cfg)
 
 
-async def test_no_op_when_provider_unset(monkeypatch):
-    """Silent disable: missing CAPTCHA_PROVIDER must not raise even
-    when the caller doesn't supply a token."""
-    _configure(monkeypatch, provider=None)
+@pytest.mark.parametrize(
+    ("provider", "secret", "site"),
+    [
+        # Silent disable: no provider at all.
+        pytest.param(None, "s", "k", id="no-provider"),
+        # Half-configured (provider set, secret absent) is treated as disabled.
+        pytest.param("hcaptcha", None, "k", id="no-secret"),
+        # The server could verify without a site key, but the SPA could not
+        # render a widget — so enforcement would reject every registration.
+        pytest.param("hcaptcha", "s", None, id="no-site-key"),
+        # A provider with no verify URL cannot be enforced — it would 500 on a
+        # lookup instead of rejecting a token.
+        pytest.param("not-a-real-provider", "s", "k", id="unknown-provider"),
+    ],
+)
+async def test_an_incomplete_configuration_verifies_nothing(
+    monkeypatch, provider: str | None, secret: str | None, site: str | None
+):
+    """Must not raise even when the caller supplies no token."""
+    _configure(monkeypatch, provider=provider, secret=secret, site=site)
     await captcha_service.verify_or_raise(None, remote_ip=None)
     await captcha_service.verify_or_raise("", remote_ip="1.2.3.4")
-
-
-async def test_no_op_when_secret_missing(monkeypatch):
-    """Half-configured (provider set, secret absent) is treated as
-    disabled — same call shape as fully-disabled."""
-    _configure(monkeypatch, provider="hcaptcha", secret=None)
-    await captcha_service.verify_or_raise("ignored", remote_ip=None)
 
 
 async def test_missing_token_when_configured(monkeypatch):
@@ -204,11 +213,3 @@ async def test_network_error_fails_closed(monkeypatch):
         await captcha_service.verify_or_raise("tok", remote_ip=None)
     assert exc.value.status_code == 400
     assert exc.value.detail == "CAPTCHA_INVALID"
-
-
-async def test_unrecognised_provider_treated_as_disabled(monkeypatch):
-    """A typo in CAPTCHA_PROVIDER shouldn't blow up registration —
-    ``is_configured`` returns False so the verifier short-circuits."""
-    _configure(monkeypatch, provider="not-a-real-provider")
-    # Should not raise even though no token is supplied.
-    await captcha_service.verify_or_raise(None, remote_ip=None)

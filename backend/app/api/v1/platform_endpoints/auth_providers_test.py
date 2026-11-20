@@ -1,10 +1,13 @@
 """CRUD tests for the login provider registry owner endpoints."""
 
+import json
+
 import pytest
 from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.audit_events import AuditEventType
 from app.core.encryption import SALT_OIDC_CLIENT_SECRET, decrypt_field
 from app.db.request_context import Unattributed
 from app.db.session import set_rls_context
@@ -14,7 +17,7 @@ from app.models.platform.federated_identity import FederatedIdentity
 from app.models.platform.user import UserRole
 from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
 from app.models.tenant.initiative import InitiativeMember
-from app.testing import route_session_to_guild
+from app.testing import emitted, route_session_to_guild
 from app.testing.factories import (
     create_auth_provider,
     create_claim_rule,
@@ -43,9 +46,15 @@ async def _owner_headers(session: AsyncSession) -> dict[str, str]:
 
 
 async def test_owner_creates_provider_secret_write_only(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, capfd
 ):
-    headers = await _owner_headers(session)
+    """The secret is stored, never returned, and never written to the audit
+    record, which names every field the row was born with and carries a value
+    only for those whose type rules out a secret."""
+    owner = await create_user(session, role=UserRole.owner)
+    owner_id = owner.id
+    headers = get_auth_headers(owner)
+    capfd.readouterr()
     response = await client.post(BASE, headers=headers, json=_VALID_CREATE)
 
     assert response.status_code == 201, response.text
@@ -56,6 +65,19 @@ async def test_owner_creates_provider_secret_write_only(
     assert body["callback_url"].endswith("/api/v1/auth/corp/callback")
     assert "client_secret" not in body
     assert "s3cret-value" not in response.text
+
+    rows = emitted(capfd, AuditEventType.AUTH_PROVIDER_CREATED)
+    assert [(r["actor_user_id"], r["target"]) for r in rows] == [
+        (owner_id, {"type": "auth_provider", "id": body["id"]})
+    ]
+    detail = rows[0]["detail"]
+    assert detail["secret_set"] is True
+    assert {"display_name", "issuer", "client_id", "enabled"} <= set(detail["changed"])
+    assert detail["values"]["enabled"] == {"from": None, "to": True}
+    assert "display_name" not in detail["values"]
+    written = json.dumps(rows[0])
+    assert "s3cret-value" not in written
+    assert _VALID_CREATE["issuer"] not in written
 
     row = (
         await session.exec(select(AuthProvider).where(AuthProvider.slug == "corp"))
@@ -68,12 +90,14 @@ async def test_owner_creates_provider_secret_write_only(
 
 @pytest.mark.parametrize("role", [UserRole.member, UserRole.operator])
 async def test_non_owner_tiers_are_refused(
-    client: AsyncClient, session: AsyncSession, role: UserRole
+    client: AsyncClient, session: AsyncSession, capfd, role: UserRole
 ):
-    """config.manage is owner-only; every verb refuses lower tiers."""
+    """config.manage is owner-only; every verb refuses lower tiers, and a
+    refusal records nothing."""
     user = await create_user(session, role=role)
     headers = get_auth_headers(user)
     provider = await create_auth_provider(session)
+    capfd.readouterr()
 
     assert (await client.get(BASE, headers=headers)).status_code == 403
     assert (
@@ -87,15 +111,21 @@ async def test_non_owner_tiers_are_refused(
     assert (
         await client.delete(f"{BASE}{provider.id}", headers=headers)
     ).status_code == 403
+    written = [r["event_type"] for r in emitted(capfd)]
+    assert [e for e in written if e.startswith("auth_provider.")] == []
 
 
 async def test_the_platform_slug_is_an_ordinary_slug(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, capfd
 ):
     """``oidc`` is the slug the pre-generalization callback URL resolves to,
-    and that is all it is: it creates, edits and deletes like any other."""
-    headers = await _owner_headers(session)
+    and that is all it is: it creates, edits and deletes like any other. Its
+    deletion is recorded with the kind it was."""
+    owner = await create_user(session, role=UserRole.owner)
+    owner_id = owner.id
+    headers = get_auth_headers(owner)
     platform_row = await create_auth_provider(session, slug="oidc")
+    platform_id = platform_row.id
 
     update = await client.patch(
         f"{BASE}{platform_row.id}", headers=headers, json={"display_name": "X"}
@@ -108,9 +138,14 @@ async def test_the_platform_slug_is_an_ordinary_slug(
     # The address an install has already registered with its IdP.
     assert entries["oidc"]["callback_url"].endswith("/api/v1/auth/oidc/callback")
 
+    capfd.readouterr()
     assert (
-        await client.delete(f"{BASE}{platform_row.id}", headers=headers)
+        await client.delete(f"{BASE}{platform_id}", headers=headers)
     ).status_code == 204
+    rows = emitted(capfd, AuditEventType.AUTH_PROVIDER_DELETED)
+    assert [(r["actor_user_id"], r["target"], r["detail"]) for r in rows] == [
+        (owner_id, {"type": "auth_provider", "id": platform_id}, {"kind": "oidc"})
+    ]
 
 
 async def test_a_providers_address_is_fixed_for_its_lifetime(
@@ -167,11 +202,26 @@ async def test_malformed_slug_rejected(
     assert response.status_code == 422, slug
 
 
-async def test_update_secret_semantics(client: AsyncClient, session: AsyncSession):
-    """client_secret: absent = keep, empty = clear, value = replace."""
-    headers = await _owner_headers(session)
+async def test_update_secret_semantics(
+    client: AsyncClient, session: AsyncSession, capfd
+):
+    """client_secret: absent = keep, empty = clear, value = replace. Each
+    edit is recorded with what moved and whether the secret did, never its
+    value; an edit that changes nothing records nothing."""
+    owner = await create_user(session, role=UserRole.owner)
+    owner_id = owner.id
+    headers = get_auth_headers(owner)
     created = await client.post(BASE, headers=headers, json=_VALID_CREATE)
     provider_id = created.json()["id"]
+    capfd.readouterr()
+
+    same = await client.patch(
+        f"{BASE}{provider_id}",
+        headers=headers,
+        json={"display_name": "Corp SSO", "enabled": True},
+    )
+    assert same.status_code == 200, same.text
+    assert emitted(capfd, AuditEventType.AUTH_PROVIDER_UPDATED) == []
 
     kept = await client.patch(
         f"{BASE}{provider_id}", headers=headers, json={"display_name": "Renamed"}
@@ -181,9 +231,21 @@ async def test_update_secret_semantics(client: AsyncClient, session: AsyncSessio
     assert kept.json()["secret_set"] is True
 
     replaced = await client.patch(
-        f"{BASE}{provider_id}", headers=headers, json={"client_secret": "rotated"}
+        f"{BASE}{provider_id}",
+        headers=headers,
+        json={"enabled": False, "client_secret": "rotated"},
     )
     assert replaced.json()["secret_set"] is True
+    rows = emitted(capfd, AuditEventType.AUTH_PROVIDER_UPDATED)
+    assert [(r["actor_user_id"], r["target"]["id"]) for r in rows] == [
+        (owner_id, provider_id),
+        (owner_id, provider_id),
+    ]
+    assert rows[0]["detail"]["changed"] == ["display_name"]
+    assert rows[1]["detail"]["changed"] == ["enabled"]
+    assert rows[1]["detail"]["values"]["enabled"] == {"from": True, "to": False}
+    assert rows[1]["detail"]["secret_changed"] is True
+    assert "rotated" not in json.dumps(rows)
     row_id = replaced.json()["id"]
     secret = await session.get(AuthProviderSecret, row_id)
     await session.refresh(secret)

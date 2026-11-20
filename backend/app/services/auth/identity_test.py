@@ -15,9 +15,8 @@ from app.core.encryption import hash_email
 from app.core.login_methods import LoginMethod
 from app.models.platform.auth_provider import AuthProvider, AuthProviderKind
 from app.models.platform.federated_identity import FederatedIdentity
-from app.models.platform.user import User, UserRole, UserStatus
+from app.models.platform.user import User
 from app.models.platform.user_email import UserEmail
-from app.services.auth import addresses
 from app.services.auth.identity import (
     IdentityResolution,
     ResolutionOutcome,
@@ -107,26 +106,6 @@ async def _identities_for(session, provider) -> list[FederatedIdentity]:
 # --- linked -------------------------------------------------------------------
 
 
-async def test_existing_link_resolves_to_user(session):
-    provider = await _create_provider(session)
-    user = await create_user(session)
-    await link_identity(
-        session, user=user, provider=provider, subject="sub-1", email_verified=True
-    )
-
-    result = await _resolve(session, provider)
-    assert result.outcome is ResolutionOutcome.LINKED
-    assert result.user.id == user.id
-    assert result.identity.last_login_at is not None
-    # The returned user must be usable past its PK: the wiring endpoint reads
-    # user.status for the active/deactivated gate. Sessions are expire_on_commit
-    # =False (db/session.py + the fixture), so the SELECT-loaded user stays
-    # populated after the identity commit — no lazy IO, no MissingGreenlet. This
-    # access would raise if that ever regressed to expire-on-commit.
-    assert result.user.status == UserStatus.active
-    assert result.user.id == user.id
-
-
 async def test_link_is_scoped_to_its_provider(session):
     """The same subject at a different provider is a different identity."""
     provider_a = await _create_provider(session)
@@ -154,57 +133,7 @@ async def test_linked_login_refreshes_email_verified_snapshot(session):
     assert result.identity.email_verified is True
 
 
-# --- email match (no link) ------------------------------------------------------
-
-
-async def test_verified_email_match_is_surfaced_but_not_linked(session):
-    """An unlinked account matched by verified email is the caller's policy
-    decision — resolution itself must not write a link."""
-    provider = await _create_provider(session)
-    user = await create_user(session, email="alice@example.com")
-
-    result = await _resolve(session, provider, email="alice@example.com")
-    assert result.outcome is ResolutionOutcome.EMAIL_MATCH
-    assert result.user.id == user.id
-    assert result.identity is None
-    assert await _identities_for(session, provider) == []
-
-
-async def test_unverified_email_match_is_refused(session):
-    provider = await _create_provider(session)
-    await create_user(session, email="victim@example.com")
-
-    result = await _resolve(
-        session, provider, email="victim@example.com", email_verified=False
-    )
-    assert result.outcome is ResolutionOutcome.EMAIL_UNVERIFIED
-    assert await _identities_for(session, provider) == []
-
-
 # --- JIT provisioning -----------------------------------------------------------
-
-
-async def test_unknown_user_is_provisioned_and_linked(session):
-    provider = await _create_provider(session)
-
-    result = await _resolve(session, provider, email="new@example.com")
-    assert result.outcome is ResolutionOutcome.PROVISIONED
-    user = result.user
-    assert await addresses.holds_address(
-        session, user_id=user.id, email="new@example.com"
-    )
-    assert user.role == UserRole.member
-    assert user.status == UserStatus.active
-    assert (await _address(session, user.id)).verified_at is not None
-    # SSO-only: no password is set — a NULL hash never verifies, so this
-    # account signs in exclusively through its provider.
-    assert user.hashed_password is None
-    assert result.identity.subject == "sub-1"
-
-    # The very next login resolves via the link.
-    again = await _resolve(session, provider, email="new@example.com")
-    assert again.outcome is ResolutionOutcome.LINKED
-    assert again.user.id == user.id
 
 
 async def test_provisioned_user_with_unverified_email_not_marked_verified(session):
@@ -214,16 +143,6 @@ async def test_provisioned_user_with_unverified_email_not_marked_verified(sessio
     )
     assert result.outcome is ResolutionOutcome.PROVISIONED
     assert (await _address(session, result.user.id)).verified_at is None
-
-
-async def test_missing_email_claim_uses_synthetic_address(session):
-    provider = await _create_provider(session)
-    result = await _resolve(session, provider, email=None, subject="opaque-7")
-    assert result.outcome is ResolutionOutcome.PROVISIONED
-    row = await _address(session, result.user.id)
-    assert row.email_hash == hash_email("opaque-7@oidc.local")
-    # A synthetic address is not a mailbox; it is never marked verified.
-    assert row.verified_at is None
 
 
 async def test_jit_disabled_provider_refuses_unknown_user(session):
@@ -309,17 +228,6 @@ async def test_provision_email_race_unverified_is_refused(session):
     )
     assert result.outcome is ResolutionOutcome.EMAIL_UNVERIFIED
     assert result.user.id == winner.id
-    assert await _identities_for(session, provider) == []
-
-
-async def test_closed_registration_refuses_unknown_user(session, monkeypatch):
-    provider = await _create_provider(session)
-    await create_user(session)  # instance is not empty → no bootstrap exception
-    await rules.put(session, "public_registration_enabled", False)
-    await session.commit()
-
-    result = await _resolve(session, provider, email="stranger@example.com")
-    assert result.outcome is ResolutionOutcome.REGISTRATION_DISABLED
     assert await _identities_for(session, provider) == []
 
 

@@ -6,15 +6,19 @@ sees only the providers it is allowed to, and the narrowing it sets is what
 decides whether somebody arriving is one of theirs.
 """
 
+import json
+
 import pytest
 from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.audit_events import AuditEventType
 from app.core.login_methods import LoginMethod
 from app.core.messages import AuthProviderMessages, GuildMessages
 from app.core.rules import SURFACE_CUSTOM_ROLES, SetBy, SignInRequirement
 from app.models.platform.guild import CommunityRole
 from app.services.platform import rules
+from app.testing import emitted
 from app.testing.factories import (
     create_auth_provider,
     create_guild,
@@ -41,11 +45,16 @@ def _base(guild_id: int) -> str:
 
 
 async def test_the_seat_connects_narrows_and_disconnects(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, capfd
 ):
+    """Each change is recorded against the community; the claim and the
+    values that count are strings, named but never copied, and an edit that
+    changes nothing records nothing."""
     admin, guild = await _seat(session)
     provider = await create_auth_provider(session, slug="google", display_name="Google")
     headers = get_auth_headers(admin)
+    admin_id, guild_id, provider_id = admin.id, guild.id, provider.id
+    capfd.readouterr()
 
     created = await client.post(
         _base(guild.id),
@@ -65,18 +74,50 @@ async def test_the_seat_connects_narrows_and_disconnects(
     listed = await client.get(_base(guild.id), headers=headers)
     assert [row["provider_slug"] for row in listed.json()] == ["google"]
 
+    same = await client.patch(
+        f"{_base(guild.id)}/{body['id']}",
+        headers=headers,
+        json={"enabled": True, "auto_join": False},
+    )
+    assert same.status_code == 200, same.text
+
     narrowed = await client.patch(
         f"{_base(guild.id)}/{body['id']}",
         headers=headers,
-        json={"claim_values": ["morels.me", "morels.dev"]},
+        json={"claim_values": ["morels.me", "morels.dev"], "auto_join": True},
     )
     assert narrowed.status_code == 200, narrowed.text
     assert narrowed.json()["claim_values"] == ["morels.me", "morels.dev"]
 
     gone = await client.delete(f"{_base(guild.id)}/{body['id']}", headers=headers)
     assert gone.status_code == 204, gone.text
-    assert await client.get(_base(guild.id), headers=headers) is not None
     assert (await client.get(_base(guild.id), headers=headers)).json() == []
+
+    written = emitted(capfd)
+    target = {"type": "guild_provider_connection", "id": body["id"]}
+    by_type = {}
+    for row in written:
+        by_type.setdefault(row["event_type"], []).append(row)
+    for event in (
+        AuditEventType.GUILD_PROVIDER_CONNECTED,
+        AuditEventType.GUILD_PROVIDER_CONNECTION_UPDATED,
+        AuditEventType.GUILD_PROVIDER_DISCONNECTED,
+    ):
+        rows = by_type[event.value]
+        assert [(r["actor_user_id"], r["guild_id"], r["target"]) for r in rows] == [
+            (admin_id, guild_id, target)
+        ], event
+        assert rows[0]["detail"]["provider_id"] == provider_id
+    born = by_type[AuditEventType.GUILD_PROVIDER_CONNECTED.value][0]["detail"]
+    assert {"provider_id", "claim", "claim_values", "enabled"} <= set(born["changed"])
+    assert "claim" not in born["values"]
+    assert "claim_values" not in born["values"]
+    assert born["values"]["enabled"] == {"from": None, "to": True}
+    moved = by_type[AuditEventType.GUILD_PROVIDER_CONNECTION_UPDATED.value][0]
+    assert set(moved["detail"]["changed"]) == {"claim_values", "auto_join"}
+    assert "claim_values" not in moved["detail"]["values"]
+    assert moved["detail"]["values"]["auto_join"] == {"from": False, "to": True}
+    assert "morels.me" not in json.dumps(written)
 
 
 async def test_a_community_sees_every_way_in_the_deployment_offers(
@@ -176,8 +217,10 @@ async def test_a_community_connects_to_a_provider_once(
 
 
 async def test_an_ordinary_admin_reads_but_does_not_connect(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, capfd
 ):
+    """Running a community is not the seat that decides who may enter it; a
+    refused connection records nothing."""
     admin = await create_user(session)
     guild = await create_guild(session, creator=admin)
     await create_guild_membership(
@@ -185,6 +228,7 @@ async def test_an_ordinary_admin_reads_but_does_not_connect(
     )
     provider = await create_auth_provider(session, slug="google")
     headers = get_auth_headers(admin)
+    capfd.readouterr()
 
     assert (await client.get(_base(guild.id), headers=headers)).status_code == 200
     refused = await client.post(
@@ -197,6 +241,7 @@ async def test_an_ordinary_admin_reads_but_does_not_connect(
         },
     )
     assert refused.status_code == 403, refused.text
+    assert emitted(capfd, AuditEventType.GUILD_PROVIDER_CONNECTED) == []
 
 
 async def test_the_surface_404s_when_the_option_is_not_granted(

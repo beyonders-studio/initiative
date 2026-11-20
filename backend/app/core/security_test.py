@@ -151,7 +151,9 @@ def test_billing_handoff_refuses_to_mint_with_an_rsa_key(monkeypatch):
 
 def test_upload_token_round_trips_to_user_id():
     """A freshly minted upload token verifies back to the user it names,
-    carrying its minting session's auth standing (empty by default)."""
+    carrying its minting session's auth standing (empty by default). It
+    carries the uploads aud/scope and deliberately omits ``ver`` — the general
+    session-JWT path keys on ``ver`` and so rejects it as an API credential."""
     token, seconds = create_upload_token(user_id=123)
     assert isinstance(token, str) and token.count(".") == 2
     assert seconds == int(UPLOAD_TOKEN_LIFETIME.total_seconds())
@@ -162,6 +164,11 @@ def test_upload_token_round_trips_to_user_id():
         {},
         frozenset(),
     )
+    payload = _decode_unverified(token)
+    assert payload["aud"] == UPLOAD_TOKEN_AUDIENCE
+    assert payload["scope"] == UPLOAD_TOKEN_SCOPE
+    assert payload["sub"] == "123"
+    assert "ver" not in payload
 
     satisfied_token, _ = create_upload_token(
         user_id=123,
@@ -187,18 +194,6 @@ def test_upload_token_carries_how_the_session_was_opened():
 
     neither, _ = create_upload_token(user_id=7)
     assert verify_upload_token(neither).markers == frozenset()
-
-
-def test_upload_token_carries_scope_and_audience_but_no_ver():
-    """The token must carry the uploads aud/scope and deliberately omit
-    ``ver`` — the general session-JWT path keys on ``ver`` and so will
-    reject this token as an API credential."""
-    token, _ = create_upload_token(user_id=7)
-    payload = _decode_unverified(token)
-    assert payload["aud"] == UPLOAD_TOKEN_AUDIENCE
-    assert payload["scope"] == UPLOAD_TOKEN_SCOPE
-    assert payload["sub"] == "7"
-    assert "ver" not in payload
 
 
 def test_verify_upload_token_rejects_session_jwt():
@@ -337,37 +332,13 @@ def test_mint_access_token_carries_session_claims():
     assert payload["sat"] == [7, 9]
     assert payload["iss"] == TOKEN_ISSUER
     assert payload["aud"] == AUTH_ACCESS_AUDIENCE
-
-
-def test_mint_access_token_exp_matches_advertised_seconds():
-    """``exp`` must equal ``iat`` + the returned seconds — the SPA schedules its
-    refresh off that number, so drift would refresh late (or never)."""
-    sid = uuid.uuid4()
-    token, seconds = mint_access_token(
-        subject="ucli_one",
-        token_version=0,
-        session_id=sid,
-        amr=["pwd"],
-        satisfied_providers=[],
-    )
-
-    payload = _decode_unverified(token)
+    # ``exp`` equals ``iat`` + the returned seconds — the SPA schedules its
+    # refresh off that number, so drift would refresh late (or never).
     assert payload["exp"] - payload["iat"] == seconds
 
-
-def test_mint_access_token_is_verifiable_with_expected_audience():
-    """A round-trip decode with the audience the verification path will require
-    must succeed — signature + aud + iss all line up."""
-    sid = uuid.uuid4()
-    token, _ = mint_access_token(
-        subject="ucli_five",
-        token_version=1,
-        session_id=sid,
-        amr=["pwd"],
-        satisfied_providers=[],
-    )
-
-    payload = jwt.decode(
+    # A round-trip decode with the audience the verification path will require
+    # succeeds — signature + aud + iss all line up.
+    verified = jwt.decode(
         token,
         settings.jwt_signing_key,
         algorithms=[JWT_ALGORITHM],
@@ -375,7 +346,7 @@ def test_mint_access_token_is_verifiable_with_expected_audience():
         issuer=TOKEN_ISSUER,
         options={"require": ["exp", "iat", "sub", "sid", "aud", "iss"]},
     )
-    assert payload["sub"] == "ucli_five"
+    assert verified["sub"] == "ucli_forty_two"
 
 
 # ── Dual-verify decode (accepts new + legacy, rejects scoped) ───────────────
@@ -396,50 +367,34 @@ def test_decode_session_token_accepts_new_access_token():
     assert payload["sat"] == [3]
 
 
-def test_decode_session_token_refuses_the_pre_session_shape():
+def test_decode_session_token_refuses_what_is_not_a_session_token():
     """The JWT builds before 0.69.0 issued — signed by us, carrying ``sub`` and
-    ``ver``, and no ``aud``/``iss`` — is no longer a session credential.
-
-    Built here rather than minted, because nothing mints one any more. Its
-    holder is not stranded: the refresh cookie is a separate credential and
-    renewing it returns a token of the shape above."""
+    ``ver``, and no ``aud``/``iss`` — is no longer a session credential; built
+    here because nothing mints one any more, and its holder renews through the
+    refresh cookie. Every access token names its session, so one that does not
+    was not minted here. A scoped upload token carries a foreign aud and is
+    not a session credential either."""
+    expires = datetime.now(UTC) + timedelta(minutes=10)
     legacy = jwt.encode(
-        {
-            "sub": "7",
-            "ver": 2,
-            "exp": datetime.now(UTC) + timedelta(minutes=10),
-        },
+        {"sub": "7", "ver": 2, "exp": expires},
         settings.jwt_signing_key,
         algorithm=JWT_ALGORITHM,
     )
-    with pytest.raises(jwt.PyJWTError):
-        decode_session_token(legacy)
-
-
-def test_decode_session_token_refuses_a_token_with_no_session():
-    """Every access token names its session; one that doesn't was not minted
-    by this server's ``mint_access_token``."""
     sessionless = jwt.encode(
         {
             "sub": "ucli_seven",
             "ver": 2,
             "aud": AUTH_ACCESS_AUDIENCE,
             "iss": TOKEN_ISSUER,
-            "exp": datetime.now(UTC) + timedelta(minutes=10),
+            "exp": expires,
         },
         settings.jwt_signing_key,
         algorithm=JWT_ALGORITHM,
     )
-    with pytest.raises(jwt.PyJWTError):
-        decode_session_token(sessionless)
-
-
-def test_decode_session_token_rejects_scoped_upload_token():
-    """A scoped upload token carries a foreign aud — it must NOT be honored as
-    a session credential on either decode path (the key security property)."""
     upload, _ = create_upload_token(user_id=7)
-    with pytest.raises(jwt.PyJWTError):
-        decode_session_token(upload)
+    for token in (legacy, sessionless, upload, "not.a.jwt"):
+        with pytest.raises(jwt.PyJWTError):
+            decode_session_token(token)
 
 
 def test_decode_session_token_rejects_handoff_token(handoff_signing_key):
@@ -466,11 +421,6 @@ def test_decode_session_token_rejects_expired_new_token():
     )
     with pytest.raises(jwt.ExpiredSignatureError):
         decode_session_token(token)
-
-
-def test_decode_session_token_rejects_garbage():
-    with pytest.raises(jwt.PyJWTError):
-        decode_session_token("not.a.jwt")
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -512,21 +462,13 @@ def public_bundle(*indexes: int) -> str:
 
 
 def test_loader_reads_every_block_in_order():
+    """The ordinary one-key case is the same code path, and an unset setting
+    is "no peer", not an error — callers decide what that means for them."""
     keys = security.load_verification_keys(public_bundle(0, 1, 2))
-    assert len(keys) == 3
     assert [k.public_bytes_raw() for k in keys] == [
         _KEYPAIRS[i].public_key().public_bytes_raw() for i in (0, 1, 2)
     ]
-
-
-def test_loader_reads_a_single_block():
-    """The ordinary one-key case is the same code path."""
     assert len(security.load_verification_keys(public_bundle(0))) == 1
-
-
-def test_loader_treats_empty_as_no_keys():
-    """An unset setting is "no peer", not an error — callers decide what that
-    means for them."""
     assert security.load_verification_keys("") == ()
 
 

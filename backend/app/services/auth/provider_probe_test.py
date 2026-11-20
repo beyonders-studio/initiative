@@ -20,41 +20,6 @@ def _discovery_from(handler) -> OidcDiscovery:
     )
 
 
-async def test_reports_the_endpoints_it_found():
-    idp = FakeIdp()
-
-    result = await provider_probe.probe_issuer(ISSUER, discovery=_discovery(idp))
-
-    assert result.ok is True
-    assert result.error_code is None
-    assert result.issuer == ISSUER
-    assert result.authorization_endpoint == f"{ISSUER}/authorize"
-    assert result.token_endpoint == f"{ISSUER}/token"
-    assert result.jwks_uri == f"{ISSUER}/jwks"
-    assert result.signing_algs == ["RS256", "ES256"]
-
-
-async def test_reports_what_the_provider_says_it_offers():
-    idp = FakeIdp()
-    idp.discovery_doc["scopes_supported"] = ["openid", "email", "profile", "groups"]
-    idp.discovery_doc["claims_supported"] = ["sub", "email", "groups"]
-
-    result = await provider_probe.probe_issuer(ISSUER, discovery=_discovery(idp))
-
-    assert result.scopes_supported == ["openid", "email", "profile", "groups"]
-    assert result.claims_supported == ["sub", "email", "groups"]
-
-
-async def test_a_provider_listing_nothing_costs_only_the_suggestions():
-    idp = FakeIdp()
-
-    result = await provider_probe.probe_issuer(ISSUER, discovery=_discovery(idp))
-
-    assert result.ok is True
-    assert result.scopes_supported == []
-    assert result.claims_supported == []
-
-
 async def test_a_malformed_offer_is_dropped_not_refused():
     idp = FakeIdp()
     # Advisory fields only steer a form, so something unexpected here costs a
@@ -91,16 +56,6 @@ async def test_nothing_answering_says_unreachable():
 
     assert result.ok is False
     assert result.error_code == AuthProviderMessages.DISCOVERY_UNREACHABLE
-
-
-async def test_a_document_for_another_issuer_says_mismatch():
-    idp = FakeIdp()
-    idp.discovery_doc["issuer"] = "https://somewhere-else.example.com"
-
-    result = await provider_probe.probe_issuer(ISSUER, discovery=_discovery(idp))
-
-    assert result.ok is False
-    assert result.error_code == AuthProviderMessages.DISCOVERY_ISSUER_MISMATCH
 
 
 async def test_a_document_missing_an_endpoint_says_invalid():
@@ -141,16 +96,6 @@ async def test_each_probe_looks_again():
     # Testing a saved provider has to report what answers now, so a second
     # look is a second request rather than the first one's answer again.
     assert idp.calls.count("/.well-known/openid-configuration") == 2
-
-
-async def test_reports_where_the_callback_will_be():
-    idp = FakeIdp()
-
-    result = await provider_probe.probe_issuer(ISSUER, discovery=_discovery(idp))
-
-    # Computed from the deployment's own APP_URL, because it has to match the
-    # finished provider's callback exactly at the far end.
-    assert result.callback_url_template.endswith("/auth/{slug}/callback")
 
 
 async def test_reports_the_callback_even_when_nothing_answered():

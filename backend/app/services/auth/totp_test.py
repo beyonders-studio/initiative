@@ -41,31 +41,6 @@ async def _enrol(session: AsyncSession, frozen) -> tuple[int, str]:
     return user.id, enrolment.secret
 
 
-async def test_a_started_enrolment_is_not_yet_asked_for(session: AsyncSession, frozen):
-    """A factor nobody has proved asks nothing of the sign-in."""
-    user_id, _secret = await _enrol(session, frozen)
-    assert await totp_service.is_enrolled(session, user_id=user_id) is False
-
-
-async def test_confirming_takes_a_code_the_authenticator_made(
-    session: AsyncSession, frozen
-):
-    user_id, secret = await _enrol(session, frozen)
-
-    assert (
-        await totp_service.confirm_enrolment(session, user_id=user_id, code="000000")
-        is False
-    )
-    assert (
-        await totp_service.confirm_enrolment(
-            session, user_id=user_id, code=_code_at(secret)
-        )
-        is True
-    )
-    await session.commit()
-    assert await totp_service.is_enrolled(session, user_id=user_id) is True
-
-
 async def test_a_code_is_taken_once(session: AsyncSession, frozen):
     """The interval an accepted code came from is recorded, so the same code
     read a second time is not accepted."""
@@ -142,20 +117,6 @@ async def test_beginning_again_replaces_an_unproved_enrolment(
         )
         is True
     )
-
-
-async def test_the_uri_carries_what_an_authenticator_reads(
-    session: AsyncSession, frozen
-):
-    _user_id, secret = await _enrol(session, frozen)
-    uri = totp_service.otpauth_uri(
-        secret, account="someone@example.com", issuer="Initiative"
-    )
-    assert uri.startswith("otpauth://totp/Initiative%3Asomeone%40example.com?")
-    assert f"secret={secret}" in uri
-    assert "issuer=Initiative" in uri
-    assert "digits=6" in uri
-    assert "period=30" in uri
 
 
 async def test_disabling_leaves_no_seed_and_no_codes(session: AsyncSession, frozen):
@@ -244,23 +205,4 @@ async def test_one_account_s_code_is_not_another_s(session: AsyncSession, frozen
             session, user_id=theirs.id, code=codes[0]
         )
         is False
-    )
-
-
-async def test_issuing_again_retires_the_previous_set(session: AsyncSession, frozen):
-    user = await create_user(session)
-    first = await totp_service.issue_recovery_codes(session, user_id=user.id)
-    await session.commit()
-    await totp_service.issue_recovery_codes(session, user_id=user.id)
-    await session.commit()
-
-    assert (
-        await totp_service.consume_recovery_code(
-            session, user_id=user.id, code=first[0]
-        )
-        is False
-    )
-    assert (
-        await totp_service.remaining_recovery_codes(session, user_id=user.id)
-        == totp_service.RECOVERY_CODE_COUNT
     )

@@ -95,11 +95,24 @@ async def _members_rule(session: AsyncSession, guild_id: int) -> SignInRequireme
 async def test_the_seat_sets_reads_and_clears_the_policy(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
+    """The seat can only require a provider its own session has satisfied —
+    proving it works and keeping it from locking out its guild."""
     seat = await acting_user(guild_role=CommunityRole.superadmin)
     provider = await create_auth_provider(session, slug="corp")
     await create_guild_provider_connection(session, guild=seat.guild, provider=provider)
     headers = _sat_headers(seat.user, [provider.id])
     guild_id = seat.guild.id
+
+    unsatisfied = await client.patch(
+        _settings(guild_id),
+        headers=seat.headers,
+        json={"auth_policy": {"policy": "required", "provider_id": provider.id}},
+    )
+    assert unsatisfied.status_code == 400
+    assert unsatisfied.json()["detail"] == "AUTH_RULE_SELF_UNSATISFIED"
+    # One code for four different asks, so the header is what tells the page
+    # which line of the form the refusal is about.
+    assert unsatisfied.headers["X-Auth-Policy-Unmet"] == "provider"
 
     put = await client.patch(
         _settings(guild_id),
@@ -336,27 +349,6 @@ async def test_a_requirement_names_a_working_provider_of_this_communitys(
     assert response.json()["detail"] == "COMMUNITY_AUTH_POLICY_INVALID_PROVIDER"
 
 
-async def test_policy_requires_admin_own_session_to_satisfy(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """An admin can only require a provider their own session has satisfied —
-    proving it works and keeping them from locking out their guild."""
-    seat = await acting_user(guild_role=CommunityRole.superadmin)
-    provider = await create_auth_provider(session, slug="corp")
-    await create_guild_provider_connection(session, guild=seat.guild, provider=provider)
-
-    response = await client.patch(
-        _settings(seat.guild.id),
-        headers=seat.headers,  # legacy token: sat is empty
-        json={"auth_policy": {"policy": "required", "provider_id": provider.id}},
-    )
-    assert response.status_code == 400
-    assert response.json()["detail"] == "AUTH_RULE_SELF_UNSATISFIED"
-    # One code for four different asks, so the header is what tells the page
-    # which line of the form the refusal is about.
-    assert response.headers["X-Auth-Policy-Unmet"] == "provider"
-
-
 async def test_without_the_entitlement_a_requirement_is_read_and_lifted_only(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
@@ -464,15 +456,6 @@ async def test_the_step_up_challenge_is_not_what_an_ordinary_401_says(
     assert no_credential.status_code == 401
     assert no_credential.headers["WWW-Authenticate"] == "Bearer"
     assert "error=" not in no_credential.headers["WWW-Authenticate"]
-
-
-async def test_open_guild_admits_any_session(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    member = await acting_user(guild_role=CommunityRole.member)
-
-    response = await client.get(member.g("/initiatives/"), headers=member.headers)
-    assert response.status_code == 200
 
 
 # --- Credentials that record no sign-in --------------------------------------
@@ -743,35 +726,23 @@ async def test_ws_token_carries_the_passkey_to_the_gate(
     assert ctx.guild_id == guild_id
 
 
-async def test_system_sentinel_passes_policy_gate(session: AsyncSession, acting_user):
-    """User-attributed system work (export/import workers) passes the gate via
-    the explicit sentinel — its enqueueing request already satisfied it."""
-    member = await acting_user(guild_role=CommunityRole.member)
-    provider = await create_auth_provider(session, slug="corp")
-    await create_guild_auth_policy(session, member.guild, provider)
-    guild_id = member.guild.id
-
-    ctx = await establish_guild_access(session, member.user, guild_id, on_behalf=True)
-    assert ctx.guild_id == guild_id
-
-
-async def test_a_required_rule_names_something(session: AsyncSession):
-    """The check constraint: a requirement names a provider or a method; one
-    naming neither would ask nothing and refuse nobody."""
+@pytest.mark.parametrize(
+    "methods",
+    [
+        # A requirement names a provider or a method; one naming neither would
+        # ask nothing and refuse nobody.
+        pytest.param([], id="names-nothing"),
+        # Whether passwords exist at all is the deployment's question, held as
+        # a constraint so it holds for every writer rather than only the
+        # endpoint.
+        pytest.param(["password"], id="password"),
+    ],
+)
+async def test_the_database_refuses_a_rule_that_asks_nothing_of_its_own(
+    session: AsyncSession, methods: list[str]
+):
     guild = await create_guild(session)
-    session.add(CommunityRule(guild_id=guild.id, key="auth_policy", methods=[]))
-    with pytest.raises(IntegrityError):
-        await session.commit()
-    await session.rollback()
-
-
-async def test_the_database_refuses_a_password_requirement(session: AsyncSession):
-    """Whether passwords exist at all is the deployment's question, held as a
-    constraint so it holds for every writer rather than only the endpoint."""
-    guild = await create_guild(session)
-    session.add(
-        CommunityRule(guild_id=guild.id, key="auth_policy", methods=["password"])
-    )
+    session.add(CommunityRule(guild_id=guild.id, key="auth_policy", methods=methods))
     with pytest.raises(IntegrityError):
         await session.commit()
     await session.rollback()
@@ -1216,26 +1187,19 @@ async def _a_community_asking_for(
 
 
 @pytest.mark.parametrize("ask", _asks())
-async def test_a_session_that_has_met_the_ask_is_admitted(
+async def test_a_session_that_has_met_the_ask_is_admitted_and_one_that_has_not_asked(
     client: AsyncClient, session: AsyncSession, acting_user, ask: Ask
 ):
-    """Each ask has its own answer, and a member holding it is let in."""
+    """Each ask has its own answer, and a member holding it is let in. The
+    refusal says which ask is unmet, so a page knows what to put in front of
+    the member: this community's login page for its own providers, a code or a
+    ceremony against the session already open for the other two."""
     member = await _a_community_asking_for(session, acting_user, ask)
+    guild_id = member.guild.id
     headers = await ask.met_by(session, member.guild, member.user)
 
     allowed = await client.get(member.g("/initiatives/"), headers=headers)
     assert allowed.status_code == 200, allowed.text
-
-
-@pytest.mark.parametrize("ask", _asks())
-async def test_a_session_that_has_not_is_asked_for_it(
-    client: AsyncClient, session: AsyncSession, acting_user, ask: Ask
-):
-    """The refusal says which ask is unmet, so a page knows what to put in
-    front of the member: this community's login page for its own providers, a
-    code or a ceremony against the session already open for the other two."""
-    member = await _a_community_asking_for(session, acting_user, ask)
-    guild_id = member.guild.id
 
     refused = await client.get(
         member.g("/initiatives/"),
@@ -1251,30 +1215,25 @@ async def test_a_session_that_has_not_is_asked_for_it(
         assert refused.headers[header] == value
 
 
-async def test_a_key_a_password_manager_syncs_answers_a_passkey_rule(
-    client: AsyncClient, session: AsyncSession, acting_user
+@pytest.mark.parametrize(
+    ("ask", "amr"),
+    [
+        # ``hwk`` is a key the device holds and ``swk`` one a password manager
+        # syncs between devices; a community asking for a passkey takes either.
+        pytest.param(A_PASSKEY, ["pwd", "swk", "mfa"], id="synced-key"),
+        # The set exists to be used. A recovery code records ``mfa`` without
+        # ``otp``, and the rule asks for the factor rather than for a live one.
+        pytest.param(A_SECOND_FACTOR, ["pwd", "mfa"], id="recovery-code"),
+    ],
+)
+async def test_the_other_answers_to_an_ask_are_admitted_too(
+    client: AsyncClient, session: AsyncSession, acting_user, ask: Ask, amr: list[str]
 ):
-    """``hwk`` is a key the device holds and ``swk`` one a password manager
-    syncs between devices; a community asking for a passkey takes either."""
-    member = await _a_community_asking_for(session, acting_user, A_PASSKEY)
+    member = await _a_community_asking_for(session, acting_user, ask)
 
     allowed = await client.get(
         member.g("/initiatives/"),
-        headers=_bearer(get_auth_token(member.user, amr=["pwd", "swk", "mfa"])),
-    )
-    assert allowed.status_code == 200, allowed.text
-
-
-async def test_a_recovery_code_session_is_admitted_too(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """The set exists to be used. A recovery code records ``mfa`` without
-    ``otp``, and the rule asks for the factor rather than for a live one."""
-    member = await _a_community_asking_for(session, acting_user, A_SECOND_FACTOR)
-
-    allowed = await client.get(
-        member.g("/initiatives/"),
-        headers=_bearer(get_auth_token(member.user, amr=["pwd", "mfa"])),
+        headers=_bearer(get_auth_token(member.user, amr=amr)),
     )
     assert allowed.status_code == 200, allowed.text
 

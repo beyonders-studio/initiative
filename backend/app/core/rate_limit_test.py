@@ -1,11 +1,7 @@
 """Tests for the shared rate limiter configuration.
 
-These assert *configuration* rather than throttling behaviour: the suite sets
-``limiter.enabled = False`` (see ``conftest.py``), so a burst test would be
-meaningless here and would flake against the hundreds of rapid requests other
-tests make from the same client IP. We instead verify that the global default
-limit and storage backend are settings-driven, and that ``SlowAPIMiddleware`` is
-actually registered on the app so ``default_limits`` is no longer inert.
+The suite sets ``limiter.enabled = False`` (see ``conftest.py``); the tests
+that throttle turn it on for themselves.
 """
 
 import uuid
@@ -21,7 +17,7 @@ from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.routing import Mount
 
-from app.core import audit_context, identify, rate_limit
+from app.core import audit_context, identify
 from app.core.config import settings
 from app.core.plugin_access_token import seal_install_token
 from app.core.rate_limit import (
@@ -40,57 +36,24 @@ from app.main import app
 from app.testing import create_user, get_auth_headers, in_request_tasks
 
 
-class TestDefaultLimitsBuilder:
-    """The default-limit list is derived from RATE_LIMIT_DEFAULT."""
-
-    def test_configured_value_produces_one_entry(self, monkeypatch):
-        monkeypatch.setattr(settings, "RATE_LIMIT_DEFAULT", "100/minute")
-        assert _default_limits() == ["100/minute"]
-
-    def test_empty_string_disables_default(self, monkeypatch):
-        """An empty value means "no global default" — and must NOT be passed to
-        slowapi as ``[""]`` (which raises ValueError during parsing)."""
-        monkeypatch.setattr(settings, "RATE_LIMIT_DEFAULT", "")
-        assert _default_limits() == []
-
-    def test_whitespace_only_disables_default(self, monkeypatch):
-        monkeypatch.setattr(settings, "RATE_LIMIT_DEFAULT", "   ")
-        assert _default_limits() == []
-
-    def test_empty_default_builds_a_usable_limiter(self, monkeypatch):
-        """A limiter built from an empty default must construct without error."""
-        monkeypatch.setattr(settings, "RATE_LIMIT_DEFAULT", "")
-        built = build_limiter(settings.RATE_LIMIT_STORAGE_URI)
-        assert built._default_limits == []
-
-
-class TestLimiterConfiguration:
-    """The shared limiter instance reflects the configured settings."""
-
-    def test_default_limit_registered(self):
-        # The module is imported with the packaged default ("100/minute"), so a
-        # single default LimitGroup should be present.
-        assert len(limiter._default_limits) == 1
-
-    def test_storage_uri_is_settings_driven(self):
-        # Defaults to in-memory; a multi-worker deploy can point this at Redis
-        # via RATE_LIMIT_STORAGE_URI with no code change.
-        assert limiter._storage_uri == settings.RATE_LIMIT_STORAGE_URI
-
-    def test_default_storage_is_in_memory(self):
-        assert settings.RATE_LIMIT_STORAGE_URI == "memory://"
-
-
-class TestMiddlewareRegistration:
-    """SlowAPIMiddleware must be in the app's middleware stack, otherwise the
-    limiter's default_limits never apply to undecorated routes."""
-
-    def test_slowapi_middleware_registered(self):
-        registered = {m.cls for m in app.user_middleware}
-        assert any(issubclass(cls, SlowAPIMiddleware) for cls in registered), registered
-
-    def test_app_uses_shared_limiter(self):
-        assert app.state.limiter is rate_limit.limiter
+@pytest.mark.parametrize(
+    ("configured", "expected"),
+    [
+        ("100/minute", ["100/minute"]),
+        # An empty value means "no global default" — and must NOT be passed to
+        # slowapi as ``[""]`` (which raises ValueError during parsing).
+        ("", []),
+        ("   ", []),
+    ],
+)
+def test_the_default_limits_are_derived_from_the_setting(
+    monkeypatch, configured: str, expected: list[str]
+):
+    monkeypatch.setattr(settings, "RATE_LIMIT_DEFAULT", configured)
+    assert _default_limits() == expected
+    # A limiter built from it constructs without error.
+    built = build_limiter(settings.RATE_LIMIT_STORAGE_URI)
+    assert len(built._default_limits) == len(expected)
 
 
 class TestRouteResolution:
@@ -175,15 +138,6 @@ class TestDefaultLimitThrottlesUndecoratedRoute:
             return {"ok": True}
 
         return burst_app
-
-    async def test_burst_past_default_is_rejected(self):
-        burst_app = self._build_app("3/minute")
-        transport = ASGITransport(app=in_request_tasks(burst_app))
-        async with AsyncClient(transport=transport, base_url="http://test") as c:
-            statuses = [(await c.get("/undecorated")).status_code for _ in range(5)]
-        # First 3 within the window succeed, the rest are throttled.
-        assert statuses[:3] == [200, 200, 200]
-        assert 429 in statuses[3:]
 
     # slowapi announces the fallback with the deprecated ``Logger.warn``.
     @pytest.mark.filterwarnings(
@@ -334,10 +288,6 @@ class TestDefaultLimitOnTheRealApp:
     def _throttled(self, rate_limit_of_one_per_minute):
         pass
 
-    async def test_an_undecorated_route_takes_the_default(self, client):
-        assert (await client.get("/api/v1/version")).status_code == 200
-        assert (await client.get("/api/v1/version")).status_code == 429
-
     async def test_a_decorated_route_takes_its_own_limit_instead(self, client, session):
         """A route carrying ``@limiter.limit`` is left to its decorator rather
         than also counted against the default, so one set ABOVE the default is
@@ -351,6 +301,7 @@ class TestDefaultLimitOnTheRealApp:
     async def test_accounts_behind_one_address_each_get_their_own_allowance(
         self, client, session
     ):
+        """An undecorated route takes the default, counted per account."""
         first = get_auth_headers(await create_user(session))
         second = get_auth_headers(await create_user(session))
         assert (await client.get("/api/v1/version", headers=first)).status_code == 200

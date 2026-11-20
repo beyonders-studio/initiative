@@ -81,7 +81,8 @@ async def test_the_list_names_each_browser_and_marks_the_one_asking(
     client: AsyncClient, session: AsyncSession
 ):
     """Two browsers signed in; the list says what each one is and which of
-    them is reading it."""
+    them is reading it. A row carries what a person needs to recognise a
+    device, and nothing from the credential columns beside it."""
     await _signed_in_user(session, "two-browsers@example.com")
 
     first = await _sign_in(
@@ -105,22 +106,7 @@ async def test_the_list_names_each_browser_and_marks_the_one_asking(
 
     current = [row for row in rows if row["is_current"]]
     assert [row["label"] for row in current] == ["Chrome on macOS"]
-
-
-async def test_the_list_carries_no_refresh_token(
-    client: AsyncClient, session: AsyncSession
-):
-    """The row a person reads is the one they need to recognise a device, and
-    nothing from the credential columns beside it."""
-    await _signed_in_user(session, "no-secrets@example.com")
-    login = await _sign_in(client, "no-secrets@example.com", user_agent=CHROME_MAC)
-
-    listed = await client.get(
-        "/api/v1/auth/sessions",
-        headers={"Authorization": f"Bearer {login.json()['access_token']}"},
-    )
-    assert listed.status_code == 200
-    assert set(listed.json()[0]) == {
+    assert set(rows[0]) == {
         "id",
         "message_device_id",
         "device",
@@ -226,31 +212,13 @@ async def test_somebody_elses_session_answers_as_missing(
     assert len(still_there.json()) == 1
 
 
-async def test_signing_out_everywhere_else_spares_the_one_asking(
-    client: AsyncClient, session: AsyncSession
-):
-    await _signed_in_user(session, "sweep@example.com")
-    await _sign_in(client, "sweep@example.com", user_agent=FIREFOX_WINDOWS)
-    client.cookies.clear()
-    asking = await _sign_in(client, "sweep@example.com", user_agent=CHROME_MAC)
-    headers = {"Authorization": f"Bearer {asking.json()['access_token']}"}
-
-    assert len((await client.get("/api/v1/auth/sessions", headers=headers)).json()) == 2
-
-    swept = await client.post("/api/v1/auth/sessions/revoke-others", headers=headers)
-    assert swept.status_code == 204
-
-    rows = (await client.get("/api/v1/auth/sessions", headers=headers)).json()
-    assert [row["label"] for row in rows] == ["Chrome on macOS"]
-    assert rows[0]["is_current"] is True
-
-
 async def test_signing_out_everywhere_else_takes_the_phones_too(
     client: AsyncClient, session: AsyncSession
 ):
-    """The app's sign-in is a session like any other, so the sweep ends it. The
-    phone keeps its messages for its next sign-in, and the list shows it as a
-    device that is not signed in; another browser's go with its session."""
+    """The sweep spares only the session asking. The app's sign-in is a
+    session like any other, so the sweep ends it. The phone keeps its messages
+    for its next sign-in, and the list shows it as a device that is not signed
+    in; another browser's go with its session."""
     await _signed_in_user(session, "sweep-phones@example.com")
     phone = await _sign_in(
         client, "sweep-phones@example.com", user_agent=FIREFOX_WINDOWS, device=True
@@ -271,6 +239,10 @@ async def test_signing_out_everywhere_else_takes_the_phones_too(
     assert swept.status_code == 204
 
     rows = (await client.get("/api/v1/auth/sessions", headers=headers)).json()
+    live = [row for row in rows if row["id"] is not None]
+    assert [(row["label"], row["is_current"]) for row in live] == [
+        ("Chrome on macOS", True)
+    ]
     kept = [row for row in rows if row["id"] is None]
     assert [row["message_device_id"] for row in kept] == [phone_keys]
     assert await session.get(DmDevice, uuid.UUID(browser_keys)) is None

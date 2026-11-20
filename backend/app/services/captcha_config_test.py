@@ -40,24 +40,6 @@ def test_current_config_falls_back_to_env_before_load(
     assert captcha_service.is_configured(cfg) is True
 
 
-def test_unknown_provider_is_not_configured() -> None:
-    """A provider we have no verify URL for cannot be enforced — it would 500 on
-    a dictionary lookup instead of rejecting a token."""
-    cfg = captcha_config.ResolvedCaptchaConfig(
-        provider="not-a-provider", site_key="s", secret_key="k"
-    )
-    assert captcha_service.is_configured(cfg) is False
-
-
-def test_secret_without_site_key_is_not_configured() -> None:
-    """The server could verify without a site key, but the SPA could not render a
-    widget — so enforcement would reject every registration it received."""
-    cfg = captcha_config.ResolvedCaptchaConfig(
-        provider="hcaptcha", site_key=None, secret_key="k"
-    )
-    assert captcha_service.is_configured(cfg) is False
-
-
 async def test_refresh_loads_db_over_env(
     session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,

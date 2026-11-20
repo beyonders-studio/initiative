@@ -9,11 +9,13 @@ from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import auth_context
+from app.core.audit_events import AuditEventType
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserRole
 from app.schemas.platform.settings import PlatformProviderDefaultUpdate
 from app.services.auth import guild_provider_connections as connections
 from app.services.auth import provider_defaults
+from app.testing import emitted
 from app.testing.factories import (
     create_auth_provider,
     create_guild,
@@ -30,9 +32,12 @@ async def _answered(session: AsyncSession, provider, **fields):
     )
 
 
-async def test_a_community_that_has_not_said_inherits(
+async def test_a_community_inherits_until_its_own_connection_replaces_the_answer(
     session: AsyncSession,
 ):
+    """A community that has not said inherits the answer; its own connection
+    then replaces it outright. Not a merge: the community's narrowing is the
+    only one that applies."""
     provider = await create_auth_provider(session, slug="entra", display_name="Entra")
     guild = await create_guild(session)
     await _answered(session, provider, claim="tid", claim_values=["acme-tenant"])
@@ -47,14 +52,6 @@ async def test_a_community_that_has_not_said_inherits(
     offered = await connections.connected_providers(session, guild_id=guild.id)
     assert [row.id for row in offered] == [provider.id]
 
-
-async def test_its_own_connection_replaces_the_answer_outright(
-    session: AsyncSession,
-):
-    """Not a merge. The community's narrowing is the only one that applies."""
-    provider = await create_auth_provider(session, slug="entra")
-    guild = await create_guild(session)
-    await _answered(session, provider, claim="tid", claim_values=["acme-tenant"])
     await create_guild_provider_connection(
         session,
         guild=guild,
@@ -114,8 +111,13 @@ async def test_an_answer_switched_off_is_inherited_by_nobody(
     assert await connections.connected_providers(session, guild_id=guild.id) == []
 
 
-async def test_only_the_operator_answers(client: AsyncClient, session: AsyncSession):
+async def test_only_the_operator_answers(
+    client: AsyncClient, session: AsyncSession, capfd
+):
+    """Only the deployment's operator sets and withdraws the answer, and each
+    is recorded naming which fields moved but never the claim's strings."""
     provider = await create_auth_provider(session, slug="entra")
+    provider_id = provider.id
     admin = await create_user(session)
     guild = await create_guild(session, creator=admin)
     await create_guild_membership(
@@ -129,13 +131,39 @@ async def test_only_the_operator_answers(client: AsyncClient, session: AsyncSess
     assert refused.status_code == 403, refused.text
 
     owner = await create_user(session, role=UserRole.owner)
+    owner_id = owner.id
+    capfd.readouterr()
     accepted = await client.put(
         path,
         headers=get_auth_headers(owner),
-        json={"claim": "tid", "claim_values": ["acme-tenant"]},
+        json={"claim": "tid", "claim_values": ["acme-tenant"], "enabled": True},
     )
     assert accepted.status_code == 200, accepted.text
     assert accepted.json()["claim_values"] == ["acme-tenant"]
+    withdrawn = await client.delete(path, headers=get_auth_headers(owner))
+    assert withdrawn.status_code == 204, withdrawn.text
+
+    written = emitted(capfd)
+    target = {"type": "auth_provider", "id": provider_id}
+    rows = [
+        r
+        for r in written
+        if r["event_type"] == AuditEventType.AUTH_PROVIDER_DEFAULT_SET.value
+    ]
+    assert [(r["actor_user_id"], r["target"]) for r in rows] == [(owner_id, target)]
+    detail = rows[0]["detail"]
+    assert {"claim", "claim_values", "enabled"} == set(detail["changed"])
+    # Which claim, and which of its values count, are strings: named, never
+    # copied.
+    assert set(detail["values"]) == {"enabled"}
+    cleared = [
+        r
+        for r in written
+        if r["event_type"] == AuditEventType.AUTH_PROVIDER_DEFAULT_CLEARED.value
+    ]
+    assert [(r["actor_user_id"], r["target"], r["detail"]) for r in cleared] == [
+        (owner_id, target, {})
+    ]
 
 
 async def test_an_answer_is_both_halves_or_neither(
@@ -152,11 +180,13 @@ async def test_an_answer_is_both_halves_or_neither(
     assert refused.status_code == 422, refused.text
 
 
-async def test_the_gate_reads_the_answer_for_a_community_that_has_none(
+async def test_the_gate_asks_the_answer_until_the_community_narrows_itself(
     session: AsyncSession,
 ):
     """The SQL gate, not just the listing. An inherited narrowing decides who
-    a community counts as its own, exactly as its own would."""
+    a community counts as its own, exactly as its own would; once the
+    community narrows the provider itself, it is asked its own question, not
+    the deployment's."""
     provider = await create_auth_provider(session, slug="entra")
     guild = await create_guild(session)
     await _answered(session, provider, claim="tid", claim_values=["acme-tenant"])
@@ -174,13 +204,6 @@ async def test_the_gate_reads_the_answer_for_a_community_that_has_none(
     assert await admits("acme-tenant") is True
     assert await admits("someone-else") is False
 
-
-async def test_its_own_narrowing_is_what_the_gate_asks(session: AsyncSession):
-    """The shadowing rule, at the gate. A community that narrowed the provider
-    itself is asked its own question, not the deployment's."""
-    provider = await create_auth_provider(session, slug="entra")
-    guild = await create_guild(session)
-    await _answered(session, provider, claim="tid", claim_values=["acme-tenant"])
     await create_guild_provider_connection(
         session,
         guild=guild,
@@ -188,17 +211,6 @@ async def test_its_own_narrowing_is_what_the_gate_asks(session: AsyncSession):
         claim="tid",
         claim_values=["a-different-tenant"],
     )
-
-    async def admits(tenant: str) -> bool:
-        auth_context.record(
-            satisfied_providers=frozenset({provider.id}),
-            satisfied_claims={str(provider.id): {"tid": [tenant]}},
-        )
-        try:
-            return await connections.admits_this_session(session, guild_id=guild.id)
-        finally:
-            auth_context.reset()
-
     assert await admits("a-different-tenant") is True
     # The deployment's answer no longer applies here.
     assert await admits("acme-tenant") is False
