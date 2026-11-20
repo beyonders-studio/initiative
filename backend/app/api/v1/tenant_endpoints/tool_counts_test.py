@@ -147,7 +147,10 @@ async def test_the_tag_tree_counts_the_view_shown(
 async def test_the_sidebar_counts_each_tools_live_view(
     client: AsyncClient, session, acting_user, tool: Tool
 ):
+    """An initiative with the tool switched off counts nothing."""
     actor, home, _tag = await _one_of_each(session, acting_user, tool)
+    off = await create_initiative(session, actor.guild, actor.user, tools={tool: False})
+    await TOOL_FACTORIES[tool](session, off, actor.user)
 
     response = await client.get(
         actor.g("/tools/counts/by-initiative"), headers=actor.headers

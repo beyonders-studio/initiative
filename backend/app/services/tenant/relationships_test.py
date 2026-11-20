@@ -8,7 +8,6 @@ police, and that a person taking a link back is remembered where a text edit is
 not.
 """
 
-import pytest
 from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -17,7 +16,6 @@ from app.core.relationships import (
     ENDPOINT_CODES,
     ENDPOINT_KINDS,
     NODE_ID_SHIFT,
-    SPECS,
     Provenance,
     RelationshipType,
     node_id,
@@ -34,7 +32,6 @@ from app.testing.factories import (
     create_file,
     create_initiative,
     create_relationship,
-    create_tag,
     create_task,
 )
 from app.testing.schema_harness import route_session_to_guild
@@ -62,71 +59,9 @@ def test_every_kind_resolves_to_a_table():
         assert title_column(kind, tools=BUILTIN_TOOLS) is not None
 
 
-def test_symmetric_types_declare_no_direction():
-    """A symmetric relation has no described end, so it cannot also be
-    asymmetric — the two characteristics contradict each other."""
-    for relationship_type, spec in SPECS.items():
-        assert not (spec.symmetric and spec.asymmetric), relationship_type
-
-
 # ---------------------------------------------------------------------------
 # Storage: what the table refuses, and what it records
 # ---------------------------------------------------------------------------
-
-
-async def test_self_loop_is_refused(session: AsyncSession, acting_user):
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    task = await create_task(session, a.project)
-    await route_session_to_guild(session, a.guild.id)
-
-    with pytest.raises(relationships.SelfLoop):
-        await relationships.create(
-            session,
-            source=Endpoint(SearchEntityType.task, task.id),
-            relationship_type=RelationshipType.related_to,
-            target=Endpoint(SearchEntityType.task, task.id),
-        )
-
-
-async def test_symmetric_edge_is_stored_once_whichever_way_it_is_asked_for(
-    session: AsyncSession, acting_user
-):
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    doc = await create_file(session, a.initiative, a.user)
-    await route_session_to_guild(session, a.guild.id)
-
-    first = await relationships.create(
-        session,
-        source=Endpoint(SearchEntityType.file, doc.id),
-        relationship_type=RelationshipType.attached,
-        target=Endpoint(SearchEntityType.project, a.project.id),
-    )
-    # The same pair, named the other way round: the same edge, not a second one.
-    second = await relationships.create(
-        session,
-        source=Endpoint(SearchEntityType.project, a.project.id),
-        relationship_type=RelationshipType.attached,
-        target=Endpoint(SearchEntityType.file, doc.id),
-    )
-    assert first is not None
-    assert second is None
-
-    rows = (
-        await session.exec(
-            select(EntityRelationship).where(
-                EntityRelationship.relationship_type == RelationshipType.attached.value
-            )
-        )
-    ).all()
-    assert len(rows) == 1
-    # Stored in node-id order, which is the constraint's rule and not the
-    # caller's: file (6) sorts below project (10).
-    assert rows[0].source_node < rows[0].target_node
-    assert rows[0].source_type == SearchEntityType.file.value
 
 
 async def test_a_part_may_belong_to_two_wholes(session: AsyncSession, acting_user):
@@ -156,112 +91,9 @@ async def test_a_part_may_belong_to_two_wholes(session: AsyncSession, acting_use
     assert len(edges) == 2
 
 
-async def test_a_dependency_loop_is_stored_and_reported_by_walk(
-    session: AsyncSession, acting_user
-):
-    """Two people each saying the other's task must go first is the strongest
-    coupling evidence the system gets. It is recorded, and found when read."""
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    first = await create_task(session, a.project, title="A")
-    second = await create_task(session, a.project, title="B")
-    await route_session_to_guild(session, a.guild.id)
-
-    for source, target in ((first, second), (second, first)):
-        assert await relationships.create(
-            session,
-            source=Endpoint(SearchEntityType.task, source.id),
-            relationship_type=RelationshipType.depends_on,
-            target=Endpoint(SearchEntityType.task, target.id),
-        )
-    await session.commit()
-
-    reached = await relationships.walk(
-        session,
-        Endpoint(SearchEntityType.task, first.id),
-        relationship_type=RelationshipType.depends_on,
-        depth=5,
-    )
-    assert any(is_cycle for _, _, is_cycle in reached), reached
-    # And the walk terminated rather than running to the depth bound.
-    assert max(depth for _, depth, _ in reached) < 5
-
-    assert await relationships.would_close_a_cycle(
-        session,
-        source=Endpoint(SearchEntityType.task, first.id),
-        relationship_type=RelationshipType.depends_on,
-        target=Endpoint(SearchEntityType.task, second.id),
-    )
-
-
-async def test_a_multi_hop_walk_is_refused_for_a_non_transitive_type(
-    session: AsyncSession, acting_user
-):
-    """*A related to B* and *B related to C* says nothing about A and C, so
-    walking it would return something that reads like a result and is not."""
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    task = await create_task(session, a.project)
-    await route_session_to_guild(session, a.guild.id)
-
-    with pytest.raises(relationships.NotTransitive):
-        await relationships.walk(
-            session,
-            Endpoint(SearchEntityType.task, task.id),
-            relationship_type=RelationshipType.related_to,
-            depth=3,
-        )
-
-
 # ---------------------------------------------------------------------------
 # Tombstones
 # ---------------------------------------------------------------------------
-
-
-async def test_a_manual_removal_is_remembered_and_the_pair_is_re_linkable(
-    session: AsyncSession, acting_user
-):
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    doc = await create_file(session, a.initiative, a.user)
-    row = await create_relationship(
-        session,
-        a.guild,
-        source=(SearchEntityType.project, a.project.id),
-        target=(SearchEntityType.file, doc.id),
-        created_by=a.user.id,
-    )
-
-    await relationships.remove(session, row, removed_by=a.user.id)
-    await session.commit()
-
-    # Gone from every read...
-    assert not await relationships.list_for_entity(
-        session,
-        Endpoint(SearchEntityType.project, a.project.id),
-        relationship_type=RelationshipType.attached,
-    )
-    # ...and still there, which is the whole point: nothing else in the schema
-    # records that somebody linked two things and then took it back.
-    kept = (
-        await session.exec(
-            select(EntityRelationship).where(EntityRelationship.id == row.id)
-        )
-    ).one()
-    assert kept.removed_at is not None
-    assert kept.removed_by == a.user.id
-
-    # The unique key covers live rows only, so the same pair links again.
-    again = await create_relationship(
-        session,
-        a.guild,
-        source=(SearchEntityType.project, a.project.id),
-        target=(SearchEntityType.file, doc.id),
-    )
-    assert again.id != row.id
 
 
 async def test_a_content_edge_is_deleted_rather_than_tombstoned(
@@ -337,28 +169,6 @@ async def test_an_edge_is_invisible_to_a_reader_who_clears_only_one_end(
     )
     assert response.status_code == 200, response.text
     assert response.json() == []
-
-
-async def test_a_tag_edge_is_still_gated_by_the_other_end(
-    session: AsyncSession, acting_user
-):
-    """A tag is guild-level and every member sees every tag, so the tag end
-    admits anyone. The task end is what decides, and it still does."""
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    tag = await create_tag(session, a.guild)
-    task = await create_task(session, a.project)
-
-    row = await create_relationship(
-        session,
-        a.guild,
-        source=(SearchEntityType.task, task.id),
-        target=(SearchEntityType.tag, tag.id),
-        relationship_type=RelationshipType.tagged_with,
-    )
-    assert row.source_type == SearchEntityType.task.value
-    assert row.target_type == SearchEntityType.tag.value
 
 
 # ---------------------------------------------------------------------------

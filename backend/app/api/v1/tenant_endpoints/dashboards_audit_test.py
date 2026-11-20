@@ -65,26 +65,8 @@ async def _set(client: AsyncClient, actor, dashboard_id: int, mode: str):
 async def test_running_as_the_initiative_is_recorded_as_a_sharing_change(
     client: AsyncClient, session: AsyncSession, acting_user, capfd
 ):
-    author = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    await _dashboards_on(session, author.initiative)
-    dashboard_id = await _dashboard(client, author)
-    capfd.readouterr()
-
-    await _set(client, author, dashboard_id, "initiative")
-
-    (row,) = _view_mode_rows(capfd)
-    assert row["actor_user_id"] == author.user.id
-    assert row["guild_id"] == author.guild.id
-    assert row["target"] == {"type": "dashboard", "id": dashboard_id}
-    assert row["detail"] == {
-        "initiative_id": author.initiative.id,
-        "view_mode": {"from": "individual", "to": "initiative"},
-    }
-
-
-async def test_setting_the_same_mode_again_records_nothing_further(
-    client: AsyncClient, session: AsyncSession, acting_user, capfd
-):
+    """Each change of mode is recorded once; setting the same mode again
+    records nothing further."""
     author = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     await _dashboards_on(session, author.initiative)
     dashboard_id = await _dashboard(client, author)
@@ -94,8 +76,12 @@ async def test_setting_the_same_mode_again_records_nothing_further(
     await _set(client, author, dashboard_id, "initiative")
     await _set(client, author, dashboard_id, "individual")
 
-    rows = _view_mode_rows(capfd)
-    assert [r["detail"]["view_mode"]["to"] for r in rows] == [
-        "initiative",
-        "individual",
-    ]
+    first, second = _view_mode_rows(capfd)
+    assert first["actor_user_id"] == author.user.id
+    assert first["guild_id"] == author.guild.id
+    assert first["target"] == {"type": "dashboard", "id": dashboard_id}
+    assert first["detail"] == {
+        "initiative_id": author.initiative.id,
+        "view_mode": {"from": "individual", "to": "initiative"},
+    }
+    assert second["detail"]["view_mode"] == {"from": "initiative", "to": "individual"}
