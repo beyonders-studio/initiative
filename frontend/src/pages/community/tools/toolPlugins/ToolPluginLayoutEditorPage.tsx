@@ -90,7 +90,9 @@ const TableLayoutEditor = ({
     parentId === null ? { initiative_id: initiativeId } : { parent_id: parentId }
   );
   const rows = useMemo(() => (listed.data?.items ?? []).map(toolRow), [listed.data]);
-  const propertyEnv = usePropertyEnv({ initiativeId, enabled: true });
+  // Its rows hold none of the initiative's properties, so none is made here.
+  const { definitions } = usePropertyEnv({ initiativeId, enabled: true });
+  const propertyEnv = useMemo(() => ({ definitions }), [definitions]);
   const fields = useMemo(() => toolFields(table, language), [table, language]);
 
   const lists = useMemo<EditableLists>(() => {

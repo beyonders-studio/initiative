@@ -450,7 +450,8 @@ def _check_plugin(target: Drawn, write: ToolPluginLayoutWrite) -> dict[str, Any]
     publishing it was: a list holds what its kind holds, its looks and its
     presets, and may be hidden. What it leaves out is drawn as shipped."""
     assert target.table is not None
-    raw = write.definition
+    # A null is what a read sends for what a layout leaves out.
+    raw = {key: value for key, value in write.definition.items() if value is not None}
     try:
         if write.kind in target.details:
             return detail_layout(raw, table=target.table, what=write.kind)

@@ -355,7 +355,8 @@ export const LayoutEditor = <D extends PropertyDefinition>({
   plugins?: LayoutPlugins;
   /** The initiative's properties, which its fields may show, and how a new
    *  one is made. */
-  propertyEnv: Pick<PropertyEnv<D>, "definitions" | "createProperty">;
+  propertyEnv: Pick<PropertyEnv<D>, "definitions"> &
+    Partial<Pick<PropertyEnv<D>, "createProperty">>;
   /** The target's layouts, read by someone who may change them. */
   layouts: LayoutSet;
   /** Stores `changes`, in order, answering with the layouts as stored. One
@@ -596,11 +597,13 @@ export const LayoutEditor = <D extends PropertyDefinition>({
       ? detailChoices(detail, openDetail, fields, plugins, t, propertiesPart)
       : { fields: [], plugins: [], parts: [] };
   // Wherever a field can be placed, a new one can be made, placed where Add
-  // was opened: the owner's metadata, or a property of the initiative's.
+  // was opened: the owner's metadata, or a property of the initiative's. What
+  // holds no properties (a tool plug-in's rows) makes none.
+  const create = propertyEnv.createProperty;
   const choices =
-    current?.kind === "calendar" || current?.kind === "gantt" || (!current && !detail)
+    !create || current?.kind === "calendar" || current?.kind === "gantt" || (!current && !detail)
       ? listed
-      : { ...listed, newField: { initiativeId, owner, create: propertyEnv.createProperty } };
+      : { ...listed, newField: { initiativeId, owner, create } };
   const addersAt = (place?: Place): Adders =>
     current?.kind === "table"
       ? { onField: (id) => edits.addColumn(id, place?.index), onPart: noop, onNode: noop }

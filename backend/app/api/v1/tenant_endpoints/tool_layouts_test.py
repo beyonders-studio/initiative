@@ -1113,10 +1113,14 @@ async def test_a_tool_plugins_table_is_laid_out_as_its_plugin_declares(
     path = admin.g("/layouts/")
     shipped = await client.get(path, params=counters, headers=admin.headers)
     saved = await client.put(path, params=counters, json=page, headers=admin.headers)
+    # Sent back as read, with what it leaves out as null.
     hidden = await client.put(
         path,
         params=counters,
-        json={"kind": "grid", "definition": {"hidden": True}},
+        json={
+            "kind": "grid",
+            "definition": {**_layouts(shipped)["grid"]["definition"], "hidden": True},
+        },
         headers=admin.headers,
     )
     reset = await client.delete(
