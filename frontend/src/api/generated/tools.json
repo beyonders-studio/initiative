@@ -479,5 +479,7 @@
     "#8A7B6B",
     "#9E8F7E",
     "#7E8579"
-  ]
+  ],
+  "trigger_word": "[\\w-]+(?:\\.[a-z0-9]+)?",
+  "moved_kinds": ["counter_group.tsjvtcm0s7gv2x", "counter.tsjvtcm0s7gv2x"]
 }

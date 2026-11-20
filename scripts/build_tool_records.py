@@ -5,7 +5,8 @@ Each tool's record (``app.core.tools.TOOL_SPECS``) holds the facts about it
 that are not a rule every tool follows: which tools start switched on, what
 each exports to, which have rows of the whole community, and the kinds that
 live inside each; the role keys of the built-in tools; what a file of each
-type exports as; and the colours a new row's colour is picked from. The frontend imports this file rather than
+type exports as; the colours a new row's colour is picked from; and the
+pattern of the word after ``#`` that names a kind in running text. The frontend imports this file rather than
 copying those facts by hand, so the two cannot drift.
 
 Written beside the generated API types, by ``frontend/scripts/generate-api.sh``
@@ -25,7 +26,9 @@ sys.path.insert(0, str(REPO_ROOT / "backend"))
 
 from app.core.file_types import FileType, export_formats
 from app.core.palette import COLOR_PALETTE
+from app.core.references import TRIGGER_WORD
 from app.core.tools import KINDS, TOOL_SPECS
+from app.models.platform.plugin_kind_code import ADOPTED_KIND_CODES
 from app.models.tenant.initiative import PermissionKey
 
 OUT = REPO_ROOT / "frontend" / "src" / "api" / "generated" / "tools.json"
@@ -57,6 +60,11 @@ def build() -> dict[str, object]:
         },
         # The colours a new row's colour is picked from.
         "colors": list(COLOR_PALETTE),
+        # The word after ``#`` that names a kind in running text, as a pattern.
+        "trigger_word": TRIGGER_WORD,
+        # The kinds of a tool that moved out of Initiative into a plug-in,
+        # which the tool's old pages lead to.
+        "moved_kinds": list(ADOPTED_KIND_CODES),
     }
 
 

@@ -12,6 +12,7 @@
  */
 
 import { FileType, SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
+import records from "@/api/generated/tools.json";
 import { isToolPluginKind } from "@/lib/toolPlugins";
 
 /** People. A separate trigger because they are read from the roster, not the
@@ -69,9 +70,8 @@ export const typeForTrigger = (word: string): string | undefined => {
 export const TRIGGER_WORDS: string[] = TRIGGER_TYPES.map(([trigger]) => trigger);
 
 /** The word after `#` in the stored form, as a pattern: a built-in kind's
- *  (`task`, `wiki-page`) and for a tool plug-in's, `.` and its uid. Mirrors the
- *  backend's `TRIGGER_WORD`. */
-export const TRIGGER_WORD = String.raw`[\w-]+(?:\.[a-z0-9]+)?`;
+ *  (`task`, `wiki-page`) and for a tool plug-in's, `.` and its uid. */
+export const TRIGGER_WORD = records.trigger_word;
 
 /** A label is written into the text, so the characters the syntax is built
  *  from cannot appear inside it. */

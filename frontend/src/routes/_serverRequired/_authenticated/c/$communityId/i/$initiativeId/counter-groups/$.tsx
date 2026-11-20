@@ -1,8 +1,12 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
+import records from "@/api/generated/tools.json";
+
 /** Counters moved into the Counters tool plug-in; these are its kinds. */
-const GROUP = "counter_group.tsjvtcm0s7gv2x";
-const COUNTER = "counter.tsjvtcm0s7gv2x";
+const movedKind = (key: string): string =>
+  records.moved_kinds.find((kind) => kind.split(".")[0] === key) ?? key;
+const GROUP = movedKind("counter_group");
+const COUNTER = movedKind("counter");
 
 /**
  * Where Counters' pages were before the plug-in: its list, a group (and the
