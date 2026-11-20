@@ -1134,7 +1134,7 @@ async def provision_community_tools(
         if drop:
             await _run_in_schema(conn, schema, drop)
         if uninstalled is not None and not any(
-            tool.kind.endswith(f".{uninstalled.lower()}") for tool in tools.installed
+            tool.listing_uid == uninstalled.upper() for tool in tools.installed
         ):
             await drop_tool_tables(conn, schema, uninstalled)
         await _apply_parts(conn, guild_id, PARTS, tools=tools)

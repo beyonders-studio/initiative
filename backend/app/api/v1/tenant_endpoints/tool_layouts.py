@@ -117,25 +117,19 @@ async def _resolve_plugin(
     located = locate(tools, kind)
     if located is None:
         return None
-    if plugin_tool_rows.parent_column(located) is None:
-        if tool_id is not None or initiative_id is None:
-            raise _invalid()
-        await _require_initiative(session, context, initiative_id)
-        await plugin_tool_rows.require_on(session, located, initiative_id)
-        return _Resolved(
-            Target(kind, None, initiative_id),
-            _manages(context, initiative_id),
-            None,
-            plugin=True,
-        )
-    if tool_id is None or initiative_id is not None:
+    under = plugin_tool_rows.placed(located, initiative_id, tool_id)
+    if under is None:
         raise _invalid()
+    if plugin_tool_rows.parent_column(located) is None:
+        await _require_initiative(session, context, under)
+        await plugin_tool_rows.require_on(session, located, under)
+        return _Resolved(
+            Target(kind, None, under), _manages(context, under), None, plugin=True
+        )
     parent = plugin_tool_rows.parent_of(located, tools)
-    row = await plugin_tool_rows.load_authorized(
-        session, context, parent, tools, tool_id
-    )
+    row = await plugin_tool_rows.load_authorized(session, context, parent, tools, under)
     return _Resolved(
-        Target(kind, tool_id, int(row.tool["initiative_id"])),
+        Target(kind, under, int(row.tool["initiative_id"])),
         _configures(row),
         row,
         plugin=True,

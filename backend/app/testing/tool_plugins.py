@@ -142,23 +142,19 @@ async def add_counter(
     community where it is not. Committed."""
     from app.db.plugin_tools import provisioned_tools
     from app.db.session import routed_guild_id
-    from app.db.tool_rows import locate
     from app.services.tenant.plugin_tool_rows import insert
     from app.testing.schema_harness import route_session_to_guild
 
     tools = await provisioned_tools(guild_id)
     (tool,) = tools.installed
-    (item,) = tool.children
     if routed_guild_id(session) is None:
         await route_session_to_guild(session, guild_id)
     group = await insert(
-        session,
-        locate(tools, tool.kind),
-        {"initiative_id": initiative_id, "name": "Scores"},
+        session, tool.table, {"initiative_id": initiative_id, "name": "Scores"}
     )
     row = await insert(
         session,
-        locate(tools, item.value),
+        tool.items[0],
         {"counter_group_id": group, "name": "Laps", **counter},
     )
     await session.commit()

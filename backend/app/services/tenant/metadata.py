@@ -97,7 +97,7 @@ from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.authorization import standing_arg
 from app.db.base import MODELS_BY_TABLE
 from app.db.guild_standing import GuildContext, InstallContext
-from app.db.initiative_rls import content_kind_tables, entity_tables, governing_path
+from app.db.initiative_rls import entity_tables, governing_path
 from app.db.request_context import SystemGuild
 from app.db.session import (
     RLS_CONTEXT_MAX_AGE_SECONDS,
@@ -237,11 +237,7 @@ def link_for(entity: Any, tools: ToolSet = BUILTIN_TOOLS) -> PropertyLinkSpec:
     """The spec for a row or its model, or for a tool plug-in's row, one of
     ``tools``'. Raises for a type that carries none."""
     if isinstance(entity, ToolRow):
-        kind = next(
-            kind
-            for kind, table in content_kind_tables(tools).items()
-            if table == entity.table.name
-        )
+        kind = tools.table_kinds[entity.table.name]
         located = locate(tools, kind)
         if located is None:  # pragma: no cover - a row of a table no tool has
             raise KeyError(f"{kind} is no installed tool's")
@@ -885,10 +881,10 @@ async def _write_in_place(
 
 
 async def copy_values(
-    session: AsyncSession, model: type[SQLModel], copies: Mapping[int, int]
+    session: AsyncSession, entity: Any, copies: Mapping[int, int]
 ) -> None:
     """Give each copy the values its source holds (``{source_id: copy_id}``,
-    rows of ``model``), replacing its own. Two statements however many rows,
+    rows of ``entity``'s kind: a model, or a row), replacing its own. Two statements however many rows,
     and two more for tasks.
 
     For a duplicate or an occurrence: the same properties apply, so each pair
@@ -902,7 +898,7 @@ async def copy_values(
     """
     if not copies:
         return
-    target = link_for(model).target
+    target = link_for(entity, routed_tools(session)).target
     # The copies' pending changes first (a series' override takes its calendar
     # just before), so their values are held to where they now sit.
     await session.flush()
@@ -932,7 +928,7 @@ async def copy_values(
             .where(_of(target, copies.keys()), properties),
         )
     )
-    if model is not Task:
+    if target != "task":
         return
     projects = col(MetadataDefinition.project_id).is_not(None) & unsigned
     await session.exec(

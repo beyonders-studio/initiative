@@ -32,7 +32,6 @@ import copy
 from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from decimal import Decimal
-from types import SimpleNamespace
 from typing import Any, cast
 
 import sqlalchemy as sa
@@ -44,16 +43,15 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.errors import CodedError
 from app.core.messages import InitiativeMessages, KindMessages, ToolPluginMessages
 from app.core.tool_set import ToolSet
-from app.core.tools import kind_refusal
+from app.core.tools import kind_refusal, plugin_kind
+from app.db.errors import dbapi_constraint
 from app.db.guild_standing import ActorContext, InstallContext
-from app.db.plugin_tools import NUMBER, NUMBER_LIMIT
-from app.db.query import apply_pagination
+from app.db.plugin_tools import CHECKED_FIELD, NUMBER, NUMBER_LIMIT
 from app.db.session import routed_tools
 from app.db.tool_rows import Located, ToolRow, load_row, locate, row_of, select_rows
 from app.models.platform.guild import GuildMembership
 from app.models.platform.user import User
 from app.models.tenant.initiative import Initiative
-from app.models.tenant.resource_grant import ResourceGrant
 from app.schemas.tenant.archive import ToolCan
 from app.schemas.tenant.plugin_tool import (
     PluginToolActionRead,
@@ -65,12 +63,13 @@ from app.schemas.tenant.plugin_tool import (
 )
 from app.schemas.tenant.tag import tag_summaries
 from app.schemas.tenant.tool_layout import MAX_PREVIEW_ITEMS
+from app.services.export import values as export_values
 from app.services.marketplace.declarative import action_change
 from app.services.marketplace.tool_plugins import (
     NEVER_EMPTY,
+    NUMBER_KINDS,
     RANDOM_COLOR,
     effective_defaults,
-    tool_row_problems,
     value_fits,
 )
 from app.services.membership import live_membership_clause
@@ -78,6 +77,7 @@ from app.services.permissions import (
     Action,
     DacResource,
     client_access,
+    grants_of,
     require_access,
     serialize_grants,
 )
@@ -86,9 +86,6 @@ from app.services.tenant import tags as tags_service
 from app.services.tenant.descriptions import newly_mentioned
 from app.services.tenant.initiative_tools import tool_on_in, tool_on_sql
 from app.services.tenant.relationships import Endpoint
-
-#: The largest number a number or counter field's column holds.
-_NUMBER_LIMIT = Decimal(10) ** 10
 
 
 def located_kind(tools: ToolSet, kind: str) -> Located:
@@ -100,23 +97,9 @@ def located_kind(tools: ToolSet, kind: str) -> Located:
     return found
 
 
-def _key(kind: str) -> str:
-    return kind.partition(".")[0]
-
-
-def _table_block(located: Located) -> Mapping[str, Any]:
-    """What the declaration says of ``located``'s table: the tool's block, or
-    its item's."""
-    block = located.tool.declaration
-    key = _key(located.kind)
-    if key == block["key"]:
-        return block
-    return next(item for item in block.get("items", []) if item["key"] == key)
-
-
 def declared_fields(located: Located) -> dict[str, Mapping[str, Any]]:
     """The fields ``located``'s table declares, by key."""
-    return {field["key"]: field for field in _table_block(located).get("fields", [])}
+    return {field["key"]: field for field in located.declared.get("fields", [])}
 
 
 def parent_column(located: Located) -> str | None:
@@ -126,13 +109,10 @@ def parent_column(located: Located) -> str | None:
 
 def children(located: Located, tools: ToolSet) -> list[Located]:
     """The item tables directly under ``located``'s table."""
-    block = located.tool.declaration
-    key = _key(located.kind)
-    uid = located.tool.kind.partition(".")[2]
     return [
-        located_kind(tools, f"{item['key']}.{uid}")
-        for item in block.get("items", [])
-        if item.get("parent", block["key"]) == key
+        located_kind(tools, item)
+        for item, parent in tools.item_parents.items()
+        if parent == located.kind
     ]
 
 
@@ -152,10 +132,9 @@ def declaration(located: Located) -> PluginToolRead:
     its kind. Not its layouts, which are the app's to draw, nor what an
     action writes."""
     block = located.tool.declaration
-    uid = located.tool.kind.partition(".")[2]
 
     def kind(key: str) -> str:
-        return f"{key}.{uid}"
+        return plugin_kind(key, located.tool.listing_uid)
 
     return PluginToolRead(
         kind=located.tool.kind,
@@ -259,14 +238,14 @@ def _column_value(field: Mapping[str, Any], raw: Any) -> Any:
     """``raw`` as ``field``'s column holds it, or a refusal."""
     key, kind = field["key"], field["kind"]
     if raw is None:
-        if kind in NEVER_EMPTY:
+        if kind in NEVER_EMPTY or field.get("required"):
             raise _invalid(key)
         return None
     if not value_fits(dict(field), raw):
         raise _invalid(key)
-    if kind in ("number", "counter", "currency"):
+    if kind in (*NUMBER_KINDS, "currency"):
         number = Decimal(str(raw))
-        if kind != "currency" and abs(number) >= _NUMBER_LIMIT:
+        if kind != "currency" and abs(number) > NUMBER_LIMIT:
             raise _invalid(key)
         return number
     if kind == "scale":
@@ -311,9 +290,8 @@ def column_values(
     """The columns a write of ``given`` (declared fields by key) sets, held to
     the declaration: a new row's (``current`` None), with each field's start
     (``effective_defaults``), or a change to a row holding ``current``. A
-    counter is held to its bounds whenever it or a field bounding it changes,
-    and the row as it would be stored to its required fields and checks
-    (``tool_row_problems``)."""
+    counter is held to its bounds whenever it or a field bounding it changes.
+    The table's own checks refuse the row as it is written (:func:`update`)."""
     declared = declared_fields(located)
     values: dict[str, Any] = {}
     for key, raw in given.items():
@@ -347,8 +325,6 @@ def column_values(
         count = _clamped(field, merged, starts[key])
         if current is None or key in values or count != current.get(key):
             values[key] = merged[key] = count
-    for key, _ in tool_row_problems(_table_block(located), merged):
-        raise _invalid(key)
     return values
 
 
@@ -407,7 +383,7 @@ async def require_members(
 def _json(value: Any) -> Any:
     """A column's value as JSON carries it."""
     if isinstance(value, Decimal):
-        return int(value) if value == value.to_integral_value() else float(value)
+        return export_values.number(value)
     if isinstance(value, date):
         return value.isoformat()
     return value
@@ -435,75 +411,45 @@ def _under(located: Located, under: int, *, archived: bool) -> list[Any]:
     ]
 
 
+def listed(
+    located: Located, tools: ToolSet, under: int, *, archived: bool
+) -> tuple[sa.Select[Any], sa.Select[Any]]:
+    """What reads ``located``'s rows under ``under`` in their order, and what
+    counts them."""
+    table = located.table
+    where = _under(located, under, archived=archived)
+    return (
+        select_rows(located, tools)
+        .where(*where)
+        .order_by(table.c.position, table.c.id),
+        select(sa.func.count()).select_from(table).where(*where),
+    )
+
+
 async def rows_under(
     session: AsyncSession,
     located: Located,
     tools: ToolSet,
     under: int,
     *,
-    archived: bool = False,
-    page_number: int | None = None,
-    page_size: int = 0,
     for_update: bool = False,
 ) -> list[ToolRow]:
-    """``located``'s rows under ``under`` in their order: every one, or the
-    page ``page_number`` names, windowed as every list is. ``for_update``
+    """``located``'s live rows under ``under`` in their order. ``for_update``
     locks every one, in the order of their ids, so two writers that each lock
     a parent's items never wait on each other in turn."""
     table = located.table
     statement = select_rows(located, tools).where(
-        *_under(located, under, archived=archived)
+        *_under(located, under, archived=False)
     )
     if for_update:
         statement = statement.order_by(table.c.id).with_for_update(of=table)
-    else:
-        statement = statement.order_by(table.c.position, table.c.id)
-    if page_number is not None:
-        statement = apply_pagination(statement, page_number, page_size)
     rows = [row_of(table, found) for found in (await session.exec(statement)).all()]
     return sorted(rows, key=lambda row: (row.position, row.id))
 
 
-async def count_under(
-    session: AsyncSession, located: Located, under: int, *, archived: bool
-) -> int:
-    """How many of ``located``'s rows :func:`rows_under` lists."""
-    where = _under(located, under, archived=archived)
-    return int(
-        (
-            await session.exec(
-                select(sa.func.count()).select_from(located.table).where(*where)
-            )
-        ).one()
-    )
-
-
-async def grants_of(
-    session: AsyncSession, kind: str, ids: Sequence[int]
-) -> dict[int, list[ResourceGrant]]:
-    """Who each of a tool's rows ``ids`` is shared with, by id."""
-    grants: dict[int, list[ResourceGrant]] = {}
-    if not ids:
-        return grants
-    for grant in (
-        await session.exec(
-            select(ResourceGrant).where(
-                ResourceGrant.resource_type == kind,
-                col(ResourceGrant.resource_id).in_(ids),
-            )
-        )
-    ).all():
-        grants.setdefault(grant.resource_id, []).append(grant)
-    return grants
-
-
 def parent_of(located: Located, tools: ToolSet) -> Located:
     """The table an item's rows sit under: its tool's, or another item's."""
-    _column, table = located.hops[0]
-    if table == located.tool.table.name:
-        return located_kind(tools, located.tool.kind)
-    (kind,) = (child.value for child in located.tool.children if child.table == table)
-    return located_kind(tools, kind)
+    return located_kind(tools, tools.item_parents[located.kind])
 
 
 def writing(located: Located) -> Action:
@@ -551,9 +497,7 @@ async def serialize(
                     if declared[key]["kind"] == "user_reference"
                 },
                 comments_enabled=bool(row.tool.get("comments_enabled", True)),
-                grants=serialize_grants(
-                    SimpleNamespace(grants=grants.get(row.id, [])), context=context
-                ),
+                grants=serialize_grants(grants.get(row.id, []), context=context),
                 tags=tag_summaries(tags.get(row.id, [])),
                 created_by=row.created_by,
                 created_by_kind=row.created_by_kind,
@@ -614,19 +558,35 @@ async def previews(
 # --- writing ------------------------------------------------------------------
 
 
+async def _written(session: AsyncSession, table: sa.Table, statement: Any) -> Any:
+    """Run a write to ``table``. A row its checks refuse is refused as a value
+    of the field the check holds."""
+    try:
+        return await session.exec(statement)
+    except IntegrityError as error:
+        fields = {
+            c.name: c.info[CHECKED_FIELD]
+            for c in table.constraints
+            if CHECKED_FIELD in c.info
+        }
+        field = fields.get(dbapi_constraint(error))
+        if field is None:
+            raise
+        raise _invalid(field) from None
+
+
 async def insert(
-    session: AsyncSession, located: Located, columns: Mapping[str, Any]
+    session: AsyncSession, table: sa.Table, columns: Mapping[str, Any]
 ) -> int:
-    """Add a row of ``located``'s table, and its id. A tool's row is not read
-    back, as a built-in tool's is not: it is shared with nobody until its
-    owner row is written after it."""
-    table = located.table
+    """Add a row to a tool plug-in's ``table``, and its id. A tool's row is
+    not read back, as a built-in tool's is not: it is shared with nobody until
+    its owner row is written after it."""
     new_id = (
         await session.exec(
             select(sa.func.nextval(sa.func.pg_get_serial_sequence(table.name, "id")))
         )
     ).one()
-    await session.exec(sa.insert(table).values(id=new_id, **columns))
+    await _written(session, table, sa.insert(table).values(id=new_id, **columns))
     return int(new_id)
 
 
@@ -638,10 +598,12 @@ async def update(
     if not columns:
         return
     table = located.table
-    result = await session.exec(
+    result = await _written(
+        session,
+        table,
         sa.update(table)
         .where(table.c.id == row_id)
-        .values(**columns, updated_at=sa.func.now())
+        .values(**columns, updated_at=sa.func.now()),
     )
     if result.rowcount != 1:
         raise located.tool.write_required()
@@ -733,16 +695,11 @@ async def step(
         *([] if high is None else [high]),
         sa.literal(NUMBER_LIMIT, NUMBER),
     )
-    try:
-        async with session.begin_nested():
-            await update(session, located, row_id, {key: moved})
-    except IntegrityError:
-        # A check the table declares refuses the new value.
-        raise _invalid(key) from None
+    await update(session, located, row_id, {key: moved})
 
 
 def _action(located: Located, action_id: str) -> Mapping[str, Any]:
-    key = _key(located.kind)
+    key = located.declared["key"]
     for action in located.tool.declaration.get("actions", []):
         if action["id"] == action_id and action["on"] == key:
             return action
@@ -783,7 +740,7 @@ async def run_action(
     under = children(located, tools)
     items: dict[str, list[ToolRow]] = {}
     for child in under:
-        items[_key(child.kind)] = await rows_under(
+        items[child.declared["key"]] = await rows_under(
             session, child, tools, row.id, for_update=True
         )
     change = await action_change(
@@ -793,7 +750,7 @@ async def run_action(
         items={
             key: [document(child, item) for item in items[key]]
             for child in under
-            for key in [_key(child.kind)]
+            for key in [child.declared["key"]]
         },
     )
     if change is None:
@@ -804,7 +761,7 @@ async def run_action(
         own = _changes(change["set"], action_id)
         await require_members(session, context, located, own)
         await write(session, located, row, own, author=author)
-    by_key = {_key(child.kind): child for child in under}
+    by_key = {child.declared["key"]: child for child in under}
     for key, entries in _changes(change.get("items", {}), action_id).items():
         child = by_key.get(key)
         if child is None or not isinstance(entries, list):
@@ -865,37 +822,18 @@ async def text_saved(
         )
 
 
-async def carried(
-    session: AsyncSession,
-    located: Located,
-    tools: ToolSet,
-    source: ToolRow,
-    copy_id: int,
-) -> None:
-    """Copy the items under ``source`` to sit under its copy ``copy_id``, and
-    theirs under theirs: their names, places and declared fields."""
-    for child in children(located, tools):
-        for row in await rows_under(session, child, tools, source.id):
-            made = await insert(
-                session,
-                child,
-                {
-                    cast(str, parent_column(child)): copy_id,
-                    "name": row.name,
-                    **copy_columns(child, row),
-                },
-            )
-            await carried(session, child, tools, row, made)
-
-
-def copy_columns(located: Located, row: ToolRow) -> dict[str, Any]:
-    """What a copy of ``row`` takes from it beside its name and where it sits:
-    its place among its siblings, its declared fields, and a tool's comment
-    switch."""
-    keep = ["position", *declared_fields(located)]
-    if parent_column(located) is None:
-        keep.append("comments_enabled")
-    return {key: row.values[key] for key in keep}
+def placed(
+    located: Located, initiative_id: int | None, parent_id: int | None
+) -> int | None:
+    """Where a request puts a row of ``located``'s table: in an initiative
+    for the tool's row, under the row it names for an item's. None where it
+    names the other, or neither."""
+    own, other = (
+        (initiative_id, parent_id)
+        if parent_column(located) is None
+        else (parent_id, initiative_id)
+    )
+    return own if other is None else None
 
 
 def refuse_placement() -> HTTPException:

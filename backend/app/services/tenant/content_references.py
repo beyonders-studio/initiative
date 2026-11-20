@@ -27,7 +27,7 @@ already reads provenance to decide that, so it is stated once, there.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Sequence
 from typing import Any
 
 import sqlalchemy as sa
@@ -158,9 +158,14 @@ def comment_parent(comment: Comment, tools: ToolSet) -> Endpoint:
     return Endpoint.of(tools, comment.subject_type, comment.subject_id)
 
 
+def texts_body(texts: Iterable[Any]) -> str | None:
+    """A tool plug-in's row's body: its declared text fields, as one text."""
+    return "\n\n".join(text for text in texts if text) or None
+
+
 async def own_body(session: AsyncSession, entity: Endpoint) -> Any:
-    """A thing's stored body, or None if its kind has none. A tool
-    plug-in's row's body is its declared text fields, as one text."""
+    """A thing's stored body, or None if its kind has none (:func:`texts_body`
+    for a tool plug-in's row)."""
     source = BODY_COLUMNS.get(entity.kind)
     if source is None:
         located = locate(await session_tools(session), entity.kind)
@@ -172,7 +177,7 @@ async def own_body(session: AsyncSession, entity: Endpoint) -> Any:
                 sa.select(*texts).where(located.table.c.id == entity.id)  # type: ignore[union-attr]
             )
         ).first()
-        return "\n\n".join(text for text in row or () if text) or None
+        return texts_body(row or ())
     model, column = source
     return (
         await session.exec(

@@ -3534,6 +3534,12 @@ def _check_option_sources(
                     )
 
 
+#: The terms :func:`listing_terms` reads.
+LISTING_TERMS = frozenset(
+    {"help", "default_name", "minimum_age", "availability", "min_plugin_api"}
+)
+
+
 def listing_terms(body: Mapping[str, Any]) -> dict[str, Any]:
     """What every plug-in carries beside what it does, container, declarative
     or tool: its help, its starting name, the ages it is for, which

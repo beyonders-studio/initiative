@@ -47,7 +47,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.tool_set import KEPT_TOOL_SETS, ToolSet
 from app.core.tools import KINDS
-from app.db.initiative_rls import NAMED_PEOPLE, content_kind_tables
+from app.db.initiative_rls import NAMED_PEOPLE
 from app.db.session import routed_tools, session_tools
 from app.models.tenant._mixins import ActorKind
 from app.models.tenant.calendar_event import RSVPStatus
@@ -459,7 +459,7 @@ def naming(tools: ToolSet) -> dict[str, list[tuple[Table, str, str, Tie]]]:
     :data:`NAMED_PEOPLE` rows (an assignee, an attendee) whose foreign key is
     the kind's. From the schema, so a new kind, a tool plug-in's among them,
     is asked the moment its table has either."""
-    kinds = content_kind_tables(tools)
+    kinds = tools.kind_tables
     kind_of = {table: kind for kind, table in kinds.items()}
     tables = tools.tables
     found: dict[str, list[tuple[Table, str, str, Tie]]] = {}

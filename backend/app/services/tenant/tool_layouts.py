@@ -42,6 +42,7 @@ from app.core.tools import (
 )
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.session import require_guild_context, routed_tools
+from app.db.tool_rows import locate
 from app.models.tenant.metadata import MetadataDefinition, MetadataType
 from app.models.tenant.task import TaskType
 from app.models.tenant.tool_layout import ToolLayout
@@ -211,20 +212,14 @@ def drawn(tool: str, tools: ToolSet = BUILTIN_TOOLS) -> Drawn:
     """What ``tool`` draws in a community with ``tools``: an Initiative tool's
     record, or a tool plug-in's table's declaration (its lists, and its rows'
     page by its kind)."""
-    for record in tools.installed:
-        if tool in (record.kind, *(child.value for child in record.children)):
-            block = record.declaration
-            key = tool.partition(".")[0]
-            declared = (
-                block
-                if key == block["key"]
-                else next(item for item in block["items"] if item["key"] == key)
-            )
-            return Drawn(
-                lists=tuple(entry["kind"] for entry in declared["layouts"]["lists"]),
-                details=(tool,),
-                table=table_fields(block, key),
-            )
+    located = locate(tools, tool)
+    if located is not None:
+        declared = located.declared
+        return Drawn(
+            lists=tuple(entry["kind"] for entry in declared["layouts"]["lists"]),
+            details=(tool,),
+            table=table_fields(located.tool.declaration, declared["key"]),
+        )
     return Drawn(
         LIST_LAYOUTS.get(tool, ()),
         DETAIL_LAYOUTS.get(tool, ()),

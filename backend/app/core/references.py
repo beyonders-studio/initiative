@@ -73,28 +73,11 @@ MAX_ENTITY_ID = 2_147_483_647
 _ID_DIGITS = frozenset("0123456789")
 
 
-#: The characters a tool plug-in's kind is written with: its key before the
-#: ``.``, and its plug-in's uid in lower case after it.
-_KEY_START = frozenset("abcdefghijklmnopqrstuvwxyz")
-_KEY_CHARS = _KEY_START | frozenset("0123456789_")
-_UID_CHARS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789")
-
-
-def is_plugin_kind(value: str) -> bool:
-    """Whether ``value`` is written as a tool plug-in's kind: a key, ``.``,
-    and a uid in lower case. Checked one character at a time."""
-    key, dot, uid = value.partition(".")
-    return (
-        bool(dot and key and uid)
-        and key[0] in _KEY_START
-        and _KEY_CHARS.issuperset(key)
-        and _UID_CHARS.issuperset(uid)
-    )
-
-
 def _kind(value: str) -> str | None:
     """The kind a reference names, or None if nothing could be called that: a
     built-in kind as its member, or a tool plug-in's as it is written."""
+    from app.db.plugin_tools import is_plugin_kind
+
     try:
         return SearchEntityType(value)
     except ValueError:

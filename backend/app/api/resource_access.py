@@ -16,7 +16,7 @@ collection), its own rule.
 # annotations re-evaluate it where cfg is out of scope → FastAPI drops the path
 # param and 422s.
 
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Annotated, Any
 
@@ -234,15 +234,17 @@ async def prepare_create(
     return initiative
 
 
-def duplicate_sharing(source: Any, *, initiative_id: int) -> list[ResourceGrantSchema]:
-    """Who a duplicate of ``source`` is shared with: the same people and roles
-    as ``source`` while it stays in the same initiative, where they exist, and
-    the create default when it goes to another. ``source.grants`` is loaded."""
-    if initiative_id != source.initiative_id:
+def duplicate_sharing(
+    grants: Iterable[Any], *, beside: bool
+) -> list[ResourceGrantSchema]:
+    """Who a duplicate of a row shared as ``grants`` say is shared with: the
+    same people and roles while it stays ``beside`` it, in its initiative,
+    where they exist, and the create default when it goes to another."""
+    if not beside:
         return initiative_readable()
     return [
         ResourceGrantSchema.model_validate(grant)
-        for grant in source.grants
+        for grant in grants
         if grant.level != ResourceAccessLevel.owner and grant.plugin_install_id is None
     ]
 

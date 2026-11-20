@@ -25,7 +25,7 @@ bookmarks, recents. Those would extend the schema under a future
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -33,11 +33,12 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.relationships import RelationshipType, node_id
+from app.core.relationships import RelationshipType, node_of
 from app.core.search import SearchEntityType
 from app.core.tools import Tool
 from app.core.user_display import display_name, handle_of
 from app.core.version import get_version
+from app.db.session import routed_tools
 from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.comment import Comment, in_thread, said_on
 from app.models.tenant.metadata import MetadataDefinition, MetadataType
@@ -104,7 +105,9 @@ async def build_project_export(
 
     task_ids = [task.id for task in project_tasks if task.id is not None]
     comments_by_task = await _load_comments(session, task_ids)
-    links_by_task = await _load_links(session, task_ids)
+    links_by_task = await load_links(
+        session, SearchEntityType.task, task_ids, targets=_LINKABLE_TARGETS
+    )
     # Everybody a description or a comment mentions, read once for the whole
     # project rather than once per body.
     mention_handles = await load_mention_handles(
@@ -429,12 +432,18 @@ async def _load_comments(
     return by_task
 
 
-async def _load_links(
-    session: AsyncSession, task_ids: list[int]
+async def load_links(
+    session: AsyncSession,
+    kind: str,
+    ids: Sequence[int],
+    *,
+    targets: Collection[str] | None = None,
 ) -> dict[int, list[EnvelopeLink]]:
-    """The edges these tasks assert, from the task's side.
+    """The edges these rows of ``kind`` assert, from their side, in the order
+    they were made: those whose far end is one of ``targets`` where it is
+    given.
 
-    Only edges *stored* with one of these tasks as the source are read, so an
+    Only edges *stored* with one of these rows as the source are read, so an
     edge is written once rather than from both ends — a symmetric one is
     stored in node order, and the importer re-orders it on the way back in.
 
@@ -443,31 +452,31 @@ async def _load_links(
     once everything has been applied, or outside it entirely, which is
     counted. Both are ordinary, and neither is knowable from here.
     """
-    if not task_ids:
+    if not ids:
         return {}
-    source_nodes = [node_id(SearchEntityType.task, task_id) for task_id in task_ids]
-    rows = (
-        await session.exec(
-            select(EntityRelationship).where(
-                EntityRelationship.source_node.in_(source_nodes),
-                EntityRelationship.relationship_type.in_(
-                    [t.value for t in EXPORTED_LINK_TYPES]
-                ),
-                EntityRelationship.removed_at.is_(None),
-            )
+    code = routed_tools(session).endpoint_codes[kind]
+    rows = await session.exec(
+        select(EntityRelationship)
+        .where(
+            EntityRelationship.source_node.in_([node_of(code, i) for i in ids]),
+            EntityRelationship.relationship_type.in_(
+                [t.value for t in EXPORTED_LINK_TYPES]
+            ),
+            EntityRelationship.removed_at.is_(None),
         )
-    ).all()
-    by_task: dict[int, list[EnvelopeLink]] = {}
+        .order_by(EntityRelationship.id)
+    )
+    by_row: dict[int, list[EnvelopeLink]] = {}
     for row in rows:
-        if row.target_type not in _LINKABLE_TARGETS:
+        if targets is not None and row.target_type not in targets:
             continue
-        by_task.setdefault(row.source_id, []).append(
+        by_row.setdefault(row.source_id, []).append(
             EnvelopeLink(
                 type=RelationshipType(row.relationship_type),
                 target_external_ref=_entity_ref(row.target_type, row.target_id),
             )
         )
-    return by_task
+    return by_row
 
 
 async def _portable_carry(

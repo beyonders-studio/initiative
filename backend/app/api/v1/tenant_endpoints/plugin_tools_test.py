@@ -225,6 +225,55 @@ async def test_rows_are_made_changed_listed_copied_and_acted_on(
     assert (beside["name"], beside["parent_id"]) == ("HP (Copy)", group["id"])
 
 
+async def test_a_copy_keeps_its_tags_and_links_as_a_built_in_tools_does(
+    client, session, acting_user
+):
+    """A copy of a tool's row, and of an item, carries their tags and links,
+    and so does each item copied under the row's copy."""
+    a, _member = await _counters(client, session, acting_user)
+    tag = await create_tag(session, a.guild, name="Boss")
+
+    async def call(method: str, path: str, body: Any = None, **params: Any) -> Any:
+        response = await client.request(
+            method, a.g(path), headers=a.headers, json=body, params=params
+        )
+        assert response.status_code in (200, 201), (path, response.text)
+        return response.json()
+
+    def made(kind: str, place: dict[str, int], name: str) -> Any:
+        body = {**place, "name": name, "tag_ids": [tag.id]}
+        return call("POST", f"/plugin-tools/{kind}/", body)
+
+    group = await made(GROUP, {"initiative_id": a.initiative.id}, "Party")
+    other = await made(GROUP, {"initiative_id": a.initiative.id}, "Other")
+    counter = await made(COUNTER, {"parent_id": group["id"]}, "HP")
+    for kind, row in ((GROUP, group), (COUNTER, counter)):
+        await call(
+            "POST",
+            "/relationships/",
+            {
+                "source": {"type": kind, "id": row["id"]},
+                "relationship_type": "related_to",
+                "target": {"type": GROUP, "id": other["id"]},
+            },
+        )
+
+    copy = await call("POST", f"/plugin-tools/{GROUP}/{group['id']}/duplicate")
+    (copied,) = (await call("GET", f"/plugin-tools/{COUNTER}/", parent_id=copy["id"]))[
+        "items"
+    ]
+    beside = await call("POST", f"/plugin-tools/{COUNTER}/{counter['id']}/duplicate")
+    for kind, row in ((GROUP, copy), (COUNTER, copied), (COUNTER, beside)):
+        read = await call("GET", f"/plugin-tools/{kind}/{row['id']}")
+        assert [each["id"] for each in read["tags"]] == [tag.id], (kind, read)
+        links = await call(
+            "GET", "/relationships/", entity=f"{kind}:{row['id']}", other_type=GROUP
+        )
+        assert [(e["other"]["type"], e["other"]["id"]) for e in links] == [
+            (GROUP, other["id"])
+        ], (kind, links)
+
+
 async def test_rows_are_tagged_and_trashed_as_a_built_in_tools_are(
     client, session, acting_user
 ):

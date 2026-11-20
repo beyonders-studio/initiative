@@ -78,7 +78,7 @@ class DashboardAdapter(ToolExportAdapter):
         rows = list(
             await session.exec(
                 select(Dashboard.id, Dashboard.listing_uid)
-                .where(*self.in_initiative(initiative_id))
+                .where(*self.in_initiative(self.record(session), initiative_id))
                 .order_by(Dashboard.id.asc())
             )
         )

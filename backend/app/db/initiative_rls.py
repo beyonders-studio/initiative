@@ -894,7 +894,7 @@ def entity_tables(tools: ToolSet) -> dict[str, str]:
     for kind, table in (
         *((k.value, e.table) for k, e in ENDPOINT_KINDS.items()),
         *((t.value, t.table) for t in ReactionTarget),
-        *content_kind_tables(tools).items(),
+        *tools.kind_tables.items(),
         *((p.kind, p.table) for p in comment_parents(tools).values()),
     ):
         if tables.setdefault(kind, table) != table:
@@ -1066,8 +1066,7 @@ def render_content_item_fn(tools: ToolSet) -> str:
     lateral call is planned as the join it stands for, and it reads no table.
     """
     kinds = ", ".join(
-        f"('{table}', '{kind}')"
-        for kind, table in sorted(content_kind_tables(tools).items())
+        f"('{table}', '{kind}')" for kind, table in sorted(tools.kind_tables.items())
     )
     return f"""
 CREATE OR REPLACE FUNCTION {CONTENT_ITEM_FN}(p_type text, p_id integer, p_parents jsonb)
@@ -1400,18 +1399,8 @@ def relationships_path(tools: ToolSet) -> InitiativePath:
     return InitiativePath(predicate=build, initiative_expr=locate)
 
 
-def content_kind_tables(tools: ToolSet) -> dict[str, str]:
-    """Every tool and everything inside one, keyed by its wire name, with the
-    table its ids point at: what the tables that name a piece of content by
-    ``(entity_type, entity_id)``, recent views and engagement levels, take."""
-    return {
-        **{tool.kind: tool.table.name for tool in tools},
-        **{kind.value: kind.table for kind in tools.child_kinds},
-    }
-
-
-#: :func:`content_kind_tables` of the built-in tools.
-CONTENT_KIND_TABLES: dict[str, str] = content_kind_tables(BUILTIN_TOOLS)
+#: ``ToolSet.kind_tables`` of the built-in tools.
+CONTENT_KIND_TABLES: dict[str, str] = BUILTIN_TOOLS.kind_tables
 
 
 def webhook_subscription_path() -> InitiativePath:
@@ -1775,7 +1764,7 @@ def content_kind_path(tools: ToolSet) -> InitiativePath:
             f"WHEN '{etype}' THEN "
             f"(SELECT {initiative_of(tbl, 're', paths=_paths(tools))} FROM {tbl} re"
             f" WHERE re.id = {r}.entity_id)"
-            for etype, tbl in content_kind_tables(tools).items()
+            for etype, tbl in tools.kind_tables.items()
         )
         return f"(CASE {r}.entity_type {arms} END)"
 
@@ -2278,7 +2267,7 @@ def layouts_report_on_their_target(tools: ToolSet) -> ReportsAs:
     it is for a shared tool or a tool plug-in's own rows; a tool plug-in's
     item's, of the row its items sit under. Whoever shows the set re-reads
     it."""
-    kinds = content_kind_tables(tools)
+    kinds = tools.kind_tables
     tables = {
         **LAYOUT_INSTANCE_TABLES,
         **{item: kinds[parent] for item, parent in tools.item_parents.items()},

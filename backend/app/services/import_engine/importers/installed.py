@@ -78,7 +78,7 @@ class InstalledToolImporter(NamesPeopleInPassing):
         where its kind keeps its rows."""
         yield located, row
         for child in rows.children(located, self.tools):
-            for item in row.items.get(child.kind.partition(".")[0], []):
+            for item in row.items.get(child.declared["key"], []):
                 yield from self._walk(child, item)
 
     def _rows(self, validated: BaseModel) -> Iterator[tuple[Located, Any]]:
@@ -173,15 +173,15 @@ class InstalledToolImporter(NamesPeopleInPassing):
             try:
                 await rows.require_members(session, guild_context, located, values)
                 columns = rows.column_values(located, values, current=None)
+                if row.position is not None:
+                    columns["position"] = Decimal(str(row.position))
+                row_id = await rows.insert(
+                    session, located.table, {**columns, **placed, "name": name}
+                )
             except CodedError as exc:
                 raise ImportEngineError(
                     ImportEngineMessages.IMPORT_INVALID_ENVELOPE
                 ) from exc
-            if row.position is not None:
-                columns["position"] = Decimal(str(row.position))
-            row_id = await rows.insert(
-                session, located, {**columns, **placed, "name": name}
-            )
             own = {"id": row_id, "initiative_id": target_initiative.id}
             if context is not None and any(
                 has_source_references(values.get(column.name))
@@ -197,7 +197,7 @@ class InstalledToolImporter(NamesPeopleInPassing):
                     importer=importer,
                 )
             written = ToolRow(located.table, own, tool=tool or own)
-            noun = located.kind.partition(".")[0]
+            noun = located.declared["key"]
             made[noun] = made.get(noun, 0) + 1
             await tags.attach(
                 written, row.tags, spec=tag_links(self.tools)[located.kind]
@@ -215,7 +215,7 @@ class InstalledToolImporter(NamesPeopleInPassing):
                         row.external_ref, link.type, link.target_external_ref
                     )
             for child in rows.children(located, self.tools):
-                key = child.kind.partition(".")[0]
+                key = child.declared["key"]
                 for item in row.items.get(key, []):
                     await write(
                         child,

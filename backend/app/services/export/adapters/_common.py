@@ -8,7 +8,9 @@ date. ``ToolExportAdapter`` holds that shape, derives the registry key and
 the envelope suffix from the tool's own ``Tool`` value, the way
 ``tool_envelope_type`` already does, and writes every tool's envelope the same
 way (``export.envelope``) — so a per-tool module states only which rows it
-loads and the formats of its own.
+loads and the formats of its own. It reads the tool as the community has it
+(its ``ToolRecord``), so a tool plug-in's source (``adapters.installed``) is
+built on it too.
 """
 
 from __future__ import annotations
@@ -23,13 +25,13 @@ from sqlalchemy import ColumnElement
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.messages import ExportMessages, InitiativeMessages
+from app.core.messages import ExportMessages, InitiativeMessages, KindMessages
 from app.core.relationships import Related
-from app.core.tools import Tool, tool_envelope_type, tool_export_source
+from app.core.tool_set import ToolRecord
+from app.core.tools import Tool, kind_refusal, tool_envelope_type, tool_export_source
 from app.core.user_input_validators import resolve_zone
 from app.db import session as db_session
 from app.models.platform.user import User
-from app.models.tenant._mixins import tool_models
 from app.models.tenant.file import File, FileVersion
 from app.models.tenant.project import Project
 from app.models.tenant.task import Task
@@ -39,8 +41,8 @@ from app.services.export.engine import ExportError
 from app.services.export.filters import narrow, parse_filters
 from app.services.export.i18n import et, export_locale
 from app.services.permissions import (
-    DAC_RESOURCES,
     EXPORT_ACCESS,
+    DacResource,
     require_export_access,
 )
 from app.services.platform.csv_export import safe_filename_component
@@ -193,7 +195,7 @@ async def get_for_export(
     session: AsyncSession,
     user: User,
     guild_id: int,
-    tool: Tool,
+    tool: Tool | ToolRecord,
     entity_id: int,
     load: Callable[[AsyncSession, int], Awaitable[Any]],
     /,
@@ -214,12 +216,12 @@ async def get_for_export(
             user.id,
             guild_id,
         )
-    if row.initiative is not None and not await tool_on_in(
-        session, row.initiative, tool
-    ):
+    # A tool plug-in's row is loaded on its tool's switch.
+    initiative = getattr(row, "initiative", None)
+    if initiative is not None and not await tool_on_in(session, initiative, tool):
         raise tool.disabled()
     require_export_access(
-        DAC_RESOURCES[tool],
+        DacResource(tool),
         row,
         context=db_session.guild_context(session),
         access=access,
@@ -284,7 +286,8 @@ class ToolExportAdapter:
     """The per-tool export source: a selection of entities, each rendered as
     one item.
 
-    A subclass names its ``Tool`` and fills in the tool-shaped hooks —
+    A subclass names its ``Tool`` (or, for a tool plug-in's, its ``kind``)
+    and fills in the tool-shaped hooks —
     :meth:`get_row` (how one row loads, when not the tool's registered
     loader), :meth:`in_initiative` (which of them one initiative's export
     holds, when not every row the initiative has), :meth:`rows` (how many
@@ -296,6 +299,8 @@ class ToolExportAdapter:
     """
 
     tool: Tool
+    #: Its kind, as the community's tools name it (``ToolSet.by_kind``).
+    kind: str
     source: str
     # Required by the SourceAdapter protocol; a json envelope renders no
     # template. A tool with report formats names its own.
@@ -316,9 +321,21 @@ class ToolExportAdapter:
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
-        cls.source = tool_export_source(cls.tool)
-        if (formats := cls.tool.spec.export_formats) is not None:
+        tool = cls.__dict__.get("tool")
+        if tool is None:
+            return
+        cls.kind = tool.value
+        cls.source = tool_export_source(tool)
+        if (formats := tool.spec.export_formats) is not None:
             cls.formats = formats
+
+    def record(self, session: AsyncSession) -> ToolRecord:
+        """The tool, as the community ``session`` is routed into has it: not
+        found where it has none of this kind."""
+        found = db_session.routed_tools(session).by_kind.get(self.kind)
+        if found is None:
+            raise kind_refusal(self.kind, KindMessages.NOT_FOUND, 404)
+        return found
 
     # -- what a tool states --------------------------------------------------
 
@@ -336,7 +353,13 @@ class ToolExportAdapter:
         session (:func:`get_for_export`). A tool whose export carries more
         than the row extends this."""
         return await get_for_export(
-            session, user, guild_id, self.tool, entity_id, self.get_row, access=access
+            session,
+            user,
+            guild_id,
+            self.record(session),
+            entity_id,
+            self.get_row,
+            access=access,
         )
 
     async def get_row(self, session: AsyncSession, entity_id: int, /) -> Any:
@@ -347,14 +370,17 @@ class ToolExportAdapter:
         config = RESOURCE_ACCESS[self.tool]
         return await (config.hydrated_loader or config.loader)(session, entity_id)
 
-    def in_initiative(self, initiative_id: int, /) -> list[ColumnElement[bool]]:
-        """The WHERE legs naming this tool's rows that an initiative or
-        community export of one initiative may include: that initiative's,
-        where it has the tool switched on."""
-        model = tool_models()[self.tool.plural]
+    def in_initiative(
+        self, record: ToolRecord, initiative_id: int, /
+    ) -> list[ColumnElement[bool]]:
+        """The WHERE legs naming the live rows of ``record``'s table that an
+        initiative or community export of one initiative may include: that
+        initiative's, where it has the tool switched on."""
+        table = record.table
         return [
-            model.initiative_id == initiative_id,
-            initiative_switch_clause(self.tool, model),
+            table.c.initiative_id == initiative_id,
+            table.c.deleted_at.is_(None),
+            initiative_switch_clause(record, table.c),
         ]
 
     async def initiative_ids(
@@ -362,12 +388,12 @@ class ToolExportAdapter:
     ) -> list[int]:
         """The ids of this tool's entities in one initiative that an initiative
         or community export may include, in id order."""
-        model = tool_models()[self.tool.plural]
+        record = self.record(session)
         return list(
             await session.exec(
-                select(model.id)
-                .where(*self.in_initiative(initiative_id))
-                .order_by(model.id.asc())
+                select(record.table.c.id)
+                .where(*self.in_initiative(record, initiative_id))
+                .order_by(record.table.c.id.asc())
             )
         )
 
@@ -455,11 +481,9 @@ class ToolExportAdapter:
 
     def selection(self, params: dict) -> list[int]:
         """The ids this request selected, read from the tool's own selector
-        keys (``{tool}_ids``, or the single ``{tool}_id``)."""
+        keys (``{kind}_ids``, or the single ``{kind}_id``)."""
         return selection_ids(
-            params,
-            single_key=f"{self.tool.value}_id",
-            multi_key=f"{self.tool.value}_ids",
+            params, single_key=f"{self.kind}_id", multi_key=f"{self.kind}_ids"
         )
 
     async def load(
@@ -472,7 +496,10 @@ class ToolExportAdapter:
     ) -> list[Any]:
         """Every selected entity, fetched and authorized one by one, then
         narrowed to those the tool's filters leave. A selection is refused
-        whole if any of it is, filtered out or not."""
+        whole if any of it is, filtered out or not, and in a format the tool
+        does not export in."""
+        if format not in (self.record(session).spec.export_formats or self.formats):
+            raise ExportError(ExportMessages.EXPORT_INVALID_FORMAT)
         ids = self.selection(params)
         entities = [
             await self.fetch(session, user, guild_id, entity_id) for entity_id in ids

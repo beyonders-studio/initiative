@@ -1596,7 +1596,7 @@ class BackupSection:
         from app.services.export.adapters import ADAPTERS
 
         if isinstance(self.tool, ToolRecord):
-            return cast(ToolExportAdapter, InstalledToolAdapter(self.tool.kind))
+            return InstalledToolAdapter(self.tool.kind)
         return cast(ToolExportAdapter, ADAPTERS[tool_export_source(self.tool)])
 
     @property
