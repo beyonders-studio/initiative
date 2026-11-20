@@ -238,6 +238,49 @@ def _add_kind_code_arms(arms: Mapping[str, int]) -> None:
     )
 
 
+#: The views that read one of ``:tables``, and the views reading those, in
+#: the order they can be dropped.
+_DEPENDENT_VIEWS = """
+    WITH RECURSIVE reads(oid, depth) AS (
+        SELECT DISTINCT r.ev_class, 1
+        FROM pg_depend d JOIN pg_rewrite r ON r.oid = d.objid
+        WHERE d.classid = 'pg_rewrite'::regclass
+          AND d.refobjid = ANY (CAST(:tables AS regclass[]))
+          AND r.ev_class <> d.refobjid
+        UNION
+        SELECT r.ev_class, reads.depth + 1
+        FROM reads JOIN pg_depend d ON d.refobjid = reads.oid
+        JOIN pg_rewrite r ON r.oid = d.objid
+        WHERE d.classid = 'pg_rewrite'::regclass AND r.ev_class <> reads.oid
+    )
+    SELECT oid::regclass::text FROM reads GROUP BY oid ORDER BY max(depth) DESC
+"""
+
+#: The policies that read one of ``:relations``.
+_DEPENDENT_POLICIES = """
+    SELECT DISTINCT p.polname, p.polrelid::regclass::text
+    FROM pg_depend d JOIN pg_policy p ON p.oid = d.objid
+    WHERE d.classid = 'pg_policy'::regclass
+      AND d.refobjid = ANY (CAST(:relations AS regclass[]))
+"""
+
+
+def _drop_dependents(tables: list[str]) -> None:
+    """Drop what a start rendered that reads ``tables``: the views over them
+    and the policies on other tables reading those, so the tables can be
+    renamed, retyped and dropped. The schema's stamp is cleared, so the next
+    start renders all of it again from the registry."""
+    views = [view for (view,) in _rows(_DEPENDENT_VIEWS, tables=tables)]
+    relations = [*tables, *views]
+    for name, table in _rows(_DEPENDENT_POLICIES, relations=relations):
+        _run(f"DROP POLICY {_q(name)} ON {table}")
+    for view in views:
+        _run(f"DROP VIEW {view}")
+    schema = _scalar("SELECT current_schema()")
+    if schema != "guild_template":
+        _run(f"COMMENT ON SCHEMA {_q(schema)} IS NULL")
+
+
 # --- upgrade -----------------------------------------------------------------
 
 
@@ -281,6 +324,7 @@ def _upgrade_schema(converted: list[int]) -> None:
     )
     if not _exists("counter_groups"):
         return
+    _drop_dependents(list(TABLES))
     with _held("counter_groups", "initiatives", "initiative_rules", "guild_plugins"):
         on_in = [
             row[0]
@@ -714,6 +758,7 @@ def _downgrade_schema(converted: list[int]) -> None:
         if install_id is None:
             return
     else:
+        _drop_dependents(list(TABLES.values()))
         for new in TABLES.values():
             _strip(new)
         for old, new in TABLES.items():

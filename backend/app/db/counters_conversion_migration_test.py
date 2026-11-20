@@ -116,6 +116,41 @@ async def _community(
     return admin, seat
 
 
+async def _as_released(session: AsyncSession, schema: str) -> None:
+    """What a release's start rendered over the built-in tables: a view that
+    reads them, and policies on other tables reading the view or the tables,
+    which the revision drops so the tables can go and a start renders anew."""
+    s = f'"{schema}"'
+    for statement in (
+        (
+            f"CREATE VIEW {s}.counted AS SELECT c.id, g.initiative_id"
+            f" FROM {s}.counters c JOIN {s}.counter_groups g ON g.id = c.counter_group_id"
+        ),
+        (
+            f"CREATE POLICY counted_read ON {s}.metadata_values AS RESTRICTIVE FOR SELECT"
+            f" USING (entity_type <> 'counter' OR EXISTS"
+            f" (SELECT 1 FROM {s}.counted WHERE counted.id = entity_id))"
+        ),
+        (
+            f"CREATE POLICY counted_group ON {s}.comments AS RESTRICTIVE FOR SELECT"
+            f" USING (subject_type <> 'counter_group' OR EXISTS"
+            f" (SELECT 1 FROM {s}.counter_groups WHERE counter_groups.id = subject_id))"
+        ),
+    ):
+        await (await session.connection()).execute(sa.text(statement))
+
+
+async def _rendered_again(session: AsyncSession, schema: str) -> None:
+    """Nothing the revision dropped is left behind, and the schema's stamp
+    asks a start to render everything."""
+    assert await _rows(
+        session,
+        "SELECT to_regclass(:v), (SELECT count(*) FROM pg_policy"
+        " WHERE polname IN ('counted_read', 'counted_group'))",
+        v=f'"{schema}".counted',
+    ) == [(None, 0)]
+
+
 async def test_a_community_using_counters_keeps_them_as_the_plug_in(
     session: AsyncSession, acting_user: Callable[..., Any], client: AsyncClient
 ) -> None:
@@ -210,6 +245,7 @@ async def test_a_community_using_counters_keeps_them_as_the_plug_in(
     assert before["edges"] and before["comments"] and before["grants"]
 
     async def as_the_builtin_tool(session: AsyncSession) -> None:
+        await _as_released(session, guild_schema_name(guild.id))
         # Back to the built-in tool: its tables, kinds and keys.
         assert await _rows(
             session,
@@ -237,6 +273,7 @@ async def test_a_community_using_counters_keeps_them_as_the_plug_in(
 
     install_id = await convert_counters(session, guild.id, between=as_the_builtin_tool)
     assert install_id is not None
+    await _rendered_again(session, guild_schema_name(guild.id))
 
     after = {
         name: sorted(await _rows(session, sql), key=repr)
@@ -280,6 +317,7 @@ async def test_a_community_without_counters_loses_the_tables(
     schema = guild_schema_name(guild_id)
 
     async def as_the_builtin_tool(session: AsyncSession) -> None:
+        await _as_released(session, schema)
         # The built-in tool's empty tables, switched off.
         assert await _rows(
             session,
