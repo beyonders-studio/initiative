@@ -133,6 +133,24 @@ class ToolSet:
         return tuple(record for record in self.records if record.installed)
 
     @cached_property
+    def item_parents(self) -> dict[str, str]:
+        """Each installed tool's item kind, and the kind of the table its rows
+        sit under: the tool's own, or another item's."""
+        parents: dict[str, str] = {}
+        for record in self.installed:
+            kinds = {record.table.name: record.kind} | {
+                child.table: child.value for child in record.children
+            }
+            for item in record.items:
+                (parent,) = (
+                    kinds[fk.column.table.name]
+                    for fk in item.foreign_keys
+                    if fk.column.table.name in kinds
+                )
+                parents[kinds[item.name]] = parent
+        return parents
+
+    @cached_property
     def child_kinds(self) -> tuple[Kind, ...]:
         """Every kind inside a tool: the built-in ones in the order
         :data:`~app.core.tools.KINDS` declares them, then the rest."""

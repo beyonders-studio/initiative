@@ -8,9 +8,10 @@ them, its source the tool's kind, in the formats its record offers
 (``ToolSpec.export_formats``):
 
 * ``json`` is the row as its envelope: its name, place and declared
-  ``fields``, the tags, property values and links it carries, and under
+  ``fields``, the tags, property values and links it carries, under
   ``items``, by each item table's key, the items in it, each written the same
-  way. A person is named by handle and anything else by its ref
+  way, and under ``layouts``, by the same key, the layouts each item table
+  keeps under it where they were changed. A person is named by handle and anything else by its ref
   (``<kind>:<id>``), never by id, so ``importers/installed.py`` restores it
   in any initiative.
 * ``csv`` and ``xlsx``, for a tool with one item table, are a table of one
@@ -33,7 +34,7 @@ from typing import Any
 import sqlalchemy as sa
 from pydantic import BaseModel, ConfigDict, ValidationError, create_model
 from sqlalchemy import Table
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import ExportMessages, KindMessages
@@ -49,6 +50,7 @@ from app.models.platform.user import User
 from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.relationship import EntityRelationship
+from app.models.tenant.tool_layout import ToolLayout
 from app.schemas.tenant.import_envelopes import CURRENT_SCHEMA_VERSION
 from app.services.export import values
 from app.services.export.adapters._common import (
@@ -104,6 +106,9 @@ class Prepared:
     people: Mapping[int, Any]
     handles: Mapping[int, str]
     carried: Mapping[tuple[str, int], Mapping[str, Any]]
+    #: The layouts each item table keeps under a row, by the table's kind
+    #: and the row's id.
+    layouts: Mapping[tuple[str, int], list[dict[str, Any]]]
 
 
 def envelope_type(tool: ToolRecord) -> str:
@@ -374,12 +379,27 @@ class InstalledToolAdapter:
         ids: dict[str, list[int]] = {}
         for table, row in cells:
             ids.setdefault(kinds[table.name], []).append(row["id"])
+        layouts: dict[tuple[str, int], list[dict[str, Any]]] = {}
+        if tool.children:
+            for layout in await session.exec(
+                select(ToolLayout)
+                .where(
+                    col(ToolLayout.tool).in_([child.value for child in tool.children]),
+                    col(ToolLayout.tool_id).in_([row["id"] for _, row in cells]),
+                )
+                .order_by(col(ToolLayout.id))
+            ):
+                assert layout.tool_id is not None
+                layouts.setdefault((layout.tool, layout.tool_id), []).append(
+                    {"kind": layout.kind, "definition": layout.definition}
+                )
         return Prepared(
             tool,
             items,
             {profile.id: profile for profile in profiles},
             await load_mention_handles(session, mentioned),
             await _carried(session, ids),
+            layouts,
         )
 
     async def prepared_reach(
@@ -398,7 +418,14 @@ class InstalledToolAdapter:
     ) -> dict[str, Any]:
         """A row, or an item, and the items under it, as the envelope holds
         them."""
-        kind = table_kinds(prepared.tool)[table.name]
+        kinds = table_kinds(prepared.tool)
+        kind = kinds[table.name]
+        under = _under(prepared.tool, table)
+        laid = {
+            item.info[DECLARED]["key"]: found
+            for item, _column in under
+            if (found := prepared.layouts.get((kinds[item.name], row["id"])))
+        }
         fields: dict[str, Any] = {}
         mentioned: list[str] = []
         for column in _fields(table):
@@ -433,8 +460,9 @@ class InstalledToolAdapter:
                     for child in items.get(item.name, [])
                     if child[column] == row["id"]
                 ]
-                for item, column in _under(prepared.tool, table)
+                for item, column in under
             },
+            **({"layouts": laid} if laid else {}),
         }
 
     def _cell(

@@ -100,6 +100,18 @@ class EnvelopeLink(SanitizedBaseModel):
     target_external_ref: str
 
 
+class InstalledToolLayout(SanitizedBaseModel):
+    """One of the layouts an item table keeps under a row, as it was changed
+    from the one its plug-in ships: a list by its kind, the item's page by
+    the item's, or the list it opens on (``default``). Held to the
+    declaration where it is restored, and drawn as shipped where it is not."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    kind: str
+    definition: dict[str, Any] = {}
+
+
 class InstalledToolRow(SanitizedBaseModel):
     """A tool plug-in's row, or an item, as ``export/adapters/installed.py``
     writes it: its declared fields by key under ``fields``, a person by
@@ -120,6 +132,8 @@ class InstalledToolRow(SanitizedBaseModel):
     properties: list[EnvelopePropertyValue] = []
     links: list[EnvelopeLink] = []
     items: dict[str, list[InstalledToolRow]] = {}
+    #: The layouts each item table under it keeps there, by the table's key.
+    layouts: dict[str, list[InstalledToolLayout]] = {}
 
 
 class InstalledToolEnvelope(_EnvelopeBase, InstalledToolRow):

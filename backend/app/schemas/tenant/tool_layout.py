@@ -39,7 +39,9 @@ from typing import Annotated, Any, Literal, get_args
 from pydantic import (
     AfterValidator,
     ConfigDict,
+    Discriminator,
     Field,
+    Tag,
     ValidationInfo,
     ValidatorFunctionWrapHandler,
     WrapValidator,
@@ -48,7 +50,7 @@ from pydantic import (
 )
 
 from app.core.collection_shapes import FieldDisplay
-from app.core.tools import LAYOUT_KIND_TARGETS, Tool
+from app.core.tools import Tool
 from app.models.tenant.task import TaskPriority, TaskStatusCategory
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.query import DateBucket, FilterOp, SortDir
@@ -790,6 +792,33 @@ ToolLayoutWrite = Annotated[
 ]
 
 
+def _plugin_kind(value: str) -> str:
+    """A tool plug-in's kind: its key, ``.`` and its uid in lower case."""
+    from app.db.plugin_tools import is_plugin_kind
+
+    if not is_plugin_kind(value):
+        raise ValueError("not a tool plug-in's kind")
+    return value
+
+
+#: The kind of a tool plug-in's table: what its rows' page is laid out as.
+ToolPluginKind = Annotated[str, AfterValidator(_plugin_kind)]
+
+
+class ToolPluginLayoutWrite(_Strict):
+    """One of a tool plug-in's table's layouts as it is changed: a list by its
+    kind, or its rows' page by the table's. It names the table's own fields,
+    so the table's declaration checks it, where the target is known."""
+
+    kind: ListLayoutKind | ToolPluginKind
+    definition: dict[str, Any]
+
+
+#: A layout as a request changes it: an Initiative tool's, or a tool
+#: plug-in's.
+LayoutWrite = ToolLayoutWrite | ToolPluginLayoutWrite
+
+
 class ToolLayoutDefaultWrite(_Strict):
     """The list a target opens on."""
 
@@ -829,21 +858,34 @@ class DetailLayoutRead(SanitizedBaseModel):
     updated_at: datetime | None = None
 
 
+class ToolPluginDetailLayoutRead(DetailLayoutRead):
+    """How a tool plug-in's table shows one of its rows, named by the table's
+    kind: as its plug-in ships it until it is changed."""
+
+    kind: ToolPluginKind  # type: ignore[assignment]
+
+
+_LIST_KINDS = frozenset(get_args(ListLayoutKind))
+
+
+def _layout_shape(value: Any) -> str:
+    """Which of a target's layouts ``value`` is: a list, an Initiative
+    tool's item's page, or a tool plug-in's table's rows' page."""
+    kind = (
+        value.get("kind") if isinstance(value, dict) else getattr(value, "kind", None)
+    )
+    if kind in _LIST_KINDS:
+        return "list"
+    return "plugin" if isinstance(kind, str) and "." in kind else "detail"
+
+
 #: One of a target's layouts.
 ToolLayoutRead = Annotated[
-    ListLayoutRead | DetailLayoutRead, Field(discriminator="kind")
+    Annotated[ListLayoutRead, Tag("list")]
+    | Annotated[DetailLayoutRead, Tag("detail")]
+    | Annotated[ToolPluginDetailLayoutRead, Tag("plugin")],
+    Discriminator(_layout_shape),
 ]
-
-
-#: What a request names a set of layouts by: any tool, or a kind inside one
-#: that lays out what it holds. Which of them have layouts is
-#: ``app.core.tools.LAYOUT_TARGETS``; the others are refused by name.
-LayoutTarget = Enum(
-    "LayoutTarget",
-    {value: value for value in (*(t.value for t in Tool), *LAYOUT_KIND_TARGETS)},
-    type=str,
-)
-LayoutTarget.__doc__ = "What a set of layouts is for."
 
 
 class ToolLayoutSetRead(SanitizedBaseModel):

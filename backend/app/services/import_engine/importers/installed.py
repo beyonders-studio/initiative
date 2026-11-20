@@ -12,7 +12,9 @@ envelope.
 What crosses as a name is placed as the built-in importers place it: a person
 in a person field, a mention and a property value by the people step's answer
 or an initiative member's handle, tags by name, properties by name and type,
-links and references by the ref each row had where it was exported.
+links and references by the ref each row had where it was exported. The
+layouts an item table keeps under a row are restored under the new row, each
+held to the declaration here.
 """
 
 from __future__ import annotations
@@ -56,6 +58,7 @@ from app.services.import_engine.references import (
     place_markdown_references,
 )
 from app.services.tenant import plugin_tool_rows as rows
+from app.services.tenant import tool_layouts
 from app.services.tenant.tags import tag_links
 
 
@@ -212,7 +215,8 @@ class InstalledToolImporter(NamesPeopleInPassing):
                         row.external_ref, link.type, link.target_external_ref
                     )
             for child in rows.children(located, self.tools):
-                for item in row.items.get(child.kind.partition(".")[0], []):
+                key = child.kind.partition(".")[0]
+                for item in row.items.get(key, []):
                     await write(
                         child,
                         item,
@@ -220,6 +224,16 @@ class InstalledToolImporter(NamesPeopleInPassing):
                         item.name,
                         tool or own,
                     )
+                # How its items are laid out under it, held to the declaration
+                # here.
+                await tool_layouts.restore_layouts(
+                    session,
+                    tool_layouts.Target(child.kind, row_id, target_initiative.id),
+                    (
+                        tool_layouts.Restored(layout.kind, layout.definition)
+                        for layout in row.layouts.get(key, [])
+                    ),
+                )
             return written
 
         top = rows.located_kind(self.tools, self.tool.kind)
