@@ -2,12 +2,9 @@
 
 import pytest
 
-from app.core.tools import BULK_EXPORT_TOOLS, Tool
+from app.core.tools import Tool
 from app.services.import_engine import limits as import_limits
 from app.services.marketplace.definitions import (
-    KIND_AUDIENCE,
-    LISTING_KINDS,
-    TOOL_LISTING_KINDS,
     normalize_listing_definition,
     normalize_listing_example,
 )
@@ -41,36 +38,23 @@ def _wiki(count: int = 1, **extra) -> dict:
     }
 
 
-class TestEveryToolHasAMarketplace:
-    def test_the_kinds_are_the_exportable_tools(self):
-        assert set(TOOL_LISTING_KINDS) == {tool.value for tool in BULK_EXPORT_TOOLS}
-        assert set(TOOL_LISTING_KINDS) <= LISTING_KINDS
-
-    def test_a_tools_marketplace_installs_to_a_community(self):
-        for kind in TOOL_LISTING_KINDS:
-            assert KIND_AUDIENCE[kind] == "guild"
-
+class TestTheEnvelopeIsStoredAsTheImporterReadsIt:
     @pytest.mark.parametrize("tool", list(Tool))
     def test_a_listing_is_refused_unless_it_is_that_tools_envelope(self, tool):
         with pytest.raises(ListingDefinitionError):
             normalize_tool_listing(tool, {"type": "initiative-something-else"})
 
-
-class TestTheEnvelopeIsStoredAsTheImporterReadsIt:
-    def test_unknown_keys_are_dropped(self):
-        stored = normalize_tool_listing(
-            Tool.wiki, _wiki(stray="not part of the envelope")
-        )
-        assert "stray" not in stored
-        assert stored["pages"][0]["title"] == "Page 0"
-
-    def test_where_it_was_exported_from_is_not_kept(self):
+    def test_unknown_keys_and_where_it_was_exported_from_are_dropped(self):
         stored = normalize_tool_listing(
             Tool.wiki,
-            _wiki(source_instance_url="https://elsewhere", source_guild_id=4),
+            _wiki(
+                stray="not part of the envelope",
+                source_instance_url="https://elsewhere",
+                source_guild_id=4,
+            ),
         )
-        assert "source_instance_url" not in stored
-        assert "source_guild_id" not in stored
+        assert not {"stray", "source_instance_url", "source_guild_id"} & set(stored)
+        assert stored["pages"][0]["title"] == "Page 0"
 
     @pytest.mark.parametrize(
         ("tool", "body"),

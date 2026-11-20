@@ -90,13 +90,15 @@ async def _listed(client: AsyncClient, headers: dict[str, str], row_id: int) -> 
     "role", [UserRole.member, UserRole.support, UserRole.moderator, UserRole.operator]
 )
 async def test_non_owner_tiers_are_refused(
-    client: AsyncClient, session: AsyncSession, role: UserRole
+    client: AsyncClient, session: AsyncSession, role: UserRole, capfd
 ):
     """``plugins.manage`` is owner-only: wiring a plug-in service is deployment
-    configuration, so no lower tier reaches any verb."""
+    configuration, so no lower tier reaches any verb, and a refused request
+    records nothing."""
     user = await create_user(session, role=role)
     headers = get_auth_headers(user)
     row = await _seed(session)
+    capfd.readouterr()
 
     assert (await client.get(BASE, headers=headers)).status_code == 403
     assert (await client.get(f"{BASE}{row.id}", headers=headers)).status_code == 403
@@ -139,6 +141,7 @@ async def test_non_owner_tiers_are_refused(
             f"{PUBLISHERS}{row.publisher_id}", headers=headers, json={"enabled": False}
         )
     ).status_code == 403
+    assert emitted(capfd, AuditEventType.PLUGIN_SERVICE_UPDATED) == []
 
 
 async def test_anonymous_is_refused(client: AsyncClient):
@@ -149,15 +152,22 @@ async def test_anonymous_is_refused(client: AsyncClient):
 
 
 async def test_owner_creates_a_registration_as_stated(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, acting_user, capfd
 ):
-    headers = await _owner_headers(session)
+    owner = await acting_user()
+    capfd.readouterr()
 
-    response = await client.post(BASE, headers=headers, json=NEW)
+    response = await client.post(
+        BASE,
+        headers=owner.headers,
+        json={**NEW, "page_origin": "https://plugin.example.com", "mandatory": True},
+    )
 
     assert response.status_code == 201, response.text
     body = response.json()
     assert body["public_id"] == "acme.widgets"
+    # Browser origins, so they come from the browser address.
+    assert body["allowed_origins"] == ["https://plugin.example.com"]
     # Its plug-in facts wait for its listing.
     assert (body["listing_uid"], body["scope_ceiling"]) == (None, [])
     assert body["publisher_prefix"] == "acme"
@@ -166,6 +176,29 @@ async def test_owner_creates_a_registration_as_stated(
     assert body["live"] is False
     for gone in ("status", "has_secret", "manifest_hash", "last_verified_at"):
         assert gone not in body
+
+    # Recorded with what it confers.
+    envelopes = emitted(capfd)
+    rows = [
+        e for e in envelopes if e["event_type"] == AuditEventType.PLUGIN_SERVICE_CREATED
+    ]
+    assert [(r["actor_user_id"], r["target"]) for r in rows] == [
+        (owner.user.id, {"type": "plugin_service_registration", "id": body["id"]})
+    ]
+    detail = rows[0]["detail"]
+    assert {"public_id", "publisher_id", "base_url", "mandatory"} <= set(
+        detail["changed"]
+    )
+    assert detail["values"]["mandatory"] == {"from": None, "to": True}
+    # The address is a string: named, never copied.
+    assert "base_url" not in detail["values"]
+    # The acme prefix was new here, so its publisher was added with it.
+    publishers = [
+        e
+        for e in envelopes
+        if e["event_type"] == AuditEventType.PLUGIN_PUBLISHER_CREATED
+    ]
+    assert [r["detail"]["via"] for r in publishers] == ["registration"]
 
 
 async def test_owner_lists_registrations_with_their_publisher(
@@ -270,6 +303,7 @@ async def test_connect_pins_the_key_set_the_operator_confirmed(
     assert shown.status_code == 200, shown.text
     (confirmed,) = shown.json()
     assert confirmed["kid"] == "acme.widgets-1"
+    assert confirmed["fingerprint"] == plugin_keys.jwk_thumbprint(served[0]["keys"][0])
     assert fetched == [f"{PLUGIN_URL}/.well-known/jwks.json"]
     assert (await _listed(client, owner.headers, row.id))["jwks"] is None
 
@@ -303,10 +337,19 @@ async def test_connect_pins_the_key_set_the_operator_confirmed(
 
 
 async def test_patch_sets_the_operator_only_fields(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, acting_user, capfd
 ):
-    headers = await _owner_headers(session)
+    owner = await acting_user()
+    headers = owner.headers
     row = await _seed(session)
+    unchanged = await client.patch(
+        f"{BASE}{row.id}",
+        headers=headers,
+        json={"suspended": False, "mandatory": False},
+    )
+    assert unchanged.status_code == 200, unchanged.text
+    # An edit that changes nothing records nothing.
+    assert emitted(capfd, AuditEventType.PLUGIN_SERVICE_UPDATED) == []
 
     response = await client.patch(
         f"{BASE}{row.id}",
@@ -320,6 +363,12 @@ async def test_patch_sets_the_operator_only_fields(
     assert (body["availability"], body["beta_communities"]) == ("none", [])
     assert body["suspended_at"] is not None
     assert body["live"] is False
+    rows = emitted(capfd, AuditEventType.PLUGIN_SERVICE_UPDATED)
+    assert [(r["actor_user_id"], r["target"]["id"]) for r in rows] == [
+        (owner.user.id, row.id)
+    ]
+    assert {"suspended_at", "mandatory"} <= set(rows[0]["detail"]["changed"])
+    assert rows[0]["detail"]["values"]["mandatory"] == {"from": False, "to": True}
 
     lifted = await client.patch(
         f"{BASE}{row.id}", headers=headers, json={"suspended": False}
@@ -429,12 +478,15 @@ async def test_the_browser_address_round_trips_and_clears(
     )
     assert set_it.status_code == 200, set_it.text
     assert set_it.json()["page_origin"] == "https://plugin.example.com"
+    # The list was still the plug-in's own origin, so it follows the plug-in.
+    assert set_it.json()["allowed_origins"] == ["https://plugin.example.com"]
 
     cleared = await client.patch(
         f"{BASE}{row.id}", headers=headers, json={"page_origin": ""}
     )
     assert cleared.status_code == 200, cleared.text
     assert cleared.json()["page_origin"] is None
+    assert cleared.json()["allowed_origins"] == [PLUGIN_URL]
 
 
 @pytest.mark.parametrize(
@@ -552,11 +604,19 @@ async def test_a_plug_in_reads_its_listings_name_art_and_publisher(
 # --- delete -------------------------------------------------------------------
 
 
-async def test_owner_deletes_a_registration(client: AsyncClient, session: AsyncSession):
-    headers = await _owner_headers(session)
+async def test_owner_deletes_a_registration(
+    client: AsyncClient, session: AsyncSession, acting_user, capfd
+):
+    owner = await acting_user()
+    headers = owner.headers
     row = await _seed(session)
+    capfd.readouterr()
 
     assert (await client.delete(f"{BASE}{row.id}", headers=headers)).status_code == 204
+    rows = emitted(capfd, AuditEventType.PLUGIN_SERVICE_DELETED)
+    assert [(r["actor_user_id"], r["target"]) for r in rows] == [
+        (owner.user.id, {"type": "plugin_service_registration", "id": row.id})
+    ]
     assert (await client.get(BASE, headers=headers)).json()["items"] == []
     assert (await client.get(f"{BASE}{row.id}", headers=headers)).status_code == 404
 
@@ -578,9 +638,11 @@ async def test_missing_registration_is_a_404(
 
 
 async def test_owner_adds_and_lists_a_publisher(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, acting_user, capfd
 ):
-    headers = await _owner_headers(session)
+    owner = await acting_user()
+    headers = owner.headers
+    capfd.readouterr()
 
     created = await client.post(
         PUBLISHERS,
@@ -594,6 +656,10 @@ async def test_owner_adds_and_lists_a_publisher(
     assert body["display_name"] == "Our own plug-ins"
     assert body["verified"] is False
     assert body["enabled"] is True
+    added = emitted(capfd, AuditEventType.PLUGIN_PUBLISHER_CREATED)
+    assert [(r["actor_user_id"], r["target"]) for r in added] == [
+        (owner.user.id, {"type": "plugin_publisher", "id": body["id"]})
+    ]
 
     listed = await client.get(PUBLISHERS, headers=headers)
     assert "private-plugins" in {entry["prefix"] for entry in listed.json()}
@@ -621,11 +687,12 @@ async def test_a_prefix_is_one_segment_of_a_plugin_id(
 
 
 async def test_switching_a_publisher_off_takes_its_plugins_out_of_service(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, capfd
 ):
     headers = await _owner_headers(session)
     row = await _seed(session)
     assert (await _listed(client, headers, row.id))["live"]
+    capfd.readouterr()
 
     off = await client.patch(
         f"{PUBLISHERS}{row.publisher_id}",
@@ -636,6 +703,10 @@ async def test_switching_a_publisher_off_takes_its_plugins_out_of_service(
     assert off.status_code == 200, off.text
     assert off.json()["enabled"] is False
     assert off.json()["display_name"] == "Acme, paused"
+    updated = emitted(capfd, AuditEventType.PLUGIN_PUBLISHER_UPDATED)
+    assert [r["detail"]["values"]["enabled"] for r in updated] == [
+        {"from": True, "to": False}
+    ]
     read = await _listed(client, headers, row.id)
     assert read["suspended_at"] is None
     assert read["publisher_enabled"] is False

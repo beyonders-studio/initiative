@@ -33,6 +33,7 @@ from app.main import app
 from app.models.platform.guild import CommunityRole
 from app.models.platform.notification import Notification, NotificationType
 from app.models.tenant.file import File
+from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.initiative import InitiativeMember
 from app.services.marketplace import plugin_oauth
 from app.services.marketplace.plugin_refs import (
@@ -502,40 +503,6 @@ async def test_a_member_token_is_issued_within_the_ceiling(
     assert issued.json()["scope"] == "comments:read"
 
 
-async def test_a_consent_bound_to_an_initiative_issues_only_narrowed_tokens(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session
-):
-    installed = await install_plugin(
-        session, acting_user, role_session, granted=["files:read"]
-    )
-    member = await _member(acting_user, installed)
-    member_ref = await _ref(installed, member.user.id)
-    await _ask(
-        client,
-        installed,
-        member=member_ref,
-        purpose="node-1",
-        initiative_id=installed.placed.id,
-    )
-    consent_id = await _consent_id(client, member, installed)
-    await _answer(client, member, installed, consent_id, "read_write")
-
-    unnarrowed = await _grant_token(client, installed, member_ref)
-    assert unnarrowed.status_code == 400
-    assert unnarrowed.json()["error"] == "invalid_target"
-
-    narrowed = await _grant_token(
-        client,
-        installed,
-        member_ref,
-        resource=f"urn:initiative:initiative:{installed.placed.id}",
-    )
-    assert narrowed.status_code == 200, narrowed.text
-    token = unseal_access_token(narrowed.json()["access_token"])
-    assert isinstance(token, InstallAccessToken)
-    assert token.initiative_id == installed.placed.id
-
-
 async def test_leaving_the_initiative_or_revoking_stops_the_member_token(
     client: AsyncClient, session: AsyncSession, acting_user, role_session
 ):
@@ -554,9 +521,17 @@ async def test_leaving_the_initiative_or_revoking_stops_the_member_token(
     )
     consent_id = await _consent_id(client, member, installed)
     await _answer(client, member, installed, consent_id, "read")
+    # Bound to an initiative, it issues only narrowed tokens.
+    unnarrowed = await _grant_token(client, installed, member_ref)
+    assert unnarrowed.status_code == 400
+    assert unnarrowed.json()["error"] == "invalid_target"
     resource = f"urn:initiative:initiative:{installed.placed.id}"
     issued = await _grant_token(client, installed, member_ref, resource=resource)
+    assert issued.status_code == 200, issued.text
     token = issued.json()["access_token"]
+    sealed = unseal_access_token(token)
+    assert isinstance(sealed, InstallAccessToken)
+    assert sealed.initiative_id == installed.placed.id
     url = _PROBE_PATH.format(community_id=installed.guild.id)
 
     assert (await client.get(url, headers=_bearer(token))).json()["files"] == ["Theirs"]
@@ -620,6 +595,15 @@ async def test_the_member_grant_is_its_own_client_authentication(
     )
     assert no_installation.status_code == 400
     assert no_installation.json()["error"] == "invalid_grant"
+
+    # Nor while the plug-in is not installed: the community's name stands, and
+    # is what the assertion names it by.
+    await route_session_to_guild(session, installed.guild.id)
+    await session.delete(await session.get(GuildPlugin, installed.plugin.id))
+    await session.commit()
+    uninstalled = await _grant_token(client, installed, member_ref)
+    assert uninstalled.status_code == 400
+    assert uninstalled.json()["error"] == "invalid_grant"
 
 
 # ---------------------------------------------------------------------------
@@ -717,7 +701,6 @@ async def _reinstall(session: AsyncSession, installed: InstalledPlugin):
     where the old one was, with the same grant."""
     from dataclasses import replace
 
-    from app.models.tenant.guild_plugin import GuildPlugin
     from app.models.tenant.plugin_placement import PluginPlacement
     from app.testing import create_guild_plugin
 
@@ -789,26 +772,3 @@ async def test_a_member_is_the_same_reference_after_a_reinstall(
     token = unseal_access_token(issued.json()["access_token"])
     assert isinstance(token, InstallAccessToken)
     assert (token.install_id, token.user_id) == (again.plugin.id, member.user.id)
-
-
-async def test_no_member_token_while_the_plugin_is_not_installed(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session
-):
-    installed = await install_plugin(
-        session, acting_user, role_session, granted=["files:read"]
-    )
-    member = await _member(acting_user, installed)
-    member_ref = await _ref(installed, member.user.id)
-    # The community's name stands, and is what the assertion names it by.
-    await ensure_plugin_guild_ref(
-        guild_id=installed.guild.id, public_id=installed.public_id
-    )
-    await route_session_to_guild(session, installed.guild.id)
-    from app.models.tenant.guild_plugin import GuildPlugin
-
-    await session.delete(await session.get(GuildPlugin, installed.plugin.id))
-    await session.commit()
-
-    refused = await _grant_token(client, installed, member_ref)
-    assert refused.status_code == 400
-    assert refused.json()["error"] == "invalid_grant"

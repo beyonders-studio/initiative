@@ -1289,24 +1289,14 @@ def test_the_metadata_columns_match_the_contract():
 
 
 def test_a_term_the_contract_does_not_name_is_reported():
-    """The whole point of the report: a newer plug-in's extra terms are named."""
+    """A newer plug-in's extra terms are named, at the top and inside the
+    objects written inline rather than as named definitions (`service`,
+    `layout`, `grid`, `binding`). This is walked from the contract's own
+    structure rather than from a list of where things nest: that list was a
+    second copy of the contract, and it missed all four of these."""
     served = maximal_manifest()
     served["rate_limit"] = 5
     served["endpoints"][0]["retries"] = 3
-    assert contract.discarded_terms(served) == ["endpoints.0.retries", "rate_limit"]
-
-
-def test_a_term_nested_in_an_inline_object_is_reported():
-    """Not every object a manifest carries is a named definition — `service`,
-    `layout`, `grid` and `binding` are written inline — and a term added inside
-    one is exactly as invisible as a term added at the top.
-
-    This is walked from the contract's own structure rather than from a list of
-    where things nest, because that list is the kind of second copy the contract
-    exists to remove: it was one, it missed all four of these, and nothing said
-    so.
-    """
-    served = maximal_manifest()
     served["service"]["region"] = "eu"
     served["dashboards"][0]["layout"]["gutter"] = 4
     served["dashboards"][0]["widgets"][0]["grid"]["z"] = 9
@@ -1316,86 +1306,25 @@ def test_a_term_nested_in_an_inline_object_is_reported():
         "dashboards.0.layout.gutter",
         "dashboards.0.widgets.0.binding.timeout",
         "dashboards.0.widgets.0.grid.z",
+        "endpoints.0.retries",
+        "rate_limit",
         "service.region",
     ]
 
 
-def test_an_object_the_contract_leaves_open_reports_nothing():
-    """A widget's `meta` and `sample_data` are opaque to the contract, and a
-    binding's `params` are named by the author. Keys inside them are nobody's
-    to declare, so reporting them would be noise on every honest manifest."""
+def test_a_manifest_this_build_fully_understands_reports_nothing():
+    """A report on a plug-in written against this contract would be a false
+    alarm on every verification. A widget's `meta` and `sample_data` are
+    opaque to the contract, and a binding's `params` are named by the author,
+    so keys inside them are nobody's to declare."""
+    assert contract.discarded_terms(maximal_manifest()) == []
+    assert contract.discarded_terms(maximal_tool_manifest()) == []
+    assert contract.discarded_terms(maximal_declarative_manifest()) == []
     served = maximal_manifest()
     served["widgets"][0]["meta"]["whatever"] = 1
     served["widgets"][0]["sample_data"][READ_ENDPOINT] = {"anything": 2}
     served["dashboards"][0]["widgets"][0]["binding"]["params"]["choice"] = "b"
-
     assert contract.discarded_terms(served) == []
-
-
-def test_a_manifest_this_build_fully_understands_reports_nothing():
-    """The ordinary case. A report on a plug-in written against this contract
-    would be a false alarm on every verification."""
-    assert contract.discarded_terms(maximal_manifest()) == []
-    assert contract.discarded_terms(maximal_tool_manifest()) == []
-
-
-# --- what only the plug-in can know --------------------------------------------
-
-
-def test_an_identity_must_name_single_returns_of_its_own_endpoint():
-    """Nothing downstream refuses a bad address — it resolves to nothing, and a
-    fire somebody was waiting on is dropped without a word. So it is refused
-    here, at the one moment somebody can still fix it."""
-    from app.services.marketplace.manifest_values import ListingDefinitionError
-
-    def publish(**endpoint):
-        body = maximal_manifest()
-        body["endpoints"][1].update(endpoint)
-        return normalize_listing_definition("plugin", body)
-
-    with pytest.raises(ListingDefinitionError):
-        publish(identity={"kind": "issue", "key": ["nothing_returned"]})
-
-    with pytest.raises(ListingDefinitionError):
-        publish(
-            returns=[{"key": "numbers", "type": "int", "list": True}],
-            identity={"kind": "issue", "key": ["numbers"]},
-        )
-
-
-def test_a_read_endpoint_has_no_identity():
-    """It touched nothing, so there is nothing for it to address."""
-    from app.services.marketplace.manifest_values import ListingDefinitionError
-
-    body = maximal_manifest()
-    body["endpoints"][0]["identity"] = {"kind": "issue", "key": ["count"]}
-    with pytest.raises(ListingDefinitionError):
-        normalize_listing_definition("plugin", body)
-
-
-# --- a vendor's own setup flow ---------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "values",
-    [
-        {"client_id": "pem"},
-        {"client_id": "client_id", "private_key": "client_id"},
-        {"nothing": "id"},
-        {"client_id": "token"},
-        {},
-    ],
-    ids=["secret-to-plain", "twice", "undeclared", "unknown", "empty"],
-)
-def test_a_setup_writes_each_answer_once_and_secrets_only_to_a_secret(values):
-    """What GitHub answers with is written to the fields the setup names, so a
-    secret one meeting a plain field would be shown on the settings form."""
-    from app.services.marketplace.manifest_values import ListingDefinitionError
-
-    body = maximal_manifest()
-    body["vendor"]["setup"]["values"] = values
-    with pytest.raises(ListingDefinitionError):
-        normalize_listing_definition("plugin", body)
 
 
 # --- container or declarative ----------------------------------------------
@@ -1593,6 +1522,43 @@ def _labelled_on(connection) -> dict:
                 b["actions"][0].update(params=["number"]),
             ),
         ),
+        # An identity is refused here, at the one moment somebody can still fix
+        # it: downstream, a bad address resolves to nothing and a fire somebody
+        # was waiting on is dropped without a word.
+        _with(
+            maximal_manifest,
+            lambda b: b["endpoints"][1].update(
+                identity={"kind": "issue", "key": ["nothing_returned"]}
+            ),
+        ),
+        _with(
+            maximal_manifest,
+            lambda b: b["endpoints"][1].update(
+                returns=[{"key": "numbers", "type": "int", "list": True}],
+                identity={"kind": "issue", "key": ["numbers"]},
+            ),
+        ),
+        _with(
+            maximal_manifest,
+            lambda b: b["endpoints"][0].update(
+                identity={"kind": "issue", "key": ["count"]}
+            ),
+        ),
+        # A vendor setup writes each answer once, and a secret only to a secret
+        # field, which the settings form would otherwise show.
+        *(
+            _with(
+                maximal_manifest,
+                lambda b, values=values: b["vendor"]["setup"].update(values=values),
+            )
+            for values in (
+                {"client_id": "pem"},
+                {"client_id": "client_id", "private_key": "client_id"},
+                {"nothing": "id"},
+                {"client_id": "token"},
+                {},
+            )
+        ),
     ],
     ids=[
         "container-hosts",
@@ -1641,6 +1607,14 @@ def _labelled_on(connection) -> dict:
         "element-action-not-declared",
         "element-action-not-where-the-field-is",
         "action-params-without-an-endpoint",
+        "identity-names-nothing-returned",
+        "identity-names-a-list",
+        "identity-on-a-read",
+        "setup-secret-to-plain",
+        "setup-twice",
+        "setup-undeclared",
+        "setup-unknown",
+        "setup-empty",
     ],
 )
 def test_one_plugin_is_one_kind_and_says_only_what_its_kind_says(body):
@@ -1684,4 +1658,3 @@ def test_a_declarative_manifest_is_named_by_its_listing():
         normalize_listing_definition(
             "plugin", maximal_declarative_manifest(), public_id="acme.other"
         )
-    assert contract.discarded_terms(maximal_declarative_manifest()) == []

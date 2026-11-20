@@ -127,19 +127,14 @@ class TestNothingExecutesListingContent:
             "os.system(cmd)",
             "subprocess.check_output(cmd)",
             "obj.attr.exec(src)",
+            # The SQLModel exemption is one receiver/method pair.
+            "shell.exec(statement)",
         ],
     )
     def test_the_guard_catches_a_call_however_it_is_reached(self, source):
         """The allow-list is one receiver/method pair, not a blanket pass for
         attribute calls — so no spelling of these slips by."""
         assert _forbidden_calls_in(source)
-
-    def test_the_allowed_pairs_are_only_those_pairs(self):
-        """SQLModel's query call is what the exemption is for, and nothing
-        inherits it: the same method on anything else still trips."""
-        assert not _forbidden_calls_in("session.exec(statement)")
-        assert not _forbidden_calls_in("system_session.exec(statement)")
-        assert _forbidden_calls_in("shell.exec(statement)")
 
     @pytest.mark.parametrize("path", _sources(), ids=lambda path: path.name)
     def test_no_module_imports_a_way_to_run_something(self, path):

@@ -263,12 +263,23 @@ class TestWritingArmsTheTimer:
         assert [row.hook for row in await _hooks(session, guild.id)] == ["erase"]
         assert await _timers(session, guild.id) == 1
 
-    async def test_only_a_community_hook_is_written(self, session):
-        _user, guild, _install = await _setup(session)
+    async def test_only_a_community_hook_is_written_or_an_answered_one_sent(
+        self, session
+    ):
+        _user, guild, install = await _setup(session)
 
         with pytest.raises(community_hooks.UnknownCommunityHookError):
             await _deliver(guild.id, hook="after_connect")
         assert await _hooks(session, guild.id) == []
+        with pytest.raises(community_hooks.UnknownCommunityHookError):
+            await community_hooks.call_now(
+                "erase",
+                public_id=PUBLIC_ID,
+                base_url="https://hooked.example.test",
+                guild_id=guild.id,
+                install_id=install.id,
+                body={},
+            )
 
     async def test_an_erase_reaches_names_whose_registration_is_gone(
         self, session, monkeypatch
@@ -326,10 +337,17 @@ class TestSending:
     async def test_a_404_means_the_hook_is_not_taken_and_is_not_asked_again(
         self, session, monkeypatch
     ):
-        _user, guild, _install = await _setup(session)
+        """An erase a plug-in takes no hook for forgets its names too."""
+        user, guild, _install = await _setup(session)
+        member = await plugin_refs.ensure_plugin_ref(
+            guild_id=guild.id, public_id=PUBLIC_ID, user_id=user.id
+        )
+        await plugin_refs.ensure_plugin_guild_ref(
+            guild_id=guild.id, public_id=PUBLIC_ID
+        )
         plugins = _answering(monkeypatch, hooked=[404])
 
-        await _deliver(guild.id, hook="uninstalled")
+        await _deliver(guild.id, hook="erase")
         await _visit(guild.id)
         await _come_due(session, guild.id)
         await _visit(guild.id)
@@ -337,6 +355,10 @@ class TestSending:
         assert len(plugins.calls) == 1
         (row,) = await _hooks(session, guild.id)
         assert row.outcome == "not_taken"
+        assert (
+            await plugin_refs.resolve_plugin_ref(session, ref=member, guild_id=guild.id)
+            is None
+        )
 
     async def test_anything_else_is_asked_again_after_a_while(
         self, session, monkeypatch
@@ -474,18 +496,6 @@ class TestSending:
 
         due = await community_hooks.due_outside(guild.id, datetime.now(UTC))
         assert due is not None and due <= datetime.now(UTC)
-
-    async def test_it_is_given_up_on_in_the_end(self, session, monkeypatch):
-        _user, guild, _install = await _setup(session)
-        _answering(monkeypatch, hooked=[503])
-        monkeypatch.setattr(community_hooks, "MAX_ATTEMPTS", 2)
-
-        await _deliver(guild.id, hook="installed")
-        await _visit(guild.id)
-        await _come_due(session, guild.id)
-        await _visit(guild.id)
-        (row,) = await _hooks(session, guild.id)
-        assert (row.outcome, row.attempts) == ("gave_up", 2)
 
 
 class TestState:
@@ -731,55 +741,6 @@ class TestErasing:
             guild_id=guild.id, public_id=PUBLIC_ID
         )
 
-    async def test_a_plugin_that_takes_no_erase_hook_is_forgotten_too(
-        self, session, monkeypatch
-    ):
-        user, guild, _install = await _setup(session)
-        member = await plugin_refs.ensure_plugin_ref(
-            guild_id=guild.id, public_id=PUBLIC_ID, user_id=user.id
-        )
-        await plugin_refs.ensure_plugin_guild_ref(
-            guild_id=guild.id, public_id=PUBLIC_ID
-        )
-        _answering(monkeypatch, hooked=[404])
-
-        await _deliver(guild.id, hook="erase")
-        await _visit(guild.id)
-        assert (
-            await plugin_refs.resolve_plugin_ref(session, ref=member, guild_id=guild.id)
-            is None
-        )
-
-    async def test_an_erase_never_answered_drops_the_names_and_says_so(
-        self, session, monkeypatch, capfd
-    ):
-        user, guild, _install = await _setup(session)
-        member = await plugin_refs.ensure_plugin_ref(
-            guild_id=guild.id, public_id=PUBLIC_ID, user_id=user.id
-        )
-        await plugin_refs.ensure_plugin_guild_ref(
-            guild_id=guild.id, public_id=PUBLIC_ID
-        )
-        _answering(monkeypatch, hooked=[503])
-        monkeypatch.setattr(community_hooks, "MAX_ATTEMPTS", 2)
-
-        await _deliver(guild.id, hook="erase")
-        await _visit(guild.id)
-        await _come_due(session, guild.id)
-        await _visit(guild.id)
-
-        (row,) = await _hooks(session, guild.id)
-        assert row.outcome == "gave_up"
-        assert (
-            await plugin_refs.resolve_plugin_ref(session, ref=member, guild_id=guild.id)
-            is None
-        )
-        assert not await community_hooks.erase_pending(
-            guild_id=guild.id, public_id=PUBLIC_ID
-        )
-        (record,) = emitted(capfd, AuditEventType.PLUGIN_ERASE_ABANDONED)
-        assert record["guild_id"] == guild.id
-
     async def test_an_erase_is_retried_after_the_install_has_gone(
         self, session, monkeypatch
     ):
@@ -955,10 +916,13 @@ class TestPurging:
         await _come_due(session, guild_id)
         await _visit(guild_id)
         (erase,) = await _hooks(session, guild_id)
-        assert erase.outcome == "gave_up"
+        assert (erase.outcome, erase.attempts) == ("gave_up", 2)
         assert (
             await plugin_refs.resolve_plugin_ref(session, ref=member, guild_id=guild_id)
             is None
+        )
+        assert not await community_hooks.erase_pending(
+            guild_id=guild_id, public_id=PUBLIC_ID
         )
         (record,) = emitted(capfd, AuditEventType.PLUGIN_ERASE_ABANDONED)
         assert record["guild_id"] == guild_id
@@ -1014,24 +978,6 @@ class TestPurging:
 
         await _visit(guild_id)
         assert [path for _, path, _, _ in plugins.calls] == ["/v1/hooks/erase"]
-        assert await _purge(session, when) == 1
-
-    async def test_an_answered_purge_erase_lets_the_purge_finish(
-        self, session, monkeypatch
-    ):
-        # Billing learns of the purge from the change log (community.purged),
-        # not from the erase: the erase only has to be answered.
-        _user, guild, _install = await _setup(session)
-        guild_id = guild.id
-        await plugin_refs.ensure_plugin_guild_ref(
-            guild_id=guild_id, public_id=PUBLIC_ID
-        )
-        _answering(monkeypatch, hooked=[204])
-        when = await _deleted(session, guild_id)
-
-        assert await _purge(session, when) == 0
-        await _visit(guild_id)
-
         assert await _purge(session, when) == 1
 
     async def test_a_community_being_purged_names_nobody_new_and_stays_gone(
@@ -1116,26 +1062,6 @@ class TestPurging:
 
 
 class TestSendingAtOnce:
-    async def test_a_hook_sent_at_once_goes_and_answers(self, session, monkeypatch):
-        _user, guild, install = await _setup(session)
-        plugins = _answering(monkeypatch, hooked=[204])
-
-        await community_hooks.call_now(
-            "schedule",
-            public_id=PUBLIC_ID,
-            base_url="https://hooked.example.test",
-            guild_id=guild.id,
-            install_id=install.id,
-            body={"schedule": "nightly"},
-        )
-
-        ((_, path, claims, body),) = plugins.calls
-        assert (path, claims["hook"], body) == (
-            "/v1/hooks/schedule",
-            "schedule",
-            {"schedule": "nightly"},
-        )
-
     async def test_nothing_goes_at_once_while_an_erase_waits(
         self, session, monkeypatch
     ):
@@ -1156,19 +1082,6 @@ class TestSendingAtOnce:
                 body={},
             )
         assert plugins.calls == []
-
-    async def test_only_an_answered_hook_is_sent_at_once(self, session):
-        _user, guild, install = await _setup(session)
-
-        with pytest.raises(community_hooks.UnknownCommunityHookError):
-            await community_hooks.call_now(
-                "erase",
-                public_id=PUBLIC_ID,
-                base_url="https://hooked.example.test",
-                guild_id=guild.id,
-                install_id=install.id,
-                body={},
-            )
 
     async def test_it_waits_for_a_send_in_flight_and_takes_a_lapsed_claim(
         self, session, monkeypatch
@@ -1196,7 +1109,7 @@ class TestSendingAtOnce:
                 base_url="https://hooked.example.test",
                 guild_id=guild_id,
                 install_id=install.id,
-                body={},
+                body={"schedule": "nightly"},
             )
 
         with pytest.raises(plugin_connection_flows.HookError, match="did not finish"):
@@ -1215,6 +1128,8 @@ class TestSendingAtOnce:
         await schedule()
         await _visit(guild_id)
         assert plugins.paths() == ["/v1/hooks/schedule", "/v1/hooks/installed"]
+        _, _, claims, body = plugins.calls[0]
+        assert (claims["hook"], body) == ("schedule", {"schedule": "nightly"})
         rows = await _hooks(session, guild_id)
         assert [(row.hook, row.outcome, row.claimed_until) for row in rows] == [
             ("installed", "delivered", None),

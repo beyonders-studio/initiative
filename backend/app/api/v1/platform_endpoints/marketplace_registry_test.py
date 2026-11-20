@@ -40,25 +40,19 @@ def repo(monkeypatch, tmp_path) -> TufRepository:
     return repository
 
 
-async def test_the_status_says_it_is_on_and_never_run(client, acting_user, repo):
+async def test_refresh_applies_and_the_status_follows(client, acting_user, repo):
     actor = await acting_user("owner")
 
-    response = await client.get(STATUS_URL, headers=actor.headers)
+    before = await client.get(STATUS_URL, headers=actor.headers)
+    response = await client.post(REFRESH_URL, headers=actor.headers)
 
-    assert response.status_code == 200, response.text
-    body = response.json()
+    assert before.status_code == 200, before.text
+    body = before.json()
     assert body["enabled"] is True
     assert body["configured"] is True
     assert body["custom_root"] is False
     assert body["registry_url"] == BASE_URL
     assert body["last_success_at"] is None
-
-
-async def test_refresh_applies_and_the_status_follows(client, acting_user, repo):
-    actor = await acting_user("owner")
-
-    response = await client.post(REFRESH_URL, headers=actor.headers)
-
     assert response.status_code == 200, response.text
     assert response.json()["upserted"] == 1
     status = (await client.get(STATUS_URL, headers=actor.headers)).json()

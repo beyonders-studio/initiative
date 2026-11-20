@@ -147,19 +147,6 @@ async def test_a_total_is_kept_and_passed_on_to_billing(
             }
         ]
 
-
-async def test_the_same_total_again_is_accepted_and_a_lower_one_is_not(
-    client: AsyncClient,
-    session: AsyncSession,
-    acting_user,
-    role_session,
-    shipped_root,
-):
-    installed = await _metered(session, acting_user, role_session)
-    guild_id = installed.guild.id
-
-    async with billing_manages_plans(session):
-        await _report(client, installed, quantity=12)
         again = await _report(client, installed, quantity=12)
         lower = await _report(client, installed, quantity=11)
         another_month = await _report(client, installed, period="2026-11", quantity=1)

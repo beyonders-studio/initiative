@@ -21,11 +21,9 @@ from starlette.requests import Request
 
 from app.api.actor_route import ActorRoute
 from app.api.deps import (
-    PLUGIN_SCOPE_ATTRIBUTE,
     ActorContext,
     ActorSessionDep,
     plugin_scope,
-    route_plugin_scope,
 )
 from app.core.identity_boundary import boundary_scope
 from app.core.messages import AuthMessages, PluginMessages
@@ -100,12 +98,6 @@ async def _with_shared_file(session, installed):
 # ---------------------------------------------------------------------------
 
 
-def test_the_dependency_carries_its_scope():
-    assert getattr(_read_files, PLUGIN_SCOPE_ATTRIBUTE) == "files:read"
-    (route,) = _probe.routes
-    assert route_plugin_scope(route) == "files:read"
-
-
 def test_an_unknown_scope_fails_where_the_route_is_written():
     with pytest.raises(ValueError):
         plugin_scope("files:admin")
@@ -132,55 +124,39 @@ async def test_an_installation_token_reads_through_the_routed_session(
     assert response.status_code == 200, response.text
     assert response.json() == {"actor": "install", "files": ["Shared"]}
 
-
-async def test_the_guild_comes_from_the_token_not_the_path(
-    client, session, acting_user, role_session
-):
-    installed = await install_plugin(
-        session, acting_user, role_session, granted=["files:read"]
-    )
-    await _with_shared_file(session, installed)
-
-    response = await client.get(
+    # The guild comes from the token, not the path.
+    elsewhere = await client.get(
         _url(installed.guild.id + 100_000),
         headers=_bearer(_install_token(installed, ["files:read"])),
     )
-
-    assert response.status_code == 200, response.text
-    assert response.json()["files"] == ["Shared"]
-
-
-async def test_write_covers_read(client, session, acting_user, role_session):
-    installed = await install_plugin(
-        session, acting_user, role_session, granted=["files:write"]
-    )
-    await _with_shared_file(session, installed)
-
-    response = await client.get(
-        _url(installed.guild.id),
-        headers=_bearer(_install_token(installed, ["files:write"])),
-    )
-
-    assert response.status_code == 200, response.text
+    assert elsewhere.status_code == 200, elsewhere.text
+    assert elsewhere.json()["files"] == ["Shared"]
 
 
-async def test_a_token_without_the_scope_is_forbidden(
-    client, session, acting_user, role_session
+@pytest.mark.parametrize(
+    ("granted", "scopes", "status"),
+    [
+        pytest.param(["files:write"], ["files:write"], 200, id="write-covers-read"),
+        pytest.param(
+            ["files:read", "comments:read"], ["comments:read"], 403, id="no-scope"
+        ),
+    ],
+)
+async def test_a_token_is_held_to_the_routes_scope(
+    client, session, acting_user, role_session, granted, scopes, status
 ):
     installed = await install_plugin(
-        session,
-        acting_user,
-        role_session,
-        granted=["files:read", "comments:read"],
+        session, acting_user, role_session, granted=granted
     )
 
     response = await client.get(
         _url(installed.guild.id),
-        headers=_bearer(_install_token(installed, ["comments:read"])),
+        headers=_bearer(_install_token(installed, scopes)),
     )
 
-    assert response.status_code == 403
-    assert response.json()["detail"] == PluginMessages.SCOPE_REQUIRED
+    assert response.status_code == status, response.text
+    if status == 403:
+        assert response.json()["detail"] == PluginMessages.SCOPE_REQUIRED
 
 
 @pytest.mark.parametrize("shape", ["tampered", "expired", "plugin-token", "not-live"])

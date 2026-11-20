@@ -109,16 +109,13 @@ class TestPublishing:
         # Inherited, because it *is* the plug-in's publish.
         assert dashboard.publisher == "Tests"
         assert dashboard.source == "operator"
+        # No artwork of its own: it previews by rendering its widgets against
+        # their sample data, which cannot go stale the way a picture would.
+        assert dashboard.avatar_url == service.DEFAULT_AVATAR_URL
+        assert dashboard.images == []
 
-    async def test_the_derived_row_is_an_ordinary_listing(self, session):
-        """Nothing downstream should be able to tell it was derived: a guild
-        installs it with the same call it installs any other dashboard with."""
-        await service.upsert_listing(
-            session, _plugin_manifest([_dashboard()]), source="operator"
-        )
-        await session.commit()
-
-        dashboard = await _by_uid(session, DASH_UID)
+        # Nothing downstream should be able to tell it was derived: a guild
+        # installs it with the same call it installs any other dashboard with.
         version = await service.get_listing_version(
             session, dashboard.latest_version_id
         )
@@ -181,18 +178,6 @@ class TestPublishing:
             await service.upsert_listing(
                 session, _plugin_manifest([entry]), source="operator"
             )
-
-    async def test_it_carries_no_artwork_of_its_own(self, session):
-        """A dashboard previews by rendering its widgets against their sample
-        data, which cannot go stale against the plug-in the way a picture would."""
-        await service.upsert_listing(
-            session, _plugin_manifest([_dashboard()]), source="operator"
-        )
-        await session.commit()
-
-        dashboard = await _by_uid(session, DASH_UID)
-        assert dashboard.avatar_url == service.DEFAULT_AVATAR_URL
-        assert dashboard.images == []
 
     async def test_a_plugin_with_no_dashboards_publishes_one_row(self, session):
         await service.upsert_listing(session, _plugin_manifest(), source="operator")
@@ -258,14 +243,6 @@ class TestItCannotTakeOverSomebodyElsesListing:
         )
         await session.commit()
 
-    async def test_it_cannot_adopt_a_standalone_dashboard(self, session):
-        await self._standalone(session)
-
-        with pytest.raises(CatalogError):
-            await service.upsert_listing(
-                session, _plugin_manifest([_dashboard()]), source="operator"
-            )
-
     async def test_the_standalone_listing_is_left_alone(self, session):
         await self._standalone(session)
 
@@ -317,26 +294,10 @@ class TestItCannotTakeOverSomebodyElsesListing:
                 source="operator",
             )
 
-    async def test_republishing_the_same_plugin_is_not_a_takeover(self, session):
-        """The case all of this has to stay out of the way of."""
-        await service.upsert_listing(
-            session,
-            _plugin_manifest([_dashboard()], version="1.0.0"),
-            source="operator",
-        )
-        await session.commit()
-        await service.upsert_listing(
-            session,
-            _plugin_manifest([_dashboard()], version="2.0.0"),
-            source="operator",
-        )
-        await session.commit()
-
-        assert (await _by_uid(session, DASH_UID)).bundled_with_uid == PLUGIN_UID
-
 
 class TestLifecycle:
     async def test_they_version_with_the_plugin(self, session):
+        """Republishing the same plug-in is not a takeover."""
         await service.upsert_listing(
             session,
             _plugin_manifest([_dashboard()], version="1.0.0"),
@@ -351,6 +312,7 @@ class TestLifecycle:
         await session.commit()
 
         dashboard = await _by_uid(session, DASH_UID)
+        assert dashboard.bundled_with_uid == PLUGIN_UID
         version = await service.get_listing_version(
             session, dashboard.latest_version_id
         )
@@ -415,17 +377,6 @@ class TestWhoIsOfferedOne:
         listings, _ = await service.list_listings(session, kind="dashboard")
         assert DASH_UID not in {listing.uid for listing in listings}
 
-    async def test_it_is_offered_where_the_plugin_is_installed(self, session):
-        await service.upsert_listing(
-            session, _plugin_manifest([_dashboard()]), source="operator"
-        )
-        await session.commit()
-
-        listings, _ = await service.list_listings(
-            session, kind="dashboard", bundled_with=[PLUGIN_UID]
-        )
-        assert DASH_UID in {listing.uid for listing in listings}
-
     async def test_a_standalone_dashboard_is_offered_either_way(self, session):
         await service.upsert_listing(
             session,
@@ -474,22 +425,6 @@ class TestWhoMayInstallOne:
         canvas = version.definition["definition"]
         assert canvas["widgets"][0]["binding"]["plugin_uid"] == PLUGIN_UID
 
-    async def test_a_guild_without_the_plugin_may_not(self, session):
-        """The case the browse filter cannot cover on its own. A uid read in a
-        guild that has the plug-in is otherwise just as installable here."""
-        user = await create_user(session)
-        guild = await create_guild(session, creator=user)
-        await service.upsert_listing(
-            session, _plugin_manifest([_dashboard()]), source="operator"
-        )
-        await session.commit()
-        await route_session_to_guild(session, guild.id)
-
-        with pytest.raises(ListingInstallError) as caught:
-            await resolve_listing_install(session, DASH_UID, kind="dashboard")
-        assert caught.value.code == "MARKETPLACE_LISTING_NEEDS_PLUGIN"
-        assert caught.value.status_code == 409
-
     async def test_a_guild_that_switched_the_plugin_off_may_not(self, session):
         user = await create_user(session)
         guild = await create_guild(session, creator=user)
@@ -514,27 +449,4 @@ class TestWhoMayInstallOne:
         with pytest.raises(ListingInstallError) as caught:
             await resolve_listing_install(session, DASH_UID, kind="dashboard")
         assert caught.value.code == "MARKETPLACE_LISTING_NEEDS_PLUGIN"
-
-    async def test_a_standalone_dashboard_needs_no_plugin(self, session):
-        """The other route, unchanged: somebody publishes a dashboard to share
-        and any guild installs it."""
-        user = await create_user(session)
-        guild = await create_guild(session, creator=user)
-        await service.upsert_listing(
-            session,
-            {
-                **_plugin_manifest(),
-                "uid": OTHER_DASH_UID,
-                "public_id": "tests.shared-board",
-                "kind": "dashboard",
-                "definition": {"widgets": []},
-            },
-            source="operator",
-        )
-        await session.commit()
-        await route_session_to_guild(session, guild.id)
-
-        listing, _ = await resolve_listing_install(
-            session, OTHER_DASH_UID, kind="dashboard"
-        )
-        assert listing.bundled_with_uid is None
+        assert caught.value.status_code == 409

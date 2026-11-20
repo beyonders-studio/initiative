@@ -58,7 +58,6 @@ from app.services.marketplace.tool_plugins import normalize_tool_plugin_definiti
 __all__ = [
     "GUILD_INSTALLABLE_PLUGIN_KINDS",
     "KIND_AUDIENCE",
-    "LISTING_AUDIENCES",
     "LISTING_KINDS",
     "LISTING_SOURCES",
     "LOCAL_SOURCE",
@@ -67,7 +66,6 @@ __all__ = [
     "RESERVED_PUBLIC_ID_PREFIX",
     "TOOL_LISTING_KINDS",
     "ListingDefinitionError",
-    "kinds_for_audience",
     "normalize_listing_definition",
     "normalize_listing_example",
     "normalize_publisher",
@@ -111,8 +109,6 @@ LISTING_KINDS: frozenset[str] = frozenset(
 #: The distinction is not cosmetic. It decides which marketplace offers a
 #: listing, who is allowed to install it, and what "installed" is even recorded
 #: against — so it is declared once, here, beside the kinds themselves.
-LISTING_AUDIENCES: frozenset[str] = frozenset({"guild", "user"})
-
 KIND_AUDIENCE: dict[str, str] = {
     "plugin": "guild",
     "auto": "guild",
@@ -120,13 +116,6 @@ KIND_AUDIENCE: dict[str, str] = {
     "home_layout": "user",
     **{kind: "guild" for kind in TOOL_LISTING_KINDS},
 }
-
-
-def kinds_for_audience(audience: str) -> frozenset[str]:
-    """The listing kinds a given marketplace offers."""
-    if audience not in LISTING_AUDIENCES:
-        raise ValueError(f"unknown listing audience {audience!r}")
-    return frozenset(kind for kind, who in KIND_AUDIENCE.items() if who == audience)
 
 
 #: How a listing reached this deployment. Not a trust ranking shown to a reader

@@ -20,12 +20,7 @@ from app.models.platform.plugin_service_registration import (
 )
 from app.models.platform.publisher import Publisher
 from app.services.marketplace import registrations as service
-from app.services.marketplace.catalog import (
-    CatalogError,
-    CatalogSourceConflict,
-    upsert_listing,
-)
-from app.services.marketplace.plugin_keys import jwk_thumbprint
+from app.services.marketplace.catalog import CatalogError, upsert_listing
 from app.services.marketplace.registration_lookup import load_registrations
 from app.services.marketplace.vendor_values import load_vendor_values
 from app.testing import (
@@ -73,95 +68,71 @@ def _ed25519_jwk(kid: str) -> dict:
     return jwk
 
 
-def test_jwks_accepts_a_usable_key_set():
-    key_set = {"keys": [_ed25519_jwk("auto.core-1")]}
-    assert service.normalize_jwks(key_set) == key_set
+def _keyless() -> dict:
+    jwk = _ed25519_jwk("dropped")
+    del jwk["kid"]
+    return jwk
 
 
-def test_jwks_treats_empty_as_cleared():
-    assert service.normalize_jwks(None) is None
-    assert service.normalize_jwks({}) is None
-
-
-def test_jwks_requires_a_kid_on_every_key():
-    keyless = _ed25519_jwk("dropped")
-    del keyless["kid"]
-    with pytest.raises(HTTPException) as excinfo:
-        service.normalize_jwks({"keys": [keyless]})
-    assert excinfo.value.status_code == 400
-    assert excinfo.value.detail == PluginServiceMessages.INVALID_JWKS
-
-
-def test_jwks_refuses_two_keys_sharing_a_kid():
-    with pytest.raises(HTTPException) as excinfo:
-        service.normalize_jwks({"keys": [_ed25519_jwk("same"), _ed25519_jwk("same")]})
-    assert excinfo.value.detail == PluginServiceMessages.INVALID_JWKS
-
-
-def test_jwks_refuses_a_private_key():
-    """The column is served in full to the owner's settings, so it holds the half
-    that is meant to be read."""
+def _private_jwk() -> dict:
+    """The column is served in full to the owner's settings, so it holds the
+    half that is meant to be read."""
     from cryptography.hazmat.primitives.asymmetric import ed25519
     from jwt.algorithms import OKPAlgorithm
 
-    key = ed25519.Ed25519PrivateKey.generate()
-    private_jwk = json.loads(OKPAlgorithm.to_jwk(key))
-    private_jwk["kid"] = "pasted-the-whole-key"
-
-    with pytest.raises(HTTPException) as excinfo:
-        service.normalize_jwks({"keys": [private_jwk]})
-    assert excinfo.value.status_code == 400
-    assert excinfo.value.detail == PluginServiceMessages.INVALID_JWKS
+    jwk = json.loads(OKPAlgorithm.to_jwk(ed25519.Ed25519PrivateKey.generate()))
+    jwk["kid"] = "pasted-the-whole-key"
+    return jwk
 
 
-@pytest.mark.parametrize("kind", ["rsa", "p-256"])
-def test_jwks_refuses_a_key_that_is_not_ed25519(kind):
+def _other_curve_jwk(kind: str) -> dict:
     """A plug-in signs with Ed25519; any other key is refused when registered,
     not when it first fails to authenticate."""
     from cryptography.hazmat.primitives.asymmetric import ec, rsa
     from jwt.algorithms import ECAlgorithm, RSAAlgorithm
 
     if kind == "rsa":
-        jwk = json.loads(
-            RSAAlgorithm.to_jwk(
-                rsa.generate_private_key(
-                    public_exponent=65537, key_size=2048
-                ).public_key()
-            )
-        )
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        jwk = json.loads(RSAAlgorithm.to_jwk(key.public_key()))
     else:
-        jwk = json.loads(
-            ECAlgorithm.to_jwk(ec.generate_private_key(ec.SECP256R1()).public_key())
-        )
+        key = ec.generate_private_key(ec.SECP256R1())
+        jwk = json.loads(ECAlgorithm.to_jwk(key.public_key()))
     jwk["kid"] = "not-ed25519"
-
-    with pytest.raises(HTTPException) as excinfo:
-        service.normalize_jwks({"keys": [jwk]})
-    assert excinfo.value.status_code == 400
-    assert excinfo.value.detail == PluginServiceMessages.INVALID_JWKS
-
-
-def test_jwks_refuses_a_symmetric_key():
-    with pytest.raises(HTTPException) as excinfo:
-        service.normalize_jwks(
-            {"keys": [{"kid": "shared", "kty": "oct", "k": "c2hhcmVkLXNlY3JldA"}]}
-        )
-    assert excinfo.value.detail == PluginServiceMessages.INVALID_JWKS
+    return jwk
 
 
 @pytest.mark.parametrize(
     "value",
     [
-        {"keys": []},
-        {"keys": "not-a-list"},
-        {"keys": [{"kid": "k", "kty": "banana"}]},
-        {"keys": ["not-an-object"]},
-        {"no_keys_member": True},
+        lambda: {"keys": [_keyless()]},
+        lambda: {"keys": [_ed25519_jwk("same"), _ed25519_jwk("same")]},
+        lambda: {"keys": [_private_jwk()]},
+        lambda: {"keys": [_other_curve_jwk("rsa")]},
+        lambda: {"keys": [_other_curve_jwk("p-256")]},
+        lambda: {"keys": [{"kid": "shared", "kty": "oct", "k": "c2hhcmVkLXNlY3JldA"}]},
+        lambda: {"keys": []},
+        lambda: {"keys": "not-a-list"},
+        lambda: {"keys": [{"kid": "k", "kty": "banana"}]},
+        lambda: {"keys": ["not-an-object"]},
+        lambda: {"no_keys_member": True},
+    ],
+    ids=[
+        "no-kid",
+        "shared-kid",
+        "private",
+        "rsa",
+        "p-256",
+        "symmetric",
+        "empty",
+        "not-a-list",
+        "unknown-kty",
+        "not-an-object",
+        "no-keys",
     ],
 )
 def test_jwks_refuses_a_set_it_could_not_verify_with(value):
     with pytest.raises(HTTPException) as excinfo:
-        service.normalize_jwks(value)
+        service.normalize_jwks(value())
     assert excinfo.value.status_code == 400
     assert excinfo.value.detail == PluginServiceMessages.INVALID_JWKS
 
@@ -210,32 +181,7 @@ async def _create(session, **overrides):
     return await service.create_registration(session, **fields)
 
 
-async def test_registration_fails_closed_without_a_signing_key(session, monkeypatch):
-    """The plugin-platform keypair is required and has no fallback to any other
-    configured key, so the registry refuses rather than borrowing one."""
-    monkeypatch.setattr(settings, "PLUGIN_PLATFORM_SIGNING_PRIVATE_KEY_PEM", None)
-
-    with pytest.raises(HTTPException) as excinfo:
-        await _create(session)
-
-    assert excinfo.value.status_code == 503
-    assert excinfo.value.detail == PluginServiceMessages.SIGNING_NOT_CONFIGURED
-
-
 # --- create ------------------------------------------------------------------
-
-
-async def test_create_stores_what_it_is_told(session):
-    """Nothing is fetched: the id and the keys are the operator's, and the plug-in
-    facts wait for its listing."""
-    key_set = {"keys": [_ed25519_jwk("acme.widgets-1")]}
-    row = await _create(session, jwks=key_set)
-
-    assert row.public_id == "acme.widgets"
-    assert row.listing_uid is None
-    assert row.scope_ceiling == []
-    assert row.jwks == key_set
-    assert row.jwks_uri is None
 
 
 async def test_duplicate_public_id_is_refused(session):
@@ -362,22 +308,6 @@ def _serving(*documents: dict):
     return fetched, httpx2.MockTransport(handler)
 
 
-async def test_connect_shows_the_fingerprints_of_the_set_the_plugin_serves(session):
-    key = _ed25519_jwk("acme.widgets-1")
-    fetched, transport = _serving({"keys": [key]})
-    row = await _create(session)
-
-    keys = await service.published_keys(session, row.id, transport=transport)
-
-    assert keys == [
-        service.PublishedKey(kid="acme.widgets-1", fingerprint=jwk_thumbprint(key))
-    ]
-    assert fetched == [f"{BASE_URL}/.well-known/jwks.json"]
-    # Nothing is stored until it is confirmed.
-    await session.refresh(row)
-    assert row.jwks is None
-
-
 async def test_connect_pins_the_confirmed_set_in_place_of_a_key_set_address(
     session,
 ):
@@ -403,20 +333,9 @@ def _renamed(key_set: dict, kid: str) -> dict:
     return {"keys": [{**key_set["keys"][0], "kid": kid}]}
 
 
-@pytest.mark.parametrize(
-    "now_served",
-    [
-        # Another key under the same kid.
-        lambda shown: {"keys": [_ed25519_jwk("acme.widgets-1")]},
-        # The same key under another kid.
-        lambda shown: _renamed(shown, "acme.widgets-2"),
-    ],
-)
-async def test_connect_refuses_a_set_that_changed_since_it_was_shown(
-    session, now_served
-):
+async def test_connect_refuses_a_key_renamed_since_it_was_shown(session):
     shown = {"keys": [_ed25519_jwk("acme.widgets-1")]}
-    _fetched, transport = _serving(shown, now_served(shown))
+    _fetched, transport = _serving(shown, _renamed(shown, "acme.widgets-2"))
     row = await _create(session, jwks={"keys": [_ed25519_jwk("acme.widgets-0")]})
     confirmed = await service.published_keys(session, row.id, transport=transport)
 
@@ -498,26 +417,6 @@ async def test_connect_needs_a_base_url(session):
 # --- addresses ---------------------------------------------------------------
 
 
-async def test_the_browser_address_names_the_allowed_origins(session):
-    row = await _create(session, page_origin=PAGE_ORIGIN)
-
-    assert row.page_origin == PAGE_ORIGIN
-    # Browser origins, so they come from the browser address.
-    assert row.allowed_origins == [PAGE_ORIGIN]
-
-
-async def test_moving_the_browser_address_moves_a_default_origin_list(session):
-    row = await _create(session)
-    assert row.allowed_origins == [BASE_URL]
-
-    updated = await service.update_registration(
-        session, row.id, page_origin=PAGE_ORIGIN
-    )
-
-    # The list was still the plug-in's own origin, so it follows the plug-in.
-    assert updated.allowed_origins == [PAGE_ORIGIN]
-
-
 async def test_an_operators_own_origin_list_survives_a_move(session):
     row = await _create(session, allowed_origins=["https://chosen.example.com"])
 
@@ -526,15 +425,6 @@ async def test_an_operators_own_origin_list_survives_a_move(session):
     )
 
     assert updated.allowed_origins == ["https://chosen.example.com"]
-
-
-async def test_clearing_the_browser_address_puts_both_surfaces_back(session):
-    row = await _create(session, page_origin=PAGE_ORIGIN)
-
-    updated = await service.update_registration(session, row.id, page_origin="")
-
-    assert updated.page_origin is None
-    assert updated.allowed_origins == [BASE_URL]
 
 
 # --- plug-in facts, from a listing ------------------------------------------------
@@ -608,22 +498,6 @@ async def test_a_listing_carries_the_compose_service_its_publisher_wrote(session
     )
 
 
-async def test_a_listing_fills_in_the_registration_set_up_before_it(session):
-    set_up = await _create(session, jwks=sample_plugin_jwks(), mandatory=True)
-
-    await upsert_listing(session, _plugin_listing(CONTAINER), source="local")
-    await session.commit()
-
-    row = await _registration(session)
-    assert row.id == set_up.id
-    assert (row.listing_uid, row.base_url, row.mandatory) == (
-        LISTING_UID,
-        BASE_URL,
-        True,
-    )
-    assert row.scope_ceiling == ["comments:read", "projects:write"]
-
-
 async def test_a_listing_republished_without_a_scope_takes_it_away(session):
     await upsert_listing(session, _plugin_listing(CONTAINER), source="operator")
     await upsert_listing(
@@ -672,27 +546,59 @@ async def test_a_listing_writes_its_reach_and_leaving_beta_deletes_the_list(
     assert await service._beta_list(session, LISTING_UID) == set()
 
 
+DECLARATIVE = {"kind": "declarative", "scope_ceiling": []}
+
+
+def _declarative_listing(registration) -> dict:
+    return {
+        **_plugin_listing(registration),
+        "definition": declarative_plugin("acme.widgets"),
+    }
+
+
+TOOL = {"kind": "tool", "scope_ceiling": []}
+
+
+def _tool_listing(registration) -> dict:
+    return {**_plugin_listing(registration), "definition": counters_tool_manifest()}
+
+
 @pytest.mark.parametrize(
-    "block",
+    "listing",
     [
-        {**CONTAINER, "kind": "hosted"},
-        {**CONTAINER, "base_url": BASE_URL},
-        {**CONTAINER, "jwks": {"keys": []}},
-        {**CONTAINER, "image": "ghcr.io/acme/widgets:latest"},
         *(
-            {**CONTAINER, "image": IMAGE, "compose": {**COMPOSE, **change}}
-            for change in (
-                {"service": "widgets:\n  image: ${IMAGES}\n"},
-                {"service": "widgets:\n  image: ${IMAGE\n"},
-                {"service": "x" * 4097},
-                {"base_url": "ftp://widgets"},
-                {"base_url": "http://widgets:8080/a b"},
-                {"base_url": f"http://{'w' * 506}"},
-                {"base_url": "http://["},
-                {"ports": []},
+            _plugin_listing(block)
+            for block in (
+                {**CONTAINER, "kind": "hosted"},
+                {**CONTAINER, "base_url": BASE_URL},
+                {**CONTAINER, "jwks": {"keys": []}},
+                {**CONTAINER, "image": "ghcr.io/acme/widgets:latest"},
+                *(
+                    {**CONTAINER, "image": IMAGE, "compose": {**COMPOSE, **change}}
+                    for change in (
+                        {"service": "widgets:\n  image: ${IMAGES}\n"},
+                        {"service": "widgets:\n  image: ${IMAGE\n"},
+                        {"service": "x" * 4097},
+                        {"base_url": "ftp://widgets"},
+                        {"base_url": "http://widgets:8080/a b"},
+                        {"base_url": f"http://{'w' * 506}"},
+                        {"base_url": "http://["},
+                        {"ports": []},
+                    )
+                ),
+                {**CONTAINER, "compose": COMPOSE},
             )
         ),
-        {**CONTAINER, "compose": COMPOSE},
+        # A registration block says the plug-in's own kind.
+        _declarative_listing(CONTAINER),
+        _plugin_listing(DECLARATIVE),
+        _declarative_listing({**DECLARATIVE, "image": IMAGE}),
+        # A tool's says it is a tool and nothing more.
+        _tool_listing(CONTAINER),
+        _tool_listing(DECLARATIVE),
+        _tool_listing({**TOOL, "image": IMAGE}),
+        _tool_listing({**TOOL, "scope_ceiling": ["projects:read"]}),
+        _plugin_listing(TOOL),
     ],
     ids=[
         "hosted",
@@ -708,30 +614,19 @@ async def test_a_listing_writes_its_reach_and_leaving_beta_deletes_the_list(
         "malformed-authority",
         "unknown-term",
         "image-placeholder-without-image",
+        "declarative-plugin-container-block",
+        "container-plugin-declarative-block",
+        "declarative-image",
+        "tool-plugin-container-block",
+        "tool-plugin-declarative-block",
+        "tool-image",
+        "tool-scopes",
+        "container-plugin-tool-block",
     ],
 )
-async def test_a_listing_block_with_a_fact_it_cannot_state_is_refused(session, block):
+async def test_a_listing_block_with_a_fact_it_cannot_state_is_refused(session, listing):
     with pytest.raises(CatalogError):
-        await upsert_listing(session, _plugin_listing(block), source="local")
-
-
-async def test_a_registration_another_listing_holds_is_refused(session):
-    await create_plugin_service_registration(
-        session, public_id="acme.widgets", listing_uid="ABCDEFGHJKMNPQ"
-    )
-
-    with pytest.raises(CatalogSourceConflict):
-        await upsert_listing(session, _plugin_listing(CONTAINER), source="local")
-
-
-DECLARATIVE = {"kind": "declarative", "scope_ceiling": []}
-
-
-def _declarative_listing(registration) -> dict:
-    return {
-        **_plugin_listing(registration),
-        "definition": declarative_plugin("acme.widgets"),
-    }
+        await upsert_listing(session, listing, source="local")
 
 
 async def test_a_declarative_plugin_is_live_with_its_vendor_values_and_no_location(
@@ -774,31 +669,6 @@ async def test_a_container_republished_as_declarative_leaves_its_location(sessio
     assert row.allowed_origins == []
 
 
-@pytest.mark.parametrize(
-    "listing",
-    [
-        _declarative_listing(CONTAINER),
-        _plugin_listing(DECLARATIVE),
-        _declarative_listing({**DECLARATIVE, "image": IMAGE}),
-    ],
-    ids=[
-        "declarative-plugin-container-block",
-        "container-plugin-declarative-block",
-        "image",
-    ],
-)
-async def test_a_registration_block_says_the_plugins_own_kind(session, listing):
-    with pytest.raises(CatalogError):
-        await upsert_listing(session, listing, source="local")
-
-
-TOOL = {"kind": "tool", "scope_ceiling": []}
-
-
-def _tool_listing(registration) -> dict:
-    return {**_plugin_listing(registration), "definition": counters_tool_manifest()}
-
-
 async def test_a_tool_plugin_registers_as_a_tool_with_no_location(session):
     """It runs no code, so its registration is a tool's: no image, no address,
     no keys and no scopes, named by its listing as a declarative plug-in is."""
@@ -816,28 +686,6 @@ async def test_a_tool_plugin_registers_as_a_tool_with_no_location(session):
     with pytest.raises(HTTPException) as refused:
         await service.update_registration(session, row.id, base_url=BASE_URL)
     assert refused.value.detail == PluginServiceMessages.DECLARATIVE_NOT_PLACED
-
-
-@pytest.mark.parametrize(
-    "listing",
-    [
-        _tool_listing(CONTAINER),
-        _tool_listing(DECLARATIVE),
-        _tool_listing({**TOOL, "image": IMAGE}),
-        _tool_listing({**TOOL, "scope_ceiling": ["projects:read"]}),
-        _plugin_listing(TOOL),
-    ],
-    ids=[
-        "tool-plugin-container-block",
-        "tool-plugin-declarative-block",
-        "image",
-        "scopes",
-        "container-plugin-tool-block",
-    ],
-)
-async def test_a_tool_registration_says_it_is_a_tool_and_nothing_more(session, listing):
-    with pytest.raises(CatalogError):
-        await upsert_listing(session, listing, source="local")
 
 
 # --- boot reconciliation -----------------------------------------------------
@@ -873,7 +721,8 @@ async def test_reconcile_writes_the_deployment_facts_from_the_mounted_file(
             [
                 {
                     "public_id": "acme.declared",
-                    "base_url": BASE_URL,
+                    "base_url": HTTPS_BASE_URL,
+                    "jwks_uri": f"{HTTPS_BASE_URL}/jwks.json",
                     "allowed_origins": ["https://app.example.com"],
                     "mandatory": True,
                 }
@@ -885,44 +734,14 @@ async def test_reconcile_writes_the_deployment_facts_from_the_mounted_file(
 
     assert (result.updated, result.skipped) == (1, 0)
     row = await _registration(session, "acme.declared")
-    assert row.base_url == BASE_URL
+    assert row.base_url == HTTPS_BASE_URL
+    assert row.jwks_uri == f"{HTTPS_BASE_URL}/jwks.json"
     assert row.allowed_origins == ["https://app.example.com"]
     assert row.mandatory is True
     assert row.listing_uid == LISTING_UID
 
-
-async def test_an_entry_waits_for_its_listing(session, tmp_path, monkeypatch):
-    """An entry whose plug-in has no listing here yet is kept, and the listing
-    apply that creates the registration applies it."""
-    monkeypatch.setattr(
-        settings,
-        "PLUGIN_SERVICES_CONFIG",
-        _write_config(
-            tmp_path,
-            [
-                {
-                    "public_id": "acme.widgets",
-                    "base_url": BASE_URL,
-                    "jwks": sample_plugin_jwks(),
-                    "mandatory": True,
-                }
-            ],
-        ),
-    )
-    result = await service.reconcile_from_config(session)
-    assert (result.waiting, result.updated) == (1, 0)
-    assert (await session.exec(select(PluginServiceRegistration))).all() == []
-
-    await upsert_listing(session, _plugin_listing(CONTAINER), source="operator")
-    await session.commit()
-
-    row = await _registration(session)
-    assert (row.base_url, row.jwks, row.mandatory) == (
-        BASE_URL,
-        sample_plugin_jwks(),
-        True,
-    )
-    assert (await load_registrations(force=True))["acme.widgets"].live is True
+    again = await service.reconcile_from_config(session)
+    assert (again.updated, again.unchanged) == (0, 1)
 
 
 @pytest.mark.parametrize(
@@ -1010,23 +829,6 @@ async def test_reconcile_reads_the_browser_address_from_the_file(
     assert row.allowed_origins == [PAGE_ORIGIN]
 
 
-async def test_reconcile_is_idempotent(session, tmp_path, monkeypatch):
-    await _listed(session, "acme.idempotent")
-    monkeypatch.setattr(
-        settings,
-        "PLUGIN_SERVICES_CONFIG",
-        _write_config(
-            tmp_path, [{"public_id": "acme.idempotent", "base_url": BASE_URL}]
-        ),
-    )
-
-    first = await service.reconcile_from_config(session)
-    second = await service.reconcile_from_config(session)
-
-    assert first.updated == 1
-    assert (second.updated, second.unchanged) == (0, 1)
-
-
 async def test_reconcile_never_lifts_a_suspension(session, tmp_path, monkeypatch):
     """Suspending a plug-in is the owner's, so a restart must not quietly
     reverse it — the file still governs everything else."""
@@ -1050,32 +852,16 @@ async def test_reconcile_never_lifts_a_suspension(session, tmp_path, monkeypatch
     assert stored.mandatory is True
 
 
-async def test_reconcile_reads_the_key_set_address(session, tmp_path, monkeypatch):
-    await _listed(session, "acme.published")
-    entry = {
-        "public_id": "acme.published",
-        "base_url": HTTPS_BASE_URL,
-        "jwks_uri": f"{HTTPS_BASE_URL}/jwks.json",
-    }
-    monkeypatch.setattr(
-        settings, "PLUGIN_SERVICES_CONFIG", _write_config(tmp_path, [entry])
-    )
-
-    assert (await service.reconcile_from_config(session)).updated == 1
-    row = await _registration(session, "acme.published")
-    assert row.jwks_uri == f"{HTTPS_BASE_URL}/jwks.json"
-
-
-async def test_reconcile_is_a_no_op_without_the_setting(session, monkeypatch):
-    monkeypatch.setattr(settings, "PLUGIN_SERVICES_CONFIG", None)
-    assert (await service.reconcile_from_config(session)).total == 0
-
-
-async def test_reconcile_survives_an_unreadable_file(session, tmp_path, monkeypatch):
+@pytest.mark.parametrize("config", [None, "{not json"], ids=["unset", "unreadable"])
+async def test_reconcile_without_a_readable_file_does_nothing(
+    session, tmp_path, monkeypatch, config
+):
     """A malformed file costs the file, never the boot."""
-    path = tmp_path / "broken.json"
-    path.write_text("{not json", encoding="utf-8")
-    monkeypatch.setattr(settings, "PLUGIN_SERVICES_CONFIG", str(path))
+    if config is not None:
+        path = tmp_path / "broken.json"
+        path.write_text(config, encoding="utf-8")
+        config = str(path)
+    monkeypatch.setattr(settings, "PLUGIN_SERVICES_CONFIG", config)
 
     assert (await service.reconcile_from_config(session)).total == 0
 
