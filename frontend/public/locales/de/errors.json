@@ -318,6 +318,7 @@
   "SETTINGS_STORAGE_BUCKET_REQUIRED": "Gib einen Bucket-Namen ein, um die Verbindung zu testen.",
   "SETTINGS_STORAGE_CONNECTION_FAILED": "Der Bucket war nicht erreichbar. Prüfe die Einstellungen; Details stehen im Serverprotokoll.",
   "IMPORT_UNKNOWN_TYPE": "Diese Datei ist kein bekannter Initiative-Export.",
+  "IMPORT_COUNTERS_NOT_RESTORED": "Zählergruppen aus einer Sicherung von vor der Umstellung von Zählern auf ein Plug-in werden nicht wiederhergestellt.",
   "IMPORT_INVALID_ENVELOPE": "Die Importdatei ist ungültig oder beschädigt.",
   "IMPORT_SCHEMA_VERSION_UNSUPPORTED": "Diese Datei stammt aus einer neueren Initiative-Version und kann hier nicht importiert werden.",
   "IMPORT_ARCHIVE_TOO_OLD": "Diese Sicherung stammt aus einer Initiative-Version vor 0.78 und kann hier nicht mehr wiederhergestellt werden. Stelle sie zuerst unter 0.78 wieder her und sichere dann erneut.",

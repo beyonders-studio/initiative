@@ -1252,6 +1252,47 @@ async def test_backup_confirm_include_map_skips_tools(
     assert job["result"]["per_tool"]["wiki"]["created"] == 0
 
 
+async def test_a_counter_group_from_before_the_plug_in_is_skipped_and_said(
+    client, acting_user, session, monkeypatch, role_session
+):
+    """A backup made while Counters was built in holds counter groups no
+    importer reads now. The rest is restored, and each group is reported as
+    not restored, saying why."""
+    a = await acting_user(
+        guild_role=CommunityRole.superadmin, initiative=True, project=True
+    )
+    wiki, wiki_envelope = _wiki_entry()
+    group = {
+        **wiki,
+        "path": "initiatives/1-restored/counter_groups/1-scores.json",
+        "tool": "counter_group",
+        "type": "initiative-counter-group",
+        "title": "Scores",
+    }
+    zip_bytes = _make_backup_zip(
+        _minimal_manifest(entries=[wiki, group]),
+        {
+            wiki["path"]: json.dumps(wiki_envelope).encode(),
+            group["path"]: json.dumps(
+                {"type": "initiative-counter-group", "name": "Scores"}
+            ).encode(),
+        },
+    )
+    job_id = (await _upload_backup(client, a, zip_bytes)).json()["id"]
+    confirmed = await client.post(
+        a.g(f"/imports/jobs/{job_id}/confirm"), headers=a.headers, json={}
+    )
+    assert confirmed.status_code == 200
+
+    await _run_import_worker(monkeypatch, role_session)
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
+    entries = {entry["title"]: entry for entry in job["result"]["entries"]}
+    assert entries["Restored Lore"]["status"] == "created"
+    assert entries["Scores"]["status"] == "skipped"
+    assert entries["Scores"]["error"] == "IMPORT_COUNTERS_NOT_RESTORED"
+
+
 async def test_an_archive_from_before_the_floor_is_refused(client, acting_user):
     """An archive from before 0.78 names tools, kinds and references as they
     were then, so it is refused rather than half restored."""

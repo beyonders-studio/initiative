@@ -321,6 +321,7 @@
   "SETTINGS_STORAGE_BUCKET_REQUIRED": "Enter a bucket name to test the connection.",
   "SETTINGS_STORAGE_CONNECTION_FAILED": "Couldn't reach the bucket. Check the settings, or the server logs for details.",
   "IMPORT_UNKNOWN_TYPE": "This file isn't a recognized Initiative export.",
+  "IMPORT_COUNTERS_NOT_RESTORED": "Counter groups from a backup made before Counters became a plug-in aren't restored.",
   "IMPORT_INVALID_ENVELOPE": "The import file is invalid or corrupted.",
   "IMPORT_SCHEMA_VERSION_UNSUPPORTED": "This file was exported by a newer version of Initiative and can't be imported here.",
   "IMPORT_ARCHIVE_TOO_OLD": "This backup was made by a version of Initiative before 0.78, which this one no longer restores. Restore it on 0.78 first, then back up again.",

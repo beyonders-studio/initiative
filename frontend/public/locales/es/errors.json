@@ -318,6 +318,7 @@
   "SETTINGS_STORAGE_BUCKET_REQUIRED": "Escribe el nombre de un bucket para probar la conexión.",
   "SETTINGS_STORAGE_CONNECTION_FAILED": "No se pudo acceder al bucket. Revisa la configuración o consulta los registros del servidor para más detalles.",
   "IMPORT_UNKNOWN_TYPE": "Este archivo no es una exportación reconocida de Initiative.",
+  "IMPORT_COUNTERS_NOT_RESTORED": "Los grupos de contadores de una copia de seguridad anterior a que Contadores pasara a ser un complemento no se restauran.",
   "IMPORT_INVALID_ENVELOPE": "El archivo de importación es inválido o está dañado.",
   "IMPORT_SCHEMA_VERSION_UNSUPPORTED": "Este archivo fue exportado por una versión más nueva de Initiative y no se puede importar aquí.",
   "IMPORT_ARCHIVE_TOO_OLD": "Esta copia de seguridad se hizo con una versión de Initiative anterior a la 0.78, que esta ya no restaura. Restáurala primero en la 0.78 y vuelve a hacer la copia.",

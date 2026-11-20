@@ -318,6 +318,7 @@
   "SETTINGS_STORAGE_BUCKET_REQUIRED": "Saisissez le nom d'un bucket pour tester la connexion.",
   "SETTINGS_STORAGE_CONNECTION_FAILED": "Impossible de joindre le bucket. Vérifiez les paramètres, ou consultez les journaux du serveur pour plus de détails.",
   "IMPORT_UNKNOWN_TYPE": "Ce fichier n'est pas un export Initiative reconnu.",
+  "IMPORT_COUNTERS_NOT_RESTORED": "Les groupes de compteurs d'une sauvegarde antérieure au passage des Compteurs en plug-in ne sont pas restaurés.",
   "IMPORT_INVALID_ENVELOPE": "Le fichier d'import est invalide ou corrompu.",
   "IMPORT_SCHEMA_VERSION_UNSUPPORTED": "Ce fichier provient d'une version plus récente d'Initiative et ne peut pas être importé ici.",
   "IMPORT_ARCHIVE_TOO_OLD": "Cette sauvegarde provient d'une version d'Initiative antérieure à 0.78, que celle-ci ne restaure plus. Restaurez-la d'abord sous 0.78, puis sauvegardez à nouveau.",

@@ -114,6 +114,10 @@ from app.services.tenant.attachments import claim_shown
 # exported into an envelope this refuses to read back.
 _TOOL_ORDER = tuple(t.value for t in BULK_EXPORT_TOOLS)
 
+#: A counter group's envelope in a backup made before Counters became a
+#: plug-in. It is skipped, and its result says why.
+_BUILTIN_COUNTER_GROUP = "initiative-counter-group"
+
 # An initiative's own files: what it is shaped like, rather than anything made
 # inside it. They carry no Tool and no registry importer — like ``file``
 # entries, they are applied here — and they go FIRST, because the content
@@ -868,7 +872,11 @@ async def _apply_entry(
     importer = importers.get(entry.type)
     if importer is None:
         return EntryResult(
-            **base, status="skipped", error=ImportEngineMessages.IMPORT_UNKNOWN_TYPE
+            **base,
+            status="skipped",
+            error=ImportEngineMessages.IMPORT_COUNTERS_NOT_RESTORED
+            if entry.type == _BUILTIN_COUNTER_GROUP
+            else ImportEngineMessages.IMPORT_UNKNOWN_TYPE,
         )
     try:
         raw = await asyncio.to_thread(

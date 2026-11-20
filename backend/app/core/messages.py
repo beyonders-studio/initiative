@@ -1075,6 +1075,9 @@ class ExportMessages:
 
 class ImportEngineMessages:
     IMPORT_UNKNOWN_TYPE = "IMPORT_UNKNOWN_TYPE"
+    #: A counter group in a backup from before Counters became a plug-in,
+    #: which a restore skips.
+    IMPORT_COUNTERS_NOT_RESTORED = "IMPORT_COUNTERS_NOT_RESTORED"
     IMPORT_INVALID_ENVELOPE = "IMPORT_INVALID_ENVELOPE"
     IMPORT_SCHEMA_VERSION_UNSUPPORTED = "IMPORT_SCHEMA_VERSION_UNSUPPORTED"
     IMPORT_ARCHIVE_TOO_OLD = "IMPORT_ARCHIVE_TOO_OLD"
