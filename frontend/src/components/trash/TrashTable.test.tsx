@@ -121,22 +121,6 @@ describe("TrashTable", () => {
     expect(pagesAsked).toEqual(["1/25", "2/25"]);
   });
 
-  it("hides the Delete now column when showPurgeAction=false", async () => {
-    server.use(
-      http.get(myTrashEndpoint, () =>
-        HttpResponse.json(
-          buildTrashListResponse([buildTrashItem({ entity_type: "project", name: "Mine" })])
-        )
-      )
-    );
-
-    renderWithProviders(<TrashTable variant="user" showPurgeAction={false} />);
-
-    await screen.findByText("Mine");
-    expect(screen.getByRole("button", { name: /Restore/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Delete now/i })).not.toBeInTheDocument();
-  });
-
   it("clicking Restore POSTs to the restore endpoint and shows a success toast", async () => {
     const { toast } = await import("@/lib/mascotToast");
     const restoreCalls: string[] = [];
@@ -158,6 +142,8 @@ describe("TrashTable", () => {
     renderWithProviders(<TrashTable variant="user" showPurgeAction={false} />);
 
     await screen.findByText("Test task");
+    // No Delete now column with showPurgeAction=false.
+    expect(screen.queryByRole("button", { name: /Delete now/i })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Restore/i }));
 
     await waitFor(() => expect(restoreCalls).toEqual(["task/42"]));

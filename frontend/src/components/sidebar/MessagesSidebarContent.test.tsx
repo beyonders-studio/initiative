@@ -75,38 +75,6 @@ beforeEach(() => {
 });
 
 describe("the messages sidebar", () => {
-  it("addresses a conversation by handle rather than selecting it in place", async () => {
-    mocks.conversations.mockReturnValue({
-      data: {
-        conversations: [{ id: "conv-1", other_user_id: 7, created_at: "2026-09-01T00:00:00Z" }],
-      },
-      isLoading: false,
-    });
-    mocks.messageRequests.mockReturnValue({
-      data: { accepted: [grant(7, "alex")], incoming: [], outgoing: [] },
-    });
-
-    setup();
-
-    expect((await screen.findByTitle("alex#1234")).closest("a")).toHaveAttribute(
-      "href",
-      "/messages?with=alex1234"
-    );
-  });
-
-  it("lists somebody with a channel nobody has opened yet", async () => {
-    mocks.messageRequests.mockReturnValue({
-      data: { accepted: [grant(8, "sam")], incoming: [], outgoing: [] },
-    });
-
-    setup();
-
-    expect((await screen.findByTitle("sam#1234")).closest("a")).toHaveAttribute(
-      "href",
-      "/messages?with=sam1234"
-    );
-  });
-
   it("answers somebody waiting without leaving the list", async () => {
     mocks.messageRequests.mockReturnValue({
       data: { accepted: [], incoming: [grant(9, "robin")], outgoing: [] },
@@ -138,7 +106,7 @@ describe("the messages sidebar", () => {
     expect(mocks.decline).toHaveBeenCalledWith({ userId: 9 });
   });
 
-  it("drops a conversation whose other side it can no longer see", async () => {
+  it("addresses each person by handle, a fresh channel included, and drops a conversation whose other side it can no longer see", async () => {
     // Ignoring somebody takes the grant with it. The thread this device has
     // already collected stays on it, but a row with no name to show and no
     // handle to address is a person nobody can open.
@@ -151,13 +119,23 @@ describe("the messages sidebar", () => {
       },
       isLoading: false,
     });
+    // Sam has a channel nobody has opened yet; a row addresses its person
+    // rather than holding a selection of its own.
     mocks.messageRequests.mockReturnValue({
-      data: { accepted: [grant(7, "alex")], incoming: [], outgoing: [] },
+      data: { accepted: [grant(7, "alex"), grant(9, "sam")], incoming: [], outgoing: [] },
     });
 
     setup();
 
-    expect(await screen.findByTitle("alex#1234")).toBeInTheDocument();
+    for (const [title, handle] of [
+      ["alex#1234", "alex1234"],
+      ["sam#1234", "sam1234"],
+    ]) {
+      expect((await screen.findByTitle(title)).closest("a")).toHaveAttribute(
+        "href",
+        `/messages?with=${handle}`
+      );
+    }
     expect(screen.queryByText(/unknown account/i)).toBeNull();
   });
 

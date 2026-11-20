@@ -39,28 +39,25 @@ describe("a slot that holds one thing", () => {
         kind="banner"
         value={null}
         onChange={vi.fn()}
-        owned={[...banners, buildOwnedDecoration({ id: "core.gold", kind: "frame" })]}
+        owned={[
+          ...banners,
+          buildOwnedDecoration({ id: "core.gold", kind: "frame" }),
+          // A pack the server knows about and this build has no artwork for. A
+          // tile that renders as nothing is worse than no tile.
+          buildOwnedDecoration({ id: "studio.holo", kind: "banner" }),
+        ]}
       />
     );
 
-    expect(screen.getAllByRole("radio")).toHaveLength(2);
+    // Real radios sharing a name: the browser gives the group one tab stop and
+    // arrow keys move within it, which is what a slot holding one thing means.
+    const tiles = screen.getAllByRole("radio");
+    expect(tiles).toHaveLength(2);
+    for (const tile of tiles) {
+      expect(tile).toHaveAttribute("name", "decoration-banner");
+    }
     expect(screen.getByRole("radio", { name: "decorations.aurora" })).toBeInTheDocument();
     expect(screen.queryByRole("radio", { name: "decorations.gold" })).not.toBeInTheDocument();
-  });
-
-  it("leaves out a decoration this build cannot draw", async () => {
-    // A pack the server knows about and this build has no artwork for. A tile
-    // that renders as nothing is worse than no tile.
-    render(
-      <SlotPicker
-        kind="banner"
-        value={null}
-        onChange={vi.fn()}
-        owned={[...banners, buildOwnedDecoration({ id: "studio.holo", kind: "banner" })]}
-      />
-    );
-
-    expect(screen.getAllByRole("radio")).toHaveLength(2);
   });
 
   it("takes the decoration off when the one already on is picked again", async () => {
@@ -74,16 +71,6 @@ describe("a slot that holds one thing", () => {
     expect(onChange).toHaveBeenCalledWith(null);
   });
 
-  it("groups a slot's tiles so they read as alternatives", () => {
-    // Real radios sharing a name: the browser gives the group one tab stop and
-    // arrow keys move within it, which is what a slot holding one thing means.
-    render(<SlotPicker kind="banner" value={null} onChange={vi.fn()} owned={banners} />);
-
-    for (const tile of screen.getAllByRole("radio")) {
-      expect(tile).toHaveAttribute("name", "decoration-banner");
-    }
-  });
-
   it("says so when the library has nothing for the slot", () => {
     render(<SlotPicker kind="frame" value={null} onChange={vi.fn()} owned={banners} />);
 
@@ -92,41 +79,32 @@ describe("a slot that holds one thing", () => {
 });
 
 describe("the trophy row", () => {
-  it("wears them in the order they were picked", async () => {
-    const onChange = vi.fn();
-    render(<TrophyPicker value={["plants.morel"]} onChange={onChange} owned={trophies} max={6} />);
+  it.each([
+    [["plants.morel"], ["plants.morel", "ttrpg.d20"]],
+    [["ttrpg.d20"], []],
+  ])(
+    "wears them in the order picked, and takes one off when picked again (%j)",
+    async (value, next) => {
+      const onChange = vi.fn();
+      render(<TrophyPicker value={value} onChange={onChange} owned={trophies} max={6} />);
 
-    await userEvent.click(screen.getByRole("checkbox", { name: "decorations.d20" }));
+      await userEvent.click(screen.getByRole("checkbox", { name: "decorations.d20" }));
 
-    expect(onChange).toHaveBeenCalledWith(["plants.morel", "ttrpg.d20"]);
-  });
+      expect(onChange).toHaveBeenCalledWith(next);
+    }
+  );
 
-  it("takes one off when it is picked again", async () => {
-    const onChange = vi.fn();
-    render(<TrophyPicker value={["ttrpg.d20"]} onChange={onChange} owned={trophies} max={6} />);
-
-    await userEvent.click(screen.getByRole("checkbox", { name: "decorations.d20" }));
-
-    expect(onChange).toHaveBeenCalledWith([]);
-  });
-
-  it("marks a tile past the cap as unavailable rather than just inert", async () => {
+  it("marks a tile past the cap as unavailable, rather than dropping what is worn", async () => {
     // Disabled says "not now" to a screen reader; an unresponsive tile says
-    // nothing at all.
-    render(<TrophyPicker value={["plants.morel"]} onChange={vi.fn()} owned={trophies} max={1} />);
-
-    expect(screen.getByRole("checkbox", { name: "decorations.d20" })).toBeDisabled();
-    expect(screen.getByRole("checkbox", { name: "decorations.morel" })).toBeEnabled();
-  });
-
-  it("stops at the cap rather than dropping what is already worn", async () => {
-    // What is on is the reader's choice; the picker must not quietly evict the
-    // oldest trophy to make room for a new one.
+    // nothing at all. What is on is the reader's choice; the picker must not
+    // quietly evict the oldest trophy to make room for a new one.
     const onChange = vi.fn();
     render(<TrophyPicker value={["plants.morel"]} onChange={onChange} owned={trophies} max={1} />);
 
-    await userEvent.click(screen.getByRole("checkbox", { name: "decorations.d20" }));
-
+    const d20 = screen.getByRole("checkbox", { name: "decorations.d20" });
+    expect(d20).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "decorations.morel" })).toBeEnabled();
+    await userEvent.click(d20);
     expect(onChange).not.toHaveBeenCalled();
   });
 });

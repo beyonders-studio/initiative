@@ -61,38 +61,20 @@ describe("CommentSection", () => {
     await waitFor(() => expect(deleted).toBe(String(mine.id)));
   });
 
-  it("posts a dashboard comment on the dashboard", async () => {
+  it.each([
+    [Tool.dashboard, 9, "Reset these before the next session."],
+    ["task", 3, "Picking this up."],
+  ] as const)("posts a %s comment on the %s", async (entityType, entityId, content) => {
     const created = captureCreate();
 
     renderPage(() => (
-      <CommentSection entityType={Tool.dashboard} entityId={9} comments={[]} initiativeId={7} />
+      <CommentSection entityType={entityType} entityId={entityId} comments={[]} initiativeId={7} />
     ));
 
-    await postComment("Reset these before the next session.");
+    await postComment(content);
 
     await waitFor(() => expect(created.body()).not.toBeNull());
-    expect(created.body()).toEqual({
-      content: "Reset these before the next session.",
-      subject_type: "dashboard",
-      subject_id: 9,
-    });
-  });
-
-  it("posts a task comment on the task", async () => {
-    const created = captureCreate();
-
-    renderPage(() => (
-      <CommentSection entityType="task" entityId={3} comments={[]} initiativeId={7} />
-    ));
-
-    await postComment("Picking this up.");
-
-    await waitFor(() => expect(created.body()).not.toBeNull());
-    expect(created.body()).toEqual({
-      content: "Picking this up.",
-      subject_type: "task",
-      subject_id: 3,
-    });
+    expect(created.body()).toEqual({ content, subject_type: entityType, subject_id: entityId });
   });
 
   it("carries the parent id when replying", async () => {

@@ -30,7 +30,7 @@ const fireStepUp = (providerSlug: string) => {
 };
 
 describe("StepUpDialog", () => {
-  it("opens on a step-up event and names the required provider", async () => {
+  it("opens on a step-up event naming the required provider, and dismisses without navigating", async () => {
     server.use(http.get("/api/v1/auth/providers", () => HttpResponse.json(providersResponse)));
     renderWithProviders(<StepUpDialog />);
 
@@ -38,18 +38,11 @@ describe("StepUpDialog", () => {
     fireStepUp("corp");
 
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    // Both the description and the action button name the provider once the
-    // listing resolves the slug to its display name.
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /sign in with Corp SSO/i })).toBeInTheDocument();
-    });
-  });
-
-  it("dismisses without navigating", async () => {
-    server.use(http.get("/api/v1/auth/providers", () => HttpResponse.json(providersResponse)));
-    renderWithProviders(<StepUpDialog />);
-    fireStepUp("corp");
-    await screen.findByRole("dialog");
+    // The action button names the provider once the listing resolves the slug
+    // to its display name.
+    expect(
+      await screen.findByRole("button", { name: /sign in with Corp SSO/i })
+    ).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /not now/i }));
 

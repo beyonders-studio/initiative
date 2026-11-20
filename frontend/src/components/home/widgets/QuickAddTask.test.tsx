@@ -43,6 +43,8 @@ describe("QuickAddTask", () => {
   it("reads the title for its details where the reader has that on", async () => {
     const sent = stubAdd();
     renderBox(true);
+    await userEvent.click(screen.getByRole("button", { name: /what a title can say/i }));
+    expect(await screen.findByText(/type the details into the title/i)).toBeInTheDocument();
     const box = screen.getByRole("textbox", { name: /add a task to chores/i });
     await userEvent.type(box, "Pay the invoice tomorrow !high #billing");
 
@@ -80,35 +82,11 @@ describe("QuickAddTask", () => {
     expect(sent[0]).toMatchObject({ title: "Ship v2", task_type_id: 61 });
   });
 
-  it("offers what a title can say only where the reader has titles read", async () => {
-    renderBox(true);
-    await userEvent.click(screen.getByRole("button", { name: /what a title can say/i }));
-    expect(await screen.findByText(/type the details into the title/i)).toBeInTheDocument();
-  });
-
-  it("offers no hints where the reader has titles read as typed", () => {
-    renderBox(false);
-    expect(screen.queryByRole("button", { name: /what a title can say/i })).not.toBeInTheDocument();
-  });
-
-  it("keeps words taken off the list in the title", async () => {
-    const sent = stubAdd();
-    renderBox(true);
-    await userEvent.type(screen.getByRole("textbox"), "Plan the trip next week");
-    await userEvent.click(
-      await screen.findByRole("button", { name: /keep “next week” in the title/i })
-    );
-    expect(screen.queryByRole("list", { name: /read from the title/i })).not.toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: /^add$/i }));
-    await waitFor(() => expect(sent).toHaveLength(1));
-    expect(sent[0].title).toBe("Plan the trip next week");
-    expect(sent[0]).not.toHaveProperty("due_date");
-  });
-
   it("adds the title as typed where the reader has it off", async () => {
     const sent = stubAdd();
     renderBox(false);
+    // No hints about what a title can say, either.
+    expect(screen.queryByRole("button", { name: /what a title can say/i })).not.toBeInTheDocument();
     await userEvent.type(screen.getByRole("textbox"), "Pay the invoice tomorrow !high");
     expect(screen.queryByRole("list", { name: /read from the title/i })).not.toBeInTheDocument();
 
@@ -149,7 +127,7 @@ describe("QuickAddTask", () => {
     expect(sent[0]).toMatchObject({ title: "Water the plants", assignee_ids: [7, 42] });
   });
 
-  it("starts the next task afresh, with nothing kept from the last", async () => {
+  it("keeps words taken off the list in the title, and starts the next task afresh", async () => {
     const sent = stubAdd();
     renderBox(true);
     const box = screen.getByRole("textbox");
@@ -157,8 +135,12 @@ describe("QuickAddTask", () => {
     await userEvent.click(
       await screen.findByRole("button", { name: /keep “next week” in the title/i })
     );
+    expect(screen.queryByRole("list", { name: /read from the title/i })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /^add$/i }));
     await waitFor(() => expect(sent).toHaveLength(1));
+    // The words taken off the list stay in the title.
+    expect(sent[0].title).toBe("Plan the trip next week");
+    expect(sent[0]).not.toHaveProperty("due_date");
     await waitFor(() => expect(box).toHaveValue(""));
 
     await userEvent.type(box, "Send the invoices next week");

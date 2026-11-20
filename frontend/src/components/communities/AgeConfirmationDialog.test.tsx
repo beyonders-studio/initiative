@@ -43,8 +43,9 @@ describe("AgeConfirmationDialog", () => {
     await userEvent.keyboard("{Escape}");
   };
 
-  it("asks for a date of birth rather than offering a box to tick", async () => {
+  it("asks for a date of birth rather than offering a box to tick, and needs one", async () => {
     renderDialog();
+    expect(await screen.findByRole("button", { name: "Confirm and join" })).toBeDisabled();
 
     await userEvent.click(await screen.findByLabelText("Date of birth"));
 
@@ -71,16 +72,11 @@ describe("AgeConfirmationDialog", () => {
     expect(offered[0]).toBe(String(thisYear - 120));
   });
 
-  it("says what is done with the date, beside the field asking for it", async () => {
+  it("says what is done with the date beside the field, why it is asked, and that it is asked once", async () => {
     renderDialog();
 
     expect(await screen.findByText(/We don't sell your data\./)).toBeInTheDocument();
-  });
-
-  it("says why it is asked, and that it is asked once", async () => {
-    renderDialog();
-
-    expect(await screen.findByText(/so we ask once/i)).toBeInTheDocument();
+    expect(screen.getByText(/so we ask once/i)).toBeInTheDocument();
   });
 
   it("sends the date and nothing else", async () => {
@@ -95,14 +91,6 @@ describe("AgeConfirmationDialog", () => {
     });
   });
 
-  it("cannot be submitted with no date", async () => {
-    renderDialog();
-    await screen.findByLabelText("Date of birth");
-
-    expect(screen.getByRole("button", { name: "Confirm and join" })).toBeDisabled();
-    expect(confirmMyAge).not.toHaveBeenCalled();
-  });
-
   it("offers no second attempt to an account whose answer stands", async () => {
     // Re-asking would let the answer be tried until it came out right, which
     // is the thing recording it exists to stop.
@@ -113,28 +101,12 @@ describe("AgeConfirmationDialog", () => {
     expect(await screen.findByText(/told us you're not old enough yet/i)).toBeInTheDocument();
     expect(screen.queryByLabelText("Date of birth")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Confirm and join" })).not.toBeInTheDocument();
-  });
-
-  it("tells a blocked account who can reset the question", async () => {
-    renderDialog(
-      buildUser({ age_confirmed_at: null, age_below_minimum_at: "2026-01-01T00:00:00Z" })
-    );
-
+    // Who can reset the question, and — so it does not read as an account shut
+    // out of the app — that the communities it was invited to are unaffected.
     expect(
-      await screen.findByText(/ask whoever runs this server to reset the question/i)
+      screen.getByText(/ask whoever runs this server to reset the question/i)
     ).toBeInTheDocument();
-  });
-
-  it("tells a blocked account the communities it was invited to are unaffected", async () => {
-    // The refusal closes one door. Saying so is what stops it reading as an
-    // account that has been shut out of the app.
-    renderDialog(
-      buildUser({ age_confirmed_at: null, age_below_minimum_at: "2026-01-01T00:00:00Z" })
-    );
-
-    expect(
-      await screen.findByText(/communities you were invited to is unaffected/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/communities you were invited to is unaffected/i)).toBeInTheDocument();
   });
 
   it("surfaces the server's answer when somebody is too young", async () => {

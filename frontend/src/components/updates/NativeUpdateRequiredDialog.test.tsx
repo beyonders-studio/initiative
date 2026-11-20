@@ -46,16 +46,7 @@ describe("NativeUpdateRequiredDialog", () => {
     expect(await screen.findByRole("link", { name: /download/i })).toHaveAttribute("href", href);
   });
 
-  it("sends an Android app installed from Google Play back to Play", async () => {
-    vi.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
-    appEnvironment.get.mockResolvedValueOnce({ installer: "com.android.vending" });
-    renderDialog();
-
-    expect(await screen.findByText(/from Google Play/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /download/i })).toHaveAttribute("href", PLAY_STORE_URL);
-  });
-
-  it("offers no download on Android until it knows where the app came from", async () => {
+  it("sends an app from Google Play back to Play, once it knows where the app came from", async () => {
     vi.spyOn(Capacitor, "getPlatform").mockReturnValue("android");
     let answer: (value: { installer?: string }) => void = () => {};
     appEnvironment.get.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
@@ -67,6 +58,7 @@ describe("NativeUpdateRequiredDialog", () => {
       "href",
       PLAY_STORE_URL
     );
+    expect(screen.getByText(/from Google Play/i)).toBeInTheDocument();
   });
 
   it("sends an iPhone to the App Store, with no download or update of its own", async () => {

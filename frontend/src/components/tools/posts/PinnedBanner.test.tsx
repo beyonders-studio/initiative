@@ -27,18 +27,14 @@ describe("PinnedBanner", () => {
     expect(container.textContent).toBe("");
   });
 
-  it("offers an end date to somebody who may pin", async () => {
-    renderPage(bannerPage({ post: pinned(), canPin: true }));
+  it.each([
+    [true, true],
+    [false, false],
+  ])("offers an end date only to somebody who may pin (may pin: %s)", async (canPin, offered) => {
+    renderPage(bannerPage({ post: pinned(), canPin }));
 
     expect(await screen.findByText(/pinned to the top/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /add an end date/i })).toBeInTheDocument();
-  });
-
-  it("offers a reader the sentence and no control", async () => {
-    renderPage(bannerPage({ post: pinned(), canPin: false }));
-
-    expect(await screen.findByText(/pinned to the top/i)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /end date/i })).not.toBeInTheDocument();
+    expect(Boolean(screen.queryByRole("button", { name: /end date/i }))).toBe(offered);
   });
 
   it("says when a pin already ends, and offers to change it", async () => {
@@ -52,20 +48,17 @@ describe("PinnedBanner", () => {
 
   // Removing is only offered where there is something to remove — otherwise it
   // is a button that does nothing, on the one dialog that exists to set a date.
-  it("offers to remove an end date only when the pin has one", async () => {
-    renderPage(bannerPage({ post: pinned(), canPin: true }));
-    await userEvent.click(await screen.findByRole("button", { name: /add an end date/i }));
+  it.each([
+    [null, /add an end date/i, false],
+    ["2026-03-01T09:00:00.000Z", /change end date/i, true],
+  ])(
+    "offers to remove an end date only when the pin has one (%s)",
+    async (expires, opener, offered) => {
+      renderPage(bannerPage({ post: pinned({ pin_expires_at: expires }), canPin: true }));
+      await userEvent.click(await screen.findByRole("button", { name: opener }));
 
-    expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /remove end date/i })).not.toBeInTheDocument();
-  });
-
-  it("offers to remove the end date a pin does have", async () => {
-    renderPage(
-      bannerPage({ post: pinned({ pin_expires_at: "2026-03-01T09:00:00.000Z" }), canPin: true })
-    );
-    await userEvent.click(await screen.findByRole("button", { name: /change end date/i }));
-
-    expect(await screen.findByRole("button", { name: /remove end date/i })).toBeInTheDocument();
-  });
+      expect(await screen.findByRole("dialog")).toBeInTheDocument();
+      expect(Boolean(screen.queryByRole("button", { name: /remove end date/i }))).toBe(offered);
+    }
+  );
 });

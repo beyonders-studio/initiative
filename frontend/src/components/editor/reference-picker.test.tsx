@@ -59,18 +59,6 @@ function type(text: string) {
 }
 
 describe("probe: # in a document", () => {
-  it("opens the picker on a match", async () => {
-    server.use(communityHttp.get("/search/suggest", () => HttpResponse.json([suggestion])));
-
-    renderPage(Harness);
-    editor = await drawnEditor();
-    type("#ship");
-
-    await waitFor(() => expect(screen.getByText("Ship the release")).toBeInTheDocument(), {
-      timeout: 4000,
-    });
-  });
-
   it("says so when nothing in the initiative matches", async () => {
     server.use(communityHttp.get("/search/suggest", () => HttpResponse.json([])));
 

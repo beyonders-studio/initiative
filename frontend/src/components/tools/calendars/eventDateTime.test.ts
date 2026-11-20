@@ -18,91 +18,79 @@ describe("offsetEndTime", () => {
 });
 
 describe("shiftEndPreservingDuration", () => {
-  it("keeps a same-day duration when the start moves", () => {
+  it.each([
     // 1-hour event; move start to 16:00 → end follows to 17:00.
-    expect(
-      shiftEndPreservingDuration(
-        "2026-07-01",
-        "09:00",
-        "2026-07-01",
-        "10:00",
-        "2026-07-01",
-        "16:00"
-      )
-    ).toMatchObject({
-      endDate: "2026-07-01",
-      endTime: "17:00",
-    });
-  });
-
-  it("preserves a multi-day span and rolls the end onto a later day", () => {
+    [
+      "keeps a same-day duration",
+      ["2026-07-01", "09:00", "2026-07-01", "10:00"],
+      ["2026-07-01", "16:00"],
+      ["2026-07-01", "17:00"],
+    ],
     // 25-hour event (Jul 1 09:00 → Jul 2 10:00); move start to Jul 5 09:00.
-    expect(
-      shiftEndPreservingDuration(
-        "2026-07-01",
-        "09:00",
-        "2026-07-02",
-        "10:00",
-        "2026-07-05",
-        "09:00"
-      )
-    ).toMatchObject({
-      endDate: "2026-07-06",
-      endTime: "10:00",
-    });
-  });
-
-  it("defaults to a one-hour duration when there is no prior end", () => {
-    expect(
-      shiftEndPreservingDuration("", "09:00", "", "10:00", "2026-07-01", "14:00")
-    ).toMatchObject({
-      endDate: "2026-07-01",
-      endTime: "15:00",
-    });
-  });
+    [
+      "rolls a multi-day span onto a later day",
+      ["2026-07-01", "09:00", "2026-07-02", "10:00"],
+      ["2026-07-05", "09:00"],
+      ["2026-07-06", "10:00"],
+    ],
+    [
+      "defaults to one hour with no prior end",
+      ["", "09:00", "", "10:00"],
+      ["2026-07-01", "14:00"],
+      ["2026-07-01", "15:00"],
+    ],
+  ] as const)(
+    "%s",
+    (_label, [startDate, startTime, endDate, endTime], [nextDate, nextTime], [
+      wantDate,
+      wantTime,
+    ]) => {
+      expect(
+        shiftEndPreservingDuration(startDate, startTime, endDate, endTime, nextDate, nextTime)
+      ).toMatchObject({ endDate: wantDate, endTime: wantTime });
+    }
+  );
 });
 
 describe("endTimeOptionsFor", () => {
-  it("hides slots at or before the start on the same day", () => {
+  it("hides slots at or before the start on the same day, and allows every slot on a later day", () => {
     const opts = endTimeOptionsFor("2026-07-01", "2026-07-01", "09:00");
     expect(opts.some((o) => o.value === "09:00")).toBe(false);
     expect(opts.some((o) => o.value === "09:30")).toBe(true);
-  });
 
-  it("allows every slot when the end is on a later day", () => {
-    const opts = endTimeOptionsFor("2026-07-01", "2026-07-03", "09:00");
-    expect(opts).toHaveLength(48);
-    expect(opts.some((o) => o.value === "00:00")).toBe(true);
+    const later = endTimeOptionsFor("2026-07-01", "2026-07-03", "09:00");
+    expect(later).toHaveLength(48);
+    expect(later.some((o) => o.value === "00:00")).toBe(true);
   });
 });
 
 describe("datesAreValid", () => {
-  it("accepts a multi-day timed range", () => {
-    expect(datesAreValid(false, "2026-07-01", "14:00", "2026-07-03", "16:00")).toBe(true);
-  });
-
-  it("rejects an end before the start", () => {
-    expect(datesAreValid(false, "2026-07-03", "16:00", "2026-07-01", "14:00")).toBe(false);
-  });
-
-  it("allows an all-day event ending on the same day", () => {
-    expect(datesAreValid(true, "2026-07-01", "00:00", "2026-07-01", "00:00")).toBe(true);
+  it.each([
+    ["a multi-day timed range", false, "2026-07-01", "14:00", "2026-07-03", "16:00", true],
+    ["an end before the start", false, "2026-07-03", "16:00", "2026-07-01", "14:00", false],
+    [
+      "an all-day event ending on the same day",
+      true,
+      "2026-07-01",
+      "00:00",
+      "2026-07-01",
+      "00:00",
+      true,
+    ],
+  ])("judges %s valid: %s", (_label, allDay, startDate, startTime, endDate, endTime, valid) => {
+    expect(datesAreValid(allDay, startDate, startTime, endDate, endTime)).toBe(valid);
   });
 });
 
 describe("reconcileEndTime", () => {
-  it("snaps a now-invalid end time forward when the end rolls back to the start day", () => {
+  it.each([
     // End was 12:00 on a later day; rolled back to the start day where the
     // start is 14:00 — 12:00 is no longer selectable, so snap to 15:00.
-    expect(reconcileEndTime("2026-07-01", "14:00", "2026-07-01", "12:00")).toBe("15:00");
-  });
-
-  it("leaves a still-valid same-day end time untouched", () => {
-    expect(reconcileEndTime("2026-07-01", "09:00", "2026-07-01", "10:00")).toBe("10:00");
-  });
-
-  it("leaves the end time untouched when the end is on a later day", () => {
-    expect(reconcileEndTime("2026-07-01", "14:00", "2026-07-03", "12:00")).toBe("12:00");
+    ["snaps a now-invalid end forward on the start day", "14:00", "2026-07-01", "12:00", "15:00"],
+    ["leaves a still-valid same-day end", "09:00", "2026-07-01", "10:00", "10:00"],
+    ["leaves an end on a later day", "14:00", "2026-07-03", "12:00", "12:00"],
+  ])("%s", (_label, startTime, endDate, endTime, expected) => {
+    expect(reconcileEndTime("2026-07-01", startTime, endDate, endTime)).toBe(expected);
   });
 });
 

@@ -63,14 +63,10 @@ beforeEach(() => {
 });
 
 describe("PluginConsentRequests", () => {
-  it("shows the plug-in's own words and waits for an answer", async () => {
+  it("shows the plug-in's own words, offers both levels it asked for, and answers or declines that one line", async () => {
     render([consent()]);
     expect(await screen.findByText("Auto: “Comment on the linked issue”")).toBeInTheDocument();
     expect(screen.getByText("Waiting for you")).toBeInTheDocument();
-  });
-
-  it("offers both levels when the plug-in asked for changes, and answers that one line", async () => {
-    render([consent()]);
     fireEvent.click(await screen.findByText("Let it read and change things as me"));
     await waitFor(() =>
       expect(grantConsent).toHaveBeenCalledWith({
@@ -84,18 +80,15 @@ describe("PluginConsentRequests", () => {
     await waitFor(() =>
       expect(grantConsent).toHaveBeenCalledWith({ consentId: 41, access: ConsentAccess.read })
     );
+
+    fireEvent.click(screen.getByText("Decline"));
+    await waitFor(() => expect(revokeConsent).toHaveBeenCalledWith(41));
   });
 
   it("never offers more than the plug-in asked for", async () => {
     render([consent({ requested_access: ConsentAccess.read })]);
     expect(await screen.findByText("Let it read as me")).toBeInTheDocument();
     expect(screen.queryByText("Let it read and change things as me")).toBeNull();
-  });
-
-  it("declines a waiting request", async () => {
-    render([consent()]);
-    fireEvent.click(await screen.findByText("Decline"));
-    await waitFor(() => expect(revokeConsent).toHaveBeenCalledWith(41));
   });
 
   it("withdraws, or narrows to reading, what was allowed", async () => {

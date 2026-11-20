@@ -80,6 +80,9 @@ describe("CommunityStatusNotice", () => {
     expect(await screen.findByText("Something is wrong")).toBeInTheDocument();
     expect(screen.getByText("Contact your platform operator.")).toBeInTheDocument();
     expect(askMock).not.toHaveBeenCalled();
+    // Help is off, so only OK.
+    expect(screen.getByRole("button", { name: "OK" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Contact support" })).toBeNull();
   });
 
   it("offers to update the card when the payment was declined", async () => {
@@ -104,19 +107,15 @@ describe("CommunityStatusNotice", () => {
     expect(openPortalMock).not.toHaveBeenCalled();
   });
 
-  it("falls back to the default notice when the payment is not the problem", async () => {
+  it.each([
+    ["the payment is not the problem", () => askMock.mockResolvedValue({ payment_failed: false })],
+    ["the question fails", () => askMock.mockRejectedValue(new Error("unreachable"))],
+  ])("falls back to the default notice when %s", async (_label, answer) => {
     state.billing = { url: "https://billing.example.com" };
-    askMock.mockResolvedValue({ payment_failed: false });
+    answer();
     renderWithProviders(<CommunityStatusNotice community={seatCommunity()} />);
     expect(await screen.findByText("Something is wrong")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Update payment method" })).toBeNull();
-  });
-
-  it("falls back to the default notice when the question fails", async () => {
-    state.billing = { url: "https://billing.example.com" };
-    askMock.mockRejectedValue(new Error("unreachable"));
-    renderWithProviders(<CommunityStatusNotice community={seatCommunity()} />);
-    expect(await screen.findByText("Something is wrong")).toBeInTheDocument();
   });
 
   it("asks the team about this community when help is on", async () => {
@@ -134,22 +133,7 @@ describe("CommunityStatusNotice", () => {
     expect(openHelpMock).toHaveBeenCalledWith();
   });
 
-  it("offers only OK when help is off", async () => {
-    renderWithProviders(<CommunityStatusNotice community={seatCommunity()} />);
-    expect(await screen.findByRole("button", { name: "OK" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Contact support" })).toBeNull();
-  });
-
-  it("shows again in a new browser session", async () => {
-    const first = renderWithProviders(<CommunityStatusNotice community={seatCommunity()} />);
-    await userEvent.click(await screen.findByRole("button", { name: "OK" }));
-    first.unmount();
-    window.sessionStorage.clear();
-    renderWithProviders(<CommunityStatusNotice community={seatCommunity()} />);
-    expect(await screen.findByText("Something is wrong")).toBeInTheDocument();
-  });
-
-  it("shows once per community in a session", async () => {
+  it("shows once per community in a session, and again in a new one", async () => {
     const first = renderWithProviders(<CommunityStatusNotice community={seatCommunity()} />);
     await userEvent.click(await screen.findByRole("button", { name: "OK" }));
     await waitFor(() => expect(screen.queryByText("Something is wrong")).toBeNull());
@@ -158,7 +142,15 @@ describe("CommunityStatusNotice", () => {
     renderWithProviders(<CommunityStatusNotice community={seatCommunity()} />);
     expect(screen.queryByText("Something is wrong")).toBeNull();
 
-    renderWithProviders(<CommunityStatusNotice community={seatCommunity({ id: 8 })} />);
+    const other = renderWithProviders(
+      <CommunityStatusNotice community={seatCommunity({ id: 8 })} />
+    );
+    expect(await screen.findByText("Something is wrong")).toBeInTheDocument();
+    other.unmount();
+
+    // And again in a new browser session.
+    window.sessionStorage.clear();
+    renderWithProviders(<CommunityStatusNotice community={seatCommunity()} />);
     expect(await screen.findByText("Something is wrong")).toBeInTheDocument();
   });
 });

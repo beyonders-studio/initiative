@@ -193,29 +193,41 @@ describe("what a drag may land on", () => {
   const nestedPage = { id: 12, kind: WikiPageKind.page, parent_page_id: 11 };
   const borrowed = { id: 7, kind: WikiPageKind.file, parent_page_id: null };
 
-  it("files a borrowed file under a page, or beside one at any depth", () => {
-    expect(dropIntents(borrowed, asPage, none)).toEqual(["before", "into", "after"]);
-    expect(dropIntents(borrowed, nestedPage, none)).toEqual(["before", "into", "after"]);
-  });
-
-  it("files nothing inside a file", () => {
-    const other = { id: 8, kind: WikiPageKind.file, parent_page_id: 11 };
-    expect(dropIntents(borrowed, other, none)).toEqual(["before", "after"]);
-  });
-
-  it("does not mistake a file for a page that shares its number", () => {
+  it.each([
+    ["files a borrowed file under a page", borrowed, asPage, none, ["before", "into", "after"]],
+    [
+      "files a borrowed file beside a page at any depth",
+      borrowed,
+      nestedPage,
+      none,
+      ["before", "into", "after"],
+    ],
+    [
+      "files nothing inside a file",
+      borrowed,
+      { id: 8, kind: WikiPageKind.file, parent_page_id: 11 },
+      none,
+      ["before", "after"],
+    ],
     // Page 12 is under the dragged page; file 12 is not.
-    const sameNumber = { id: 12, kind: WikiPageKind.file, parent_page_id: null };
-    expect(dropIntents(asPage, sameNumber, new Set([12]))).toEqual(["before", "after"]);
-  });
-
-  it("offers a page the middle of another page, and only the edges of a file", () => {
-    expect(dropIntents(asPage, nestedPage, none)).toEqual(["before", "into", "after"]);
-    expect(dropIntents(asPage, borrowed, none)).toEqual(["before", "after"]);
-  });
-
-  it("offers a page nothing on itself or on what is filed under it", () => {
-    expect(dropIntents(asPage, asPage, none)).toEqual([]);
-    expect(dropIntents(asPage, nestedPage, new Set([12]))).toEqual([]);
+    [
+      "does not mistake a file for a page that shares its number",
+      asPage,
+      { id: 12, kind: WikiPageKind.file, parent_page_id: null },
+      new Set([12]),
+      ["before", "after"],
+    ],
+    [
+      "offers a page the middle of another page",
+      asPage,
+      nestedPage,
+      none,
+      ["before", "into", "after"],
+    ],
+    ["offers a page only the edges of a file", asPage, borrowed, none, ["before", "after"]],
+    ["offers a page nothing on itself", asPage, asPage, none, []],
+    ["offers a page nothing on what is filed under it", asPage, nestedPage, new Set([12]), []],
+  ])("%s", (_label, dragged, target, under, expected) => {
+    expect(dropIntents(dragged, target, under)).toEqual(expected);
   });
 });

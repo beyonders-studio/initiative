@@ -102,25 +102,15 @@ describe("buildTaskCalendarEntries", () => {
     }
   });
 
-  it("renders a single start marker when only start_date is set", () => {
-    const task = buildTask({ id: 10, start_date: "2026-01-15T09:00:00", due_date: undefined });
+  it.each([
+    ["2026-01-15T09:00:00", undefined, ["start"]],
+    [undefined, "2026-01-15T17:00:00", ["due"]],
+    [undefined, undefined, []],
+  ])("renders a marker for each date set (start %s, due %s)", (start_date, due_date, kinds) => {
+    const task = buildTask({ id: 10, start_date, due_date });
     const entries = buildTaskCalendarEntries(task, COLOR);
-    expect(entries).toHaveLength(1);
-    expect(entries[0].kind).toBe("start");
-    expect(entries[0].meta).toMatchObject({ kind: "start" });
-  });
-
-  it("renders a single due marker when only due_date is set", () => {
-    const task = buildTask({ id: 11, start_date: undefined, due_date: "2026-01-15T17:00:00" });
-    const entries = buildTaskCalendarEntries(task, COLOR);
-    expect(entries).toHaveLength(1);
-    expect(entries[0].kind).toBe("due");
-    expect(entries[0].meta).toMatchObject({ kind: "due" });
-  });
-
-  it("renders nothing when the task has no dates", () => {
-    const task = buildTask({ id: 12, start_date: undefined, due_date: undefined });
-    expect(buildTaskCalendarEntries(task, COLOR)).toHaveLength(0);
+    expect(entries.map((entry) => entry.kind)).toEqual(kinds);
+    expect(entries.map((entry) => (entry.meta as { kind: string }).kind)).toEqual(kinds);
   });
 
   it("propagates the draggable flag onto entries (defaults to true)", () => {

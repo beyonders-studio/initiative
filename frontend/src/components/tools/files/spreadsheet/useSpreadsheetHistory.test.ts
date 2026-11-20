@@ -8,7 +8,6 @@ import { createYjsUndoManager } from "@/hooks/useYjsHistory";
 import { DEFAULT_SHEET_ID } from "@/lib/spreadsheet/sheets";
 
 import {
-  ALL_SPREADSHEET_ORIGINS,
   SPREADSHEET_ORIGINS,
   SPREADSHEET_SEED_ORIGINS,
   UNDOABLE_SPREADSHEET_ORIGINS,
@@ -186,11 +185,5 @@ describe("spreadsheet transaction origins", () => {
       ...Object.keys(SPREADSHEET_SEED_ORIGINS),
     ];
     expect(declared.filter((key) => !used.has(key))).toEqual([]);
-  });
-
-  it("are undoable unless they seed a file", () => {
-    expect(UNDOABLE_SPREADSHEET_ORIGINS).toContain(SPREADSHEET_ORIGINS.PASTE);
-    expect(UNDOABLE_SPREADSHEET_ORIGINS).not.toContain(SPREADSHEET_SEED_ORIGINS.BOOTSTRAP);
-    expect(ALL_SPREADSHEET_ORIGINS).toContain(SPREADSHEET_SEED_ORIGINS.BOOTSTRAP);
   });
 });

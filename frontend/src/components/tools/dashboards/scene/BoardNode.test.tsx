@@ -52,21 +52,14 @@ describe("a board column with more cards than fit", () => {
     );
   });
 
-  it("keeps every card at its own height", () => {
-    render(<BoardNode node={board(170)} />);
+  it("keeps every card at its own height, and the column itself scrollable", () => {
+    const { container } = render(<BoardNode node={board(170)} />);
     const cards = screen.getAllByRole("article");
 
     expect(cards).toHaveLength(170);
     for (const card of cards) {
       expect(card.className).toContain("shrink-0");
     }
-  });
-
-  it("leaves the column itself scrollable", () => {
-    const { container } = render(<BoardNode node={board(170)} />);
-    const list = container.querySelector(".overflow-y-auto");
-
-    expect(list).not.toBeNull();
-    expect(list?.className).toContain("min-h-0");
+    expect(container.querySelector(".overflow-y-auto")?.className).toContain("min-h-0");
   });
 });

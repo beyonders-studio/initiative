@@ -316,13 +316,6 @@ describe("the way into the community directory", () => {
     state.communityDirectory = true;
   });
 
-  it("sits in the rail under the add-a-community button", async () => {
-    setup([entry({ id: 1, name: "Alpha" })]);
-
-    const link = await screen.findByRole("link", { name: "Join a community" });
-    expect(link).toHaveAttribute("href", "/communities");
-  });
-
   it("is offered even where communities cannot be created", async () => {
     // A deployment with community creation switched off is exactly where joining an
     // existing community is the only way into one.
@@ -344,8 +337,12 @@ describe("the way into the community directory", () => {
     expect(screen.queryByRole("button", { name: "Create community" })).not.toBeInTheDocument();
   });
 
-  it("is repeated in the expanded community list", async () => {
+  it("sits in the rail under the add-a-community button, and again in the expanded list", async () => {
     setup([entry({ id: 1, name: "Alpha" })]);
+    expect(await screen.findByRole("link", { name: "Join a community" })).toHaveAttribute(
+      "href",
+      "/communities"
+    );
     const { panel } = await openFlyout();
 
     expect(within(panel).getByRole("link", { name: "Join a community" })).toBeInTheDocument();
@@ -362,20 +359,17 @@ describe("the way into the community directory", () => {
 });
 
 describe("the mark on the logo", () => {
-  it("says how much is waiting in messages", async () => {
-    // Inside a community the home link is the only thing pointing at My
-    // Messages, so it is the only place the mark can be seen from there.
-    waiting.mockReturnValue(3);
+  // Inside a community the home link is the only thing pointing at My
+  // Messages, so it is the only place the mark can be seen from there.
+  it.each([
+    [3, true],
+    [0, false],
+  ])("says how much is waiting in messages (%i)", async (count, marked) => {
+    waiting.mockReturnValue(count);
     setup([entry({ id: 1, name: "Alpha" })]);
 
     const home = await screen.findByRole("link", { name: /home/i });
-    expect(within(home).getByText(/3/)).toBeInTheDocument();
-  });
-
-  it("marks nothing when nothing is waiting", async () => {
-    setup([entry({ id: 1, name: "Alpha" })]);
-
-    const home = await screen.findByRole("link", { name: /home/i });
-    expect(within(home).queryByText(/waiting/i)).toBeNull();
+    if (marked) expect(within(home).getByText(/3/)).toBeInTheDocument();
+    else expect(within(home).queryByText(/waiting/i)).toBeNull();
   });
 });

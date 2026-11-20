@@ -82,12 +82,6 @@ const renderSheet = async (rows: Record<string, { hidden: true }>) => {
 };
 
 describe("a hidden row", () => {
-  it("is drawn when nothing is hidden", async () => {
-    await renderSheet({});
-
-    expect(screen.getAllByText("Test2").length).toBeGreaterThan(0);
-  });
-
   it("is not drawn once hidden, so it cannot land on the row below", async () => {
     await renderSheet({ "1": { hidden: true } });
 

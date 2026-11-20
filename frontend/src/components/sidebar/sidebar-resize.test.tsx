@@ -55,20 +55,17 @@ describe("dragging the sidebar's edge", () => {
     expect(getItem("sidebar-width")).toBe(String(FLOOR + 120));
   });
 
-  it("will not go narrower than the width the app asked for", () => {
+  // Never narrower than the width the app asked for, never more than half the
+  // window.
+  it.each([
+    [-200, `${FLOOR}px`],
+    [900, "512px"],
+  ])("clamps a drag of %ipx to %s", (travel, width) => {
     setup();
 
-    drag(-200);
+    drag(travel);
 
-    expect(widthOf()).toBe(`${FLOOR}px`);
-  });
-
-  it("will not take more than half the window", () => {
-    setup();
-
-    drag(900);
-
-    expect(widthOf()).toBe("512px");
+    expect(widthOf()).toBe(width);
   });
 
   it("starts at the width this device last settled on", () => {
