@@ -7,6 +7,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from httpx import AsyncClient
     from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -18,9 +20,11 @@ __all__ = [
     "add_counter",
     "convert_counters",
     "counters_conversion",
+    "counters_follow_up",
     "counters_tool_manifest",
     "install_counters",
     "install_tool_plugin",
+    "run_as_a_revision",
 ]
 
 #: The uid the SDK's example names Counters by.
@@ -339,17 +343,17 @@ async def add_counter(
     return tools, group, row
 
 
-#: The revision that turns the built-in Counters into its plug-in.
+#: The revision that turns the built-in Counters into its plug-in, and the one
+#: that writes what it left behind.
 _CONVERSION = "20261119_0619_counters_become_a_plug_in.py"
+_FOLLOW_UP = "20261120_0621_counter_subscriptions_and_switches_follow_the_plug_in.py"
 
 
-def counters_conversion() -> Any:
-    """The revision that turns the built-in Counters into its plug-in,
-    loaded by path."""
+def _revision(name: str) -> Any:
     import importlib.util
     from pathlib import Path
 
-    path = Path(__file__).resolve().parents[2] / "alembic" / "versions" / _CONVERSION
+    path = Path(__file__).resolve().parents[2] / "alembic" / "versions" / name
     spec = importlib.util.spec_from_file_location(path.stem, path)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
@@ -357,51 +361,109 @@ def counters_conversion() -> Any:
     return module
 
 
+def counters_conversion() -> Any:
+    """The revision that turns the built-in Counters into its plug-in,
+    loaded by path."""
+    return _revision(_CONVERSION)
+
+
+def counters_follow_up() -> Any:
+    """The revision that writes what the conversion left behind, loaded by
+    path."""
+    return _revision(_FOLLOW_UP)
+
+
+async def run_as_a_revision(
+    session: AsyncSession, guild_id: int, step: Callable[[], None]
+) -> None:
+    """``step``, a revision's work in ``guild_id``'s schema alone, as a
+    revision runs it: on the provisioning login, which owns the tables and is
+    neither a superuser nor exempt from row security, so a table it reads
+    with row security forced hides what its policies hide. The suite builds a
+    community's schema on its superuser, so the schema and what is in it are
+    handed to that login first. ``session`` is committed first."""
+    import sqlalchemy as sa
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+    from sqlalchemy.engine import make_url
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy.pool import NullPool
+
+    from app.core.config import settings
+    from app.db import session as db_session
+    from app.db.schema_provisioning import guild_schema_name
+
+    schema = guild_schema_name(guild_id)
+    login = make_url(settings.DATABASE_URL)
+    assert login.username is not None
+    owner = session.get_bind().dialect.identifier_preparer.quote(login.username)
+    await session.commit()
+    connection = await session.connection()
+    await connection.execute(sa.text(f'ALTER SCHEMA "{schema}" OWNER TO {owner}'))
+    relations = await connection.execute(
+        sa.text(
+            "SELECT relname, CASE relkind WHEN 'v' THEN 'VIEW' ELSE 'TABLE' END"
+            " FROM pg_class WHERE relkind IN ('r', 'p', 'v')"
+            " AND relnamespace = CAST(:s AS regnamespace)"
+        ),
+        {"s": schema},
+    )
+    for name, what in relations.all():
+        await connection.execute(
+            sa.text(f'ALTER {what} "{schema}"."{name}" OWNER TO {owner}')
+        )
+    await session.commit()
+
+    def apply(bind: Any) -> None:
+        assert bind.execute(
+            sa.text(
+                "SELECT NOT rolsuper AND NOT rolbypassrls"
+                " FROM pg_roles WHERE rolname = current_user"
+            )
+        ).scalar_one()
+        bind.execute(
+            sa.text("SELECT set_config('search_path', :sp, true)"),
+            {"sp": f"{schema}, public"},
+        )
+        with Operations.context(MigrationContext.configure(bind)):
+            step()
+
+    engine = create_async_engine(
+        login.set(database=db_session.provisioning_engine.url.database),
+        poolclass=NullPool,
+    )
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(apply)
+    finally:
+        await engine.dispose()
+
+
 async def convert_counters(
     session: AsyncSession, guild_id: int, *, between: Any = None
 ) -> int | None:
     """Turn ``guild_id``'s Counters back into the built-in tool and convert it
-    again, as the revision does in each community, then provision what a start
-    renders for it. ``between`` is awaited with ``session`` while the built-in
-    tool is back, before the conversion. Returns the install's id afterwards,
-    None where the community has none. ``session`` is committed."""
-    import sqlalchemy as sa
-    from alembic.migration import MigrationContext
-    from alembic.operations import Operations
+    again, as an upgrade does in each community (the conversion, then the
+    revision writing what it left behind, each as a revision runs), then
+    provision what a start renders for it. ``between`` is awaited with
+    ``session`` while the built-in tool is back, before the conversion.
+    Returns the install's id afterwards, None where the community has none.
+    ``session`` is committed."""
     from sqlmodel import select
 
-    from app.db import session as db_session
     from app.db.kind_codes import ensure_kind_codes
     from app.db.schema_provisioning import provision_community_tools
     from app.models.tenant.guild_plugin import GuildPlugin
     from app.testing.schema_harness import route_session_to_guild
 
-    migration = counters_conversion()
-
-    def step(forward: bool) -> Any:
-        def apply(bind: Any) -> None:
-            bind.execute(
-                sa.text("SELECT set_config('search_path', :sp, true)"),
-                {"sp": f"guild_{guild_id}, public"},
-            )
-            with Operations.context(MigrationContext.configure(bind)):
-                if forward:
-                    migration._apply_upgrade()
-                else:
-                    migration._apply_downgrade()
-
-        return apply
-
-    # As a revision runs: on the provisioning connection, which owns the
-    # tables and is held to their row security.
-    await session.commit()
-    async with db_session.provisioning_engine.begin() as conn:
-        await conn.run_sync(step(forward=False))
+    conversion, follow_up = counters_conversion(), counters_follow_up()
+    await run_as_a_revision(session, guild_id, follow_up._apply_downgrade)
+    await run_as_a_revision(session, guild_id, conversion._apply_downgrade)
     if between is not None:
         await between(session)
         await session.commit()
-    async with db_session.provisioning_engine.begin() as conn:
-        await conn.run_sync(step(forward=True))
+    await run_as_a_revision(session, guild_id, conversion._apply_upgrade)
+    await run_as_a_revision(session, guild_id, follow_up._apply_upgrade)
     await ensure_kind_codes()
     await provision_community_tools(guild_id)
     await route_session_to_guild(session, guild_id)
