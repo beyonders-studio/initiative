@@ -1617,6 +1617,11 @@ GUILD_FUNCTION_SIGNATURES: dict[str, str] = {
     "entity_access": "(text, integer, boolean, boolean, public.standing)",
     "entity_initiative": "(text, integer)",
     "content_item_of": "(text, integer, jsonb)",
+    # What ``guild_ddl`` renders from the community's tools: a comment's trash
+    # following what it is on, and a person leaving its content.
+    "fn_comment_trash_follows": "()",
+    "member_departs": "(text, integer, integer)",
+    "fn_initiative_departure": "()",
 }
 
 #: Functions an earlier render put in a guild schema under a name or

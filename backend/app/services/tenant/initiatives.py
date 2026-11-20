@@ -348,7 +348,7 @@ async def remove_user_from_guild_initiatives(
     from app.services.tenant import personal_items
 
     schema = guild_schema_name(guild_id)
-    await session.exec(select(func.public.member_departs(schema, user_id, None)))
+    await session.exec(select(func.member_departs(schema, user_id, None)))
     # An initiative they reached only through items shared with them has no
     # membership row to delete, so its departure is run here.
     shared_only = (
@@ -366,9 +366,7 @@ async def remove_user_from_guild_initiatives(
     )
     shared_only_ids = list((await session.exec(shared_only)).all())
     for initiative_id in shared_only_ids:
-        await session.exec(
-            select(func.public.member_departs(schema, user_id, initiative_id))
-        )
+        await session.exec(select(func.member_departs(schema, user_id, initiative_id)))
     if shared_only_ids:
         # Outside a trigger the departure leaves archived content as it is,
         # its grants included. A grant goes whatever state its item is in.

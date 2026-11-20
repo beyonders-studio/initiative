@@ -65,16 +65,16 @@ from app.db.frozen import (
 from app.db.guild_migrations import split_sql_statements
 from app.db.initiative_rls import (
     ANSWERED,
-    COMMENT_PARENTS,
     ENTITY_INITIATIVE_FN,
     INITIATIVE_SCOPED_TABLES,
-    NAMED_PEOPLE,
     InitiativePath,
     NamedPerson,
+    comment_parents,
     dac_asks_at_write,
     governing_walk,
     initiative_of,
     managed_write,
+    named_people,
     paths_for,
     plugin_entry_written,
     render_content_item_fn,
@@ -729,23 +729,27 @@ def _trashed_with(table: str, column: str) -> str:
     )
 
 
-def _subject_trashed_with() -> str:
-    """Whether what the comment is said on went to the trash with it."""
+def _subject_trashed_with(tools: ToolSet) -> str:
+    """Whether what the comment is said on went to the trash with it: one arm
+    for each kind a comment is said on in the community."""
     arms = " ".join(
         f"WHEN '{p.kind}' THEN EXISTS (SELECT 1 FROM {p.table} c"
         " WHERE c.id = NEW.subject_id AND c.deleted_at = NEW.deleted_at)"
-        for p in COMMENT_PARENTS.values()
+        for p in comment_parents(tools).values()
     )
     return f"COALESCE((CASE NEW.subject_type {arms} END), false)"
 
 
-_COMMENT_TRASH_FOLLOWS_FN = f"""
-CREATE OR REPLACE FUNCTION public.fn_comment_trash_follows() RETURNS trigger
+def _comment_trash_follows_fn(tools: ToolSet) -> str:
+    """``fn_comment_trash_follows``, in the community's schema, since its arms
+    are the community's tools."""
+    return f"""
+CREATE OR REPLACE FUNCTION fn_comment_trash_follows() RETURNS trigger
     LANGUAGE plpgsql AS $trash_follows$
 BEGIN
     IF {IN_POLICY.system} OR {_OLD_AUTHOR_IS_ME}
        OR {_trashed_with("comments", "parent_comment_id")}
-       OR {_subject_trashed_with()} THEN
+       OR {_subject_trashed_with(tools)} THEN
         RETURN NULL;
     END IF;
     RAISE EXCEPTION 'a comment goes to the trash with what it is on'
@@ -770,7 +774,7 @@ $answer_owner$;
 """
 
 
-def _authored_block() -> str:
+def _authored_block(tools: ToolSet) -> str:
     queue = managed_write("initiative_id")
     return "\n".join(
         [
@@ -796,13 +800,13 @@ def _authored_block() -> str:
                 " BEFORE UPDATE ON comments FOR EACH ROW"
                 " EXECUTE FUNCTION public.fn_comment_author_guard();"
             ),
-            _COMMENT_TRASH_FOLLOWS_FN,
+            _comment_trash_follows_fn(tools),
             "DROP TRIGGER IF EXISTS tr_comments_trash_follows ON comments;",
             (
                 "CREATE CONSTRAINT TRIGGER tr_comments_trash_follows"
                 " AFTER UPDATE ON comments DEFERRABLE INITIALLY DEFERRED FOR EACH ROW"
                 " WHEN (OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL)"
-                " EXECUTE FUNCTION public.fn_comment_trash_follows();"
+                " EXECUTE FUNCTION fn_comment_trash_follows();"
             ),
             "DROP POLICY IF EXISTS owner_insert ON calendar_event_answers;",
             (
@@ -1887,28 +1891,40 @@ _DEPARTURE_SECTION = """\
 -- ==========================================================================="""
 
 
+def _quoted(name: str) -> str:
+    """``name`` as an identifier, quoted where Postgres needs it: a tool
+    plug-in's field key may be a word SQL reserves."""
+    return _DIALECT.identifier_preparer.quote(name)
+
+
 def _departs(named: NamedPerson, tools: ToolSet) -> str:
     """One statement of ``member_departs``: take the person off ``named``'s
     rows in the initiative. Outside a trigger (the community's own content,
-    on leaving it), archived or trashed content is left as it is."""
-    initiative = initiative_of(named.table, "t", qualify="%1$I.")
+    on leaving it), archived or trashed content is left as it is, and a
+    ``frozen_kept`` column's always is."""
+    initiative = initiative_of(
+        named.table, "t", qualify="%1$I.", paths=paths_for(tools)
+    )
+    column = _quoted(named.column)
     if named.clear:
-        head = f"UPDATE %1$I.{named.table} t SET {named.column} = NULL"
+        head = f"UPDATE %1$I.{named.table} t SET {column} = NULL"
         frozen = freeze_leg(named.table, "UPDATE", tools, alias="t")
     else:
         head = f"DELETE FROM %1$I.{named.table} t"
         frozen = freeze_leg(named.table, "DELETE", tools, alias="t")
     kept = f" AND NOT ({named.kept})" if named.kept else ""
+    inside = "" if named.frozen_kept else "pg_trigger_depth() > 0 OR "
     return (
-        f"    EXECUTE format($q${head} WHERE t.{named.column} = $1"
+        f"    EXECUTE format($q${head} WHERE t.{column} = $1"
         f" AND {initiative} IS NOT DISTINCT FROM $2{kept}"
-        f" AND (pg_trigger_depth() > 0 OR NOT COALESCE({frozen}, false))$q$,"
+        f" AND ({inside}NOT COALESCE({frozen}, false))$q$,"
         " p_schema) USING p_user_id, p_initiative_id;"
     )
 
 
 def render_departure_fns(tools: ToolSet) -> str:
-    """``public.member_departs`` and the trigger function that calls it."""
+    """``member_departs`` and the trigger function that calls it, in the
+    community's schema, since what it clears is the community's tools'."""
     grants = (
         "    EXECUTE format($q$DELETE FROM %1$I.resource_grants t"
         " WHERE t.user_id = $1 AND t.initiative_id IS NOT DISTINCT FROM $2"
@@ -1916,9 +1932,9 @@ def render_departure_fns(tools: ToolSet) -> str:
         "t.resource_type, t.resource_id, true), false))$q$, p_schema)"
         " USING p_user_id, p_initiative_id;"
     )
-    body = "\n".join([grants, *(_departs(n, tools) for n in NAMED_PEOPLE)])
+    body = "\n".join([grants, *(_departs(n, tools) for n in named_people(tools))])
     return f"""
-CREATE OR REPLACE FUNCTION public.member_departs(
+CREATE OR REPLACE FUNCTION member_departs(
     p_schema text, p_user_id integer, p_initiative_id integer
 ) RETURNS void LANGUAGE plpgsql AS $member_departs$
 BEGIN
@@ -1926,10 +1942,11 @@ BEGIN
 END;
 $member_departs$;
 
-CREATE OR REPLACE FUNCTION public.fn_initiative_departure() RETURNS trigger
+CREATE OR REPLACE FUNCTION fn_initiative_departure() RETURNS trigger
     LANGUAGE plpgsql AS $departure$
 BEGIN
-    PERFORM public.member_departs(TG_TABLE_SCHEMA, OLD.user_id, OLD.initiative_id);
+    EXECUTE format('SELECT %I.member_departs($1, $2, $3)', TG_TABLE_SCHEMA)
+        USING TG_TABLE_SCHEMA, OLD.user_id, OLD.initiative_id;
     RETURN NULL;
 END;
 $departure$;
@@ -1939,25 +1956,37 @@ $departure$;
 INITIATIVE_DEPARTURE_TRIGGER = (
     "CREATE OR REPLACE TRIGGER tr_initiative_members_departure"
     " AFTER DELETE ON initiative_members FOR EACH ROW"
-    " EXECUTE FUNCTION public.fn_initiative_departure();"
+    " EXECUTE FUNCTION fn_initiative_departure();"
 )
 
 
-def _departure_policies() -> str:
+def _departure_policies(tools: ToolSet) -> str:
+    paths = paths_for(tools)
+    by_table: dict[str, list[NamedPerson]] = {}
+    for named in named_people(tools):
+        by_table.setdefault(named.table, []).append(named)
     lines: list[str] = []
-    for named in NAMED_PEOPLE:
-        t, col = named.table, named.column
-        initiative = initiative_of(t, t)
-        departed = (
-            f"pg_trigger_depth() > 0 AND {initiative} IS NOT NULL AND NOT EXISTS"
+    for t, columns in by_table.items():
+        initiative = initiative_of(t, t, paths=paths)
+        gone = [
             " (SELECT 1 FROM initiative_members m"
-            f" WHERE m.user_id = {t}.{col} AND m.initiative_id = {initiative})"
+            f" WHERE m.user_id = {t}.{_quoted(n.column)}"
+            f" AND m.initiative_id = {initiative})"
+            for n in columns
+        ]
+        departed = f"pg_trigger_depth() > 0 AND {initiative} IS NOT NULL AND " + (
+            f"NOT EXISTS{gone[0]}"
+            if len(gone) == 1
+            else "(" + " OR ".join(f"NOT EXISTS{g}" for g in gone) + ")"
         )
+        emptied = " OR ".join(f"{_quoted(n.column)} IS NULL" for n in columns)
         write = (
             f"departure_update ON {t} AS PERMISSIVE FOR UPDATE"
             f"  USING ({departed})"
-            f" WITH CHECK (pg_trigger_depth() > 0 AND {col} IS NULL);"
-            if named.clear
+            f" WITH CHECK (pg_trigger_depth() > 0 AND "
+            + (emptied if len(columns) == 1 else f"({emptied})")
+            + ");"
+            if columns[0].clear
             else f"departure_delete ON {t} AS PERMISSIVE FOR DELETE"
             f"  USING ({departed});"
         )
@@ -2049,7 +2078,7 @@ def render_guild_rls_ddl(tools: ToolSet) -> str:
         out += "\n\n" + _OWN_ROW_SECTION + "\n\n" + "\n\n".join(own_rows)
     private = [_private_row_block(t, c) for t, c in sorted(PRIVATE_ROW_TABLES.items())]
     out += "\n\n" + _PRIVATE_ROW_SECTION + "\n\n" + "\n\n".join(private)
-    out += "\n\n" + _AUTHORED_SECTION + "\n" + _authored_block()
+    out += "\n\n" + _AUTHORED_SECTION + "\n" + _authored_block(tools)
     credentials = [
         _member_credential_block(t, owner)
         for t, owner in sorted(MEMBER_CREDENTIAL_TABLES.items())
@@ -2097,7 +2126,7 @@ def render_guild_rls_ddl(tools: ToolSet) -> str:
         + "\n"
         + INITIATIVE_DEPARTURE_TRIGGER
         + "\n"
-        + _departure_policies()
+        + _departure_policies(tools)
     )
     guards = [
         f"{frozen_guard_trigger(t, tools)};" for t in sorted(frozen_tables(tools))
