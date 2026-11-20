@@ -204,6 +204,14 @@ async def test_rows_are_made_changed_listed_copied_and_acted_on(
     assert [row["id"] for row in listed["items"]] == [counter["id"]]
     listed = await call("GET", f"{GROUP}/?initiative_id={a.initiative.id}")
     assert [row["id"] for row in listed["items"]] == [group["id"]]
+    assert listed["items"][0]["preview"] is None
+    previewed = await call(
+        "GET", f"{GROUP}/?initiative_id={a.initiative.id}&include_preview=true"
+    )
+    (preview,) = (row["preview"] for row in previewed["items"])
+    assert {kind: [row["id"] for row in rows] for kind, rows in preview.items()} == {
+        COUNTER: [counter["id"]]
+    }
 
     await call("POST", f"{GROUP}/{group['id']}/actions/reset_all")
     read = await call("GET", f"{COUNTER}/{counter['id']}")

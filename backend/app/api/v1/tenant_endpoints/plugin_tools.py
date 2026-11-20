@@ -149,11 +149,19 @@ async def list_plugin_tool_rows(
         default=None, description="The row whose items to list, for an item's kind"
     ),
     archived: bool = Query(default=False, description="List archived rows instead"),
+    include_preview: bool = Query(
+        default=False,
+        description=(
+            "Also send each row's first items of each item table under it, read "
+            "for the whole page at once."
+        ),
+    ),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=0, le=100),
 ) -> PluginToolRowList:
     """A page of a tool plug-in's rows: its tool's in an initiative, or an
-    item's under the row it sits in, in their order."""
+    item's under the row it sits in, in their order, each with what its card
+    previews of its items where ``include_preview`` asks."""
     tools = routed_tools(session)
     located = rows_service.located_kind(tools, kind)
     if rows_service.parent_column(located) is None:
@@ -178,14 +186,15 @@ async def list_plugin_tool_rows(
         page_size=page_size,
     )
     total = await rows_service.count_under(session, located, under, archived=archived)
-    return PluginToolRowList(
-        **build_paginated_response(
-            await rows_service.serialize(session, context, located, rows),
-            total,
-            page,
-            page_size,
-        )
+    previews = (
+        await rows_service.previews(session, context, located, tools, rows)
+        if include_preview
+        else {}
     )
+    items = await rows_service.serialize(session, context, located, rows)
+    for item in items:
+        item.preview = previews.get(item.id)
+    return PluginToolRowList(**build_paginated_response(items, total, page, page_size))
 
 
 @router.post(

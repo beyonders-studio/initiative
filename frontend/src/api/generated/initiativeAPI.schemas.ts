@@ -10344,6 +10344,8 @@ export type PluginToolRowReadFields = {
 
 export type PluginToolRowReadPeople = { [key: string]: number | null };
 
+export type PluginToolRowReadPreview = { [key: string]: PluginToolRowRead[] } | null;
+
 /**
  * One row of a tool plug-in's tool or of one of its items.
  */
@@ -10367,6 +10369,7 @@ export interface PluginToolRowRead {
   tags: TagSummary[];
   created_at: string;
   updated_at: string;
+  preview: PluginToolRowReadPreview;
 }
 
 export interface PluginToolRowList {
@@ -14414,6 +14417,8 @@ export type ListPluginToolRowsParams = {
   parent_id?: number | null;
   /** List archived rows instead */
   archived?: boolean;
+  /** Also send each row's first items of each item table under it, read for the whole page at once. */
+  include_preview?: boolean;
   /** @minimum 1 */
   page?: number;
   /**
