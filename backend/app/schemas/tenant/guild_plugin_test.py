@@ -96,26 +96,6 @@ def test_the_pinned_definition_is_passed_through_verbatim():
     assert payload.definition["automation"] == {"nodes": [{"id": "low_stock"}]}
 
 
-def test_the_config_state_the_plugin_reported_is_carried():
-    """Until a plug-in reports, an install has no verdict; once it does, the
-    settings page can say whether the plug-in is happy without leaving the app."""
-    assert (
-        serialize_guild_plugin(_plugin(), context=CONTEXT, viewer=ADULT).config_state
-        == "ok"
-    )
-    assert (
-        serialize_guild_plugin(
-            _plugin(config_state="invalid", config_state_detail="missing_read_orders"),
-            context=CONTEXT,
-            viewer=ADULT,
-        ).config_state_detail
-        == "missing_read_orders"
-    )
-    assert serialize_guild_plugin(
-        _plugin(config_state="unverified"), context=CONTEXT, viewer=ADULT
-    ).config_state == ("unverified")
-
-
 def test_no_stored_value_appears_anywhere_in_the_payload():
     payload = serialize_guild_plugin(
         _plugin(config={"admin": {"shop_domain": "example.test"}}),

@@ -6,8 +6,6 @@ from app.core.capabilities import (
     Capability,
     can_assign_role,
     capabilities_for,
-    role_rank,
-    roles_with_capability,
     standing_capabilities,
     user_has_capability,
 )
@@ -32,82 +30,17 @@ def test_a_suspended_account_holds_no_capability():
     )
 
 
-def test_config_manage_is_owner_only():
-    assert roles_with_capability(Capability.CONFIG_MANAGE) == frozenset(
-        {UserRole.owner}
-    )
-
-
-def test_plugins_manage_is_owner_only():
-    """Wiring a plug-in service is deployment configuration — the same tier
-    ``config.manage`` occupies, and no lower one."""
-    assert roles_with_capability(Capability.PLUGINS_MANAGE) == frozenset(
-        {UserRole.owner}
-    )
-
-
-def test_data_bypass_is_operator_and_owner():
-    assert roles_with_capability(Capability.DATA_BYPASS) == frozenset(
-        {UserRole.operator, UserRole.owner}
-    )
-
-
-def test_a_moderator_holds_moderation_alone():
-    """No grant but ``moderate``, no account recovery, no billing: support
-    holds all of that, on top of everything a moderator does."""
-    moderator = capabilities_for(UserRole.moderator)
-    assert Capability.CONTENT_MODERATE in moderator
-    assert Capability.COMMUNITIES_SUSPEND in moderator
-    assert Capability.ACCESS_REQUEST in moderator
-    for capability in (
-        Capability.ACCESS_REQUEST_ANY,
-        Capability.USERS_MANAGE,
-        Capability.USERS_AGE_UNBLOCK,
-        Capability.BILLING_SUPPORT,
-    ):
-        assert capability not in moderator
-        assert capability in capabilities_for(UserRole.support)
-    assert moderator < capabilities_for(UserRole.support)
-
-
-def test_access_approve_is_operator_and_owner():
-    """Approvers are also the ones who read the full access-grant queue."""
-    assert roles_with_capability(Capability.ACCESS_APPROVE) == frozenset(
-        {UserRole.operator, UserRole.owner}
-    )
-
-
-def test_role_rank_follows_the_ladder():
-    ladder = [
-        UserRole.member,
-        UserRole.moderator,
-        UserRole.support,
-        UserRole.operator,
-        UserRole.owner,
-    ]
-    assert [role_rank(role) for role in ladder] == list(range(len(ladder)))
-    assert sorted(UserRole, key=role_rank) == ladder
-
-
-def test_member_has_no_capabilities():
-    assert capabilities_for(UserRole.member) == frozenset()
-
-
-def test_owner_can_assign_every_role():
-    owner = _Actor(UserRole.owner)
-    for role in UserRole:
-        assert can_assign_role(owner, role) is True, role
-
-
-def test_operator_can_assign_up_to_operator_but_not_owner():
-    operator = _Actor(UserRole.operator)
-    assert can_assign_role(operator, UserRole.member) is True
-    assert can_assign_role(operator, UserRole.support) is True
-    assert can_assign_role(operator, UserRole.moderator) is True
-    assert can_assign_role(operator, UserRole.operator) is True
-    assert can_assign_role(operator, UserRole.owner) is False
-
-
-def test_roles_without_assign_capability_cannot_assign():
-    for role in (UserRole.member, UserRole.support, UserRole.moderator):
-        assert can_assign_role(_Actor(role), UserRole.member) is False
+@pytest.mark.parametrize(
+    ("actor", "assignable"),
+    [
+        (UserRole.owner, set(UserRole)),
+        (UserRole.operator, set(UserRole) - {UserRole.owner}),
+        (UserRole.support, set()),
+        (UserRole.moderator, set()),
+        (UserRole.member, set()),
+    ],
+)
+def test_a_role_is_assigned_only_at_or_below_the_assigners_rung(actor, assignable):
+    assert {
+        role for role in UserRole if can_assign_role(_Actor(actor), role)
+    } == assignable

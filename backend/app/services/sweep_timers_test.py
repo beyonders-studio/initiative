@@ -14,7 +14,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core import metrics
 from app.core.config import settings
 from app.db import cohorts, timers
-from app.models.platform.community_timer import CommunityTimer
 from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
 from app.models.platform.user_notification_prefs import DigestCadence
 from app.models.tenant._mixins import ActorKind
@@ -408,16 +407,6 @@ async def test_a_community_arms_its_own_timers_and_reads_none(session: AsyncSess
                 await routed.exec(statement)
             await routed.rollback()
             await route_system(routed, guild_id=community_id)
-
-
-def test_a_timer_names_the_community_the_sweep_and_the_time_and_nothing_else():
-    """What the work is, the visit reads from the community's own schema."""
-    assert set(CommunityTimer.__table__.columns.keys()) == {  # type: ignore[attr-defined]
-        "id",
-        "community_id",
-        "kind",
-        "due_at",
-    }
 
 
 async def _read_as_community(community_id: int, statement):

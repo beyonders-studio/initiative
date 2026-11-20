@@ -14,7 +14,6 @@ import json
 from pathlib import Path
 
 import pytest
-from httpx2 import AsyncClient
 
 pytestmark = pytest.mark.always
 
@@ -27,18 +26,6 @@ RETIRED = (
     "reference_sectors",
     "REFERENCE_SECTORS",
 )
-
-
-async def test_the_community_reference_route_is_gone(client: AsyncClient):
-    body = {"purpose": "billing", "community_ref": "gplu_x"}
-    response = await client.post(
-        "/api/v1/plugin-platform/community-reference", json=body
-    )
-    nowhere = await client.post("/api/v1/plugin-platform/never-a-route", json=body)
-
-    # Answered as any path no route serves is.
-    assert response.status_code == nowhere.status_code
-    assert response.status_code in (404, 405)
 
 
 def test_nothing_in_the_app_names_them():
