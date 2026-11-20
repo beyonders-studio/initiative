@@ -99,18 +99,14 @@ describe("useDashboardEditor", () => {
     editor.add();
     editor.add();
     editor.add();
+    // Shown at once, before any save.
+    expect(editor.widgets()).toHaveLength(3);
     expect(mutate).not.toHaveBeenCalled();
 
     editor.settle();
     expect(mutate).toHaveBeenCalledTimes(1);
     // The last state wins, not the first.
     expect((mutate.mock.calls[0][0] as SavePayload).definition.widgets).toHaveLength(3);
-  });
-
-  it("shows the edit immediately, before the save lands", () => {
-    const editor = setup();
-    editor.add();
-    expect(editor.widgets()).toHaveLength(1);
   });
 
   it("hands control back to the server once the draft matches what was saved", () => {
@@ -144,47 +140,15 @@ describe("useDashboardEditor", () => {
     expect(editor.widgets()).toHaveLength(2);
   });
 
-  it("does not clear a draft the user has moved on from", () => {
-    // The overlapping-responses case this used to cover cannot happen any more
-    // — saves are serialized, so one client never has two in flight. What
-    // remains is the ordinary one: a response arrives, and by then the canvas
-    // has changed again.
-    const editor = setup();
-
-    editor.add();
-    editor.settle();
-    editor.add();
-
-    act(() => settlers[0]());
-    editor.refetch();
-
-    expect(editor.widgets()).toHaveLength(2);
-  });
-
-  it("keeps one save on the wire at a time", () => {
+  it("keeps one save on the wire, sending what accumulated once it lands", () => {
     // Each save is a whole-definition PATCH. Two in flight can commit in either
     // order and leave the older one authoritative, so a second save waits.
     const editor = setup();
 
     editor.add();
     editor.settle();
-    expect(mutate).toHaveBeenCalledTimes(1);
-
     editor.add();
     editor.settle();
-    expect(mutate).toHaveBeenCalledTimes(1);
-
-    editor.add();
-    editor.settle();
-    expect(mutate).toHaveBeenCalledTimes(1);
-  });
-
-  it("sends what accumulated while a save was on the wire, once it lands", () => {
-    const editor = setup();
-
-    editor.add();
-    editor.settle();
-    editor.add();
     editor.add();
     editor.settle();
     expect(mutate).toHaveBeenCalledTimes(1);

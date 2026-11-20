@@ -41,52 +41,44 @@ const canSellOn = async () => {
 };
 
 describe("useBillingPortal canSell", () => {
-  it("sells on the web and the desktop app where a portal is configured", async () => {
-    expect((await canSellOn()).current.canSell).toBe(true);
-    onPlatform("electron");
-    expect((await canSellOn()).current.canSell).toBe(true);
+  it.each([
+    ["the web", "web", {}, {}, true],
+    ["the desktop app", "electron", {}, {}, true],
+    ["iOS on the US storefront", "ios", {}, { country: "USA" }, true],
+    ["iOS elsewhere", "ios", {}, { country: "CAN" }, false],
+    [
+      "a Play install in an allowed country",
+      "android",
+      { installer: "com.android.vending" },
+      { country: "NL" },
+      true,
+    ],
+    [
+      "a Play install outside them",
+      "android",
+      { installer: "com.android.vending" },
+      { country: "IN" },
+      false,
+    ],
+    [
+      "an Android install from outside Play",
+      "android",
+      { installer: "dev.imranr.obtainium" },
+      {},
+      true,
+    ],
+  ])("on %s, sells: %s", async (_where, platform, installer, country, sells) => {
+    onPlatform(platform);
+    environment.get.mockResolvedValue(installer);
+    environment.storeCountry.mockResolvedValue(country);
+    const result = await canSellOn();
+    await waitFor(() => expect(result.current.canSell).toBe(sells));
+    if (!sells) expect(result.current.reserveTab()).toBeNull();
   });
 
   it("never sells without a portal", async () => {
     state.billing = null;
     expect((await canSellOn()).current.canSell).toBe(false);
-  });
-
-  it("sells on iOS on the US storefront only", async () => {
-    onPlatform("ios");
-    environment.storeCountry.mockResolvedValue({ country: "USA" });
-    const result = await canSellOn();
-    await waitFor(() => expect(result.current.canSell).toBe(true));
-  });
-
-  it("does not sell on iOS elsewhere", async () => {
-    onPlatform("ios");
-    environment.storeCountry.mockResolvedValue({ country: "CAN" });
-    const result = await canSellOn();
-    expect(result.current.canSell).toBe(false);
-    expect(result.current.reserveTab()).toBeNull();
-  });
-
-  it("sells on a Play install in an allowed country, and not in another", async () => {
-    onPlatform("android");
-    environment.get.mockResolvedValue({ installer: "com.android.vending" });
-    environment.storeCountry.mockResolvedValue({ country: "NL" });
-    const allowed = await canSellOn();
-    await waitFor(() => expect(allowed.current.canSell).toBe(true));
-  });
-
-  it("does not sell on a Play install outside the allowed countries", async () => {
-    onPlatform("android");
-    environment.get.mockResolvedValue({ installer: "com.android.vending" });
-    environment.storeCountry.mockResolvedValue({ country: "IN" });
-    expect((await canSellOn()).current.canSell).toBe(false);
-  });
-
-  it("sells on an Android install from outside Play", async () => {
-    onPlatform("android");
-    environment.get.mockResolvedValue({ installer: "dev.imranr.obtainium" });
-    const result = await canSellOn();
-    await waitFor(() => expect(result.current.canSell).toBe(true));
   });
 });
 

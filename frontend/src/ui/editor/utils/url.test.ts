@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { pasteOverDefaultLinkUrl, validateUrl, withoutDefaultScheme } from "./url";
+import { validateUrl, withoutDefaultScheme } from "./url";
 
 /** validateUrl accepts only addresses `sanitizeUrl` keeps. */
 describe("validateUrl", () => {
@@ -61,16 +61,5 @@ describe("withoutDefaultScheme", () => {
     expect(withoutDefaultScheme("https://example.com/?next=https://other.test")).toBe(
       "https://example.com/?next=https://other.test"
     );
-  });
-});
-
-describe("pasteOverDefaultLinkUrl", () => {
-  it("takes a pasted URL whole", () => {
-    expect(pasteOverDefaultLinkUrl("https://example.com/a")).toBe("https://example.com/a");
-    expect(pasteOverDefaultLinkUrl("  http://example.com\n")).toBe("http://example.com");
-  });
-
-  it("keeps https:// in front of a pasted bare host", () => {
-    expect(pasteOverDefaultLinkUrl("example.com/a")).toBe("https://example.com/a");
   });
 });

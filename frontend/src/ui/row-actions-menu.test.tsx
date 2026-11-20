@@ -15,17 +15,7 @@ import { DropdownMenuItem } from "./dropdown-menu";
 import { RowActionsMenu } from "./row-actions-menu";
 
 describe("RowActionsMenu", () => {
-  it("names the row it acts on", () => {
-    render(
-      <RowActionsMenu subject="jordan#1234">
-        <DropdownMenuItem>Suspend</DropdownMenuItem>
-      </RowActionsMenu>
-    );
-
-    expect(screen.getByRole("button", { name: "Actions for jordan#1234" })).toBeInTheDocument();
-  });
-
-  it("keeps its actions behind the trigger until asked", async () => {
+  it("names the row it acts on, and keeps its actions behind the trigger until asked", async () => {
     render(
       <RowActionsMenu subject="jordan#1234">
         <DropdownMenuItem>Suspend</DropdownMenuItem>
@@ -35,7 +25,7 @@ describe("RowActionsMenu", () => {
 
     expect(screen.queryByText("Suspend")).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: /Actions for/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Actions for jordan#1234" }));
 
     expect(await screen.findByText("Suspend")).toBeInTheDocument();
     expect(screen.getByText("Delete")).toBeInTheDocument();

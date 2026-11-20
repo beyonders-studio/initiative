@@ -73,7 +73,7 @@ const FILTERED_AS: Partial<Record<MetadataType, MetadataType>> = {
  * Return the ordered list of operators that make sense for a property type.
  * The first entry is used as the default when adding a new filter.
  */
-export const opsForType = (type: MetadataType): BackendOp[] => {
+const opsForType = (type: MetadataType): BackendOp[] => {
   switch (type) {
     case MetadataType.text:
     case MetadataType.url:

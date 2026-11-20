@@ -22,26 +22,28 @@ const renderSync = (auth: GuardAuthState | undefined, server = web) => {
 };
 
 describe("useRouteGuardSync", () => {
-  it("does not invalidate on mount — the initial load already ran the guards", () => {
-    const { router } = renderSync({ loading: true, user: null });
+  it("does not invalidate on mount, and invalidates once per transition, not once per render", () => {
+    const { router, view } = renderSync({ loading: true, user: null });
+    // The initial load already ran the guards.
     expect(router.invalidate).not.toHaveBeenCalled();
-  });
 
-  it("invalidates when auth settles to signed out", () => {
-    const { router, view } = renderSync({ loading: true, user: null });
-    view.rerender({ auth: { loading: false, user: null }, server: web });
+    const settled = { loading: false, user: null };
+    view.rerender({ auth: settled, server: web });
+    view.rerender({ auth: { ...settled }, server: web });
+    view.rerender({ auth: { ...settled }, server: web });
     expect(router.invalidate).toHaveBeenCalledTimes(1);
   });
 
-  it("invalidates when auth settles to signed in", () => {
-    const { router, view } = renderSync({ loading: true, user: null });
-    view.rerender({ auth: { loading: false, user: { id: 3 } }, server: web });
-    expect(router.invalidate).toHaveBeenCalledTimes(1);
-  });
-
-  it("invalidates on sign out", () => {
-    const { router, view } = renderSync({ loading: false, user: { id: 3 } });
-    view.rerender({ auth: { loading: false, user: null }, server: web });
+  it.each([
+    [
+      "auth settles to signed in",
+      { loading: true, user: null },
+      { loading: false, user: { id: 3 } },
+    ],
+    ["the user signs out", { loading: false, user: { id: 3 } }, { loading: false, user: null }],
+  ])("invalidates when %s", (_case, before, after) => {
+    const { router, view } = renderSync(before);
+    view.rerender({ auth: after, server: web });
     expect(router.invalidate).toHaveBeenCalledTimes(1);
   });
 
@@ -50,15 +52,6 @@ describe("useRouteGuardSync", () => {
     view.rerender({ auth: { loading: false, user: { id: 3 } }, server: { ...web } });
     view.rerender({ auth: { loading: false, user: { id: 3 } }, server: { ...web } });
     expect(router.invalidate).not.toHaveBeenCalled();
-  });
-
-  it("invalidates once per transition, not once per render", () => {
-    const { router, view } = renderSync({ loading: true, user: null });
-    const settled = { loading: false, user: null };
-    view.rerender({ auth: settled, server: web });
-    view.rerender({ auth: { ...settled }, server: web });
-    view.rerender({ auth: { ...settled }, server: web });
-    expect(router.invalidate).toHaveBeenCalledTimes(1);
   });
 
   it("invalidates when a native install gains a configured server", () => {

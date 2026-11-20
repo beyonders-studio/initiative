@@ -27,19 +27,14 @@ const tree = async () => {
 };
 
 describe("useUnreadTree", () => {
-  it("lights every level a place names", async () => {
+  it("lights every level a place names, and nothing else", async () => {
     places({ community_id: 7, initiative_id: 9, tool: "project" });
     const result = await tree();
 
     expect(result.current.hasCommunity(7)).toBe(true);
     expect(result.current.hasInitiative(7, 9)).toBe(true);
     expect(result.current.hasTool(7, 9, "project")).toBe(true);
-  });
-
-  it("lights nothing a place does not name", async () => {
-    places({ community_id: 7, initiative_id: 9, tool: "project" });
-    const result = await tree();
-
+    // And nothing it does not name.
     expect(result.current.hasCommunity(8)).toBe(false);
     expect(result.current.hasInitiative(7, 10)).toBe(false);
     expect(result.current.hasTool(7, 9, "file")).toBe(false);

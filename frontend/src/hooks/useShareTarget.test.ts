@@ -69,13 +69,13 @@ describe("useShareTarget", () => {
     await vi.waitFor(() => expect(remove).toHaveBeenCalled());
   });
 
-  it("does not listen in a browser", () => {
+  it("does not listen in a browser, nor in the desktop app", () => {
     native = false;
-    renderHook(() => useShareTarget());
+    const browser = renderHook(() => useShareTarget());
     expect(listener).toBeNull();
-  });
+    browser.unmount();
 
-  it("does not listen in the desktop app", () => {
+    native = true;
     vi.spyOn(Capacitor, "getPlatform").mockReturnValue("electron");
     renderHook(() => useShareTarget());
     expect(listener).toBeNull();
@@ -83,22 +83,15 @@ describe("useShareTarget", () => {
 });
 
 describe("useResumePendingShare", () => {
-  it("leads back to a share the page has not shown", () => {
-    setPendingShare(receivedShare({ texts: ["hello"] }));
+  it.each([
+    ["leads back to a share the page has not shown", "/", false, true],
+    ["leaves somebody alone once the page has shown it", "/", true, false],
+    ["does nothing on the share page itself", "/share", false, false],
+  ])("%s", (_case, at, opened, leads) => {
+    pathname = at;
+    setPendingShare({ ...receivedShare({ texts: ["hello"] })!, opened });
     renderHook(() => useResumePendingShare());
-    expect(navigate).toHaveBeenCalledWith({ to: "/share" });
-  });
-
-  it("leaves somebody alone once the page has shown it", () => {
-    setPendingShare({ ...receivedShare({ texts: ["hello"] })!, opened: true });
-    renderHook(() => useResumePendingShare());
-    expect(navigate).not.toHaveBeenCalled();
-  });
-
-  it("does nothing on the share page itself", () => {
-    pathname = "/share";
-    setPendingShare(receivedShare({ texts: ["hello"] }));
-    renderHook(() => useResumePendingShare());
-    expect(navigate).not.toHaveBeenCalled();
+    if (leads) expect(navigate).toHaveBeenCalledWith({ to: "/share" });
+    else expect(navigate).not.toHaveBeenCalled();
   });
 });

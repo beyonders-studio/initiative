@@ -109,6 +109,8 @@ describe("DataTable row selection", () => {
     // Filter to hide the selected rows (show only Echo).
     const filter = screen.getByPlaceholderText("Filter…");
     await user.type(filter, "Echo");
+    // Neither selected row is among those the filter left, so the count says so.
+    expect(screen.getByText("2 selected (1 match filter)")).toBeInTheDocument();
 
     // Only Echo is visible now; select it.
     const visible = screen.getAllByRole("checkbox", { name: "Select row" });
@@ -128,25 +130,17 @@ describe("DataTable row selection", () => {
     expect(reported()).toBe("1,2,5");
   });
 
-  // Alpha + Bravo are selected and then filtered out of sight. Even where the
-  // filter leaves more rows than are selected — 2 selected, 3 matching — the
-  // plain "2 of 3 selected" would be misleading, because neither of the two is
-  // among the three. So the filtered variant is what both cases show.
-  it.each([
-    ["hidden by a filter that leaves one row", "Echo", "2 selected (1 match filter)"],
-    [
-      "hidden by a filter that leaves more rows than are selected",
-      "e",
-      "2 selected (3 match filter)",
-    ],
-  ])("shows a filter-aware count for rows %s", async (_label, filterText, count) => {
+  // Even where the filter leaves more rows than are selected — 2 selected, 3
+  // matching — the plain "2 of 3 selected" would be misleading, because neither
+  // of the two is among the three.
+  it("keeps the count filter-aware when the filter leaves more rows than are selected", async () => {
     const { user, getCheckboxes } = await selecting(<Harness />);
 
     await user.click(getCheckboxes()[0]);
     await user.click(getCheckboxes()[1]);
-    await user.type(screen.getByPlaceholderText("Filter…"), filterText);
+    await user.type(screen.getByPlaceholderText("Filter…"), "e");
 
-    expect(screen.getByText(count)).toBeInTheDocument();
+    expect(screen.getByText("2 selected (3 match filter)")).toBeInTheDocument();
     expect(screen.queryByText("2 of 3 row(s) selected")).not.toBeInTheDocument();
   });
 });
@@ -268,27 +262,17 @@ describe("DataTable grouping", () => {
     expect(screen.getAllByText("Alpha")).toHaveLength(1);
   });
 
-  it("re-reports the selection when the data is re-shaped under it", async () => {
+  it("re-reports the selection when the data is re-shaped, and does not bring it back", async () => {
     const { user, getCheckboxes } = await selecting(<GroupedHarness />);
 
     // Rows read Ungrouped (Charlie), bug (Alpha, Bravo), urgent (Alpha) — pick
     // Alpha's row in the "bug" group.
     await user.click(getCheckboxes()[1]);
     expect(reported()).toBe("1::bug");
-
-    // Re-shaping the rows re-keys them, so nothing is checked any more — the
-    // reported selection has to follow rather than keep the stale row.
-    await user.click(screen.getByRole("button", { name: "Reshape" }));
-    expect(reported()).toBe("");
-  });
-
-  it("does not bring a selection back when the original row keys return", async () => {
-    const { user, getCheckboxes } = await selecting(<GroupedHarness />);
-
-    await user.click(getCheckboxes()[1]);
     const reshape = screen.getByRole("button", { name: "Reshape" });
 
-    // Away from the fanned shape the selected id no longer exists...
+    // Re-shaping the rows re-keys them, so away from the fanned shape the
+    // selected id no longer exists and the reported selection follows...
     await user.click(reshape);
     expect(reported()).toBe("");
 
@@ -411,16 +395,27 @@ describe("DataTable sorting", () => {
     expect(firstBodyRowText()).toContain("Row 25");
   });
 
-  it("leaves row order alone under manualSorting", async () => {
+  it("leaves row order alone under manualSorting, reporting the change to the caller", async () => {
     // The caller sorts server-side, so a header click reports the intent but
     // must not reorder the rows the table was handed.
     const user = userEvent.setup();
+    const seen: string[] = [];
     const reversed = [...manyRows].reverse();
-    render(<DataTable columns={sortableColumns} data={reversed} manualSorting />);
+    render(
+      <DataTable
+        columns={sortableColumns}
+        data={reversed}
+        manualSorting
+        onSortingChange={(sorting) =>
+          seen.push(sorting.map((s) => `${s.id}:${s.desc ? "desc" : "asc"}`).join(","))
+        }
+      />
+    );
     expect(firstBodyRowText()).toContain("Row 25");
 
     await user.click(screen.getByRole("button", { name: "Name" }));
     expect(firstBodyRowText()).toContain("Row 25");
+    expect(seen).toEqual(["name:asc"]);
   });
 
   it("keeps a pinned row first whichever way it sorts", async () => {
@@ -439,23 +434,6 @@ describe("DataTable sorting", () => {
     expect(firstBodyRowText()).toContain("Row 13");
     await user.click(screen.getByRole("button", { name: "Name" }));
     expect(firstBodyRowText()).toContain("Row 13");
-  });
-
-  it("reports sorting changes to the caller", async () => {
-    const user = userEvent.setup();
-    const seen: string[] = [];
-    render(
-      <DataTable
-        columns={sortableColumns}
-        data={manyRows}
-        manualSorting
-        onSortingChange={(sorting) =>
-          seen.push(sorting.map((s) => `${s.id}:${s.desc ? "desc" : "asc"}`).join(","))
-        }
-      />
-    );
-    await user.click(screen.getByRole("button", { name: "Name" }));
-    expect(seen).toEqual(["name:asc"]);
   });
 });
 
@@ -642,22 +620,15 @@ const names = () =>
     .map((row) => row.textContent?.replace(/^Fold/, ""));
 
 describe("DataTable nested rows", () => {
-  it("draws a row's nested rows under it, and folds them with it", async () => {
+  it("draws a row's nested rows under it, folds them with it, and keeps it folded on a refetch", async () => {
     const user = userEvent.setup();
     render(<TreeHarness />);
 
     expect(names()).toEqual(["Post", "Script", "Shoot", "Lights", "Other"]);
 
     await user.click(screen.getByRole("button", { name: "Fold Post" }));
-
     expect(names()).toEqual(["Post", "Other"]);
-  });
 
-  it("keeps a folded row folded when its rows arrive again", async () => {
-    const user = userEvent.setup();
-    render(<TreeHarness />);
-
-    await user.click(screen.getByRole("button", { name: "Fold Post" }));
     await user.click(screen.getByRole("button", { name: "Refetch" }));
 
     expect(names()).toEqual(["Post", "Other"]);

@@ -19,55 +19,29 @@ import { documentExtension } from "@/ui/editor/document-extension";
 import { Plugins } from "@/ui/editor/plugins";
 import { TooltipProvider } from "@/ui/tooltip";
 
-const entry = (key: string, text: string, tag: HeadingTagType): TableOfContentsEntry => [
-  key,
-  text,
-  tag,
-];
-
 describe("buildOutlineTree", () => {
-  it("files each heading under the nearest shallower one", () => {
-    const tree = buildOutlineTree([
-      entry("1", "Overview", "h1"),
-      entry("2", "Details", "h2"),
-      entry("3", "Edge cases", "h3"),
-      entry("4", "Appendix", "h1"),
-    ]);
+  type Node = ReturnType<typeof buildOutlineTree>[number];
+  /** The tree as `A(B(C)) D`: each heading, its children in brackets. */
+  const shape = (nodes: Node[]): string =>
+    nodes
+      .map((node) => (node.children.length ? `${node.text}(${shape(node.children)})` : node.text))
+      .join(" ");
 
-    expect(tree.map((node) => node.text)).toEqual(["Overview", "Appendix"]);
-    expect(tree[0].children.map((node) => node.text)).toEqual(["Details"]);
-    expect(tree[0].children[0].children.map((node) => node.text)).toEqual(["Edge cases"]);
-    expect(tree[1].children).toEqual([]);
-  });
-
-  it("puts the shallowest headings it actually has at the top", () => {
-    const tree = buildOutlineTree([
-      entry("1", "First", "h2"),
-      entry("2", "Under first", "h3"),
-      entry("3", "Second", "h2"),
-    ]);
-
-    expect(tree.map((node) => node.text)).toEqual(["First", "Second"]);
-    expect(tree[0].children.map((node) => node.text)).toEqual(["Under first"]);
-  });
-
-  it("keeps a skipped level as nesting rather than inventing a heading", () => {
-    const tree = buildOutlineTree([entry("1", "Overview", "h1"), entry("2", "Deep", "h3")]);
-
-    expect(tree).toHaveLength(1);
-    expect(tree[0].children.map((node) => node.text)).toEqual(["Deep"]);
-  });
-
-  it("closes every deeper heading when a shallower one arrives", () => {
-    const tree = buildOutlineTree([
-      entry("1", "A", "h3"),
-      entry("2", "B", "h4"),
-      entry("3", "C", "h5"),
-      entry("4", "D", "h3"),
-    ]);
-
-    expect(tree.map((node) => node.text)).toEqual(["A", "D"]);
-    expect(tree[0].children[0].children.map((node) => node.text)).toEqual(["C"]);
+  it.each([
+    ["files each heading under the nearest shallower one", "h1 A, h2 B, h3 C, h1 D", "A(B(C)) D"],
+    ["puts the shallowest headings it actually has at the top", "h2 A, h3 B, h2 C", "A(B) C"],
+    ["keeps a skipped level as nesting rather than inventing one", "h1 A, h3 B", "A(B)"],
+    [
+      "closes every deeper heading when a shallower one arrives",
+      "h3 A, h4 B, h5 C, h3 D",
+      "A(B(C)) D",
+    ],
+  ])("%s", (_case, headings, expected) => {
+    const entries = headings.split(", ").map((heading, key): TableOfContentsEntry => {
+      const [tag, text] = heading.split(" ");
+      return [String(key), text, tag as HeadingTagType];
+    });
+    expect(shape(buildOutlineTree(entries))).toBe(expected);
   });
 });
 

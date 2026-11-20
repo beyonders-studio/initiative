@@ -117,14 +117,23 @@ const renderAuth = () =>
     </AuthProvider>
   );
 
-describe("useAuth identity ordering", () => {
-  beforeEach(() => {
-    get.mockReset();
-    post.mockReset().mockResolvedValue({ data: {} });
-    getItem.mockReset().mockReturnValue(null);
-  });
+beforeEach(() => {
+  get.mockReset();
+  post.mockReset().mockResolvedValue({ data: {} });
+  getItem.mockReset().mockReturnValue(null);
+  setItem.mockReset();
+  setAuthToken.mockReset();
+  presentPasskey.mockReset();
+  prefetchViewPreferences.mockClear();
+});
 
-  it("keeps the newer account when an older read finishes last", async () => {
+describe("useAuth identity ordering", () => {
+  // The second order is the one a turn-counter gets wrong: the older read lands
+  // first, and must not make the newer answer look stale.
+  it.each([
+    ["the newer read answers first", true],
+    ["the older read answers first", false],
+  ])("keeps the newer account when %s", async (_order, newerFirst) => {
     // Boot, so the provider settles before the interesting part.
     get.mockResolvedValueOnce({ data: buildUser({ username: "At boot" }) });
     renderAuth();
@@ -134,47 +143,25 @@ describe("useAuth identity ordering", () => {
     const newer = deferred<{ data: unknown }>();
     get.mockReturnValueOnce(older.promise).mockReturnValueOnce(newer.promise);
 
-    let firstDone: Promise<void>;
-    let secondDone: Promise<void>;
+    let firstDone: Promise<void> = Promise.resolve();
+    let secondDone: Promise<void> = Promise.resolve();
     act(() => {
       firstDone = auth.refreshUser();
       secondDone = auth.refreshUser();
     });
 
-    // The newer request answers first; the older one straggles in behind it.
-    await act(async () => {
+    const answerNewer = async () => {
       newer.resolve({ data: buildUser({ username: "Newer" }) });
       await secondDone;
+    };
+    const answerOlder = async () => {
       older.resolve({ data: buildUser({ username: "Older" }) });
       await firstDone;
-    });
-
-    expect(auth.user?.username).toBe("Newer");
-  });
-
-  it("keeps the newer account when the older read finishes first", async () => {
-    // The other order, and the one a turn-counter gets wrong: the older read
-    // lands first, and must not make the newer answer look stale.
-    get.mockResolvedValueOnce({ data: buildUser({ username: "At boot" }) });
-    renderAuth();
-    await waitFor(() => expect(auth.user?.username).toBe("At boot"));
-
-    const older = deferred<{ data: unknown }>();
-    const newer = deferred<{ data: unknown }>();
-    get.mockReturnValueOnce(older.promise).mockReturnValueOnce(newer.promise);
-
-    let firstDone: Promise<void>;
-    let secondDone: Promise<void>;
-    act(() => {
-      firstDone = auth.refreshUser();
-      secondDone = auth.refreshUser();
-    });
-
+    };
     await act(async () => {
-      older.resolve({ data: buildUser({ username: "Older" }) });
-      await firstDone;
-      newer.resolve({ data: buildUser({ username: "Newer" }) });
-      await secondDone;
+      for (const answer of newerFirst ? [answerNewer, answerOlder] : [answerOlder, answerNewer]) {
+        await answer();
+      }
     });
 
     expect(auth.user?.username).toBe("Newer");
@@ -212,10 +199,13 @@ describe("useAuth identity ordering", () => {
     expect(auth).toBe(before);
   });
 
-  it("still swaps the object when the account actually moved", async () => {
-    get.mockResolvedValueOnce({ data: buildUser({ username: "Before" }) });
+  it("applies a read that nothing overtook, swapping the object", async () => {
+    const atBoot = buildUser({ username: "Before" });
+    get.mockResolvedValueOnce({ data: atBoot });
     renderAuth();
     await waitFor(() => expect(auth.user?.username).toBe("Before"));
+    // The message store is settled on whoever is signed in before it is read.
+    expect(serveAccount).toHaveBeenCalledWith("default", atBoot.id);
     const before = auth.user;
 
     get.mockResolvedValueOnce({ data: buildUser({ username: "After" }) });
@@ -326,31 +316,9 @@ describe("useAuth identity ordering", () => {
       platform.native = false;
     }
   );
-
-  it("applies a read that nothing overtook", async () => {
-    const atBoot = buildUser({ username: "At boot" });
-    get.mockResolvedValueOnce({ data: atBoot });
-    renderAuth();
-    await waitFor(() => expect(auth.user?.username).toBe("At boot"));
-    // The message store is settled on whoever is signed in before it is read.
-    expect(serveAccount).toHaveBeenCalledWith("default", atBoot.id);
-
-    get.mockResolvedValueOnce({ data: buildUser({ username: "Fresh" }) });
-    await act(async () => {
-      await auth.refreshUser();
-    });
-
-    expect(auth.user?.username).toBe("Fresh");
-  });
 });
 
 describe("useAuth second factor", () => {
-  beforeEach(() => {
-    get.mockReset();
-    post.mockReset().mockResolvedValue({ data: {} });
-    getItem.mockReset().mockReturnValue(null);
-  });
-
   /** The 401 both sign-in routes answer with when a factor is outstanding. */
   const challengeRefusal = (challenge: string) => ({
     response: { status: 401, data: { detail: "TOTP_REQUIRED", challenge } },
@@ -367,76 +335,43 @@ describe("useAuth second factor", () => {
     });
   });
 
-  it("still reports an ordinary refusal as one", async () => {
+  it.each([
+    ["an ordinary refusal", { status: 400, data: { detail: "INCORRECT_CREDENTIALS" } }],
+    ["a 401 that carries no challenge", { status: 401, data: { detail: "TOTP_REQUIRED" } }],
+  ])("still reports %s as a refusal", async (_what, response) => {
     get.mockResolvedValue({ data: buildUser() });
     renderAuth();
-    post.mockRejectedValueOnce({
-      response: { status: 400, data: { detail: "INCORRECT_CREDENTIALS" } },
-    });
-
-    const failure = auth.login({ email: "a@example.com", password: "wrong" });
-    await expect(failure).rejects.toThrow();
-    await expect(failure).rejects.not.toMatchObject({
-      name: "SecondFactorRequiredError",
-    });
-  });
-
-  it("does not mistake a 401 that carries no challenge for one", async () => {
-    get.mockResolvedValue({ data: buildUser() });
-    renderAuth();
-    post.mockRejectedValueOnce({
-      response: { status: 401, data: { detail: "TOTP_REQUIRED" } },
-    });
+    post.mockRejectedValueOnce({ response });
 
     await expect(auth.login({ email: "a@example.com", password: "pw" })).rejects.not.toMatchObject({
       name: "SecondFactorRequiredError",
     });
   });
 
-  it("answers the challenge with the code and signs in", async () => {
+  it.each([
+    ["a live code", { code: "123456" }, { code: "123456", recovery_code: null }],
+    [
+      "a recovery code",
+      { recoveryCode: "abcde-fghij" },
+      { code: null, recovery_code: "abcde-fghij" },
+    ],
+  ])("answers the challenge with %s and signs in", async (_what, answer, sent) => {
     get.mockResolvedValue({ data: buildUser({ username: "Signed in" }) });
     renderAuth();
     await waitFor(() => expect(auth.user?.username).toBe("Signed in"));
 
     post.mockResolvedValueOnce({ data: { access_token: "fresh-token" } });
     await act(async () => {
-      await auth.completeSecondFactor({ challenge: "c", code: "123456" });
+      await auth.completeSecondFactor({ challenge: "c", ...answer });
     });
 
-    expect(post).toHaveBeenCalledWith("/api/v1/auth/token/totp", {
-      challenge: "c",
-      code: "123456",
-      recovery_code: null,
-    });
+    expect(post).toHaveBeenCalledWith("/api/v1/auth/token/totp", { challenge: "c", ...sent });
     // Signing in is the person being here: the session's idle window starts now.
     expect(startSessionActivity).toHaveBeenCalled();
-  });
-
-  it("sends a recovery code as one, not as a live code", async () => {
-    get.mockResolvedValue({ data: buildUser() });
-    renderAuth();
-
-    post.mockResolvedValueOnce({ data: { access_token: "fresh-token" } });
-    await act(async () => {
-      await auth.completeSecondFactor({ challenge: "c", recoveryCode: "abcde-fghij" });
-    });
-
-    expect(post).toHaveBeenCalledWith("/api/v1/auth/token/totp", {
-      challenge: "c",
-      code: null,
-      recovery_code: "abcde-fghij",
-    });
   });
 });
 
 describe("useAuth password sign-in on native", () => {
-  beforeEach(() => {
-    get.mockReset();
-    post.mockReset();
-    getItem.mockReset().mockReturnValue(null);
-    setItem.mockReset();
-  });
-
   it("posts the browser's form with the device's name and keeps the refresh token", async () => {
     const { Capacitor } = await import("@capacitor/core");
     vi.spyOn(Capacitor, "isNativePlatform").mockReturnValue(true);
@@ -459,12 +394,6 @@ describe("useAuth password sign-in on native", () => {
 });
 
 describe("useAuth account switch", () => {
-  beforeEach(() => {
-    get.mockReset();
-    post.mockReset().mockResolvedValue({ data: {} });
-    getItem.mockReset().mockReturnValue(null);
-  });
-
   it("drops the previous account's answers when a sign-in names somebody else", async () => {
     const before = buildUser({ username: "Before" });
     get.mockResolvedValue({ data: before });
@@ -489,12 +418,6 @@ describe("useAuth account switch", () => {
 });
 
 describe("useAuth registration", () => {
-  beforeEach(() => {
-    get.mockReset();
-    post.mockReset();
-    getItem.mockReset().mockReturnValue(null);
-  });
-
   it("asks the server again whether anyone has signed up", async () => {
     get.mockResolvedValue({ data: null });
     renderAuth();
@@ -515,14 +438,6 @@ describe("useAuth registration", () => {
 });
 
 describe("useAuth passkey step-up", () => {
-  beforeEach(() => {
-    get.mockReset();
-    post.mockReset().mockResolvedValue({ data: {} });
-    getItem.mockReset().mockReturnValue(null);
-    setAuthToken.mockReset();
-    presentPasskey.mockReset();
-  });
-
   it("takes the session the ceremony produced, as the code step-up does", async () => {
     get.mockResolvedValueOnce({ data: buildUser({ username: "Half in" }) });
     renderAuth();
@@ -552,13 +467,6 @@ describe("useAuth passkey step-up", () => {
 });
 
 describe("useAuth while suspended", () => {
-  beforeEach(() => {
-    get.mockReset();
-    post.mockReset().mockResolvedValue({ data: {} });
-    getItem.mockReset().mockReturnValue(null);
-    prefetchViewPreferences.mockClear();
-  });
-
   const refused = () =>
     act(() => {
       window.dispatchEvent(new CustomEvent("initiative:auth:account-suspended"));
