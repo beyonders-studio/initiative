@@ -305,7 +305,8 @@ async def _purge_references(
         tool_layouts,
     )
 
-    content_kinds = {table: kind for kind, table in content_kind_tables(tools).items()}
+    content_kinds_by_kind = content_kind_tables(tools)
+    content_kinds = {table: kind for kind, table in content_kinds_by_kind.items()}
     installed = {table.name for table in tools.installed_tables}
     # What an edge may name that has a row: everything in a tool, and a tag.
     edge_codes = {
@@ -313,8 +314,11 @@ async def _purge_references(
         for table, kind in {**content_kinds, KINDS["tag"].table: "tag"}.items()
     }
     reaction_targets = {target.table: target for target in ReactionTarget}
-    layout_tools = {table: target for target, table in LAYOUT_INSTANCE_TABLES.items()}
-    layout_tools |= {tool.table.name: tool.kind for tool in tools.installed}
+    # The layouts each row lays out: an instance's, and a tool plug-in's row's
+    # item tables', each its own target under the row.
+    layout_tools = {table: [target] for target, table in LAYOUT_INSTANCE_TABLES.items()}
+    for item, parent in tools.item_parents.items():
+        layout_tools.setdefault(content_kinds_by_kind[parent], []).append(item)
     commented = {parent.table: kind for kind, parent in comment_parents(tools).items()}
     for table, ids in doomed.items():
         name = table.name
@@ -339,7 +343,7 @@ async def _purge_references(
             await metadata.drop_values(session, spec.target, ids)
         elif name in installed:
             await metadata.drop_values(session, content_kinds[name], ids)
-        if (tool := layout_tools.get(name)) is not None:
+        for tool in layout_tools.get(name, ()):
             await tool_layouts.drop_for_instances(session, tool, ids)
     for table, ids in doomed.items():
         kind = commented.get(table.name)

@@ -1226,25 +1226,56 @@ def administration_path() -> InitiativePath:
     )
 
 
-def tool_layouts_path() -> InitiativePath:
+def layout_holder(t: str, tools: ToolSet) -> str:
+    """The kind of the row a layout's ``tool_id`` names: the target itself, or
+    for a tool plug-in's item table, the table its rows sit under."""
+    if not tools.item_parents:
+        return f"{t}.tool"
+    arms = " ".join(
+        f"WHEN '{item}' THEN '{parent}'" for item, parent in tools.item_parents.items()
+    )
+    return f"(CASE {t}.tool {arms} ELSE {t}.tool END)"
+
+
+def tool_layouts_path(tools: ToolSet) -> InitiativePath:
     """A layout is read by the members of its initiative. A layout of one
     instance of a tool is written by whoever may write that instance, in the
     layout's own initiative: :data:`ENTITY_ACCESS_FN` asks the instance's own
-    entry, sharing included, as a property value's write does. A layout of a
-    shared tool (no instance) is written as the initiative's setup is
-    (:func:`managed_write`).
+    entry, sharing included, as a property value's write does; a tool
+    plug-in's item's, by whoever may write the row its items sit under. A
+    layout of a shared tool, or of a tool plug-in's own rows (no instance), is
+    written as the initiative's setup is (:func:`managed_write`). A tool
+    plug-in's layouts are there only while its install leaves its tool there
+    (:func:`tool_present`), as its rows are.
     """
+    owners = {
+        kind: tool.kind
+        for tool in tools.installed
+        for kind in (tool.kind, *(child.value for child in tool.children))
+    }
+
+    def present(t: str, w: bool, gate: str) -> str:
+        if not owners:
+            return gate
+        arms = " ".join(f"WHEN '{kind}' THEN '{tool}'" for kind, tool in owners.items())
+        return (
+            f"({gate} AND ({t}.tool NOT IN ({sql_values(owners)})"
+            f" OR {tool_present(f'(CASE {t}.tool {arms} END)', w)}))"
+        )
 
     def build(t: str, w: bool) -> str:
         if not w:
-            return _access(f"{t}.initiative_id", False)
+            return present(t, w, _access(f"{t}.initiative_id", False))
+        holder = layout_holder(t, tools)
         instance = (
-            f"({_entity_call(f'{t}.tool', f'{t}.tool_id', True, True)}"
-            f" AND {ENTITY_INITIATIVE_FN}({t}.tool, {t}.tool_id) = {t}.initiative_id)"
+            f"({_entity_call(holder, f'{t}.tool_id', True, True)}"
+            f" AND {ENTITY_INITIATIVE_FN}({holder}, {t}.tool_id) = {t}.initiative_id)"
         )
-        return (
+        return present(
+            t,
+            w,
             f"(CASE WHEN {t}.tool_id IS NULL THEN {managed_write(f'{t}.initiative_id')}"
-            f" ELSE ({_P.system} OR {instance}) END)"
+            f" ELSE ({_P.system} OR {instance}) END)",
         )
 
     return InitiativePath(
@@ -1835,7 +1866,7 @@ def paths_for(tools: ToolSet) -> dict[str, InitiativePath]:
         # on an install, by (entity_type, entity_id).
         "metadata_values": metadata_values_path(tools),
         # An initiative's views of one tool instance, or of a shared page.
-        "tool_layouts": tool_layouts_path(),
+        "tool_layouts": tool_layouts_path(tools),
         "comments": comments_path(tools),
         # Polymorphic over what it is on; gated by that thing's own path.
         "reactions": reactions_path(tools),
@@ -2227,15 +2258,21 @@ def values_report_on_their_target(kinds: Iterable[str], facet: str) -> ReportsAs
     )
 
 
-def layouts_report_on_their_target() -> ReportsAs:
+def layouts_report_on_their_target(tools: ToolSet) -> ReportsAs:
     """A layout is a facet of the instance it is for, or of its initiative when
-    it is for a shared tool. Whoever shows the set re-reads it."""
+    it is for a shared tool or a tool plug-in's own rows; a tool plug-in's
+    item's, of the row its items sit under. Whoever shows the set re-reads
+    it."""
+    kinds = content_kind_tables(tools)
+    tables = {
+        **LAYOUT_INSTANCE_TABLES,
+        **{item: kinds[parent] for item, parent in tools.item_parents.items()},
+    }
     arms = " ".join(
-        f"WHEN '{target}' THEN '{table}'"
-        for target, table in LAYOUT_INSTANCE_TABLES.items()
+        f"WHEN '{target}' THEN '{table}'" for target, table in tables.items()
     )
     return ReportsAs(
-        resource_types=frozenset(LAYOUT_INSTANCE_TABLES.values()) | {"initiatives"},
+        resource_types=frozenset(tables.values()) | {"initiatives"},
         id_expr=lambda r: f"COALESCE({r}.tool_id, {r}.initiative_id)",
         facet="layouts",
         type_expr=lambda r: (
@@ -2408,7 +2445,7 @@ EVENT_SOURCES: dict[str, Emit | Silent] = {
     ),
     # A layout is read in its instance's set, or its initiative's for a shared
     # tool, so a change reports as that.
-    "tool_layouts": Emit(reports_as=layouts_report_on_their_target()),
+    "tool_layouts": Emit(reports_as=layouts_report_on_their_target),
     # An answer is read with the event it answers, as its attendees are.
     "calendar_event_answers": Emit(
         reports_as=reports_as("calendar_events", "calendar_event_id", "answers")

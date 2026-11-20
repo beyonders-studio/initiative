@@ -3,10 +3,14 @@ layouts.
 
 A row belongs to a target: one instance of a tool (``tool``, ``tool_id``: a
 project), a collection (``tool`` is ``collection``), or, for a tool the whole
-initiative shares, the initiative itself (``tool_id`` NULL: the calendar). Its ``kind`` says which layout it is: one way
+initiative shares, the initiative itself (``tool_id`` NULL: the calendar). A
+tool plug-in's table is its own target, named by its kind, in each place its
+rows are listed: the initiative for the tool's own rows (``tool_id`` NULL),
+and the row an item's rows sit under (``tool_id`` that row's), so each item
+table of a row keeps its own. Its ``kind`` says which layout it is: one way
 the target lists what it holds (``table``, ``board``, ``calendar``), its
-detail (``task``), or which list it opens on (``default``). A target has
-at most one of each.
+detail (``task``; a tool plug-in's table's rows' page, by the table's kind),
+or which list it opens on (``default``). A target has at most one of each.
 
 A row is stored when what it holds is changed, and only then, so its
 ``updated_at`` is its own; what is not stored is drawn as shipped
@@ -20,15 +24,17 @@ There is no foreign key to the instance: the purge removes an instance's
 layouts explicitly, as it does its property values. The initiative is a
 foreign key, so a shared tool's layouts go with their initiative.
 
-Read by the initiative's members; written by whoever may write the instance,
-or, for a shared tool, by the initiative's managers and the community's admin
-(``app.db.initiative_rls``).
+Read by the initiative's members; written by whoever may write the instance
+(for a tool plug-in's item, the row it sits under), or, for a shared tool and
+a tool plug-in's own table, by the initiative's managers and the community's
+admin (``app.db.initiative_rls``).
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
     CheckConstraint,
@@ -46,9 +52,46 @@ from app.core.tools import LAYOUT_KINDS, LAYOUT_TARGETS, LAYOUTS_SHARED, TYPED_D
 from app.db.registry_checks import FROM_REGISTRY
 from app.models.tenant._mixins import CreatedByMixin
 
-_TOOL_VALUES = ", ".join(f"'{target}'" for target in LAYOUT_TARGETS)
-_SHARED_VALUES = ", ".join(f"'{tool.value}'" for tool in LAYOUTS_SHARED)
-_KIND_VALUES = ", ".join(f"'{kind}'" for kind in LAYOUT_KINDS)
+if TYPE_CHECKING:
+    from app.core.tool_set import ToolSet
+
+
+def _listed(values: Iterable[str]) -> str:
+    return ", ".join(f"'{value}'" for value in values)
+
+
+def _tables(tools: ToolSet | None) -> list[str]:
+    """Each installed tool plug-in's tables in a community with ``tools``, by
+    kind: the tool's own, then its items'."""
+    installed = () if tools is None else tools.installed
+    return [
+        kind
+        for tool in installed
+        for kind in (tool.kind, *(child.value for child in tool.children))
+    ]
+
+
+def _tool_rule(tools: ToolSet | None) -> str:
+    """Which targets a row may name in a community with ``tools``: the
+    built-in ones, and each installed tool plug-in's tables."""
+    return f"tool IN ({_listed((*LAYOUT_TARGETS, *_tables(tools)))})"
+
+
+def _target_rule(tools: ToolSet | None) -> str:
+    """A shared tool, and a tool plug-in's own table, name no row; every
+    other target names one."""
+    installed = () if tools is None else tools.installed
+    shared = (*(tool.value for tool in LAYOUTS_SHARED), *(t.kind for t in installed))
+    return f"(tool IN ({_listed(shared)})) = (tool_id IS NULL)"
+
+
+def _kind_rule(tools: ToolSet | None) -> str:
+    """Which layouts a row may be in a community with ``tools``: the built-in
+    ones, and the page of each installed tool plug-in's table's rows, by its
+    kind (its lists are among the built-in ones)."""
+    return f"kind IN ({_listed((*LAYOUT_KINDS, *_tables(tools)))})"
+
+
 _TYPED = " OR ".join(
     f"(tool = '{tool.value}' AND kind = '{kind}')"
     for tool, kind in TYPED_DETAILS.items()
@@ -62,20 +105,20 @@ class ToolLayout(CreatedByMixin, table=True):
     __tablename__ = "tool_layouts"
     __table_args__ = (
         CheckConstraint(
-            f"tool IN ({_TOOL_VALUES})",
+            _tool_rule(None),
             name="ck_tool_layouts_tool",
-            info={FROM_REGISTRY: True},
+            info={FROM_REGISTRY: _tool_rule},
         ),
         # A shared tool names no instance, and every other tool's layout names one.
         CheckConstraint(
-            f"(tool IN ({_SHARED_VALUES})) = (tool_id IS NULL)",
+            _target_rule(None),
             name="ck_tool_layouts_target",
-            info={FROM_REGISTRY: True},
+            info={FROM_REGISTRY: _target_rule},
         ),
         CheckConstraint(
-            f"kind IN ({_KIND_VALUES})",
+            _kind_rule(None),
             name="ck_tool_layouts_kind",
-            info={FROM_REGISTRY: True},
+            info={FROM_REGISTRY: _kind_rule},
         ),
         # A detail laid out per type names its type, and nothing else does.
         CheckConstraint(

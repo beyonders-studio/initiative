@@ -365,6 +365,33 @@
     "notFound": "Das gibt es hier nicht",
     "notFoundBody": "Es wurde vielleicht entfernt, oder das Tool, zu dem es gehört, ist in dieser Community nicht installiert.",
     "backToTool": "Zurück zu {{name}}",
-    "actions": "Aktionen"
+    "actions": "Aktionen",
+    "layout": {
+      "name": "{{name}}-Seite",
+      "help": "Wie jeder Eintrag beim Öffnen angezeigt wird. Was das Layout weglässt, ist ausgeblendet.",
+      "shipped": "Das ist das Layout, wie das Plug-in es mitbringt. Eine Änderung macht es zum eigenen dieses Orts.",
+      "titleHelp": "Jeder Eintrag zeigt seinen Namen.",
+      "hiddenHelp": "Jeder Eintrag kann das zeigen. Entfernt ist es ausgeblendet, und „Hinzufügen“ holt es zurück.",
+      "parts": {
+        "byline": "Daten",
+        "notice": "Hinweis „Nur lesen“",
+        "actions": "Menü",
+        "relations": "Verknüpfungen",
+        "comments": "Kommentare"
+      },
+      "partHelp": {
+        "byline": "Wann er hinzugefügt und zuletzt geändert wurde.",
+        "notice": "Sagt es allen, die ihn nicht ändern können.",
+        "actions": "Was sich sonst noch damit tun lässt.",
+        "relations": "Womit er verknüpft ist.",
+        "comments": "Seine Unterhaltung."
+      },
+      "noItems": "Füge einen Eintrag hinzu, um sein Layout hier zu sehen.",
+      "lists": {
+        "grid": "Jeder Eintrag als Karte, in gleichmäßigen Reihen.",
+        "masonry": "Jeder Eintrag als Karte, jede so hoch, wie sie ist.",
+        "table": "Jeder Eintrag als Zeile, seine Felder in Spalten."
+      }
+    }
   }
 }

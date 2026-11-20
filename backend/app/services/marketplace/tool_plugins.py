@@ -95,10 +95,14 @@ __all__ = [
     "TOOL_LAYOUT_FIELDS",
     "TOOL_LIST_LAYOUTS",
     "TOOL_PLUGIN_TERMS",
+    "TableFields",
     "ToolChanges",
+    "detail_layout",
     "effective_defaults",
     "is_tool_plugin",
+    "list_layout",
     "normalize_tool_plugin_definition",
+    "table_fields",
     "tool_changes",
     "tool_kinds",
     "tool_row_problems",
@@ -723,14 +727,43 @@ def _presets(raw: Any, *, what: str) -> list[dict[str, Any]]:
     return cleaned
 
 
-def _list_layout(
-    raw: Any,
-    *,
-    declared: dict[str, dict[str, Any]],
-    names: frozenset[str],
-    under: dict[str, dict[str, dict[str, Any]]],
-    what: str,
-) -> dict[str, Any]:
+@dataclass(frozen=True)
+class TableFields:
+    """What a layout of one of a tool's tables names: the fields it declares,
+    by key, every field a layout of it may name (those and the fields every
+    tool row has), and the fields of each item table directly under it, by
+    the item's key."""
+
+    declared: dict[str, dict[str, Any]]
+    names: frozenset[str]
+    under: dict[str, dict[str, dict[str, Any]]]
+
+
+def _table_fields(
+    fields: list[dict[str, Any]], under: dict[str, list[dict[str, Any]]]
+) -> TableFields:
+    declared = {field["key"]: field for field in fields}
+    return TableFields(
+        declared,
+        frozenset(declared) | TOOL_LAYOUT_FIELDS,
+        {
+            key: {field["key"]: field for field in item_fields}
+            for key, item_fields in under.items()
+        },
+    )
+
+
+def table_fields(tool: Mapping[str, Any], key: str) -> TableFields:
+    """What a layout of the table ``key`` of the declared ``tool`` (a
+    definition's ``tool`` block) names."""
+    items = list(tool.get("items", []))
+    if key == tool["key"]:
+        return _table_fields(list(tool.get("fields", [])), _under(items, None))
+    (item,) = (item for item in items if item["key"] == key)
+    return _table_fields(item["fields"], _under(items, key))
+
+
+def _list_layout(raw: Any, *, table: TableFields, what: str) -> dict[str, Any]:
     """One way a table's rows are listed: a grid or a masonry wall of its
     card, or a table of its columns, with a look for each scale or counter
     field that has one, and its presets."""
@@ -744,7 +777,18 @@ def _list_layout(
     body = {key: value for key, value in layout.items() if key != "kind"}
     if layout.get("presets") is not None:
         body["presets"] = _presets(layout["presets"], what=what)
-    definition, stored = _validated(ListLayoutDefinition, body, fields=names, what=what)
+    return {"kind": kind, **list_layout(body, table=table, what=what)}
+
+
+def list_layout(raw: Any, *, table: TableFields, what: str) -> dict[str, Any]:
+    """A list of a table's rows as ``tool_layouts`` stores it: what it sets of
+    its card or columns, its looks and its presets, each naming the table's
+    fields, and nothing unset. Whether the list holds what its kind holds is
+    the caller's to ask."""
+    declared, under = table.declared, table.under
+    definition, stored = _validated(
+        ListLayoutDefinition, raw, fields=table.names, what=what
+    )
     roots: list[CardPart] = [definition.card] if definition.card is not None else []
     for part, _ in (found for root in roots for found in parts_of(root)):
         if isinstance(part, PluginPart):
@@ -784,17 +828,19 @@ def _list_layout(
                 fail(f"{what} preset {preset.slug!r}: {field!r} does not sort")
     if too_large(stored, roots, len(definition.columns or ())):
         fail(f"{what} holds more parts, or nests them deeper, than a layout may")
-    return {"kind": kind, **stored}
+    return stored
 
 
-def _detail_layout(
-    raw: Any, *, declared: dict[str, dict[str, Any]], names: frozenset[str], what: str
-) -> dict[str, Any]:
+def detail_layout(raw: Any, *, table: TableFields, what: str) -> dict[str, Any]:
     """How one of a table's rows is shown: its parts in three regions, each
     placing fields, the initiative's properties and the parts every tool's
     page has."""
+    declared = table.declared
     definition, stored = _validated(
-        DetailLayoutDefinition, require_mapping(raw, what), fields=names, what=what
+        DetailLayoutDefinition,
+        require_mapping(raw, what),
+        fields=table.names,
+        what=what,
     )
     if not stored:
         fail(f"{what} places its parts in a header, main or side")
@@ -833,34 +879,20 @@ def _layouts(
     layouts = require_mapping(raw, f"{what} layouts")
     if set(layouts) != {"lists", "detail"}:
         fail(f"{what} layouts: lists and a detail")
-    declared = {field["key"]: field for field in fields}
-    names = frozenset(declared) | TOOL_LAYOUT_FIELDS
+    table = _table_fields(fields, under)
     lists = require_list(layouts["lists"], f"{what} lists", len(TOOL_LIST_LAYOUTS))
     if not lists:
         fail(f"{what} layouts: lists one way at least")
     cleaned = [
-        _list_layout(
-            entry,
-            declared=declared,
-            names=names,
-            under={
-                key: {field["key"]: field for field in item_fields}
-                for key, item_fields in under.items()
-            },
-            what=f"{what} list layout",
-        )
-        for entry in lists
+        _list_layout(entry, table=table, what=f"{what} list layout") for entry in lists
     ]
     kinds = [entry["kind"] for entry in cleaned]
     if len(set(kinds)) != len(kinds):
         fail(f"{what} layouts: each list is of a different kind")
     return {
         "lists": cleaned,
-        "detail": _detail_layout(
-            layouts["detail"],
-            declared=declared,
-            names=names,
-            what=f"{what} detail layout",
+        "detail": detail_layout(
+            layouts["detail"], table=table, what=f"{what} detail layout"
         ),
     }
 

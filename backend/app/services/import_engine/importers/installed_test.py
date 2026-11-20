@@ -22,6 +22,7 @@ from app.models.platform.guild import CommunityRole
 from app.models.tenant.data_job import DataJobStatus
 from app.models.tenant.relationship import EntityRelationship
 from app.models.tenant.resource_grant import ResourceGrant
+from app.models.tenant.tool_layout import ToolLayout
 from app.services.platform import rules
 from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
@@ -120,6 +121,15 @@ async def test_a_tool_plugins_row_round_trips_into_another_initiative(
         },
     )
 
+    # The group's counters listed as a table of their own.
+    laid_out = await client.put(
+        a.g("/layouts/"),
+        headers=a.headers,
+        params={"tool": COUNTER, "tool_id": group["id"]},
+        json={"kind": "table", "definition": {"columns": ["name", "count"]}},
+    )
+    assert laid_out.status_code == 200, laid_out.text
+
     response = await client.get(
         a.g(f"/exports/{GROUP}"),
         headers=a.headers,
@@ -129,6 +139,9 @@ async def test_a_tool_plugins_row_round_trips_into_another_initiative(
     envelope = response.json()
     assert envelope["fields"]["description"].startswith("Kept by @")
     assert envelope["mention_handles"]
+    assert envelope["layouts"] == {
+        "counter": [{"kind": "table", "definition": {"columns": ["name", "count"]}}]
+    }
 
     response = await _import(client, a, envelope, target.id)
     assert response.status_code == 201, response.text
@@ -190,6 +203,18 @@ async def test_a_tool_plugins_row_round_trips_into_another_initiative(
         )
     ).scalar_one()
     assert edge.target_node == node_of(code, items[1].id)
+    (layout,) = (
+        await session.exec(
+            sa.select(ToolLayout).where(
+                ToolLayout.tool == COUNTER, ToolLayout.tool_id == made.id
+            )
+        )
+    ).scalars()
+    assert (layout.initiative_id, layout.kind, layout.definition) == (
+        target.id,
+        "table",
+        {"columns": ["name", "count"]},
+    )
 
 
 async def test_a_tool_plugins_envelope_is_refused_where_it_cannot_be_made(

@@ -13,7 +13,9 @@ import type { ListLayoutReadKind } from "@/api/generated/initiativeAPI.schemas";
 import { MasonryIcon } from "./MasonryIcon";
 
 /** A layout's icon, and its name, by a key that names its namespace. */
-export type LayoutLook = { icon: LucideIcon; labelKey: string };
+/** A layout's icon and name: a key to it, or, for a plug-in's own, the
+ *  name itself in the reader's language. */
+export type LayoutLook = { icon: LucideIcon; labelKey: string; label?: string };
 
 /** Each list layout's icon and name, in `layouts`. */
 export const listLayoutLooks: Record<ListLayoutReadKind, LayoutLook> = {

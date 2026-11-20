@@ -65,14 +65,14 @@ const wordsOf = (key: string): EditableDetail["words"] => ({
 });
 
 /** The detail tree's regions, as a detail draws them. */
-const regionsOf = (tree: LayoutNode): StoredRegions => ({
+export const regionsOf = (tree: LayoutNode): StoredRegions => ({
   header: tree.children?.[0]?.children ?? [],
   main: tree.children?.[1]?.children ?? [],
   side: tree.children?.[2]?.children ?? [],
 });
 
 /** What a detail's menu is drawn as, where nothing in it is used. */
-const ActionsPreview = () => (
+export const ActionsPreview = () => (
   <Button type="button" variant="outline" size="icon" tabIndex={-1} aria-hidden>
     <MoreHorizontal className="h-4 w-4" />
   </Button>

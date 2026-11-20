@@ -83,6 +83,83 @@ describe("ToolPluginRowPage", () => {
     expect(screen.getByRole("button", { name: "New Book" })).toBeInTheDocument();
   });
 
+  it("draws the row and its items as the places they are listed in laid them out", async () => {
+    const changed = "2026-11-01T00:00:00Z";
+    const name = { type: "field", props: { field: "name" } };
+    server.use(
+      communityHttp.get("/plugins/", () => HttpResponse.json({ items: [buildToolPlugin()] })),
+      communityHttp.get(`/plugin-tools/${shelf}/5`, () =>
+        HttpResponse.json(
+          buildToolRowRead({
+            kind: shelf,
+            id: 5,
+            initiative_id: 3,
+            name: "Novels",
+            fields: { about: "Long ones" },
+          })
+        )
+      ),
+      communityHttp.get(`/plugin-tools/${book}/`, () =>
+        HttpResponse.json({
+          items: [
+            buildToolRowRead({
+              id: 8,
+              initiative_id: 3,
+              parent_id: 5,
+              name: "Middlemarch",
+              fields: { pages: 800, read: 200 },
+            }),
+          ],
+          total_count: 1,
+          page: 1,
+          page_size: 100,
+          has_next: false,
+          has_prev: false,
+        })
+      ),
+      communityHttp.get("/layouts/", ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        // The shelves' page, as their initiative changed it: its name alone.
+        if (params.get("tool") === shelf && params.get("initiative_id") === "3") {
+          return HttpResponse.json({
+            can_configure: false,
+            layouts: [
+              {
+                kind: shelf,
+                definition: { header: [name], main: [], side: [] },
+                updated_at: changed,
+              },
+            ],
+          });
+        }
+        // The books' grid under this shelf, as it changed it: their names alone.
+        if (params.get("tool") === book && params.get("tool_id") === "5") {
+          return HttpResponse.json({
+            can_configure: false,
+            layouts: [
+              {
+                kind: "grid",
+                is_default: true,
+                hidden: false,
+                definition: { card: { type: "card", children: [name] } },
+                updated_at: changed,
+              },
+            ],
+          });
+        }
+        return HttpResponse.json({ can_configure: false, layouts: [] });
+      })
+    );
+    render(shelf);
+
+    expect(await screen.findByDisplayValue("Novels")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByDisplayValue("Long ones")).not.toBeInTheDocument());
+    expect(await screen.findByRole("link", { name: "Middlemarch" })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("img", { name: "200 / 800" })).not.toBeInTheDocument()
+    );
+  });
+
   it("walks every page of the items under it", async () => {
     const asked: (string | null)[] = [];
     server.use(

@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Plus } from "lucide-react";
+import { FileText, LayoutList as LayoutsIcon, Plus } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -10,17 +10,23 @@ import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCreateFromSearchParam } from "@/hooks/useCreateFromSearchParam";
 import { layoutViewSpec, useListView, viewKey } from "@/hooks/useListView";
 import { usePluginToolRows } from "@/hooks/usePluginToolRows";
+import { useSaveLayouts, useToolLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import {
   type InstalledTool,
   type ToolTable,
+  toolLayoutTarget,
+  toolPluginLayoutsRoute,
   toolPluginRowRoute,
   toolRow,
   toolText,
 } from "@/lib/toolPlugins";
 import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
-import { shippedLists } from "@/ui/layouts/layoutSet";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
+import { DropdownMenuItem } from "@/ui/dropdown-menu";
+import { LayoutsOverview } from "@/ui/layouts/LayoutList";
+import { laidOutLists, shippedLists } from "@/ui/layouts/layoutSet";
 import { listLayoutLooks } from "@/ui/layouts/looks";
 import { fieldSorting, presetName, presetsOf } from "@/ui/layouts/presets";
 import { CardGridSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
@@ -71,9 +77,20 @@ export const ToolTableRows = ({
   const label = t("tool.create", { name: toolText(table.name, i18n.language) });
   useRegisterPrimaryCreateAction(primary && canCreate ? { run: () => setOpen(true), label } : null);
 
-  // The lists it declares, drawn as shipped, and the one this person was last
-  // in here, or the first.
-  const lists = useMemo(() => shippedLists(table.layouts.lists), [table.layouts.lists]);
+  // The lists it declares, each as this place laid it out or as shipped, and
+  // the one this person was last in here, or the one it opens on.
+  const target = useMemo(
+    () => toolLayoutTarget(table, initiativeId, parentId ?? null),
+    [table, initiativeId, parentId]
+  );
+  const layouts = useToolLayouts(target);
+  const saveLayouts = useSaveLayouts(target);
+  const [layoutsOpen, setLayoutsOpen] = useState(false);
+  const lists = useMemo(
+    () =>
+      laidOutLists(shippedLists(table.layouts.lists), layouts.data).filter((each) => !each.hidden),
+    [table.layouts.lists, layouts.data]
+  );
   const listView = useListView(
     useMemo(
       () =>
@@ -85,7 +102,10 @@ export const ToolTableRows = ({
       [communityId, table.kind, parentId, initiativeId]
     )
   );
-  const list = lists.find((each) => each.kind === listView.layout) ?? lists[0];
+  const list =
+    lists.find((each) => each.kind === listView.layout) ??
+    lists.find((each) => each.is_default) ??
+    lists[0];
   // Its presets sort it as a view: the rows keep their own order.
   const presets = useMemo(
     () => presetsOf(list?.definition, { shipped: [], read: () => null, sorting: fieldSorting }),
@@ -137,6 +157,14 @@ export const ToolTableRows = ({
               }
             : undefined
         }
+        menuItems={
+          layouts.data?.can_configure ? (
+            <DropdownMenuItem onSelect={() => setLayoutsOpen(true)}>
+              <LayoutsIcon className="h-4 w-4" />
+              {t("layouts:tab")}
+            </DropdownMenuItem>
+          ) : undefined
+        }
         // The page's own add is the app's add button on a phone too.
         {...(primary ? { actions: add } : { trailing: add })}
       />
@@ -162,6 +190,28 @@ export const ToolTableRows = ({
           />
         )
       )}
+      {layouts.data?.can_configure ? (
+        <Dialog open={layoutsOpen} onOpenChange={setLayoutsOpen}>
+          <DialogContent className="sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle>{t("layouts:tab")}</DialogTitle>
+              <DialogDescription>{t("layouts:settingsDescription")}</DialogDescription>
+            </DialogHeader>
+            <LayoutsOverview
+              layouts={layouts.data.layouts}
+              pageLooks={{
+                [table.kind]: {
+                  icon: FileText,
+                  labelKey: "",
+                  label: t("tool.layout.name", { name: toolText(table.name, i18n.language) }),
+                },
+              }}
+              save={saveLayouts.mutateAsync}
+              editor={gp(toolPluginLayoutsRoute(initiativeId, table.kind, parentId ?? null))}
+            />
+          </DialogContent>
+        </Dialog>
+      ) : null}
       {canCreate ? (
         <AddToolRowDialog
           open={open}

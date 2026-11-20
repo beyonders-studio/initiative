@@ -365,6 +365,33 @@
     "notFound": "Esto no está aquí",
     "notFoundBody": "Puede que se haya eliminado, o que la herramienta a la que pertenece no esté instalada en esta comunidad.",
     "backToTool": "Volver a {{name}}",
-    "actions": "Acciones"
+    "actions": "Acciones",
+    "layout": {
+      "name": "Página de {{name}}",
+      "help": "Cómo se muestra cada uno al abrirlo. Lo que deja fuera queda oculto.",
+      "shipped": "Este es el diseño tal como lo trae su plug-in. Cambiarlo lo hace propio de este lugar.",
+      "titleHelp": "Cada uno muestra su nombre.",
+      "hiddenHelp": "Cada uno puede mostrar esto. Si lo quitas, queda oculto, y Añadir lo vuelve a poner.",
+      "parts": {
+        "byline": "Fechas",
+        "notice": "Aviso de solo lectura",
+        "actions": "Menú",
+        "relations": "Relaciones",
+        "comments": "Comentarios"
+      },
+      "partHelp": {
+        "byline": "Cuándo se añadió y se cambió por última vez.",
+        "notice": "Se lo dice a quien no puede cambiarlo.",
+        "actions": "Qué más se puede hacer con él.",
+        "relations": "Con qué está vinculado.",
+        "comments": "Su conversación."
+      },
+      "noItems": "Añade uno para ver aquí su diseño.",
+      "lists": {
+        "grid": "Cada uno como una tarjeta, en filas parejas.",
+        "masonry": "Cada uno como una tarjeta, cada una tan alta como es.",
+        "table": "Cada uno como una fila, con sus campos en columnas."
+      }
+    }
   }
 }

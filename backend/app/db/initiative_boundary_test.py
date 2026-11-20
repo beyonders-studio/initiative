@@ -226,8 +226,34 @@ def _installed_kinds(tools: ToolSet) -> tuple[str, ...]:
     )
 
 
+def _layout_targets(tools: ToolSet) -> list[tuple[str, dict[str, Any]]]:
+    """A project's layouts, and each tool plug-in's tables': its tool's own,
+    which are the initiative's, and each item's under a row of the table it
+    sits in."""
+    kinds = entity_tables(tools)
+    return [
+        ("tool_layouts", {}),
+        *(
+            (
+                f"tool_layouts of a {tool.kind}",
+                {"tool": tool.kind, "tool_id": None, "kind": _DISTINCT},
+            )
+            for tool in tools.installed
+        ),
+        *(
+            (
+                f"tool_layouts of a {item}",
+                {"tool": item, "tool_id": _Parent(kinds[parent])},
+            )
+            for item, parent in tools.item_parents.items()
+        ),
+    ]
+
+
 def _variants(name: str, tools: ToolSet) -> list[tuple[str, dict[str, Any] | None]]:
     """The cases one table is swept as: once, or once per subject kind."""
+    if name == "tool_layouts":
+        return [(label, inherit or None) for label, inherit in _layout_targets(tools)]
     if name not in _EVERY_SUBJECT:
         return [(name, None)]
     column, kinds = _EVERY_SUBJECT[name]
@@ -432,7 +458,13 @@ class _Seeder:
                 if f"{column.name}_kind" in table.c:
                     values[f"{column.name}_kind"] = ActorKind.member.value
         for column, value in (inherit or {}).items():
-            if column in table.c:
+            if isinstance(value, _Parent):
+                values[column] = (await self.make(value.table, owner))["id"]
+            elif value is _DISTINCT:
+                taken = self.taken.get((name, column), 0)
+                values[column] = self.catalog.allowed[(name, column)][taken]
+                self.taken[(name, column)] = taken + 1
+            elif column in table.c:
                 values[column] = value
 
         for fk in table.foreign_key_constraints:
