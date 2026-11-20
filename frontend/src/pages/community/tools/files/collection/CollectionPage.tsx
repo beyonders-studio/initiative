@@ -77,14 +77,13 @@ import type { ToolIndexRow } from "@/pages/community/tools/ToolIndexPage";
 import { TABLE_SORT_FIELDS, ToolIndexTable } from "@/pages/community/tools/ToolIndexTable";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
 import { DropdownMenuItem } from "@/ui/dropdown-menu";
 import { DropOverlay } from "@/ui/file-drop";
 import { Label } from "@/ui/label";
 import { DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
 import { requiredKeys, type StoredRegions } from "@/ui/layouts/detailLayout";
 import { withDisplays } from "@/ui/layouts/fields";
-import { LayoutsOverview } from "@/ui/layouts/LayoutList";
+import { LayoutsDialog } from "@/ui/layouts/LayoutList";
 import { detailLayoutOf, listLayouts } from "@/ui/layouts/layoutSet";
 import { listLayoutLooks } from "@/ui/layouts/looks";
 import { formatPeriod } from "@/ui/lib/formatDate";
@@ -864,20 +863,14 @@ export function CollectionPage() {
       />
 
       {collection && layoutsQuery.data?.can_configure ? (
-        <Dialog open={layoutsOpen} onOpenChange={setLayoutsOpen}>
-          <DialogContent className="sm:max-w-xl">
-            <DialogHeader>
-              <DialogTitle>{t("layouts:tab")}</DialogTitle>
-              <DialogDescription>{t("layouts:settingsDescription")}</DialogDescription>
-            </DialogHeader>
-            <LayoutsOverview
-              layouts={layoutsQuery.data.layouts}
-              pageLooks={detailLayoutLooks}
-              save={saveLayouts.mutateAsync}
-              editor={gp(`${collectionRoute(collection.initiative_id, collection.id)}/layouts`)}
-            />
-          </DialogContent>
-        </Dialog>
+        <LayoutsDialog
+          open={layoutsOpen}
+          onOpenChange={setLayoutsOpen}
+          layouts={layoutsQuery.data.layouts}
+          pageLooks={detailLayoutLooks}
+          save={saveLayouts.mutateAsync}
+          editor={gp(`${collectionRoute(collection.initiative_id, collection.id)}/layouts`)}
+        />
       ) : null}
     </div>
   );

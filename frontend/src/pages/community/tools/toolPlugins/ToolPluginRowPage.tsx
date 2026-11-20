@@ -26,8 +26,8 @@ import { Section } from "@/ui/layouts/section";
 import { DetailPageSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { StatusMessage } from "@/ui/status-message";
 
+import { ItemRows } from "./ItemRows";
 import { RowActions } from "./RowActions";
-import { ToolTableRows } from "./ToolPluginView";
 import { toolDetail } from "./toolDetail";
 
 /**
@@ -123,7 +123,7 @@ export function ToolPluginRowPage() {
         const items = tool.tables.get(itemKind);
         return items ? (
           <Section key={itemKind} title={toolText(items.name, i18n.language)}>
-            <ToolTableRows
+            <ItemRows
               tool={tool}
               table={items}
               initiativeId={row.initiative_id}

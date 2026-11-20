@@ -3,6 +3,7 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
 import { host } from "@/ui/host";
 import {
   type DetailLayout,
@@ -220,6 +221,30 @@ export const LayoutsOverview = ({
         <p className="text-muted-foreground text-sm">{t("compact")}</p>
       )}
     </div>
+  );
+};
+
+/** A place's layouts, from its list's menu: each shown or hidden, the one
+ *  it opens on, and the way into the layout editor. */
+export const LayoutsDialog = ({
+  open,
+  onOpenChange,
+  ...overview
+}: Parameters<typeof LayoutsOverview>[0] & {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) => {
+  const { t } = useTranslation("layouts");
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{t("tab")}</DialogTitle>
+          <DialogDescription>{t("settingsDescription")}</DialogDescription>
+        </DialogHeader>
+        <LayoutsOverview {...overview} />
+      </DialogContent>
+    </Dialog>
   );
 };
 

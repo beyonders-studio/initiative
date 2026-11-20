@@ -6,7 +6,6 @@ import type {
   ResourceGrantBulkItem,
   ResourceGrantSchema,
   SearchInitiativeMembersParams,
-  Tool,
   ToolCan,
   UserSummary,
 } from "@/api/generated/initiativeAPI.schemas";
@@ -50,8 +49,9 @@ export interface BulkAccessItem {
 interface BulkEditAccessDialogProps extends DialogWithSuccessProps {
   /** The selected resources to edit sharing on. */
   items: BulkAccessItem[];
-  /** Which tool these are — routes to the right adapter server-side. */
-  resourceType: Tool;
+  /** Which tool these are, a built-in tool or a tool plug-in's kind —
+   *  routes to the right adapter server-side. */
+  resourceType: string;
   /** Invalidate the relevant list caches after a successful change. */
   invalidate: () => void;
 }
@@ -98,7 +98,11 @@ export function BulkEditAccessDialog({
   // The tool noun, pluralized for `count`, so descriptions/toasts read "2 projects"
   // rather than a hardcoded "files".
   const resourceNoun = useCallback(
-    (n: number) => t(`bulkBar.resource_${resourceType}`, { count: n }),
+    (n: number) =>
+      t(`bulkBar.resource_${resourceType}` as never, {
+        count: n,
+        defaultValue: t("bulkBar.resource_item", { count: n }),
+      }),
     [t, resourceType]
   );
   const [tab, setTab] = useState<"people" | "roles" | "all">("people");

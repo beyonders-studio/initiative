@@ -11,12 +11,7 @@ import { useInitiative } from "@/hooks/useInitiatives";
 import { useRouteId } from "@/hooks/useRouteId";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { resolveInitiativeColor } from "@/lib/initiativeColors";
-import {
-  type InstalledTool,
-  selectInstalledTools,
-  toolPluginListRoute,
-  toolText,
-} from "@/lib/toolPlugins";
+import { selectInstalledTools, toolPluginListRoute, toolText } from "@/lib/toolPlugins";
 import { initiativeRoute, TOOLS, toolCamelPlural, toolListRoute } from "@/lib/tools";
 import { CalendarsView } from "@/pages/community/tools/calendars/CalendarsPage";
 import { ContactsView } from "@/pages/community/tools/contacts/ContactsPage";
@@ -24,7 +19,7 @@ import { DashboardsView } from "@/pages/community/tools/dashboards/DashboardsPag
 import { FilesView } from "@/pages/community/tools/files/FilesPage";
 import { PostsView } from "@/pages/community/tools/posts/PostsPage";
 import { ProjectsView } from "@/pages/community/tools/projects/ProjectsPage";
-import { ToolPluginView } from "@/pages/community/tools/toolPlugins/ToolPluginView";
+import { ToolIndexPage } from "@/pages/community/tools/ToolIndexPage";
 import { WikisView } from "@/pages/community/tools/wikis/WikisPage";
 import { Button } from "@/ui/button";
 import { cn } from "@/ui/lib/utils";
@@ -65,11 +60,9 @@ export interface InitiativeDetailPageProps {
 }
 
 /** One tool's tab: its kind, its name, where it leads, and its list: a
- *  built-in tool's view, or the installed tool `ToolPluginView` draws. */
-type ToolTab = { kind: string; label: string; to: string } & (
-  | { View: ComponentType<ToolViewProps>; installed?: never }
-  | { installed: InstalledTool }
-);
+ *  built-in tool's view, or for an installed tool the index page every tool
+ *  without a page of its own lists in. */
+type ToolTab = { kind: string; label: string; to: string; View?: ComponentType<ToolViewProps> };
 
 export const InitiativePage = ({ tool }: InitiativeDetailPageProps = {}) => {
   const initiativeId = useRouteId("initiativeId");
@@ -109,7 +102,6 @@ export const InitiativePage = ({ tool }: InitiativeDetailPageProps = {}) => {
           kind: installed.kind,
           label: toolText(installed.name, i18n.language),
           to: toolPluginListRoute(initiative.id, installed.kind),
-          installed,
         })
       ),
     ].filter((tab) => viewable.includes(tab.kind));
@@ -301,10 +293,10 @@ export const InitiativePage = ({ tool }: InitiativeDetailPageProps = {}) => {
         {tabs.map((tab) => (
           <TabsContent key={tab.kind} value={tab.kind} className="mt-6">
             <Suspense fallback={tabFallback}>
-              {tab.installed ? (
-                <ToolPluginView
+              {tab.View === undefined ? (
+                <ToolIndexPage
                   key={`${tab.kind}-${initiative.id}`}
-                  tool={tab.installed}
+                  tool={tab.kind}
                   fixedInitiativeId={initiative.id}
                   canCreate={initiative.can.create.includes(tab.kind)}
                 />

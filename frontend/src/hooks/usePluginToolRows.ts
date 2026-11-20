@@ -3,10 +3,11 @@
  * kind through the generic routes every tool plug-in shares.
  */
 
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useCallback } from "react";
 
 import type {
+  ListPluginToolRowsParams,
   PluginToolActionRun,
   PluginToolRowCreate,
   PluginToolRowRead,
@@ -35,19 +36,20 @@ import type { ToolRow, ToolTable } from "@/lib/toolPlugins";
 import type { MutationOpts } from "@/types/mutation";
 import type { LayoutEnv } from "@/ui/layouts/fields";
 
-/** Every row of `table` in one place, the tool's own in an initiative or an
- *  item table's under one row, live or archived, each with what its card
- *  previews of the items under it: `page_size: 0` walks the server's
- *  windows, so a preset sorts all of them. */
+/** `table`'s rows in one place, the tool's own in an initiative or an item
+ *  table's under one row, each with what its card previews of the items under
+ *  it: the page `params` names, or with `page_size: 0` every one, walking the
+ *  server's windows, so a preset sorts all of them. */
 export const usePluginToolRows = (
   { kind, items }: Pick<ToolTable, "kind" | "items">,
-  where: ({ initiative_id: number } | { parent_id: number }) & { archived?: true }
+  params: ListPluginToolRowsParams
 ) => {
   const communityId = useActiveCommunityId();
-  const params = { ...where, ...(items.length > 0 ? { include_preview: true } : {}), page_size: 0 };
+  const asked = { ...(items.length > 0 ? { include_preview: true } : {}), page_size: 0, ...params };
   return useQuery({
-    queryKey: getListPluginToolRowsQueryKey(communityId, kind, params),
-    queryFn: () => fetchAllPages((p) => listPluginToolRows(communityId, kind, p), params),
+    queryKey: getListPluginToolRowsQueryKey(communityId, kind, asked),
+    queryFn: () => fetchAllPages((p) => listPluginToolRows(communityId, kind, p), asked),
+    placeholderData: keepPreviousData,
   });
 };
 

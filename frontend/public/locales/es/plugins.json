@@ -358,6 +358,9 @@
     "loadError": "No se han podido cargar.",
     "installsLoadError": "No se pudieron cargar las herramientas de esta comunidad.",
     "empty": "Aún no hay nada aquí.",
+    "emptyBody": "Añade el primero para empezar.",
+    "createFirst": "Añadir el primero",
+    "noMatches": "Nada aquí coincide con tus filtros.",
     "notFound": "Esto no está aquí",
     "notFoundBody": "Puede que se haya eliminado, o que la herramienta a la que pertenece no esté instalada en esta comunidad.",
     "backToTool": "Volver a {{name}}",
@@ -390,5 +393,9 @@
       }
     },
     "accessSettings": "Configuración de acceso"
+  },
+  "filters": {
+    "searchLabel": "Nombre o texto",
+    "search": "Buscar por nombre o texto"
   }
 }
