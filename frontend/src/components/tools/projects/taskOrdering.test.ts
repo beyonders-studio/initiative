@@ -10,36 +10,21 @@ import {
 } from "./taskOrdering";
 
 describe("computeMidpoint", () => {
-  it("returns the midpoint between two neighbors", () => {
-    const tasks = [{ position: 1 }, { position: 2 }];
-    // Insert at index 1 -> between position 1 and 2.
-    expect(computeMidpoint(tasks, 1)).toBe(1.5);
-  });
-
-  it("returns one less than the first task when inserting at the top", () => {
-    const tasks = [{ position: 5 }, { position: 6 }];
-    expect(computeMidpoint(tasks, 0)).toBe(4);
-  });
-
-  it("returns one more than the last task when inserting at the bottom", () => {
-    const tasks = [{ position: 1 }, { position: 2 }];
-    expect(computeMidpoint(tasks, 2)).toBe(3);
-  });
-
-  it("returns 0 for an empty list", () => {
-    expect(computeMidpoint([], 0)).toBe(0);
-  });
-
-  it("produces a fractional value between fractional neighbors", () => {
-    const tasks = [{ position: 1.5 }, { position: 1.75 }];
-    expect(computeMidpoint(tasks, 1)).toBe(1.625);
-  });
-
-  it("clamps precision to 10 decimal places", () => {
-    const tasks = [{ position: 1 }, { position: 1.0000000001 }];
-    const result = computeMidpoint(tasks, 1);
-    // (1 + 1.0000000001) / 2 = 1.00000000005, rounded to 10 dp.
-    expect(result).toBe(Number((1.00000000005).toFixed(10)));
+  it.each([
+    ["between two neighbors", [1, 2], 1, 1.5],
+    ["one less than the first, at the top", [5, 6], 0, 4],
+    ["one more than the last, at the bottom", [1, 2], 2, 3],
+    ["0 for an empty list", [], 0, 0],
+    ["fractional between fractional neighbors", [1.5, 1.75], 1, 1.625],
+    // (1 + 1.0000000001) / 2 = 1.00000000005, clamped to 10 decimal places.
+    ["clamped to 10 decimal places", [1, 1.0000000001], 1, Number((1.00000000005).toFixed(10))],
+  ])("returns %s", (_label, positions, index, expected) => {
+    expect(
+      computeMidpoint(
+        positions.map((position) => ({ position })),
+        index
+      )
+    ).toBe(expected);
   });
 });
 
@@ -101,45 +86,41 @@ describe("resolveKanbanDropTarget", () => {
 });
 
 describe("shouldInsertAfter", () => {
-  it("returns true when the dragged card's center is below the target's", () => {
-    const active = { top: 100, height: 40 }; // center 120
-    const over = { top: 90, height: 40 }; // center 110
-    expect(shouldInsertAfter(active, over)).toBe(true);
-  });
-
-  it("returns false when the dragged card's center is above the target's", () => {
-    const active = { top: 80, height: 40 }; // center 100
-    const over = { top: 100, height: 40 }; // center 120
-    expect(shouldInsertAfter(active, over)).toBe(false);
-  });
-
-  it("defaults to false (insert before) when a rect is missing", () => {
-    expect(shouldInsertAfter(null, { top: 0, height: 40 })).toBe(false);
-    expect(shouldInsertAfter({ top: 0, height: 40 }, undefined)).toBe(false);
+  it.each([
+    [
+      "the dragged card's center is below the target's",
+      { top: 100, height: 40 },
+      { top: 90, height: 40 },
+      true,
+    ],
+    [
+      "the dragged card's center is above the target's",
+      { top: 80, height: 40 },
+      { top: 100, height: 40 },
+      false,
+    ],
+    // Insert before when a rect is missing.
+    ["the dragged card has no rect", null, { top: 0, height: 40 }, false],
+    ["the target has no rect", { top: 0, height: 40 }, undefined, false],
+  ])("when %s: %s", (_label, active, over, expected) => {
+    expect(shouldInsertAfter(active, over)).toBe(expected);
   });
 });
 
 describe("isDraggingDown", () => {
   const tasks = [{ id: 1 }, { id: 2 }, { id: 3 }];
 
-  it("is true when the active card sits above the target (drag down)", () => {
+  it.each([
     // Drag the top card (1) onto the second (2): should land after it.
-    expect(isDraggingDown(tasks, 1, 2)).toBe(true);
-  });
-
-  it("is false when the active card sits below the target (drag up to top)", () => {
+    ["the active card sits above the target", 1, 2, true],
     // Drag the bottom card (3) onto the top card (1): should land before it,
     // i.e. reach the first slot — this is the regression that snapped to second.
-    expect(isDraggingDown(tasks, 3, 1)).toBe(false);
-  });
-
-  it("is false when there is no target card", () => {
-    expect(isDraggingDown(tasks, 1, null)).toBe(false);
-  });
-
-  it("is false when a card is not in the list", () => {
-    expect(isDraggingDown(tasks, 99, 1)).toBe(false);
-    expect(isDraggingDown(tasks, 1, 99)).toBe(false);
+    ["the active card sits below the target", 3, 1, false],
+    ["there is no target card", 1, null, false],
+    ["the active card is not in the list", 99, 1, false],
+    ["the target card is not in the list", 1, 99, false],
+  ])("when %s: %s", (_label, active, target, expected) => {
+    expect(isDraggingDown(tasks, active, target)).toBe(expected);
   });
 });
 

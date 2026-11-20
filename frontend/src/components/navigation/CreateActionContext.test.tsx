@@ -37,12 +37,6 @@ function Tree({ mounted, action }: { mounted: boolean; action: PrimaryCreateActi
 }
 
 describe("CreateActionContext", () => {
-  it("reports no create context and a null action when nothing is registered", () => {
-    render(<Tree mounted={false} action={null} />);
-    expect(screen.getByTestId("ctx").textContent).toBe("false");
-    expect(screen.getByTestId("action").textContent).toBe("no");
-  });
-
   it("exposes a registered action and runs the latest handler (permitted route)", () => {
     const run = vi.fn();
     const { rerender } = render(<Tree mounted={true} action={{ run, label: "Add Task" }} />);
@@ -63,19 +57,12 @@ describe("CreateActionContext", () => {
     expect(screen.getByTestId("label").textContent).toBe("Add File");
   });
 
-  it("marks a create context but exposes a null action when unpermitted (button hidden)", () => {
-    render(<Tree mounted={true} action={null} />);
+  it("marks a create context with no action when unpermitted, and clears it on unmount", () => {
+    const { rerender } = render(<Tree mounted={true} action={null} />);
     // isCreateContext is true so the nav knows to hide the add button rather
     // than fall back to the global create menu.
     expect(screen.getByTestId("ctx").textContent).toBe("true");
     expect(screen.getByTestId("action").textContent).toBe("no");
-  });
-
-  it("clears the registration when the create-able page unmounts", () => {
-    const { rerender } = render(
-      <Tree mounted={true} action={{ run: vi.fn(), label: "Add Item" }} />
-    );
-    expect(screen.getByTestId("ctx").textContent).toBe("true");
 
     rerender(<Tree mounted={false} action={null} />);
     expect(screen.getByTestId("ctx").textContent).toBe("false");

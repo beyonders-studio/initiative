@@ -45,6 +45,8 @@ describe("EntityCard", () => {
     renderCard();
     const link = await screen.findByRole("link", { name: /Onboarding checklist/ });
     expect(link.getAttribute("href")).toContain("/files/4");
+    // No unlink where the reader may not.
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
   it("still reaches a thing whose parent did not come back", async () => {
@@ -64,30 +66,17 @@ describe("EntityCard", () => {
     expect(container.querySelector("img")).toHaveAttribute("src", "/uploads/3/cover.png");
   });
 
-  it("draws every picture a thing offers, not just the first", async () => {
-    // A collection nobody picked a cover for stands for itself with its
-    // newest few.
+  // A collection nobody picked a cover for stands for itself with its newest
+  // few; one that chose a picture draws that one alone.
+  it.each([
+    [["/uploads/3/a.webp", "/uploads/3/b.webp", "/uploads/3/c.webp"]],
+    [["/uploads/3/cover.webp"]],
+  ])("draws every picture a thing offers: %j", async (image_urls) => {
     const { container } = renderCard({
-      end: end({
-        type: SearchEntityType.collection,
-        tool: Tool.file,
-        image_urls: ["/uploads/3/a.webp", "/uploads/3/b.webp", "/uploads/3/c.webp"],
-      }),
+      end: end({ type: SearchEntityType.collection, tool: Tool.file, image_urls }),
     });
     await screen.findByText("Onboarding checklist");
-    expect(container.querySelectorAll("img")).toHaveLength(3);
-  });
-
-  it("draws the one picture a thing chose on its own", async () => {
-    const { container } = renderCard({
-      end: end({
-        type: SearchEntityType.collection,
-        tool: Tool.file,
-        image_urls: ["/uploads/3/cover.webp"],
-      }),
-    });
-    await screen.findByText("Onboarding checklist");
-    expect(container.querySelectorAll("img")).toHaveLength(1);
+    expect(container.querySelectorAll("img")).toHaveLength(image_urls.length);
   });
 
   it("says the same things in a row as it does in a tile", async () => {
@@ -125,10 +114,5 @@ describe("EntityCard", () => {
   it("offers to unlink a link somebody made", async () => {
     renderCard({ onRemove: vi.fn(), end: end() });
     expect(await screen.findByRole("button", { name: /Onboarding checklist/ })).toBeInTheDocument();
-  });
-
-  it("offers no unlink when the reader may not", async () => {
-    renderCard();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 });

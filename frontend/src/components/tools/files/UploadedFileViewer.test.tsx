@@ -84,19 +84,18 @@ describe("UploadedFileViewer version controls", () => {
     ];
   });
 
-  it("hides upload + delete for a read-only viewer", async () => {
-    renderViewer({ canEdit: false, canDeleteVersions: false });
-    await userEvent.click(screen.getByRole("button", { name: /version history/i }));
-    expect(screen.queryByText(/upload new version/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /delete version/i })).not.toBeInTheDocument();
-  });
-
-  it("shows the upload action for a writer", async () => {
-    renderViewer({ canEdit: true, canDeleteVersions: false });
-    await userEvent.click(screen.getByRole("button", { name: /version history/i }));
-    expect(screen.getByText(/upload new version/i)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /delete version/i })).not.toBeInTheDocument();
-  });
+  it.each([
+    [false, false],
+    [true, true],
+  ])(
+    "offers upload only to a writer, and delete to nobody without the right (writer: %s)",
+    async (canEdit, upload) => {
+      renderViewer({ canEdit, canDeleteVersions: false });
+      await userEvent.click(screen.getByRole("button", { name: /version history/i }));
+      expect(Boolean(screen.queryByText(/upload new version/i))).toBe(upload);
+      expect(screen.queryByRole("button", { name: /delete version/i })).not.toBeInTheDocument();
+    }
+  );
 
   it("lets the owner delete a non-last version", async () => {
     renderViewer({ canEdit: true, canDeleteVersions: true });

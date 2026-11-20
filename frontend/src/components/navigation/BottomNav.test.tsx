@@ -57,10 +57,12 @@ beforeEach(() => {
 });
 
 describe("the bottom bar", () => {
-  it("goes to My Messages", async () => {
+  it("goes to My Messages, carrying no mark when nothing is waiting", async () => {
     const { router } = setup();
 
-    await userEvent.click(await screen.findByRole("button", { name: "My Messages" }));
+    const messages = await screen.findByRole("button", { name: "My Messages" });
+    expect(messages).toHaveTextContent("");
+    await userEvent.click(messages);
 
     expect(router.state.location.pathname).toBe("/messages");
   });
@@ -72,13 +74,6 @@ describe("the bottom bar", () => {
     expect(
       await screen.findByRole("button", { name: /My Messages, 3 waiting/ })
     ).toBeInTheDocument();
-  });
-
-  it("carries no mark when nothing is waiting", async () => {
-    setup();
-
-    const messages = await screen.findByRole("button", { name: "My Messages" });
-    expect(messages).toHaveTextContent("");
   });
 
   it("stands beside the create button where the pill is not drawn", async () => {

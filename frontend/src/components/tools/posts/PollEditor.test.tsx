@@ -26,39 +26,26 @@ import {
 const draft = (options: string[]) => ({ ...emptyPollDraft(), options });
 
 describe("isPollDraftValid", () => {
-  it("refuses a fresh draft, which is two empty rows", () => {
-    expect(isPollDraftValid(emptyPollDraft())).toBe(false);
-  });
-
-  it("refuses one choice", () => {
-    expect(isPollDraftValid(draft(["Tuesday", "  "]))).toBe(false);
-  });
-
-  it("refuses two choices that say the same thing", () => {
-    expect(isPollDraftValid(draft(["Tuesday", "tuesday"]))).toBe(false);
-  });
-
-  it("refuses more choices than a poll may have", () => {
-    expect(isPollDraftValid(draft(Array.from({ length: 11 }, (_, i) => `Choice ${i}`)))).toBe(
-      false
-    );
-  });
-
-  it("accepts two filled rows and ignores a blank third", () => {
-    expect(isPollDraftValid(draft(["Tuesday", "Thursday", ""]))).toBe(true);
+  it.each([
+    ["a fresh draft, which is two empty rows", emptyPollDraft(), false],
+    ["one choice", draft(["Tuesday", "  "]), false],
+    ["two choices that say the same thing", draft(["Tuesday", "tuesday"]), false],
+    [
+      "more choices than a poll may have",
+      draft(Array.from({ length: 11 }, (_, i) => `C${i}`)),
+      false,
+    ],
+    ["two filled rows and a blank third", draft(["Tuesday", "Thursday", ""]), true],
+  ])("judges %s valid: %s", (_label, value, valid) => {
+    expect(isPollDraftValid(value)).toBe(valid);
   });
 });
 
 describe("pollDraftToWrite", () => {
-  it("drops the blank rows and trims the rest", () => {
-    expect(pollDraftToWrite(draft([" Tuesday ", "", "Thursday"])).options).toEqual([
-      { text: "Tuesday" },
-      { text: "Thursday" },
-    ]);
-  });
-
-  it("sends no question rather than an empty one", () => {
-    expect(pollDraftToWrite({ ...draft(["a", "b"]), question: "   " }).question).toBeNull();
+  it("drops the blank rows, trims the rest, and sends no question rather than an empty one", () => {
+    const written = pollDraftToWrite({ ...draft([" Tuesday ", "", "Thursday"]), question: "   " });
+    expect(written.options).toEqual([{ text: "Tuesday" }, { text: "Thursday" }]);
+    expect(written.question).toBeNull();
   });
 });
 

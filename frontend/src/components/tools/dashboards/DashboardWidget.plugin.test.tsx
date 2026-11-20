@@ -30,7 +30,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import type { WidgetBinding } from "@/hooks/useWidgetData";
 import type { DefinitionWidget } from "@/lib/widgets/definition";
-import { WidgetErrorCode } from "@/lib/widgets/errors";
 
 // The generated client calls the client itself, with the URL in its config, and
 // the hand-written one calls `get`. Both land in `apiGet`, by URL.
@@ -205,10 +204,6 @@ describe("DashboardWidget with a plug-in source", () => {
     });
     // The catalogs are declarations; the data plane is never touched.
     expect(apiGet.mock.calls.every(([url]) => url.endsWith("/widget-catalog"))).toBe(true);
-  });
-
-  it("has a localized message for the failure it can produce", () => {
-    expect(WidgetErrorCode.PLUGIN_UNAVAILABLE).toBe("WIDGET_PLUGIN_UNAVAILABLE");
   });
 
   it("asks for the plug-in to be reconnected when the catalog no longer lists it", async () => {

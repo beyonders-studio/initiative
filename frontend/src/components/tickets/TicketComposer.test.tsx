@@ -55,16 +55,23 @@ const box = (props: Partial<React.ComponentProps<typeof TicketComposer>> = {}) =
   );
 
 describe("TicketComposer", () => {
-  it("takes a picture of the page, with the people on it hidden to start with", async () => {
-    box({ pagePicture: { hidePeople: true } });
-    const user = userEvent.setup();
+  it.each([true, false])(
+    "takes a picture of the page, hiding the people on it: %s",
+    async (hidePeople) => {
+      box({ pagePicture: { hidePeople } });
+      const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: "Picture this page" }));
+      await user.click(screen.getByRole("button", { name: "Picture this page" }));
 
-    expect(await screen.findByRole("dialog", { name: "Picture of this page" })).toBeInTheDocument();
-    expect(screen.getByRole("switch", { name: "Hide people" })).toBeChecked();
-    expect(screen.getByRole("button", { name: "Attach picture" })).toBeInTheDocument();
-  });
+      expect(
+        await screen.findByRole("dialog", { name: "Picture of this page" })
+      ).toBeInTheDocument();
+      expect(screen.getByRole("switch", { name: "Hide people" }).getAttribute("aria-checked")).toBe(
+        String(hidePeople)
+      );
+      expect(screen.getByRole("button", { name: "Attach picture" })).toBeInTheDocument();
+    }
+  );
 
   it("keeps Enter in the editor from sending what the box is in", async () => {
     const send = vi.fn();
@@ -107,15 +114,6 @@ describe("TicketComposer", () => {
     // Attached as it is: the editor opens only when asked.
     expect(screen.queryByRole("dialog")).toBeNull();
     thing.remove();
-  });
-
-  it("leaves the people showing where the box says so", async () => {
-    box({ pagePicture: { hidePeople: false } });
-    const user = userEvent.setup();
-
-    await user.click(screen.getByRole("button", { name: "Picture this page" }));
-
-    expect(await screen.findByRole("switch", { name: "Hide people" })).not.toBeChecked();
   });
 
   it("offers no picture of the page where the box is not over one", () => {

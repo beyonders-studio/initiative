@@ -26,34 +26,20 @@ import { ReportButton, ReportHost } from "./ReportButton";
 
 const me = buildUser({ id: 10 });
 
-const render = (props: Partial<React.ComponentProps<typeof ReportButton>> = {}) =>
-  renderWithProviders(<ReportButton targetType="post" targetId={1} {...props} />, {
-    auth: { user: me },
-  });
-
 describe("ReportButton", () => {
-  it("is offered on somebody else's work", () => {
-    render({ authorId: 99 });
-    expect(screen.getByRole("button", { name: "Report" })).toBeInTheDocument();
-  });
-
-  it("is not offered on your own", () => {
-    // Deleting or editing it is already there; a report about yourself is
-    // somebody else's time.
-    render({ authorId: me.id });
-    expect(screen.queryByRole("button", { name: "Report" })).not.toBeInTheDocument();
-  });
-
-  it("is offered on something with no author", () => {
-    render({ authorId: null });
-    expect(screen.getByRole("button", { name: "Report" })).toBeInTheDocument();
-  });
-
-  it("is offered to nobody when nobody is signed in", () => {
-    renderWithProviders(<ReportButton targetType="post" targetId={1} />, {
-      auth: { user: null },
+  // You cannot report your own work — deleting or editing it is already there,
+  // and a report about yourself is somebody else's time — and a signed-out
+  // reader is offered nothing.
+  it.each([
+    ["somebody else's work", me, 99, true],
+    ["something with no author", me, null, true],
+    ["your own work", me, me.id, false],
+    ["anything, signed out", null, 99, false],
+  ])("on %s it is offered: %s", (_label, user, authorId, offered) => {
+    renderWithProviders(<ReportButton targetType="post" targetId={1} authorId={authorId} />, {
+      auth: { user },
     });
-    expect(screen.queryByRole("button", { name: "Report" })).not.toBeInTheDocument();
+    expect(Boolean(screen.queryByRole("button", { name: "Report" }))).toBe(offered);
   });
 
   it("opens a new report for each thing reported", async () => {

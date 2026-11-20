@@ -36,20 +36,14 @@ const postWithPoll = (overrides: Parameters<typeof buildPoll>[0] = {}) =>
   buildPost({ poll: buildPoll(overrides) });
 
 describe("PostPoll", () => {
-  it("shows the question and its choices", async () => {
-    renderPage(pollPage({ post: postWithPoll() }));
-
-    expect(await screen.findByText("Which night works?")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Tuesday/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Thursday/ })).toBeInTheDocument();
-  });
-
-  it("sends the ballot for the choice that was clicked", async () => {
+  it("shows the question and its choices, and sends the ballot for the one clicked", async () => {
     vote.mockClear();
     const post = postWithPoll();
     renderPage(pollPage({ post }));
 
-    await userEvent.click(await screen.findByRole("button", { name: /Tuesday/ }));
+    expect(await screen.findByText("Which night works?")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Thursday/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Tuesday/ }));
 
     await waitFor(() =>
       expect(vote).toHaveBeenCalledWith({ option_ids: [post.poll?.options[0].id] })

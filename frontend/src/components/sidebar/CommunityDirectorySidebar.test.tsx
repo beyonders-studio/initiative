@@ -42,14 +42,9 @@ describe("the community directory's sidebar", () => {
     await waitFor(() => expect(addressSearch(router).q).toBe("dice"));
   });
 
-  it("starts from the search the address arrived with", async () => {
-    setup({ q: "dice" });
-
-    expect(await screen.findByLabelText("Search communities")).toHaveValue("dice");
-  });
-
-  it("keeps the search when a shelf is picked", async () => {
+  it("starts from the search the address arrived with, and keeps it when a shelf is picked", async () => {
     const { router } = setup({ q: "dice" });
+    expect(await screen.findByLabelText("Search communities")).toHaveValue("dice");
 
     await userEvent.click(await screen.findByRole("link", { name: "Tabletop RPG" }));
 

@@ -75,35 +75,29 @@ beforeEach(() => {
 });
 
 describe("PluginsSection", () => {
-  it("points a member at the store when the community has no plug-ins", async () => {
-    // They cannot add one, but they can look and ask, so the shelf is worth
-    // pointing at rather than hiding.
-    render(false);
-    expect(await screen.findByText("Plug-ins")).toBeInTheDocument();
-    expect(screen.getByText("Browse the marketplace")).toBeInTheDocument();
-    expect(screen.queryByText("Add a plug-in")).toBeNull();
-  });
+  // A member cannot add one, but they can look and ask, so the shelf is worth
+  // pointing at rather than hiding; an admin is invited to add one.
+  it.each([
+    [false, "Browse the marketplace", "Add a plug-in"],
+    [true, "Add a plug-in", "Browse the marketplace"],
+  ])(
+    "offers a way in when the community has no plug-ins (admin: %s)",
+    async (admin, offered, absent) => {
+      render(admin);
+      expect(await screen.findByText("Plug-ins")).toBeInTheDocument();
+      expect(screen.getByText(offered)).toBeInTheDocument();
+      expect(screen.queryByText(absent)).toBeNull();
+    }
+  );
 
-  it("invites an admin to add one when the community has no plug-ins", async () => {
-    render(true);
-    expect(await screen.findByText("Plug-ins")).toBeInTheDocument();
-    expect(screen.getByText("Add a plug-in")).toBeInTheDocument();
-    expect(screen.queryByText("Browse the marketplace")).toBeNull();
-  });
-
-  it("lists installed plug-ins for a member", async () => {
+  it("lists installed plug-ins for a member, each linked to what it mounted", async () => {
     plugins = [plugin()];
     render(false);
     expect(await screen.findByText("Community calendar")).toBeInTheDocument();
     // No add affordance: installing is a community-admin action.
     expect(screen.queryByText("Add a plug-in")).toBeNull();
     expect(screen.getByText("Browse the marketplace")).toBeInTheDocument();
-  });
-
-  it("links a plug-in to what it mounted", async () => {
-    plugins = [plugin()];
-    render(false);
-    const link = (await screen.findByText("Community calendar")).closest("a");
+    const link = screen.getByText("Community calendar").closest("a");
     // The list, not one of them: a member may add calendars to the plug-in, so its
     // entry leads to everything it holds.
     expect(link?.getAttribute("href")).toContain("/calendars");
@@ -119,20 +113,15 @@ describe("PluginsSection", () => {
     expect(link?.getAttribute("href")).toContain("/calendars");
   });
 
-  it("hides a disabled plug-in", async () => {
-    // Turned off means gone from the sidebar; community settings is where it comes
-    // back, which is also the only place the switch lives.
+  // Turned off means gone from the sidebar; community settings is where it comes
+  // back, which is also the only place the switch lives. A member is still
+  // offered the store.
+  it.each([true, false])("hides a disabled plug-in (admin: %s)", async (admin) => {
     plugins = [plugin({ enabled: false })];
-    render(true);
+    render(admin);
     await screen.findByText("Plug-ins");
     expect(screen.queryByText("Community calendar")).toBeNull();
-  });
-
-  it("still offers the store to a member when every plug-in is disabled", async () => {
-    plugins = [plugin({ enabled: false })];
-    render(false);
-    expect(await screen.findByText("Browse the marketplace")).toBeInTheDocument();
-    expect(screen.queryByText("Community calendar")).toBeNull();
+    if (!admin) expect(screen.getByText("Browse the marketplace")).toBeInTheDocument();
   });
 
   it("opens a service plug-in's own page", async () => {

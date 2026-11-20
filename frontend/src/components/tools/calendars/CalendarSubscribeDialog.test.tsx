@@ -118,6 +118,10 @@ describe("NewSubscriptionLinkDialog", () => {
     );
     const subscription = key();
     if (!isSubscription(subscription)) throw new Error("a calendar's key is a subscription");
+    // Offered only for a calendar's key.
+    expect(isSubscription(key({ resource_type: null, resource_id: null, read_only: false }))).toBe(
+      false
+    );
     renderWithProviders(<NewSubscriptionLinkDialog apiKey={subscription} onClose={() => {}} />);
 
     expect(screen.getByText(/current link stops working/)).toBeInTheDocument();
@@ -162,12 +166,5 @@ describe("NewSubscriptionLinkDialog", () => {
 
     answer();
     expect(await screen.findByText(/token=ppk_late$/)).toBeInTheDocument();
-  });
-
-  it("is offered only for a calendar's key", () => {
-    expect(isSubscription(key())).toBe(true);
-    expect(isSubscription(key({ resource_type: null, resource_id: null, read_only: false }))).toBe(
-      false
-    );
   });
 });

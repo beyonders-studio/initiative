@@ -36,27 +36,26 @@ const renderQueue = (
 };
 
 describe("JoinRequestQueue", () => {
-  it("lists who knocked and what they said", () => {
-    renderQueue([knock()]);
+  it("lists who knocked and what they said, counted in its heading", () => {
+    renderQueue([
+      knock(),
+      knock({ id: 12, user: buildUserSummary({ id: 43, display_name: "Grace" }) }),
+    ]);
 
+    expect(within(screen.getByText("Requests to join")).getByText("2")).toBeInTheDocument();
     expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
-    expect(screen.getByText("I run the Thursday session.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Approve/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Deny/ })).toBeInTheDocument();
+    expect(screen.getAllByText("I run the Thursday session.")).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: /Approve/ })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: /Deny/ })).toHaveLength(2);
   });
 
-  it("says so when a request carries no note", () => {
-    renderQueue([knock({ message: null })]);
-
-    expect(screen.getByText("No message")).toBeInTheDocument();
-  });
-
-  it("marks a requester turned down before", () => {
-    renderQueue([knock({ prior_denials: 2 })]);
+  it("marks a requester turned down before, and a request with no note", () => {
+    renderQueue([knock({ prior_denials: 2, message: null })]);
 
     // A denied requester may ask again, so the repeat is visible rather than
     // hidden.
     expect(screen.getByText("Denied 2 times before")).toBeInTheDocument();
+    expect(screen.getByText("No message")).toBeInTheDocument();
   });
 
   it("leaves the marker off a first-time requester, and where the page knows of none", () => {
@@ -91,15 +90,5 @@ describe("JoinRequestQueue", () => {
 
     await screen.findByTestId("mounted");
     expect(screen.queryByText("Requests to join")).not.toBeInTheDocument();
-  });
-
-  it("counts the queue in its heading", () => {
-    renderQueue([
-      knock(),
-      knock({ id: 12, user: buildUserSummary({ id: 43, display_name: "Grace" }) }),
-    ]);
-
-    const heading = screen.getByText("Requests to join");
-    expect(within(heading).getByText("2")).toBeInTheDocument();
   });
 });

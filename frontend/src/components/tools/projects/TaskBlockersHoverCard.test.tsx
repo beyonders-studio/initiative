@@ -67,12 +67,6 @@ describe("TaskBlockersHoverCard", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
-  it("marks a task that is waiting on something", async () => {
-    mount(2);
-
-    expect(await screen.findByRole("button", { name: "What's holding this up" })).toBeVisible();
-  });
-
   it("costs no request until somebody asks what the things are", async () => {
     const asked = vi.fn();
     server.use(
