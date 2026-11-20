@@ -27,6 +27,7 @@ import {
   useSetInitiativeDefaults,
 } from "@/hooks/useInitiativeRoles";
 import { permissionName } from "@/lib/pluginSurfaces";
+import { installedTool } from "@/lib/toolPlugins";
 import {
   isBuiltInTool,
   toolCamelPlural,
@@ -146,7 +147,12 @@ export const CommunityInitiativeDefaultsCard = ({
   /** Where a tool can be used: everywhere for a built-in tool, where its
    *  install is placed for a tool plug-in's. */
   const placed = (kind: string, id: number) => toolOf(kind)?.placedIn?.includes(id) ?? true;
-  const subjects: Subject[] = [...tools.map((tool) => tool.kind), ...plugins];
+  // A tool plug-in is ruled by its tool's switch and keys; its install has no
+  // initiative permission of its own to rule beside them.
+  const subjects: Subject[] = [
+    ...tools.map((tool) => tool.kind),
+    ...plugins.filter((install) => installedTool(install) === null),
+  ];
   const ruled = subjects.filter((subject) => hasRule(ruleOf(defaults, subject)));
   const free = subjects.filter((subject) => !ruled.includes(subject));
 

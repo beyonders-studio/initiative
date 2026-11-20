@@ -14,7 +14,7 @@ import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
-import { installedTools, toolText } from "@/lib/toolPlugins";
+import { installedTool, toolText } from "@/lib/toolPlugins";
 import { SIDEBAR_TOOLS, TOOL_ICONS, toolCamelPlural } from "@/lib/tools";
 
 /** One of the community's tools. */
@@ -43,21 +43,22 @@ export const builtInTool = (tool: Tool, t: (key: never) => string): CommunityToo
   placedIn: null,
 });
 
-/** The community's tools; with `initiativeId`, only those that initiative
- *  has: every built-in tool, and the tool plug-ins placed in it. */
+/** The community's tools. With `initiativeId`, only those that initiative
+ *  has: every built-in tool, and the tool plug-ins on in the community and
+ *  placed in it. Without, every installed one, switched off or not, since
+ *  what the community set for a tool outlives its install's switch. */
 export const useCommunityTools = (initiativeId?: number): CommunityTool[] => {
   const { t, i18n } = useTranslation("initiatives");
   const plugins = useCommunityPlugins().data?.items;
   return useMemo(() => {
-    const installs = new Map((plugins ?? []).map((plugin) => [plugin.id, plugin]));
-    const installed = installedTools(plugins ?? []).flatMap((tool): CommunityTool[] => {
-      const plugin = installs.get(tool.pluginId);
-      if (
-        !plugin ||
-        (initiativeId !== undefined && !plugin.placed_initiative_ids.includes(initiativeId))
-      ) {
-        return [];
-      }
+    const installed = (plugins ?? []).flatMap((plugin): CommunityTool[] => {
+      const tool = installedTool(plugin);
+      const here =
+        initiativeId === undefined ||
+        (plugin.enabled &&
+          plugin.available !== false &&
+          plugin.placed_initiative_ids.includes(initiativeId));
+      if (!tool || !here) return [];
       return [
         {
           kind: tool.kind,

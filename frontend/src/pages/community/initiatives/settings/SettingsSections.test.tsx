@@ -277,6 +277,7 @@ describe("initiative settings sections", () => {
             {
               id: 3,
               name: "CI",
+              definition: {},
               permissions: [
                 { id: "use", level: "initiative", name: null, members: false },
                 { id: "export", level: "initiative", name: { en: "Export builds" }, members: true },
@@ -338,7 +339,10 @@ describe("initiative settings sections", () => {
       communityHttp.get("/plugins/", () =>
         HttpResponse.json({
           items: [
-            buildToolPlugin({ placed_initiative_ids: [INITIATIVE_ID] }),
+            buildToolPlugin({
+              placed_initiative_ids: [INITIATIVE_ID],
+              permissions: [{ id: "use", level: "initiative", name: null, members: false }],
+            }),
             buildToolPlugin({
               listing_uid: "ELSEWHERE00001",
               definition: {
@@ -371,6 +375,8 @@ describe("initiative settings sections", () => {
 
     expect(await screen.findByRole("switch", { name: "View Reading" })).toBeChecked();
     expect(screen.queryByText("Elsewhere")).not.toBeInTheDocument();
+    // Its tool's keys are the role's answer; its install has no switch beside them.
+    expect(screen.queryByRole("switch", { name: "Reading: Use" })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("switch", { name: "Create in Reading" }));
     await waitFor(() => expect(patches).toHaveLength(1));
     expect(patches[0]).toMatchObject({

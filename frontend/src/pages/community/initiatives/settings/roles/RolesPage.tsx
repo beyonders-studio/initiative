@@ -16,6 +16,7 @@ import {
 } from "@/hooks/useInitiativeRoles";
 import { useInitiativeSettings } from "@/hooks/useInitiativeSettings";
 import { permissionName } from "@/lib/pluginSurfaces";
+import { installedTool } from "@/lib/toolPlugins";
 import {
   isToolEnabled,
   toolCamelPlural,
@@ -277,7 +278,9 @@ const InitiativeSettingsRolesTab = ({
   /** Each plug-in placed here, its initiative permissions named as it
    *  declares them, with the role's answer to each. */
   const pluginRules = (role: InitiativeRoleRead) =>
+    // A tool plug-in's tool has its own row above, by its keys.
     plugins.flatMap((install) => {
+      if (installedTool(install) !== null) return [];
       const rules = install.permissions.flatMap((permission) => {
         const rule = role.plugin_permissions.find(
           (one) => one.install_id === install.id && one.permission === permission.id
