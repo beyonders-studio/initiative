@@ -863,8 +863,26 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
     if converted:
         # Counters turned back into the built-in tool and converted again, as
         # 20261119_0619 does in a community that uses it: every check below
-        # then holds for the converted tables.
+        # then holds for the converted tables. The built-in tool has no place
+        # for a layout of the plug-in's own lists, so the round trip drops
+        # those, and they are laid out again once Counters is the plug-in.
+        layouts = seeder.table("tool_layouts")
+        own_lists = [
+            pk
+            for tool in tools.installed
+            for pk in cases[f"tool_layouts of a {tool.kind}"].rows.values()
+        ]
+        laid_out = await session.exec(
+            sa.select(layouts).where(_matching(layouts, own_lists))
+        )
+        laid_out_rows = [dict(row) for row in laid_out.mappings().all()]
+        assert laid_out_rows
         install = {**install, "id": await convert_counters(session, guild.id)}
+        await route_session_to_guild(session, guild.id)
+        await session.exec(
+            pg_insert(layouts).values(laid_out_rows).on_conflict_do_nothing()
+        )
+        await session.commit()
         await route_session_to_guild(session, guild.id)
 
     await _tools_on(role_session, people.moderator_a, guild.id, initiative_a, tools)
