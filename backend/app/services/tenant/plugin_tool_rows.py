@@ -15,6 +15,10 @@ Every tool plug-in's tool and each of its items is one kind
   of its kind (``tool_plugins.value_fits``), a select's options, a person who
   is a member of the community, and a counter within its bounds, which may be
   the row's own fields.
+* **A step** moves a counter field in one statement, from the value the
+  database holds, so two steps landing together each count.
+* **The declaration** a reader is answered is the tool's own block, less
+  its layouts and its actions' expressions.
 * **An action** runs its ``write`` through the expression evaluator
   declarative plug-ins' actions run through (``declarative.action_change``),
   over the row and the items directly under it, and its change is made as
@@ -32,6 +36,7 @@ from typing import Any, cast
 
 import sqlalchemy as sa
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -44,10 +49,18 @@ from app.db.query import apply_pagination
 from app.db.tool_rows import Located, ToolRow, load_row, locate, row_of, select_rows
 from app.models.platform.guild import GuildMembership
 from app.models.platform.user import User
+from app.models.tenant.counter import COUNTER_LIMIT, COUNTER_NUMBER
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.resource_grant import ResourceGrant
 from app.schemas.tenant.archive import ToolCan
-from app.schemas.tenant.plugin_tool import PluginToolRowRead, PluginToolValues
+from app.schemas.tenant.plugin_tool import (
+    PluginToolActionRead,
+    PluginToolFieldRead,
+    PluginToolItemRead,
+    PluginToolRead,
+    PluginToolRowRead,
+    PluginToolValues,
+)
 from app.services.marketplace.declarative import action_change
 from app.services.marketplace.tool_plugins import (
     NEVER_EMPTY,
@@ -115,6 +128,62 @@ def children(located: Located, tools: ToolSet) -> list[Located]:
         for item in block.get("items", [])
         if item.get("parent", block["key"]) == key
     ]
+
+
+def _fields_read(block: Mapping[str, Any]) -> list[PluginToolFieldRead]:
+    return [PluginToolFieldRead.model_validate(f) for f in block.get("fields", [])]
+
+
+def declaration(located: Located) -> PluginToolRead:
+    """The tool ``located`` is or sits in, as its plug-in declares it: its
+    names, the fields of its rows and its items', which item sits under
+    which, and its actions with the fields they ask for, each table named by
+    its kind. Not its layouts, which are the app's to draw, nor what an
+    action writes."""
+    block = located.tool.declaration
+    uid = located.tool.kind.partition(".")[2]
+
+    def kind(key: str) -> str:
+        return f"{key}.{uid}"
+
+    return PluginToolRead(
+        kind=located.tool.kind,
+        key=block["key"],
+        name=block["name"],
+        instance_name=block["instance_name"],
+        icon=block["icon"],
+        fields=_fields_read(block),
+        items=[
+            PluginToolItemRead(
+                kind=kind(item["key"]),
+                key=item["key"],
+                name=item["name"],
+                parent=kind(item.get("parent", block["key"])),
+                fields=_fields_read(item),
+            )
+            for item in block.get("items", [])
+        ],
+        actions=[
+            PluginToolActionRead(
+                id=action["id"],
+                name=action["name"],
+                on=kind(action["on"]),
+                params=action.get("params", []),
+                confirm=action.get("confirm"),
+            )
+            for action in block.get("actions", [])
+        ],
+    )
+
+
+def placed_anywhere(context: ActorContext, located: Located) -> bool:
+    """Whether ``located``'s tool is on in some initiative the reader
+    reaches: switched on there and its install placed there."""
+    for pair in context.enabled_tools:
+        initiative, _, kind = pair.partition(":")
+        if kind == located.tool.kind and initiative.isdigit():
+            return True
+    return False
 
 
 # --- gates -------------------------------------------------------------------
@@ -545,6 +614,71 @@ async def write(
         after=columns,
         author=author,
     )
+
+
+def _term(table: sa.Table, raw: Any) -> sa.ColumnElement[Any] | None:
+    """A counter's bound, step or start in SQL: a number, or the column of
+    the number field of the row it names; none where it is left out."""
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        return table.c[raw]
+    return sa.literal(Decimal(str(raw)), COUNTER_NUMBER)
+
+
+async def step(
+    session: AsyncSession,
+    located: Located,
+    row_id: int,
+    key: str,
+    *,
+    by: float | None = None,
+    down: bool = False,
+) -> None:
+    """Move the counter field ``key`` of a row of ``located``'s table, as the
+    reader: by ``by``, or by its own step (up, or ``down``), held to its
+    bounds and to the largest number a counter stores. One statement, so the
+    new value is the database's own plus the step, and two steps landing
+    together each count; ``GREATEST`` and ``LEAST`` skip an open bound. The
+    caller has authorized the edit and commits."""
+    field = declared_fields(located).get(key)
+    if field is None or field["kind"] != "counter":
+        raise _invalid(key)
+    table = located.table
+    counter = field.get("counter") or {}
+    if by is None:
+        amount = sa.func.coalesce(
+            _term(table, counter.get("step")), sa.literal(Decimal(1), COUNTER_NUMBER)
+        )
+        if down:
+            amount = -amount
+    else:
+        amount = sa.literal(
+            _column_value({"key": key, "kind": "number"}, by), COUNTER_NUMBER
+        )
+    start = _term(table, counter.get("initial"))
+    current = sa.func.coalesce(
+        table.c[key],
+        *([] if start is None else [start]),
+        sa.literal(Decimal(0), COUNTER_NUMBER),
+    )
+    low = _term(table, counter.get("min"))
+    high = _term(table, counter.get("max"))
+    moved = sa.func.least(
+        sa.func.greatest(
+            current + amount,
+            *([] if low is None else [low]),
+            sa.literal(-COUNTER_LIMIT, COUNTER_NUMBER),
+        ),
+        *([] if high is None else [high]),
+        sa.literal(COUNTER_LIMIT, COUNTER_NUMBER),
+    )
+    try:
+        async with session.begin_nested():
+            await update(session, located, row_id, {key: moved})
+    except IntegrityError:
+        # A check the table declares refuses the new value.
+        raise _invalid(key) from None
 
 
 def _action(located: Located, action_id: str) -> Mapping[str, Any]:

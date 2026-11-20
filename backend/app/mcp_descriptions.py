@@ -353,6 +353,12 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
         "belong together. 409 if the link is already there."
     ),
     # --- Tool plug-ins ------------------------------------------------------
+    "read_plugin_tool": (
+        "Read what a tool a plug-in brings holds, by its `kind`: the fields of "
+        "its rows and of each of its items (their keys, kinds and options), "
+        "which item sits under which, and its actions. Read it before writing "
+        "a row, to know the keys `fields` takes."
+    ),
     "list_plugin_tool_rows": (
         "List the rows of a tool a plug-in brings, by its `kind` "
         "(`<key>.<id>`): the tool's own rows in an initiative "
@@ -373,6 +379,11 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     "update_plugin_tool_row": (
         "Change a row of a tool a plug-in brings. Only the fields sent change; "
         "a counter is kept within its bounds."
+    ),
+    "step_plugin_tool_row": (
+        "Move one counter field of a row of a tool a plug-in brings, named by "
+        "its key in `field`: by `by` (negative to count down), or by its own "
+        "step, up or `down`. It stays within its bounds."
     ),
 }
 

@@ -13,8 +13,9 @@ an installed plug-in names them by its references.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Self
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, model_validator
 
 from app.core.identity_boundary import GuildId, PersonId
 from app.schemas.base import MentionStr, SanitizedBaseModel, TitleStr, reject_null
@@ -65,6 +66,22 @@ class PluginToolActionRun(PluginToolValues):
     name."""
 
 
+class PluginToolStep(SanitizedBaseModel):
+    """Move one counter field of a row: by ``by``, a signed amount, or, left
+    out, by the field's own step, up, or down where ``down`` says so."""
+
+    #: The key of the counter field to move.
+    field: str = Field(..., min_length=1)
+    by: float | None = Field(default=None, allow_inf_nan=False)
+    down: bool = False
+
+    @model_validator(mode="after")
+    def _one_way(self) -> Self:
+        if self.by is not None and self.down:
+            raise ValueError("by is signed: send it alone, or down alone")
+        return self
+
+
 class PluginToolRowRead(ToolState[ToolCan], CreatedByRead):
     """One row of a tool plug-in's tool or of one of its items."""
 
@@ -91,3 +108,87 @@ class PluginToolRowRead(ToolState[ToolCan], CreatedByRead):
 
 class PluginToolRowList(PageMeta):
     items: list[PluginToolRowRead]
+
+
+#: Text in each language it is given in, by language code.
+LocalizedText = dict[str, str]
+
+
+class PluginToolOptionRead(SanitizedBaseModel):
+    """One option of a select or multi-select field."""
+
+    value: str
+    label: LocalizedText
+
+
+class PluginToolCounterRead(SanitizedBaseModel):
+    """A counter field's bounds, step and start: each a number, or the key of
+    a number field of the same row. Left out, a side is open, the step is 1
+    and the start is 0."""
+
+    min: str | int | float | None = None
+    max: str | int | float | None = None
+    step: str | int | float | None = None
+    initial: str | int | float | None = None
+
+
+class PluginToolFieldRead(SanitizedBaseModel):
+    """One field a table of the tool declares, by its key in ``fields`` (or
+    in ``people``, for a ``user_reference``)."""
+
+    key: str
+    name: LocalizedText
+    #: The contract's field kind: ``text``, ``number``, ``counter``,
+    #: ``select``, ``user_reference`` and the rest.
+    kind: str
+    #: What a new row holds when nothing is written to it.
+    default: str | bool | int | float | list[str] | None = None
+    required: bool = False
+    #: A select's or a multi-select's options.
+    options: list[PluginToolOptionRead] = Field(default_factory=list)
+    #: A currency field's currency.
+    currency: str | None = None
+    #: A counter field's bounds.
+    counter: PluginToolCounterRead | None = None
+
+
+class PluginToolItemRead(SanitizedBaseModel):
+    """One item table of the tool: its rows sit under the rows of
+    ``parent``."""
+
+    kind: str
+    key: str
+    name: LocalizedText
+    #: The kind its rows sit under: the tool's, or another item's.
+    parent: str
+    fields: list[PluginToolFieldRead]
+
+
+class PluginToolActionRead(SanitizedBaseModel):
+    """One action of the tool, run on a row of ``on``."""
+
+    id: str
+    name: LocalizedText
+    #: The kind of the rows it runs on.
+    on: str
+    #: The fields of that row whose values it asks for when it runs.
+    params: list[str] = Field(default_factory=list)
+    #: What to ask before it runs, where it asks.
+    confirm: LocalizedText | None = None
+
+
+class PluginToolRead(SanitizedBaseModel):
+    """A tool plug-in's tool as it declares it: its names, its own rows'
+    fields, its items and its actions. Its layouts are the app's to draw."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    kind: str
+    key: str
+    name: LocalizedText
+    #: What one row of the tool is called.
+    instance_name: LocalizedText
+    icon: str
+    fields: list[PluginToolFieldRead]
+    items: list[PluginToolItemRead]
+    actions: list[PluginToolActionRead]

@@ -5,12 +5,15 @@ own (``history/tool-plugins-design.md``). Its rows are the tool's and its
 items', each table a kind (``<key>.<uid>``), and these routes take the kind as
 a path parameter, so no tool plug-in adds a route:
 
+* ``GET /{kind}``: the tool as its plug-in declares it, its fields, items and
+  actions, where it is on in an initiative the reader reaches;
 * ``GET /{kind}/``: a page of the tool's rows in an initiative
   (``initiative_id``), or an item's under the row it sits in (``parent_id``);
 * ``POST /{kind}/``: a new one there;
 * ``GET`` and ``PATCH /{kind}/{row_id}``: one row, of the tool or an item;
 * ``POST /{kind}/{row_id}/duplicate``: a copy of a row with the items under
   it, as a built-in tool's duplicate makes one;
+* ``POST /{kind}/{row_id}/step``: move one of a row's counter fields;
 * ``POST /{kind}/{row_id}/actions/{action_id}``: run one of its actions;
 * ``/{kind}/{row_id}/ws``: the tool's row's change signal.
 
@@ -42,10 +45,12 @@ from app.db.tool_rows import Located, ToolRow, load_row
 from app.schemas.base import RESERVED_SIGIL_CODE, RESERVED_SIGILS
 from app.schemas.tenant.plugin_tool import (
     PluginToolActionRun,
+    PluginToolRead,
     PluginToolRowCreate,
     PluginToolRowList,
     PluginToolRowRead,
     PluginToolRowUpdate,
+    PluginToolStep,
 )
 from app.schemas.tenant.tool import ToolDuplicateRequest
 from app.services.content_sockets import sockets
@@ -89,6 +94,21 @@ async def _committed(
 
 def _tool_id(row: ToolRow) -> int:
     return int(row.tool["id"])
+
+
+@router.get("/{kind}", response_model=PluginToolRead, name="read_plugin_tool")
+async def read_plugin_tool(
+    kind: str, session: ActorSessionDep, context: ToolRead
+) -> PluginToolRead:
+    """A tool plug-in's tool as it declares it, by its kind or one of its
+    items': its names, the fields of its rows and of each item with their
+    kinds and options, which item sits under which, and its actions with the
+    fields they ask for. Not found where it is on in no initiative the
+    caller reaches."""
+    located = rows_service.located_kind(routed_tools(session), kind)
+    if not rows_service.placed_anywhere(context, located):
+        raise located.tool.not_found()
+    return rows_service.declaration(located)
 
 
 @router.get("/{kind}/", response_model=PluginToolRowList, name="list_plugin_tool_rows")
@@ -348,6 +368,32 @@ async def duplicate_plugin_tool_row(
     return await _committed(
         session, context, located, copy_id, _tool_id(source), "item_added"
     )
+
+
+@router.post(
+    "/{kind}/{row_id}/step",
+    response_model=PluginToolRowRead,
+    name="step_plugin_tool_row",
+)
+async def step_plugin_tool_row(
+    kind: str,
+    row_id: int,
+    body: PluginToolStep,
+    session: ActorSessionDep,
+    context: ToolWrite,
+) -> PluginToolRowRead:
+    """Move one counter field of a row, named by its key: by ``by``, signed,
+    or by the field's own step, up or ``down``, held within its bounds. Two
+    steps landing together each count. Answers the row as it now stands."""
+    tools = routed_tools(session)
+    located = rows_service.located_kind(tools, kind)
+    row = await rows_service.load_authorized(
+        session, context, located, tools, row_id, action=rows_service.writing(located)
+    )
+    await rows_service.step(
+        session, located, row.id, body.field, by=body.by, down=body.down
+    )
+    return await _committed(session, context, located, row_id, _tool_id(row), "updated")
 
 
 @router.post(

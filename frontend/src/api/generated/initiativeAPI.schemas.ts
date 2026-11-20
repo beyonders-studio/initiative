@@ -10434,6 +10434,21 @@ export interface PluginSummaryListResponse {
   items?: PluginSummaryRead[];
 }
 
+export type PluginToolActionReadName = { [key: string]: string };
+
+export type PluginToolActionReadConfirm = { [key: string]: string } | null;
+
+/**
+ * One action of the tool, run on a row of ``on``.
+ */
+export interface PluginToolActionRead {
+  id: string;
+  name: PluginToolActionReadName;
+  on: string;
+  params?: string[];
+  confirm?: PluginToolActionReadConfirm;
+}
+
 export type PluginToolActionRunFields = {
   [key: string]: string | boolean | number | string[] | null;
 };
@@ -10447,6 +10462,78 @@ export type PluginToolActionRunPeople = { [key: string]: number | null };
 export interface PluginToolActionRun {
   fields?: PluginToolActionRunFields;
   people?: PluginToolActionRunPeople;
+}
+
+/**
+ * A counter field's bounds, step and start: each a number, or the key of
+ * a number field of the same row. Left out, a side is open, the step is 1
+ * and the start is 0.
+ */
+export interface PluginToolCounterRead {
+  min?: string | number | null;
+  max?: string | number | null;
+  step?: string | number | null;
+  initial?: string | number | null;
+}
+
+export type PluginToolFieldReadName = { [key: string]: string };
+
+export type PluginToolOptionReadLabel = { [key: string]: string };
+
+/**
+ * One option of a select or multi-select field.
+ */
+export interface PluginToolOptionRead {
+  value: string;
+  label: PluginToolOptionReadLabel;
+}
+
+/**
+ * One field a table of the tool declares, by its key in ``fields`` (or
+ * in ``people``, for a ``user_reference``).
+ */
+export interface PluginToolFieldRead {
+  key: string;
+  name: PluginToolFieldReadName;
+  kind: string;
+  default?: string | boolean | number | string[] | null;
+  required?: boolean;
+  options?: PluginToolOptionRead[];
+  currency?: string | null;
+  counter?: PluginToolCounterRead | null;
+}
+
+export type PluginToolItemReadName = { [key: string]: string };
+
+/**
+ * One item table of the tool: its rows sit under the rows of
+ * ``parent``.
+ */
+export interface PluginToolItemRead {
+  kind: string;
+  key: string;
+  name: PluginToolItemReadName;
+  parent: string;
+  fields: PluginToolFieldRead[];
+}
+
+export type PluginToolReadName = { [key: string]: string };
+
+export type PluginToolReadInstanceName = { [key: string]: string };
+
+/**
+ * A tool plug-in's tool as it declares it: its names, its own rows'
+ * fields, its items and its actions. Its layouts are the app's to draw.
+ */
+export interface PluginToolRead {
+  kind: string;
+  key: string;
+  name: PluginToolReadName;
+  instance_name: PluginToolReadInstanceName;
+  icon: string;
+  fields: PluginToolFieldRead[];
+  items: PluginToolItemRead[];
+  actions: PluginToolActionRead[];
 }
 
 export type PluginToolRowCreateFields = {
@@ -10527,6 +10614,17 @@ export interface PluginToolRowUpdate {
   people?: PluginToolRowUpdatePeople;
   name?: string | null;
   position?: number | null;
+}
+
+/**
+ * Move one counter field of a row: by ``by``, a signed amount, or, left
+ * out, by the field's own step, up, or down where ``down`` says so.
+ */
+export interface PluginToolStep {
+  /** @minLength 1 */
+  field: string;
+  by?: number | null;
+  down?: boolean;
 }
 
 export type PluginWidgetReadMeta = { [key: string]: unknown };

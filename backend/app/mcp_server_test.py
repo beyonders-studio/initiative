@@ -110,6 +110,9 @@ _SAFE_WRITES = {
     # actions stay off, as a built-in tool's duplicate and resets do.
     "create_plugin_tool_row",
     "update_plugin_tool_row",
+    # Its counter fields' counts, which two updates landing together would
+    # lose one of, as a counter's step.
+    "step_plugin_tool_row",
 }
 
 
@@ -147,8 +150,8 @@ async def test_mcp_tools_are_curated():
         "tool_counts",
         # The caller's communities: where a session learns its community_id.
         "list_communities",
-        # The rows of every tool a plug-in brings, by kind.
-        "plugin_tool_row",
+        # Every tool a plug-in brings, and its rows, by kind.
+        "plugin_tool",
         *(tool.value for tool in Tool),
         *(tool.plural for tool in Tool),
     )
