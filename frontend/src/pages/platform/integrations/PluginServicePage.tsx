@@ -17,9 +17,9 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { runsAService, vendorCheckRefusalIn } from "@/lib/pluginServices";
-import { localized } from "@/lib/widgets/widgetMeta";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { localized } from "@/ui/lib/localized";
 import { SettingsPaneSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { StatusMessage } from "@/ui/status-message";
 

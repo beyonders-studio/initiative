@@ -30,14 +30,20 @@ import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { useCommunities } from "@/hooks/useCommunities";
 import type { MutationOpts } from "@/types/mutation";
-import type { QueryOpts } from "@/types/query";
 
-export const useCommunityPlugins = (options?: QueryOpts<CommunityPluginListResponse>) => {
+/** The community's installs, or what `select` reads off them. A reader the
+ *  installs are not read for (a guest) asks for none. */
+export const useCommunityPlugins = <T = CommunityPluginListResponse>({
+  enabled = true,
+  select,
+}: {
+  enabled?: boolean;
+  select?: (data: CommunityPluginListResponse) => T;
+} = {}) => {
   const communityId = useActiveCommunityId();
   const communityWide = Boolean(useCommunities().activeCommunity?.can.community_wide);
-  const { enabled = true, ...rest } = options ?? {};
-  return useListCommunityPlugins(communityId, {
-    query: { enabled: enabled && communityWide, ...rest },
+  return useListCommunityPlugins<T>(communityId, {
+    query: { enabled: enabled && communityWide, select },
   });
 };
 

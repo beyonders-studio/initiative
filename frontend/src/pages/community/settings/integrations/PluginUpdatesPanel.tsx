@@ -38,8 +38,8 @@ import { useUpdateCommunityPlugin } from "@/hooks/useCommunityPlugins";
 import { getErrorMessage, messageForCode } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { type PluginNames, scopeSentence } from "@/lib/pluginScopes";
-import { localized } from "@/lib/widgets/widgetMeta";
 import { Button } from "@/ui/button";
+import { localized } from "@/ui/lib/localized";
 import { Switch } from "@/ui/switch";
 
 export function PluginUpdatesPanel({ plugin }: { plugin: CommunityPluginDetail }) {

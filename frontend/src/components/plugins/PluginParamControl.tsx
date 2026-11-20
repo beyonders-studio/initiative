@@ -10,10 +10,10 @@ import { useTranslation } from "react-i18next";
 import type { PluginDataParam } from "@/api/pluginData";
 import { usePluginParamOptions } from "@/hooks/usePluginData";
 import { asControlValue, asDeclaredList, asDeclaredType } from "@/lib/widgets/pluginParams";
-import { localized } from "@/lib/widgets/widgetMeta";
 import { Combobox } from "@/ui/combobox";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { localized } from "@/ui/lib/localized";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /**

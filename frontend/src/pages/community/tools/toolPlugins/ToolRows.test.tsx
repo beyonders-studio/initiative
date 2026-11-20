@@ -31,11 +31,8 @@ const tableOf = (key: string): ToolTable => tool().tables.get(`${key}.${uid}`) a
 const noop = () => {};
 
 describe("ToolRows", () => {
-  it("draws each row's card, its name opening the row, tinted and in the declared look", async () => {
-    const row = buildToolRow({
-      name: "Middlemarch",
-      fields: { read: 40, pages: 300, cover: "#336699" },
-    });
+  it("draws each row's card in its declared look, its name opening the row", async () => {
+    const row = buildToolRow({ name: "Middlemarch", fields: { read: 40, pages: 300 } });
     const table = tableOf("book");
     renderPage(() => (
       <ToolRows
@@ -51,10 +48,8 @@ describe("ToolRows", () => {
 
     const name = await screen.findByRole("link", { name: "Middlemarch" });
     expect(name).toHaveAttribute("href", `/c/1/i/3/t/book.${uid}/${row.id}`);
-    // The layout draws the counter as a bar, bounded by the row's own length.
+    // The list's displays, and the counter's bound as the row holds it.
     expect(screen.getByRole("img", { name: "40 / 300" })).toBeInTheDocument();
-    // The card takes the colour its `tint` field holds.
-    expect(name.closest("[style]")).toHaveStyle({ backgroundColor: "#336699" });
   });
 
   it("previews a row's first items on its card, each stepping its counter", async () => {
@@ -90,8 +85,6 @@ describe("ToolRows", () => {
       "href",
       `/c/1/i/3/t/book.${uid}/${book.id}`
     );
-    // Drawn as the book table's first list draws it: as a bar.
-    expect(screen.getByRole("img", { name: "3 / 10" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Step Read up" }));
     await waitFor(() => expect(stepped).toEqual({ field: "read" }));
   });

@@ -1,6 +1,13 @@
 import { Link } from "@tanstack/react-router";
-import { Blocks, CircleChevronRight, MoreVertical, Settings, ShieldAlert } from "lucide-react";
-import { memo, useEffect, useMemo, useState } from "react";
+import {
+  Blocks,
+  CircleChevronRight,
+  type LucideIcon,
+  MoreVertical,
+  Settings,
+  ShieldAlert,
+} from "lucide-react";
+import { memo, type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -83,28 +90,52 @@ export const InitiativeSection = memo(
     const pluginTools = tools.filter((tool) => initiative.can.view.includes(tool.kind));
     const builtInTools = SIDEBAR_TOOLS.filter(showTool);
 
+    /** One tool's row, a built-in tool's or a tool plug-in's: its unread dot,
+     *  its count where the sidebar counts it, and its add button. */
+    const toolRowOf = ({
+      kind,
+      Icon,
+      label,
+      to,
+      count,
+      create,
+    }: {
+      kind: string;
+      Icon: LucideIcon;
+      label: string;
+      to: string;
+      count?: number;
+      create: ReactNode;
+    }) => (
+      <SidebarMenuItem key={kind}>
+        <div className="group/tool flex w-full min-w-0 items-center gap-1">
+          <SidebarMenuButton asChild size="sm" className="min-w-0 flex-1">
+            <Link to={gp(to)} className="flex min-w-0 items-center gap-2">
+              <Icon className="h-4 w-4" />
+              <span className="min-w-0 flex-1 truncate">{label}</span>
+              {unread.hasTool(activeCommunityId, initiative.id, kind) ? <UnreadDot /> : null}
+              {count === undefined ? null : (
+                <span className="text-muted-foreground text-xs">{count}</span>
+              )}
+            </Link>
+          </SidebarMenuButton>
+          {create}
+        </div>
+      </SidebarMenuItem>
+    );
+
     /** One built-in tool's row. */
-    const toolRow = (tool: Tool) => {
-      const Icon = TOOL_ICONS[tool];
-      const rowTo = toolListRoute(tool, initiative.id);
-      return (
-        <SidebarMenuItem key={tool}>
-          <div className="group/tool flex w-full min-w-0 items-center gap-1">
-            <SidebarMenuButton asChild size="sm" className="min-w-0 flex-1">
-              <Link to={gp(rowTo)} className="flex min-w-0 items-center gap-2">
-                <Icon className="h-4 w-4" />
-                <span className="min-w-0 flex-1 truncate">{t(toolNavLabelKey(tool))}</span>
-                {unread.hasTool(activeCommunityId, initiative.id, tool) ? <UnreadDot /> : null}
-                <span className="text-muted-foreground text-xs">{counts[tool] ?? 0}</span>
-              </Link>
-            </SidebarMenuButton>
-            {canCreateTool(tool) && (
-              <ToolCreateButton tool={tool} initiativeId={initiative.id} variant="icon" />
-            )}
-          </div>
-        </SidebarMenuItem>
-      );
-    };
+    const toolRow = (tool: Tool) =>
+      toolRowOf({
+        kind: tool,
+        Icon: TOOL_ICONS[tool],
+        label: t(toolNavLabelKey(tool)),
+        to: toolListRoute(tool, initiative.id),
+        count: counts[tool] ?? 0,
+        create: canCreateTool(tool) && (
+          <ToolCreateButton tool={tool} initiativeId={initiative.id} variant="icon" />
+        ),
+      });
 
     // Plug-ins offering this reader a surface inside *this* initiative, as the
     // server computed it for them.
@@ -293,33 +324,25 @@ export const InitiativeSection = memo(
               {builtInTools.filter((tool) => tool !== Tool.project).map(toolRow)}
 
               {pluginTools.map((tool) => {
-                const Icon = tool.icon;
-                const rowTo = toolPluginListRoute(initiative.id, tool.kind);
+                const to = toolPluginListRoute(initiative.id, tool.kind);
                 const instance = tool.tables.get(tool.kind);
-                return (
-                  <SidebarMenuItem key={tool.kind}>
-                    <div className="group/tool flex w-full min-w-0 items-center gap-1">
-                      <SidebarMenuButton asChild size="sm" className="min-w-0 flex-1">
-                        <Link to={gp(rowTo)} className="flex min-w-0 items-center gap-2">
-                          <Icon className="h-4 w-4" />
-                          <span className="min-w-0 flex-1 truncate">
-                            {toolText(tool.name, i18n.language)}
-                          </span>
-                        </Link>
-                      </SidebarMenuButton>
-                      {instance && initiative.can.create.includes(tool.kind) ? (
-                        <CreateLink
-                          to={gp(rowTo)}
-                          search={{ create: "true" }}
-                          label={t("plugins:tool.create", {
-                            name: toolText(instance.name, i18n.language),
-                          })}
-                          variant="icon"
-                        />
-                      ) : null}
-                    </div>
-                  </SidebarMenuItem>
-                );
+                return toolRowOf({
+                  kind: tool.kind,
+                  Icon: tool.icon,
+                  label: toolText(tool.name, i18n.language),
+                  to,
+                  create:
+                    instance && initiative.can.create.includes(tool.kind) ? (
+                      <CreateLink
+                        to={gp(to)}
+                        search={{ create: "true" }}
+                        label={t("plugins:tool.create", {
+                          name: toolText(instance.name, i18n.language),
+                        })}
+                        variant="icon"
+                      />
+                    ) : null,
+                });
               })}
 
               {showTool(Tool.project) && toolRow(Tool.project)}

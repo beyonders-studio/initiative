@@ -26,9 +26,9 @@ vi.mock("@/hooks/useSearch", () => ({
 vi.mock("@/hooks/useUsers", () => ({
   useMemberSearch: () => ({ data: undefined, isLoading: false }),
 }));
-// One answer for every render, as the real hook's memo gives.
-const noTools = { status: "ready", tools: [] };
-vi.mock("@/hooks/usePluginToolRows", () => ({ useInstalledTools: () => noTools }));
+// One answer for every render, as the real query's select gives.
+const noTools = { data: [] };
+vi.mock("@/hooks/useCommunityPlugins", () => ({ useCommunityPlugins: () => noTools }));
 
 describe("the mention picker", () => {
   it("moves through what [[ offers with the arrow keys", () => {

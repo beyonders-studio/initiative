@@ -25,8 +25,8 @@ import { BUILTIN_WIDGET_TYPES } from "@/lib/widgets/registry";
 import { ALL_SAMPLES, sampleFor } from "@/lib/widgets/sampleData";
 import { resolveMapping } from "@/lib/widgets/shape";
 import { shapeFor } from "@/lib/widgets/shapes";
-import { localized } from "@/lib/widgets/widgetMeta";
 import { Button } from "@/ui/button";
+import { localized } from "@/ui/lib/localized";
 
 /** Widget modules that misbehave in each way the runtime bounds, so the error
  *  path is visible rather than only asserted in tests. The label keys are ours

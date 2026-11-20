@@ -14,10 +14,10 @@ import { useTranslation } from "react-i18next";
 import { PluginTag } from "@/api/generated/initiativeAPI.schemas";
 import { declaredPages } from "@/lib/pluginSurfaces";
 import { kindNames } from "@/lib/tools";
-import { localized } from "@/lib/widgets/widgetMeta";
 import { Badge } from "@/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
 import { listFormat } from "@/ui/lib/intl";
+import { localized } from "@/ui/lib/localized";
 import { cn } from "@/ui/lib/utils";
 
 const TAG_ICONS = {

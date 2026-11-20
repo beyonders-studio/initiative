@@ -77,7 +77,7 @@ export const SendButton = ({ kind, entityId, className }: SendTarget & { classNa
 /**
  * The address a sent thing opens at, as its bell line opens it: the `/go`
  * resolver, which finds where it lives today wherever it has moved since. A
- * kind with no address of its own (a counter) is sent from its own page, so
+ * kind with no address of its own is sent from its own page, so
  * that page is the link.
  */
 const useSentLink = ({ kind, entityId }: SendTarget): string => {

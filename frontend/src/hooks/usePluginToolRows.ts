@@ -4,7 +4,7 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 
 import type {
   PluginToolActionRun,
@@ -29,34 +29,11 @@ import { invalidate, q } from "@/api/query-keys";
 import type { GrantsChange } from "@/hooks/toolHooks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
-import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
 import type { FieldSaveKind } from "@/hooks/useFieldSave";
 import { fetchAllPages } from "@/lib/fetchAllPages";
-import {
-  type InstalledTool,
-  installedTools,
-  type ToolRow,
-  type ToolTable,
-} from "@/lib/toolPlugins";
+import type { ToolRow, ToolTable } from "@/lib/toolPlugins";
 import type { MutationOpts } from "@/types/mutation";
 import type { LayoutEnv } from "@/ui/layouts/fields";
-
-/** The tools the community's tool plug-ins declare, as far as they are known:
- *  still being read, unread for a failure, or read. */
-export type InstalledTools =
-  | { status: "loading" }
-  | { status: "error"; retry: () => void }
-  | { status: "ready"; tools: InstalledTool[] };
-
-/** The tools the community's tool plug-ins declare, from the installs every
- *  member reads. A reader the installs are not read for has none. */
-export const useInstalledTools = (): InstalledTools => {
-  const { data, isError, isLoading, refetch } = useCommunityPlugins();
-  const tools = useMemo(() => (data ? installedTools(data.items) : []), [data]);
-  if (data) return { status: "ready", tools };
-  if (isError) return { status: "error", retry: () => void refetch() };
-  return isLoading ? { status: "loading" } : { status: "ready", tools };
-};
 
 /** Every row of `table` in one place, the tool's own in an initiative or an
  *  item table's under one row, live or archived, each with what its card
@@ -79,23 +56,25 @@ export const usePluginToolRow = (kind: string, rowId: number | null) =>
     query: { enabled: rowId !== null },
   });
 
+/** Adds a row. A row over it previews its items, so every tool plug-in row
+ *  is read again, as after every write here. */
 export const useCreatePluginToolRow = (kind: string) =>
   useCommunityMutation<PluginToolRowRead, PluginToolRowCreate>({
     mutationFn: (communityId, data) => createPluginToolRow(communityId, kind, data),
-    invalidate: () => invalidate(q.pluginToolRows(kind)),
+    invalidate: () => invalidate(q.pluginToolRows()),
     errorKey: "plugins:error",
   });
 
 /** Runs one of a table's actions on a row. What it writes may reach the rows
- *  under it, so every read of the tool is read again. */
-export const useRunPluginToolAction = (kind: string, itemKinds: readonly string[]) =>
+ *  under it and over it. */
+export const useRunPluginToolAction = (kind: string) =>
   useCommunityMutation<
     PluginToolRowRead,
     { rowId: number; actionId: string } & PluginToolActionRun
   >({
     mutationFn: (communityId, { rowId, actionId, ...run }) =>
       runPluginToolAction(communityId, kind, rowId, actionId, run),
-    invalidate: () => invalidate(q.pluginToolRows(kind), ...itemKinds.map(q.pluginToolRows)),
+    invalidate: () => invalidate(q.pluginToolRows()),
     errorKey: "plugins:error",
   });
 
@@ -164,11 +143,12 @@ export const useSetPluginToolRowGrants = (kind: string, rowId: number) =>
   });
 
 /** How a row of `kind` is saved field by field. Its rows hold none of the
- *  initiative's properties. */
+ *  initiative's properties; a row over it previews it, so every list of a
+ *  tool plug-in's rows is read again. */
 export const pluginToolRowSaves = (kind: string): FieldSaveKind<ToolRow, PluginToolRowUpdate> => ({
   name: `plugin-tool-${kind}`,
   readKey: (communityId, id) => getReadPluginToolRowQueryKey(communityId, kind, id),
   patch: (communityId, id, patch) => updatePluginToolRow(communityId, kind, id, patch),
-  lists: () => q.pluginToolRows(kind),
+  lists: () => q.pluginToolRows(),
   itself: () => q.pluginToolRows(kind),
 });

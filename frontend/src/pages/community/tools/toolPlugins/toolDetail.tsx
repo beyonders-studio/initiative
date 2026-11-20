@@ -20,6 +20,7 @@ import {
   type ToolRow,
   type ToolTable,
   toolText,
+  withChange,
 } from "@/lib/toolPlugins";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import { type ItemHome, useItemContext, useItemHome } from "@/ui/layouts/DetailLayoutView";
@@ -95,13 +96,8 @@ const DeclaredFieldEditor = ({ field, item, label }: EditorProps & { field: Tool
     saved,
     (value) => {
       const change = fieldChange(field, value);
-      return save.save({
-        patch: change,
-        shows: {
-          fields: { ...item.fields, ...change.fields },
-          people: { ...item.people, ...change.people },
-        },
-      });
+      const { fields, people } = withChange(item, change);
+      return save.save({ patch: change, shows: { fields, people } });
     },
     sameJson
   );

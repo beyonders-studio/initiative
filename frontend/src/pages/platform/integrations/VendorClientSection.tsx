@@ -7,7 +7,6 @@ import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useStartVendorSetup } from "@/hooks/usePluginServices";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { postToVendor } from "@/lib/pluginServices";
-import { localized } from "@/lib/widgets/widgetMeta";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
@@ -15,6 +14,7 @@ import { CopyButton } from "@/ui/copy-button";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { localized } from "@/ui/lib/localized";
 import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
 import { Textarea } from "@/ui/textarea";
 

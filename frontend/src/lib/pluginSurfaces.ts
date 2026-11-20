@@ -20,7 +20,7 @@ import type { TFunction } from "i18next";
 
 import type { PluginPermissionRead } from "@/api/generated/initiativeAPI.schemas";
 import { initiativeRoute, TOOLS, toolListRoute } from "@/lib/tools";
-import { localized } from "@/lib/widgets/widgetMeta";
+import { localized } from "@/ui/lib/localized";
 
 export interface PluginPage {
   id: string;

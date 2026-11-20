@@ -10279,7 +10279,7 @@ export interface PluginToolFieldRead {
   default?: string | boolean | number | string[] | null;
   required?: boolean;
   options?: PluginToolOptionRead[];
-  currency?: string | null;
+  currency?: CurrencyCode | null;
   counter?: PluginToolCounterRead | null;
 }
 

@@ -6,12 +6,17 @@ import { useTranslation } from "react-i18next";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { Markdown } from "@/components/markdown/Markdown";
 import { useCommunities } from "@/hooks/useCommunities";
+import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
 import { useInitiative } from "@/hooks/useInitiatives";
-import { useInstalledTools } from "@/hooks/usePluginToolRows";
 import { useRouteId } from "@/hooks/useRouteId";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { resolveInitiativeColor } from "@/lib/initiativeColors";
-import { type InstalledTool, toolPluginListRoute, toolText } from "@/lib/toolPlugins";
+import {
+  type InstalledTool,
+  selectInstalledTools,
+  toolPluginListRoute,
+  toolText,
+} from "@/lib/toolPlugins";
 import { initiativeRoute, TOOLS, toolCamelPlural, toolListRoute } from "@/lib/tools";
 import { CalendarsView } from "@/pages/community/tools/calendars/CalendarsPage";
 import { ContactsView } from "@/pages/community/tools/contacts/ContactsPage";
@@ -81,8 +86,8 @@ export const InitiativePage = ({ tool }: InitiativeDetailPageProps = {}) => {
   const isCommunityAdmin = Boolean(activeCommunity?.can.administer_content);
   const canManageInitiative = Boolean(initiative?.can.manage);
 
-  const installs = useInstalledTools();
-  const installedTools = installs.status === "ready" ? installs.tools : null;
+  const installs = useCommunityPlugins({ select: selectInstalledTools });
+  const installedTools = installs.data;
 
   // A tool's tab renders when its permission allows viewing it (the backend
   // already folds in the initiative's master switches): the built-in tools,
@@ -131,7 +136,7 @@ export const InitiativePage = ({ tool }: InitiativeDetailPageProps = {}) => {
 
   // Until the installs are known no tab is picked: the URL may name a tool
   // plug-in's, and the first tab might be one.
-  if (initiativeQuery.isLoading || installs.status === "loading") {
+  if (initiativeQuery.isLoading || installs.isLoading) {
     // Its header, the tool tabs, and the first tab's list.
     return (
       <SkeletonRegion className="space-y-4 sm:space-y-6">
@@ -154,9 +159,15 @@ export const InitiativePage = ({ tool }: InitiativeDetailPageProps = {}) => {
   }
 
   // A tab the built-in tools do not name is a tool plug-in's, which is not
-  // given up for another while the installs could not be read.
-  if (installs.status === "error" && tool && !TOOL_TAB_VIEWS.has(tool as Tool)) {
-    return <StatusMessage title={t("plugins:tool.installsLoadError")} onRetry={installs.retry} />;
+  // given up for another while the installs could not be read; a refresh
+  // that fails keeps the installs it had.
+  if (installs.isError && !installs.data && tool && !TOOL_TAB_VIEWS.has(tool as Tool)) {
+    return (
+      <StatusMessage
+        title={t("plugins:tool.installsLoadError")}
+        onRetry={() => void installs.refetch()}
+      />
+    );
   }
 
   const color = resolveInitiativeColor(initiative.color);

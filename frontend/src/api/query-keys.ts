@@ -605,9 +605,10 @@ const pluginToolRows = (kind = ""): Spec => ({
 });
 
 /** One entity and every list it sits in — what a generic per-tool write makes
- *  stale. A tool plug-in's row, every read of its kind. */
+ *  stale. A tool plug-in's row, every plug-in row read: a row over it
+ *  previews it. */
 const tool = (which: string, id: number): Spec =>
-  isBuiltInTool(which) ? compose(toolEntity(which, id), toolList(which)) : pluginToolRows(which);
+  isBuiltInTool(which) ? compose(toolEntity(which, id), toolList(which)) : pluginToolRows();
 
 // The same two, by name, for the call sites that already know their tool.
 const allProjects = (): Spec => toolList(Tool.project);

@@ -8,10 +8,10 @@ import type { LucideIcon } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import { useInstalledTools } from "@/hooks/usePluginToolRows";
+import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
 import { MENTIONABLE_TYPES } from "@/lib/mentions";
 import { entityIcon } from "@/lib/searchResults";
-import { type InstalledTool, toolOfKind, toolText } from "@/lib/toolPlugins";
+import { type InstalledTool, selectInstalledTools, toolOfKind, toolText } from "@/lib/toolPlugins";
 
 const NO_TOOLS: InstalledTool[] = [];
 
@@ -27,8 +27,7 @@ export interface ReferenceKinds {
 
 export const useReferenceKinds = (): ReferenceKinds => {
   const { t, i18n } = useTranslation("search");
-  const installs = useInstalledTools();
-  const tools = installs.status === "ready" ? installs.tools : NO_TOOLS;
+  const tools = useCommunityPlugins({ select: selectInstalledTools }).data ?? NO_TOOLS;
   return useMemo(
     () => ({
       mentionable: [...MENTIONABLE_TYPES, ...tools.flatMap((tool) => [...tool.tables.keys()])],

@@ -6,7 +6,7 @@ import { AddItemDialog } from "@/components/layouts/AddItemDialog";
 import { itemSaves } from "@/hooks/useFieldSave";
 import { pluginToolRowSaves, useCreatePluginToolRow } from "@/hooks/usePluginToolRows";
 import {
-  fieldChange,
+  fieldChanges,
   fieldStart,
   fieldValue,
   type ToolRow,
@@ -20,9 +20,8 @@ import { sameJson } from "@/ui/layouts/editing";
 import { toolDetail } from "./toolDetail";
 
 /** A row of `table` not yet added, each field shown as the server starts it. */
-export const blankRow = (table: ToolTable, initiativeId: number): ToolRow => {
-  const start = table.fields.map((field) => fieldChange(field, fieldStart(table.fields, field)));
-  return toolRow({
+export const blankRow = (table: ToolTable, initiativeId: number): ToolRow =>
+  toolRow({
     kind: table.kind,
     id: 0,
     community_id: 0,
@@ -30,8 +29,7 @@ export const blankRow = (table: ToolTable, initiativeId: number): ToolRow => {
     parent_id: null,
     name: "",
     position: 0,
-    fields: Object.assign({}, ...start.map((change) => change.fields)),
-    people: Object.assign({}, ...start.map((change) => change.people)),
+    ...fieldChanges(table.fields.map((field) => [field, fieldStart(table.fields, field)])),
     created_by: null,
     created_by_kind: ActorKind.member,
     created_by_install: null,
@@ -44,22 +42,18 @@ export const blankRow = (table: ToolTable, initiativeId: number): ToolRow => {
     updated_at: "",
     preview: null,
   });
-};
 
 /** The fields `item` holds otherwise than `blank`: the ones the person set. */
 export const setOn = (
   table: ToolTable,
   blank: ToolRow,
   item: ToolRow
-): Required<Pick<PluginToolRowCreate, "fields" | "people">> => {
-  const changes = table.fields
-    .filter((field) => !sameJson(fieldValue(item, field), fieldValue(blank, field)))
-    .map((field) => fieldChange(field, fieldValue(item, field)));
-  return {
-    fields: Object.assign({}, ...changes.map((change) => change.fields)),
-    people: Object.assign({}, ...changes.map((change) => change.people)),
-  };
-};
+): Required<Pick<PluginToolRowCreate, "fields" | "people">> =>
+  fieldChanges(
+    table.fields
+      .filter((field) => !sameJson(fieldValue(item, field), fieldValue(blank, field)))
+      .map((field) => [field, fieldValue(item, field)])
+  );
 
 /**
  * Adding a row to a plug-in's table, drawn as the detail layout it declared
