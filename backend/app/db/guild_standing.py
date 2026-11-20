@@ -308,8 +308,7 @@ def _tool_states(tools: ToolSet) -> str:
     if not tools.installed:
         return ""
     installs = ", ".join(
-        f"('{record.kind.partition('.')[2].upper()}', '{record.kind}')"
-        for record in tools.installed
+        f"('{record.listing_uid}', '{record.kind}')" for record in tools.installed
     )
     hidden = sql_values(
         status.value
@@ -338,14 +337,18 @@ tool_states AS MATERIALIZED (
 )"""
 
 
-def _enabled_tools(tools: ToolSet, initiatives: str) -> str:
+def _enabled_tools(tools: ToolSet, initiatives: str, everywhere: str = "false") -> str:
     """``app.enabled_tools``: each ``<initiative>:<tool>`` pair whose switch is
     on in an initiative of ``initiatives`` (a sub-select of ids). With tool
     plug-ins, a tool whose install the community switched off or whose
     state hides it has no pair, nor has one in an initiative its install is
     not placed in, and each that is there carries the pairs
     ``app.db.initiative_rls.tool_present`` asks for (:data:`gucs.TOOL_OPEN`,
-    :data:`gucs.TOOL_WRITES`)."""
+    :data:`gucs.TOOL_WRITES`).
+
+    Where ``everywhere`` (a SQL condition) holds, the reader reaches every
+    initiative, and a tool plug-in's pairs cover every initiative: they are
+    where ``tool_on`` reads whether its install is placed there."""
     if not tools.installed:
         return f"""COALESCE((
       SELECT string_agg(DISTINCT i.id || ':' || t.tool, ',')
@@ -354,6 +357,7 @@ def _enabled_tools(tools: ToolSet, initiatives: str) -> str:
       WHERE {_TOOL_ON}
         AND i.id IN ({initiatives})
     ), '')"""
+    installed = sql_values(record.kind for record in tools.installed)
     opens, writes = (
         pair.replace("{kind}", "' || ts.kind || '")
         for pair in (gucs.TOOL_OPEN, gucs.TOOL_WRITES)
@@ -365,7 +369,8 @@ def _enabled_tools(tools: ToolSet, initiatives: str) -> str:
       FROM initiatives i
       CROSS JOIN LATERAL {_tool_switches(tools)} AS t(tool, enabled)
       WHERE {_TOOL_ON}
-        AND i.id IN ({initiatives})
+        AND (i.id IN ({initiatives})
+          OR ({everywhere} AND t.tool IN ({installed})))
         AND t.tool NOT IN (
           SELECT ts.kind FROM tool_states ts
           WHERE NOT ts.switched_on OR NOT EXISTS (
@@ -397,6 +402,15 @@ def _held_surfaces(membership: str) -> str:
         ON r.id = cm.role_id AND r.base_rung = m.role::text
     ), '')"""
 
+
+#: The community's admins and content grantees, who reach every initiative
+#: in it, as ``app.guild_admin`` and ``app.pam_read`` say.
+_REACHES_EVERY_INITIATIVE = f"""(
+          EXISTS (SELECT 1 FROM my_membership m WHERE m.role IN ({_ADMIN_RUNGS_SQL}))
+          OR EXISTS (
+            SELECT 1 FROM my_grants g
+            WHERE g.purpose = '{AccessGrantPurpose.content.value}'
+          ))"""
 
 #: What the person statement writes: each standing key and its expression.
 _PERSON_STANDING: dict[gucs.Guc, _Expr] = {
@@ -518,6 +532,7 @@ _PERSON_STANDING: dict[gucs.Guc, _Expr] = {
           UNION ALL
           SELECT it.initiative_id FROM my_items it
         """,
+        _REACHES_EVERY_INITIATIVE,
     ),
     gucs.OVERRIDE_INITIATIVES: """COALESCE((
       SELECT string_agg(DISTINCT mi.initiative_id::text, ',')

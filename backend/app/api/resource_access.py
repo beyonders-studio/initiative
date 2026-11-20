@@ -65,7 +65,12 @@ from app.services.tenant import counters as counters_service
 from app.services.tenant import dashboards as dashboards_service
 from app.services.tenant import files as files_service
 from app.services.tenant import initiatives as initiatives_service
-from app.services.tenant import named_people, project_grants, task_queries
+from app.services.tenant import (
+    named_people,
+    plugin_tool_rows,
+    project_grants,
+    task_queries,
+)
 from app.services.tenant import ownership as ownership_service
 from app.services.tenant import posts as posts_service
 from app.services.tenant import share_requests as share_requests_service
@@ -603,6 +608,10 @@ async def load_kind(
         row = await load_row(session, located, tools, entity_id)
         if row is None:
             raise kind_refusal(kind, KindMessages.NOT_FOUND, 404)
+        # Its tool on in the row's initiative, as a built-in tool's is.
+        await plugin_tool_rows.require_on(
+            session, guild_context, located, int(row.tool["initiative_id"])
+        )
         permissions_service.require_access(
             permissions_service.DacResource(located.tool),
             row,

@@ -60,6 +60,12 @@ class ToolRecord(ToolRefusals):
         return self.kind
 
     @property
+    def listing_uid(self) -> str:
+        """The listing uid of the tool plug-in that brings it, as its kind
+        carries it in lower case."""
+        return self.kind.partition(".")[2].upper()
+
+    @property
     def installed(self) -> bool:
         """Whether a tool plug-in brings it: its tables are built from its
         declaration rather than from a model."""
