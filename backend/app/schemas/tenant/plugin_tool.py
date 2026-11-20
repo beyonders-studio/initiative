@@ -191,7 +191,8 @@ class PluginToolActionRead(SanitizedBaseModel):
 
 class PluginToolRead(SanitizedBaseModel):
     """A tool plug-in's tool as it declares it: its names, its own rows'
-    fields, its items and its actions. Its layouts are the app's to draw."""
+    fields, its items and its actions, and the formats its rows export in.
+    Its layouts are the app's to draw."""
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
@@ -204,3 +205,6 @@ class PluginToolRead(SanitizedBaseModel):
     fields: list[PluginToolFieldRead]
     items: list[PluginToolItemRead]
     actions: list[PluginToolActionRead]
+    #: The formats its rows export in: ``json``, the envelope, and for a tool
+    #: with one item table ``csv`` and ``xlsx``, a table of one row's items.
+    export_formats: list[str]
