@@ -140,8 +140,6 @@
     "create_projects",
     "files_enabled",
     "create_files",
-    "counter_groups_enabled",
-    "create_counter_groups",
     "calendars_enabled",
     "create_calendars",
     "dashboards_enabled",
