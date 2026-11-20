@@ -348,5 +348,23 @@
   "permissions": {
     "use": "Use",
     "named": "{{plugin}}: {{permission}}"
+  },
+  "tool": {
+    "namePlaceholder": "Give it a name",
+    "readOnly": "You can read this, but not change it.",
+    "byline": "Added {{added}} · changed {{changed}}",
+    "fields": {
+      "createdAt": "Added",
+      "createdBy": "Added by",
+      "updatedAt": "Last changed"
+    },
+    "create": "New {{name}}",
+    "loadError": "These couldn't be loaded.",
+    "installsLoadError": "This community's tools couldn't be loaded.",
+    "empty": "Nothing here yet.",
+    "notFound": "This isn't here",
+    "notFoundBody": "It may have been removed, or the tool it belongs to isn't installed in this community.",
+    "backToTool": "Back to {{name}}",
+    "actions": "Actions"
   }
 }

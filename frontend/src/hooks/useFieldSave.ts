@@ -46,8 +46,9 @@ export interface FieldSaveKind<I, P> {
   readKey: (communityId: number, id: number) => QueryKey;
   /** Sends a patch, answering with the item as the server now holds it. */
   patch: (communityId: number, id: number, patch: P) => Promise<Partial<I>>;
-  /** Where its properties are set. */
-  properties: ContentKind;
+  /** Where its properties are set; none for a kind whose rows hold none, which
+   *  nothing then sets them on. */
+  properties?: ContentKind;
   /** Sets its properties where they are not set as a target's: a file's
    *  values of a collection's metadata, which are the collection's. */
   setProperties?: (
@@ -260,17 +261,17 @@ export const useItemFieldSave = <I, P>(
       // and would land over it. Runs when this save's turn comes, not when
       // it was queued.
       await cancelReads(save);
-      return "patch" in edit
-        ? kind.patch(save.communityId, save.id, edit.patch)
-        : // Every kind that has properties reads them as `properties`.
-          ({
-            properties: await (kind.setProperties
-              ? kind.setProperties(save.communityId, save.id, { ...edit.properties, merge: true })
-              : setProperties(save.communityId, kind.properties, save.id, {
-                  ...edit.properties,
-                  merge: true,
-                })),
-          } as unknown as Partial<I>);
+      if ("patch" in edit) return kind.patch(save.communityId, save.id, edit.patch);
+      const set = kind.setProperties
+        ? kind.setProperties(save.communityId, save.id, { ...edit.properties, merge: true })
+        : kind.properties
+          ? setProperties(save.communityId, kind.properties, save.id, {
+              ...edit.properties,
+              merge: true,
+            })
+          : Promise.reject(new Error(`A ${kind.name} holds no properties`));
+      // Every kind that has properties reads them as `properties`.
+      return { properties: await set } as unknown as Partial<I>;
     },
     onSuccess: async (written, save) => {
       if (!inSession(save)) return;

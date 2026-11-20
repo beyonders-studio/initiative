@@ -27,6 +27,20 @@ describe("resolveEntityPath", () => {
     );
   });
 
+  it("opens a tool plug-in's row on the page every plug-in's rows share", async () => {
+    // As a notice's link names it: the key kebab-cased, the uid as it is.
+    server.use(
+      communityHttp.get("/plugin-tools/:kind/:id", ({ params }) =>
+        params.kind === "counter_group.abc123"
+          ? HttpResponse.json({ id: 8, initiative_id: 6 })
+          : new HttpResponse(null, { status: 404 })
+      )
+    );
+    await expect(
+      resolveEntityPath(queryClient, COMMUNITY, "counter-group.abc123", 8)
+    ).resolves.toBe("/i/6/t/counter_group.abc123/8");
+  });
+
   it("nests a task under the project that owns it", async () => {
     server.use(
       communityHttp.get("/tasks/:id", () =>

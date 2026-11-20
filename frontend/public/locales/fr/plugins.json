@@ -348,5 +348,23 @@
   "permissions": {
     "use": "Utiliser",
     "named": "{{plugin}} : {{permission}}"
+  },
+  "tool": {
+    "namePlaceholder": "Donnez-lui un nom",
+    "readOnly": "Vous pouvez lire ceci, mais pas le modifier.",
+    "byline": "Ajouté {{added}} · modifié {{changed}}",
+    "fields": {
+      "createdAt": "Ajouté",
+      "createdBy": "Ajouté par",
+      "updatedAt": "Dernière modification"
+    },
+    "create": "Créer : {{name}}",
+    "loadError": "Impossible de les charger.",
+    "installsLoadError": "Les outils de cette communauté n'ont pas pu être chargés.",
+    "empty": "Rien ici pour l'instant.",
+    "notFound": "Ce n'est pas ici",
+    "notFoundBody": "Il a peut-être été supprimé, ou l'outil auquel il appartient n'est pas installé dans cette communauté.",
+    "backToTool": "Retour à {{name}}",
+    "actions": "Actions"
   }
 }

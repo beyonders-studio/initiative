@@ -30,6 +30,10 @@ import {
   readFile,
 } from "@/api/generated/files/files";
 import { SearchEntityType, type ShareStanding, Tool } from "@/api/generated/initiativeAPI.schemas";
+import {
+  getReadPluginToolRowQueryKey,
+  readPluginToolRow,
+} from "@/api/generated/plugin-tools/plugin-tools";
 import { getReadPostQueryKey, readPost } from "@/api/generated/posts/posts";
 import { getReadProjectQueryKey, readProject } from "@/api/generated/projects/projects";
 import { getReadShareStandingQueryKey, readShareStanding } from "@/api/generated/sharing/sharing";
@@ -40,6 +44,7 @@ import {
   readWiki,
   readWikiPage,
 } from "@/api/generated/wikis/wikis";
+import { isToolPluginKind, toolPluginRowRoute } from "@/lib/toolPlugins";
 import {
   collectionRoute,
   eventRoute,
@@ -190,6 +195,21 @@ const resolveComment: Resolve = async (read, communityId, id) => {
 };
 RESOLVERS.set("comment", resolveComment);
 
+/** A tool plug-in's row, the tool's own or an item's, by its kind
+ *  (`counter-group.abc123`, its key kebab-cased as every ref type is): the page
+ *  every tool plug-in's rows share, in its initiative. None for any other ref
+ *  type. */
+const pluginToolResolver = (refType: string): Resolve | null => {
+  const kind = refType.replaceAll("-", "_");
+  if (!isToolPluginKind(kind)) return null;
+  return async (read, communityId, id) => {
+    const row = await read(getReadPluginToolRowQueryKey(communityId, kind, id), () =>
+      readPluginToolRow(communityId, kind, id)
+    );
+    return toolPluginRowRoute(row.initiative_id, kind, id);
+  };
+};
+
 /** The fragment a link to one comment ends in. */
 export const commentAnchor = (commentId: number): string => `#comment-${commentId}`;
 
@@ -255,7 +275,7 @@ export async function resolveEntityPath(
   refType: string,
   entityId: number
 ): Promise<string | null> {
-  const resolve = RESOLVERS.get(refType);
+  const resolve = RESOLVERS.get(refType) ?? pluginToolResolver(refType);
   if (!Number.isFinite(entityId) || !resolve) return null;
 
   const read = <T>(queryKey: readonly unknown[], queryFn: () => Promise<T>) =>

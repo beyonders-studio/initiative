@@ -41,8 +41,17 @@ type ToolCreateButtonProps = {
  * presentation.
  */
 export function ToolCreateButton({ tool, initiativeId, variant }: ToolCreateButtonProps) {
-  const { to, search, label } = useToolCreate(tool, initiativeId);
+  return <CreateLink {...useToolCreate(tool, initiativeId)} variant={variant} />;
+}
 
+/** The create affordance, given where it leads and what it says: a built-in
+ *  tool's from `useToolCreate`, a tool plug-in's from its declaration. */
+export function CreateLink({
+  to,
+  search,
+  label,
+  variant,
+}: ReturnType<typeof useToolCreate> & Pick<ToolCreateButtonProps, "variant">) {
   if (variant === "menu-item") {
     return (
       <DropdownMenuItem asChild>

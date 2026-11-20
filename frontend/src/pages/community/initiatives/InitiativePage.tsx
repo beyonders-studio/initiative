@@ -7,9 +7,11 @@ import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { Markdown } from "@/components/markdown/Markdown";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useInitiative } from "@/hooks/useInitiatives";
+import { useInstalledTools } from "@/hooks/usePluginToolRows";
 import { useRouteId } from "@/hooks/useRouteId";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { resolveInitiativeColor } from "@/lib/initiativeColors";
+import { type InstalledTool, toolPluginListRoute, toolText } from "@/lib/toolPlugins";
 import { initiativeRoute, TOOLS, toolCamelPlural, toolListRoute } from "@/lib/tools";
 import { CalendarsView } from "@/pages/community/tools/calendars/CalendarsPage";
 import { ContactsView } from "@/pages/community/tools/contacts/ContactsPage";
@@ -18,6 +20,7 @@ import { DashboardsView } from "@/pages/community/tools/dashboards/DashboardsPag
 import { FilesView } from "@/pages/community/tools/files/FilesPage";
 import { PostsView } from "@/pages/community/tools/posts/PostsPage";
 import { ProjectsView } from "@/pages/community/tools/projects/ProjectsPage";
+import { ToolPluginView } from "@/pages/community/tools/toolPlugins/ToolPluginView";
 import { WikisView } from "@/pages/community/tools/wikis/WikisPage";
 import { Button } from "@/ui/button";
 import { cn } from "@/ui/lib/utils";
@@ -52,15 +55,23 @@ const TOOL_TABS: Array<[Tool, ComponentType<ToolViewProps>]> = TOOLS.map((tool) 
 export const TOOL_TAB_VIEWS: ReadonlyMap<Tool, ComponentType<ToolViewProps>> = new Map(TOOL_TABS);
 
 export interface InitiativeDetailPageProps {
-  /** The tool tab the URL names. Omitted on the bare initiative route, where
-   *  the page falls back to the first tab this member can see. */
-  tool?: Tool;
+  /** The tool tab the URL names, a built-in tool or a tool plug-in's kind.
+   *  Omitted on the bare initiative route, where the page falls back to the
+   *  first tab this member can see. */
+  tool?: string;
 }
+
+/** One tool's tab: its kind, its name, where it leads, and its list: a
+ *  built-in tool's view, or the installed tool `ToolPluginView` draws. */
+type ToolTab = { kind: string; label: string; to: string } & (
+  | { View: ComponentType<ToolViewProps>; installed?: never }
+  | { installed: InstalledTool }
+);
 
 export const InitiativePage = ({ tool }: InitiativeDetailPageProps = {}) => {
   const initiativeId = useRouteId("initiativeId");
   const gp = useCommunityPath();
-  const { t } = useTranslation(["initiatives", "common"]);
+  const { t, i18n } = useTranslation(["initiatives", "common", "plugins"]);
   const { activeCommunity } = useCommunities();
   const communityAdminLabel = t("settings.communityAdminRole");
 
@@ -72,23 +83,42 @@ export const InitiativePage = ({ tool }: InitiativeDetailPageProps = {}) => {
   const isCommunityAdmin = Boolean(activeCommunity?.can.administer_content);
   const canManageInitiative = Boolean(initiative?.can.manage);
 
+  const installs = useInstalledTools();
+  const installedTools = installs.status === "ready" ? installs.tools : null;
+
   // A tool's tab renders when its permission allows viewing it (the backend
-  // already folds in the initiative's master switches). The advanced tool is
-  // additionally gated by the deployment-level runtime config.
-  const availableTabs = useMemo<Tool[]>(
-    () =>
-      TOOL_TABS.map(([tabTool]) => tabTool).filter((tabTool) =>
-        Boolean(initiative?.can.view.includes(tabTool))
+  // already folds in the initiative's master switches): the built-in tools,
+  // then the tools the community's plug-ins declare.
+  const tabs = useMemo<ToolTab[]>(() => {
+    if (!initiative) return [];
+    const viewable = initiative.can.view;
+    return [
+      ...TOOL_TABS.map(
+        ([tabTool, View]): ToolTab => ({
+          kind: tabTool,
+          label: t(`detail.${toolCamelPlural(tabTool)}` as never),
+          to: toolListRoute(tabTool, initiative.id),
+          View,
+        })
       ),
-    [initiative]
-  );
+      ...(installedTools ?? []).map(
+        (installed): ToolTab => ({
+          kind: installed.kind,
+          label: toolText(installed.name, i18n.language),
+          to: toolPluginListRoute(initiative.id, installed.kind),
+          installed,
+        })
+      ),
+    ].filter((tab) => viewable.includes(tab.kind));
+  }, [initiative, installedTools, t, i18n.language]);
+  const availableTabs = tabs.map((tab) => tab.kind);
 
   // The path names the tab, so it is shareable and survives a reload. A tool
   // this member can't view falls back to the first one they can, rather than
   // dead-ending a bookmark the moment a permission changes — the same rule My
   // Tools applies to its `?tool=` param.
   const activeTab =
-    tool && availableTabs.includes(tool) ? tool : (availableTabs[0] ?? Tool.project);
+    tool && availableTabs.includes(tool) ? tool : (availableTabs[0] ?? (Tool.project as string));
 
   const memberCount = initiative?.member_count ?? 0;
 
@@ -101,7 +131,9 @@ export const InitiativePage = ({ tool }: InitiativeDetailPageProps = {}) => {
     return <Navigate to={gp("/")} replace />;
   }
 
-  if (initiativeQuery.isLoading) {
+  // Until the installs are known no tab is picked: the URL may name a tool
+  // plug-in's, and the first tab might be one.
+  if (initiativeQuery.isLoading || installs.status === "loading") {
     // Its header, the tool tabs, and the first tab's list.
     return (
       <SkeletonRegion className="space-y-4 sm:space-y-6">
@@ -121,6 +153,12 @@ export const InitiativePage = ({ tool }: InitiativeDetailPageProps = {}) => {
         backLabel={t("detail.backToInitiatives")}
       />
     );
+  }
+
+  // A tab the built-in tools do not name is a tool plug-in's, which is not
+  // given up for another while the installs could not be read.
+  if (installs.status === "error" && tool && !TOOL_TAB_VIEWS.has(tool as Tool)) {
+    return <StatusMessage title={t("plugins:tool.installsLoadError")} onRetry={installs.retry} />;
   }
 
   const color = resolveInitiativeColor(initiative.color);
@@ -234,10 +272,10 @@ export const InitiativePage = ({ tool }: InitiativeDetailPageProps = {}) => {
           className="h-auto gap-5 rounded-none border-b bg-transparent p-0"
           style={{ "--initiative": color } as CSSProperties}
         >
-          {TOOL_TABS.filter(([tabTool]) => availableTabs.includes(tabTool)).map(([tabTool]) => (
+          {tabs.map((tab) => (
             <TabsTrigger
-              key={tabTool}
-              value={tabTool}
+              key={tab.kind}
+              value={tab.kind}
               className="-mb-px rounded-none border-transparent border-b-2 px-0 pt-1 pb-2 data-[state=active]:border-(--initiative) data-[state=active]:bg-transparent data-[state=active]:shadow-none"
               asChild
             >
@@ -245,20 +283,29 @@ export const InitiativePage = ({ tool }: InitiativeDetailPageProps = {}) => {
                     button. `search={{}}` clears the page cursor: all six tabs
                     now share one search schema, so a ?page from the projects tab
                     would otherwise follow the reader into files. */}
-              <Link to={gp(toolListRoute(tabTool, initiative.id))} search={{}}>
-                {t(`detail.${toolCamelPlural(tabTool)}` as never)}
+              <Link to={gp(tab.to)} search={{}}>
+                {tab.label}
               </Link>
             </TabsTrigger>
           ))}
         </TabsBar>
-        {TOOL_TABS.filter(([tabTool]) => availableTabs.includes(tabTool)).map(([tabTool, View]) => (
-          <TabsContent key={tabTool} value={tabTool} className="mt-6">
+        {tabs.map((tab) => (
+          <TabsContent key={tab.kind} value={tab.kind} className="mt-6">
             <Suspense fallback={tabFallback}>
-              <View
-                key={`${tabTool}-${initiative.id}`}
-                fixedInitiativeId={initiative.id}
-                canCreate={initiative.can.create.includes(tabTool)}
-              />
+              {tab.installed ? (
+                <ToolPluginView
+                  key={`${tab.kind}-${initiative.id}`}
+                  tool={tab.installed}
+                  fixedInitiativeId={initiative.id}
+                  canCreate={initiative.can.create.includes(tab.kind)}
+                />
+              ) : (
+                <tab.View
+                  key={`${tab.kind}-${initiative.id}`}
+                  fixedInitiativeId={initiative.id}
+                  canCreate={initiative.can.create.includes(tab.kind)}
+                />
+              )}
             </Suspense>
           </TabsContent>
         ))}
