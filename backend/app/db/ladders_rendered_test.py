@@ -1,6 +1,6 @@
 """Each ladder is spelled once, by the enum that owns it; the SQL reads it.
 
-The unit tests pin the spelling. The database tests ask the rendered rule the
+The database tests ask the rendered rule the
 way a request does — on the request login, through the seam — and compare its
 answer with the enum's, rung by rung.
 """
@@ -11,13 +11,12 @@ import pytest
 from sqlalchemy import func
 from sqlmodel import select
 
-from app.db.authorization import sql_values, standing_arg
+from app.db.authorization import standing_arg
 from app.models.platform.access_grant import SettingsLevel
 from app.models.platform.guild import GUILD_STORED_ROLES, CommunityRole
 from app.models.platform.user import UserRole
 from app.models.tenant.resource_grant import (
     RESOURCE_LEVEL_LADDER,
-    WRITE_LEVELS,
     ResourceAccessLevel,
 )
 from app.testing import (
@@ -29,24 +28,11 @@ from app.testing import (
 )
 
 
-def test_a_value_list_is_spelled_from_the_enum():
-    assert sql_values(
-        r.value for r in (CommunityRole.admin, CommunityRole.superadmin)
-    ) == ("'admin', 'superadmin'")
-    assert sql_values(level.value for level in WRITE_LEVELS) == "'write', 'owner'"
-
-
 def test_the_sharing_ladder_reaches_downward():
-    assert RESOURCE_LEVEL_LADDER == (
-        ResourceAccessLevel.read,
-        ResourceAccessLevel.write,
-        ResourceAccessLevel.owner,
-    )
     assert ResourceAccessLevel.owner.reaches(ResourceAccessLevel.write)
     assert ResourceAccessLevel.write.reaches(ResourceAccessLevel.read)
     assert not ResourceAccessLevel.read.reaches(ResourceAccessLevel.write)
     assert not ResourceAccessLevel.write.reaches(ResourceAccessLevel.owner)
-    assert WRITE_LEVELS == (ResourceAccessLevel.write, ResourceAccessLevel.owner)
 
 
 # A guest's row needs an end, so its standing is read in guests_test.

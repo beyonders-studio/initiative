@@ -8,10 +8,8 @@ task, then its case, then its task again.
 
 from __future__ import annotations
 
-import importlib.util
 import uuid
 from datetime import UTC, datetime
-from pathlib import Path
 from types import ModuleType
 
 from alembic.migration import MigrationContext
@@ -31,21 +29,7 @@ from app.testing import (
     create_user,
     make_operations_community,
 )
-
-_MIGRATION = (
-    Path(__file__).resolve().parents[2]
-    / "alembic"
-    / "versions"
-    / "20261105_0578_a_cases_evidence_names_its_task.py"
-)
-
-
-def _load() -> ModuleType:
-    spec = importlib.util.spec_from_file_location(_MIGRATION.stem, _MIGRATION)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+from app.testing.later_revisions import load_revision
 
 
 def _step(migration: ModuleType, forward: bool):
@@ -94,7 +78,7 @@ async def test_a_cases_evidence_moves_from_its_case_to_its_task(session) -> None
     case_id, task_id = int(case.id), int(task.id)
     await set_rls_context(session, Unattributed())
     assert case_id != task_id
-    migration = _load()
+    migration = load_revision("20261105_0578_a_cases_evidence_names_its_task")
 
     async def named(column: str) -> int:
         result = await (await session.connection()).execute(

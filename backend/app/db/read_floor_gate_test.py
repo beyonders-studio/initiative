@@ -23,6 +23,32 @@ from app.services.platform import rules
 from app.testing.factories import create_auth_provider, create_guild
 
 
+async def _ask(engine, guild_id: int, *steps: dict[str, str]) -> list[bool]:
+    """``guild_auth_satisfied()`` asked on the read-only guild role, once per
+    step, each step's settings laid over the ones before it."""
+    answers = []
+    async with engine.connect() as conn:
+        await conn.execute(
+            text(f'SET ROLE "{guild_role_name(guild_id, GuildRoleKind.read_only)}"')
+        )
+        base = {
+            "app.current_user_id": "1",
+            "app.current_guild_id": str(guild_id),
+            "app.satisfied_providers": "",
+            "app.satisfied_claims": "",
+        }
+        for step in (base, *steps):
+            for key, value in step.items():
+                await conn.execute(
+                    text("SELECT set_config(:k, :v, true)"), {"k": key, "v": value}
+                )
+            if step is not base:
+                answers.append(
+                    await conn.scalar(text("SELECT public.guild_auth_satisfied()"))
+                )
+    return answers
+
+
 async def test_the_read_floor_can_answer_the_gate(session, engine):
     """A read-only member of a community that requires a sign-in.
 
@@ -40,22 +66,7 @@ async def test_the_read_floor_can_answer_the_gate(session, engine):
     )
     await session.commit()
 
-    async with engine.connect() as conn:
-        await conn.execute(
-            text(f'SET ROLE "{guild_role_name(guild_id, GuildRoleKind.read_only)}"')
-        )
-        for key, value in (
-            ("app.current_user_id", "1"),
-            ("app.current_guild_id", str(guild_id)),
-            ("app.satisfied_providers", ""),
-            ("app.satisfied_claims", ""),
-        ):
-            await conn.execute(
-                text("SELECT set_config(:k, :v, true)"), {"k": key, "v": value}
-            )
-        answered = await conn.scalar(text("SELECT public.guild_auth_satisfied()"))
-
-    assert answered is False
+    assert await _ask(engine, guild_id, {}) == [False]
 
 
 async def test_the_read_floor_reads_a_deployment_wide_answer(session, engine):
@@ -81,26 +92,14 @@ async def test_the_read_floor_reads_a_deployment_wide_answer(session, engine):
     )
     await session.commit()
 
-    async with engine.connect() as conn:
-        await conn.execute(
-            text(f'SET ROLE "{guild_role_name(guild_id, GuildRoleKind.read_only)}"')
-        )
-        for key, value in (
-            ("app.current_user_id", "1"),
-            ("app.current_guild_id", str(guild_id)),
-            ("app.satisfied_providers", str(provider_id)),
-            (
-                "app.satisfied_claims",
-                json.dumps({str(provider_id): {"tid": ["acme-tenant"]}}),
-            ),
-        ):
-            await conn.execute(
-                text("SELECT set_config(:k, :v, true)"), {"k": key, "v": value}
-            )
-        answered = await conn.scalar(text("SELECT public.guild_auth_satisfied()"))
-
+    arrival = {
+        "app.satisfied_providers": str(provider_id),
+        "app.satisfied_claims": json.dumps(
+            {str(provider_id): {"tid": ["acme-tenant"]}}
+        ),
+    }
     # The inherited narrowing counts this arrival, so the requirement is met.
-    assert answered is True
+    assert await _ask(engine, guild_id, arrival) == [True]
 
 
 async def test_the_read_floor_reads_what_the_deployment_asks(session, engine):
@@ -115,26 +114,6 @@ async def test_the_read_floor_reads_what_the_deployment_asks(session, engine):
     )
     await session.commit()
 
-    async with engine.connect() as conn:
-        await conn.execute(
-            text(f'SET ROLE "{guild_role_name(guild_id, GuildRoleKind.read_only)}"')
-        )
-        for key, value in (
-            ("app.current_user_id", "1"),
-            ("app.current_guild_id", str(guild_id)),
-            ("app.satisfied_providers", ""),
-            ("app.satisfied_claims", ""),
-            ("app.platform_role", "member"),
-            ("app.platform_factor", "false"),
-        ):
-            await conn.execute(
-                text("SELECT set_config(:k, :v, true)"), {"k": key, "v": value}
-            )
-        without = await conn.scalar(text("SELECT public.guild_auth_satisfied()"))
-        await conn.execute(
-            text("SELECT set_config('app.platform_factor', 'true', true)")
-        )
-        holding = await conn.scalar(text("SELECT public.guild_auth_satisfied()"))
-
-    assert without is False
-    assert holding is True
+    without = {"app.platform_role": "member", "app.platform_factor": "false"}
+    holding = {"app.platform_factor": "true"}
+    assert await _ask(engine, guild_id, without, holding) == [False, True]

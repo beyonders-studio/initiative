@@ -7,27 +7,14 @@ shape, rows written as an older release wrote them, up, and down again."""
 
 from __future__ import annotations
 
-import importlib.util
 import json
-from pathlib import Path
 
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import text
 
 from app.testing import create_guild, create_initiative, create_project, create_user
-
-_VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
-
-
-def _load(name: str):
-    path = _VERSIONS / f"{name}.py"
-    spec = importlib.util.spec_from_file_location(path.stem, path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
+from app.testing.later_revisions import load_revision
 
 _SEEDS = (
     ("all", "All", True, "{}"),
@@ -77,9 +64,9 @@ async def test_presets_become_views_and_come_back(session) -> None:
         name: (await create_project(session, initiative, user, name=name)).id
         for name in names
     }
-    migration = _load("20261009_0478_tool_views")
-    drop_mode = _load("20261009_0479_a_project_opens_on_its_default_view")
-    layouts = _load("20261010_0493_views_become_layouts")
+    migration = load_revision("20261009_0478_tool_views")
+    drop_mode = load_revision("20261009_0479_a_project_opens_on_its_default_view")
+    layouts = load_revision("20261010_0493_views_become_layouts")
 
     def run(step):
         def apply(sync_session) -> None:
@@ -297,7 +284,7 @@ async def test_views_become_layouts_and_come_back(session) -> None:
     drawn = (await create_project(session, initiative, user, name="Drawn")).id
     filtered = (await create_project(session, initiative, user, name="Filtered")).id
     seeded = (await create_project(session, initiative, user, name="Seeded")).id
-    layouts = _load("20261010_0493_views_become_layouts")
+    layouts = load_revision("20261010_0493_views_become_layouts")
 
     def run(step):
         def apply(sync_session) -> None:

@@ -7,9 +7,7 @@ row security like any other role until the migration lifts it.
 
 from __future__ import annotations
 
-import importlib.util
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 
 from sqlalchemy import text
 from sqlmodel import select
@@ -20,21 +18,7 @@ from app.db.request_context import Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.access_grant import AccessGrant
 from app.testing import create_guild, create_user
-
-_REVISION = (
-    Path(__file__).resolve().parents[2]
-    / "alembic"
-    / "versions"
-    / "20261010_0489_grants_report_to_their_case.py"
-)
-
-
-def _migration():
-    spec = importlib.util.spec_from_file_location(_REVISION.stem, _REVISION)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+from app.testing.later_revisions import load_revision
 
 
 async def test_ended_grants_are_closed_out_and_live_ones_are_not(
@@ -71,7 +55,9 @@ async def test_ended_grants_are_closed_out_and_live_ones_are_not(
     ids = {name: row.id for name, row in rows.items()}
 
     async with db_session.provisioning_engine.begin() as conn:
-        for statement in _migration().CLOSE_OUT_ENDED:
+        for statement in load_revision(
+            "20261010_0489_grants_report_to_their_case"
+        ).CLOSE_OUT_ENDED:
             await conn.execute(text(statement))
 
     session.expire_all()

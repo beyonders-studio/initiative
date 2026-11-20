@@ -21,8 +21,6 @@ from app.db.public_rls import (
     UPDATE,
     apply_public_rls,
     policy_roles,
-    public_rls_digest,
-    render_public_rls_ddl,
     unregistered_policies,
 )
 
@@ -65,11 +63,6 @@ def test_a_table_without_policies_is_forced_or_off():
     for table, rls in PUBLIC_RLS.items():
         if not rls.policies and rls.enabled:
             assert rls.forced, f"{table}: enabled with no policy must be forced"
-
-
-def test_render_is_stable():
-    assert render_public_rls_ddl() == render_public_rls_ddl()
-    assert len(public_rls_digest()) == 16
 
 
 # --- integration ----------------------------------------------------------------

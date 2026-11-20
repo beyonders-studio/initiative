@@ -87,36 +87,23 @@ async def _listable(session, viewer, guild) -> set[int]:
 # ---------------------------------------------------------------- can_ask ---
 
 
-async def test_public_may_be_asked_by_a_stranger(session):
+@pytest.mark.parametrize(
+    ("policy", "connection", "asked"),
+    [
+        (DmPolicy.public, None, True),
+        (DmPolicy.private, None, False),
+        (DmPolicy.private, ContactGrantState.accepted, True),
+        (DmPolicy.private, ContactGrantState.pending, False),
+    ],
+    ids=["public", "private", "private, connected", "private, pending connection"],
+)
+async def test_who_may_ask(session, policy, connection, asked):
     asker = await create_user(session)
     target = await create_user(session)
-    await _policy(session, target, DmPolicy.public)
-    assert await _can_ask(session, asker, target) is True
-
-
-async def test_private_may_not_be_asked_without_a_connection(session):
-    asker = await create_user(session)
-    target = await create_user(session)
-    await _policy(session, target, DmPolicy.private)
-    assert await _can_ask(session, asker, target) is False
-
-
-async def test_a_connection_satisfies_private(session):
-    asker = await create_user(session)
-    target = await create_user(session)
-    await _policy(session, target, DmPolicy.private)
-    await _grant(session, asker, target, ContactGrantKind.connection)
-    assert await _can_ask(session, asker, target) is True
-
-
-async def test_a_pending_connection_satisfies_nothing(session):
-    asker = await create_user(session)
-    target = await create_user(session)
-    await _policy(session, target, DmPolicy.private)
-    await _grant(
-        session, asker, target, ContactGrantKind.connection, ContactGrantState.pending
-    )
-    assert await _can_ask(session, asker, target) is False
+    await _policy(session, target, policy)
+    if connection is not None:
+        await _grant(session, asker, target, ContactGrantKind.connection, connection)
+    assert await _can_ask(session, asker, target) is asked
 
 
 async def test_community_needs_a_shared_community(session):
@@ -174,24 +161,15 @@ async def test_a_missing_settings_row_reads_as_private(session):
 # ------------------------------------------------------------- permission ---
 
 
-async def test_a_connection_alone_is_may_request_not_open(session):
+async def test_a_connection_may_request_and_an_accepted_message_grant_opens(session):
     a = await create_user(session)
     b = await create_user(session)
     await _policy(session, a, DmPolicy.private)
     await _policy(session, b, DmPolicy.private)
     await _grant(session, a, b, ContactGrantKind.connection)
-
     assert await _permission(session, a, b) == "may_request"
 
-
-async def test_an_accepted_message_grant_opens_it(session):
-    a = await create_user(session)
-    b = await create_user(session)
-    await _policy(session, a, DmPolicy.private)
-    await _policy(session, b, DmPolicy.private)
-    await _grant(session, a, b, ContactGrantKind.connection)
     await _grant(session, a, b, ContactGrantKind.message)
-
     assert await _permission(session, a, b) == "open"
 
 

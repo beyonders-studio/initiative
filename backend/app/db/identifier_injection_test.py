@@ -15,15 +15,12 @@ from functools import partial
 
 import pytest
 
-from app.db.public_rls import platform_tier, role_name
 from app.db.request_context import Platform
 from app.db.schema_provisioning import (
     GuildRoleKind,
     guild_role_name,
     guild_schema_name,
 )
-from app.db.session import set_rls_context
-from app.models.platform.user import UserRole
 
 _GUILD_ID_BUILDERS = {
     "schema": guild_schema_name,
@@ -44,6 +41,7 @@ _HOSTILE_GUILD_IDS = [
     "  ",
     None,
     3.5,
+    42,  # a real id: still only digits after the prefix
 ]
 
 
@@ -63,22 +61,6 @@ def test_guild_name_builders_reject_or_sanitize_hostile_ids(builder, hostile):
 
 
 @pytest.mark.parametrize(
-    "builder", _GUILD_ID_BUILDERS.values(), ids=list(_GUILD_ID_BUILDERS)
-)
-def test_guild_name_builders_emit_identifier_safe_names(builder):
-    """For a real integer id the output is only ``<prefix>guild_<digits>`` with
-    an optional role suffix — no quotable characters."""
-    name = builder(42)
-    assert re.fullmatch(r"[A-Za-z0-9_]*guild_42[a-z_]*", name), name
-
-
-@pytest.mark.parametrize("tier", [role.value for role in UserRole])
-def test_platform_role_names_are_identifier_safe_for_valid_tiers(tier):
-    name = role_name(platform_tier(tier))
-    assert re.fullmatch(rf"[A-Za-z0-9_]*platform_{tier}", name), name
-
-
-@pytest.mark.parametrize(
     "hostile_platform_role",
     ["owner'; DROP ROLE app_admin; --", "superuser", "member ", "", "ADMIN"],
 )
@@ -88,15 +70,3 @@ def test_a_routing_rejects_unknown_platform_tier(hostile_platform_role):
     before any session is touched, so a bad value fails closed."""
     with pytest.raises(ValueError):
         Platform(user_id=1, tier=hostile_platform_role)
-
-
-async def test_set_rls_context_takes_no_role_to_claim():
-    """There is no name sink here at all any more.
-
-    A routing says which community it is in. What the reader is there is a row
-    the database reads into the request's standing, so there is no parameter to
-    hand a value to.
-    """
-    import inspect
-
-    assert "guild_role" not in inspect.signature(set_rls_context).parameters

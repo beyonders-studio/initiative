@@ -55,8 +55,10 @@ NEWEST: tuple[str, ...] = (
 )
 
 
-def _load(name: str) -> ModuleType:
-    path = _VERSIONS / name
+def load_revision(name: str) -> ModuleType:
+    """The revision ``alembic/versions/<name>`` as a module, named with or
+    without its ``.py``."""
+    path = _VERSIONS / f"{name.removesuffix('.py')}.py"
     spec = importlib.util.spec_from_file_location(path.stem, path)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
@@ -66,7 +68,7 @@ def _load(name: str) -> ModuleType:
 
 def _steps(bind: Any, *, forward: bool) -> list[Callable[[], None]]:
     batched, data_jobs, rules, defaults, claims, queues, contacts, pair = (
-        _load(name) for name in LATER
+        load_revision(name) for name in LATER
     )
     if forward:
         return [
@@ -122,7 +124,7 @@ def step_newest(*, forward: bool, after: str = "") -> None:
     ``Operations`` context."""
     revisions = [
         revision
-        for revision in (_load(name) for name in NEWEST)
+        for revision in (load_revision(name) for name in NEWEST)
         if revision.revision > after
     ]
     if forward:

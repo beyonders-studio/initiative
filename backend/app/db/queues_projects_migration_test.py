@@ -5,10 +5,7 @@ tables, a queue written the way 0.77 stored one, then up again, the way
 
 from __future__ import annotations
 
-import importlib.util
 import json
-from pathlib import Path
-from types import ModuleType
 from typing import Any
 
 from alembic.migration import MigrationContext
@@ -22,22 +19,7 @@ from app.testing import (
     create_tag,
     create_user,
 )
-from app.testing.later_revisions import restate_kind_code, step_newest
-
-_MIGRATION = (
-    Path(__file__).resolve().parents[2]
-    / "alembic"
-    / "versions"
-    / "20261105_0581_queues_are_projects.py"
-)
-
-
-def _load() -> ModuleType:
-    spec = importlib.util.spec_from_file_location(_MIGRATION.stem, _MIGRATION)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+from app.testing.later_revisions import load_revision, restate_kind_code, step_newest
 
 
 async def _rows(session, sql: str, **params: Any) -> list[tuple]:
@@ -54,7 +36,7 @@ def _runner(schema: str):
     newest revisions (``later_revisions.NEWEST``) off around it. Back up,
     ``public.relationship_kind_code`` is put back as boot renders it
     (``app.testing.later_revisions``)."""
-    migration = _load()
+    migration = load_revision("20261105_0581_queues_are_projects")
 
     def run(forward: bool):
         def apply(sync_session) -> None:

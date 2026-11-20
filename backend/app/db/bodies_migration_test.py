@@ -3,27 +3,13 @@ shapes. Loaded by path and run on a guild holding rows written the old way."""
 
 from __future__ import annotations
 
-import importlib.util
-from pathlib import Path
-from types import ModuleType
-
 from pycrdt import Doc, Map, Text, XmlElement, XmlFragment, XmlText
 from sqlalchemy import text
 
 from app.core.file_types import FileType
 from app.services.tenant.body_states import SPREADSHEET
 from app.testing import create_file, create_guild, create_initiative, create_user
-
-_VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
-
-
-def _load(name: str) -> ModuleType:
-    path = _VERSIONS / name
-    spec = importlib.util.spec_from_file_location(path.stem, path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+from app.testing.later_revisions import load_revision
 
 
 def _text(words: str, kind: str = "text") -> dict:
@@ -105,7 +91,7 @@ async def test_bodies_take_today_s_shape(session) -> None:
         },
         yjs_state=_old_sheet_state(),
     )
-    migration = _load("20261109_0598_bodies_take_todays_shape.py")
+    migration = load_revision("20261109_0598_bodies_take_todays_shape.py")
 
     def upgrade(sync_session) -> None:
         bind = sync_session.connection()
