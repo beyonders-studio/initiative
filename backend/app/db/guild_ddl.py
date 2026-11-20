@@ -56,6 +56,7 @@ from app.db.frozen import (
     frozen_guard_trigger,
     frozen_tables,
     frozen_write_triggers,
+    own_frozen,
     render_frozen_ancestor_fn,
     render_frozen_guard_fn,
     render_frozen_parent_guard_fn,
@@ -1913,7 +1914,12 @@ def _departs(named: NamedPerson, tools: ToolSet) -> str:
         head = f"DELETE FROM %1$I.{named.table} t"
         frozen = freeze_leg(named.table, "DELETE", tools, alias="t")
     kept = f" AND NOT ({named.kept})" if named.kept else ""
-    inside = "" if named.frozen_kept else "pg_trigger_depth() > 0 OR "
+    inside = "pg_trigger_depth() > 0 OR "
+    if named.frozen_kept:
+        # Archived or trashed by its own stamp as well as by what it is under.
+        own = own_frozen("t", named.table, tools)
+        frozen = " OR ".join(f"({leg})" for leg in (own, frozen) if leg is not None)
+        inside = ""
     return (
         f"    EXECUTE format($q${head} WHERE t.{column} = $1"
         f" AND {initiative} IS NOT DISTINCT FROM $2{kept}"

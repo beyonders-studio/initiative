@@ -646,7 +646,8 @@ async def test_leaving_an_initiative_takes_the_person_off_its_rows(
     client, session, acting_user
 ):
     """A person field names a member while they are in the row's initiative:
-    removed from it, they are taken off its rows, and the others stay."""
+    removed from it, they are taken off its rows, and the others stay. A row
+    in the trash keeps them, as archived or trashed content does."""
     definition = counters_tool_manifest()
     definition["tool"]["fields"].append(
         {"key": "keeper", "name": {"en": "Keeper"}, "kind": "user_reference"}
@@ -667,12 +668,21 @@ async def test_leaving_an_initiative_takes_the_person_off_its_rows(
         return made.json()["id"]
 
     theirs, mine = await group(member.user.id), await group(a.user.id)
+    binned = await group(member.user.id)
+    trashed = await client.delete(
+        a.g(f"/plugin-tools/{GROUP}/{binned}"), headers=a.headers
+    )
+    assert trashed.status_code == 204, trashed.text
     removed = await client.delete(
         a.g(f"/initiatives/{a.initiative.id}/members/{member.user.id}"),
         headers=a.headers,
     )
     assert removed.status_code == 204, removed.text
-    for row, keeper in ((theirs, None), (mine, a.user.id)):
+    restored = await client.post(
+        a.g(f"/trash/{GROUP}/{binned}/restore"), headers=a.headers
+    )
+    assert restored.status_code == 200, restored.text
+    for row, keeper in ((theirs, None), (mine, a.user.id), (binned, member.user.id)):
         read = await client.get(a.g(f"/plugin-tools/{GROUP}/{row}"), headers=a.headers)
         assert read.json()["people"].get("keeper") == keeper, read.text
 

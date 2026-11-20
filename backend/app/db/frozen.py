@@ -370,7 +370,7 @@ def _self_stamped(table: str, tools: ToolSet) -> bool:
     return table in archivable_tables(tools) and table in trashable_tables(tools)
 
 
-def _own_frozen(alias: str, table: str, tools: ToolSet) -> str | None:
+def own_frozen(alias: str, table: str, tools: ToolSet) -> str | None:
     """Whether the row aliased ``alias`` is itself archived or trashed."""
     legs = []
     if table in archivable_tables(tools):
@@ -495,7 +495,7 @@ def render_resource_frozen_fn(tools: ToolSet) -> str:
         checks = [
             c
             for c in (
-                _own_frozen("fz", table, tools),
+                own_frozen("fz", table, tools),
                 None
                 if _self_stamped(table, tools)
                 else _parent_call(table, "fz", trashed_ok="trashed_ok", tools=tools),
@@ -625,7 +625,7 @@ def frozen_write_triggers(table: str, tools: ToolSet) -> list[str]:
     """
     out: list[str] = []
     if _self_stamped(table, tools):
-        own = _own_frozen("OLD", table, tools)
+        own = own_frozen("OLD", table, tools)
         trashed = _trashed("OLD", table, tools)
         out.append(
             f"CREATE OR REPLACE TRIGGER {object_name('tr', table, 'frozen_delete')} "
@@ -838,7 +838,7 @@ def frozen_guard_trigger(table: str, tools: ToolSet) -> str:
     before the other row triggers, so what it compares is the statement's own
     change rather than another trigger's edit of it.
     """
-    when = _own_frozen("OLD", table, tools)
+    when = own_frozen("OLD", table, tools)
     if when is None:  # pragma: no cover — frozen_tables is built from these
         raise ValueError(f"{table} carries no lifecycle columns")
     return (
