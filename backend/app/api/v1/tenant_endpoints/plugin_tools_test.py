@@ -24,6 +24,7 @@ from app.services.tenant import plugin_tool_rows as rows_service
 from app.testing import (
     COUNTERS_UID,
     counters_tool_manifest,
+    counters_tool_set,
     create_tag,
     guild_url,
     install_tool_plugin,
@@ -100,22 +101,28 @@ async def test_an_initiatives_creator_adds_a_row_after_the_install(
     assert response.json()["can"]["share"] is True
 
 
-async def test_a_new_row_starts_as_declared_and_actions_side_by_side_both_land(
+async def test_a_counter_steps_within_its_bounds_and_writes_side_by_side_all_land(
     client, session, acting_user, reading_as
 ):
+    """A new row starts as declared. A counter field steps by its own step or a
+    signed amount, held to its own bounds and its table's checks. Two actions
+    run side by side both land, and so do two steps."""
     a, _member = await _counters(
-        client, session, acting_user, _with_more(counters_tool_manifest())
+        client,
+        session,
+        acting_user,
+        _with_a_capped_count(_with_more(counters_tool_manifest())),
     )
 
-    async def call(path: str, body: Any = None) -> Any:
+    async def post(path: str, body: Any = None) -> Any:
         response = await client.post(
             a.g(f"/plugin-tools/{path}"), headers=a.headers, json=body
         )
         assert response.status_code in (200, 201), (path, response.text)
         return response.json()
 
-    group = await call(f"{GROUP}/", {"initiative_id": a.initiative.id, "name": "G"})
-    counter = await call(f"{COUNTER}/", {"parent_id": group["id"], "name": "HP"})
+    group = await post(f"{GROUP}/", {"initiative_id": a.initiative.id, "name": "G"})
+    counter = await post(f"{COUNTER}/", {"parent_id": group["id"], "name": "HP"})
     assert counter["fields"]["done"] is False
     assert counter["fields"]["count"] == 0
 
@@ -152,10 +159,82 @@ async def test_a_new_row_starts_as_declared_and_actions_side_by_side_both_land(
     )
     assert read.json()["fields"]["count"] == 2
 
+    async def call(method: str, path: str, body: Any = None) -> Any:
+        response = await client.request(
+            method, a.g(f"/plugin-tools/{path}"), headers=a.headers, json=body
+        )
+        assert response.status_code in (200, 201), (path, response.text)
+        return response.json()
+
+    group = await call(
+        "POST", f"{GROUP}/", {"initiative_id": a.initiative.id, "name": "G"}
+    )
+    hp = await call(
+        "POST",
+        f"{COUNTER}/",
+        {
+            "parent_id": group["id"],
+            "name": "HP",
+            "fields": {"min": 0, "max": 3, "step": 2},
+        },
+    )
+    at = f"{COUNTER}/{hp['id']}/step"
+
+    async def count(body: dict[str, Any]) -> Any:
+        stepped = await call("POST", at, body)
+        assert stepped["id"] == hp["id"]
+        return stepped["fields"]["count"]
+
+    # By its own step, held to its own max and min; by a signed amount.
+    assert await count({"field": "count"}) == 2
+    assert await count({"field": "count"}) == 3
+    assert await count({"field": "count", "down": True}) == 1
+    assert await count({"field": "count", "by": -100}) == 0
+    assert await count({"field": "count", "by": 0.5}) == 0.5
+
+    async def refused(path: str, body: dict[str, Any]) -> tuple[int, Any]:
+        response = await client.post(
+            a.g(f"/plugin-tools/{path}"), headers=a.headers, json=body
+        )
+        return response.status_code, response.json().get("detail")
+
+    invalid = (422, ToolPluginMessages.FIELD_INVALID)
+    for body in (
+        {"field": "step"},
+        {"field": "nothing"},
+        {"field": "count", "by": 1e12},
+    ):
+        assert await refused(at, body) == invalid, body
+    assert await refused(f"{GROUP}/{group['id']}/step", {"field": "count"}) == invalid
+    status, _ = await refused(at, {"field": "count", "by": 1, "down": True})
+    assert status == 422
+
+    # A step past a check of the table is refused, and changes nothing.
+    mp = await call("POST", f"{COUNTER}/", {"parent_id": group["id"], "name": "MP"})
+    assert await refused(
+        f"{COUNTER}/{mp['id']}/step", {"field": "count", "by": 10}
+    ) == (invalid)
+    read = await call("GET", f"{COUNTER}/{mp['id']}")
+    assert read["fields"]["count"] == 0
+
+    async def stepped() -> None:
+        """One step, on a connection of its own, as two requests make them."""
+        own = await reading_as(a.user.id, a.guild.id)
+        context = require_guild_context(own)
+        located = rows_service.located_kind(context.tools, COUNTER)
+        await rows_service.step(own, located, mp["id"], "count")
+        await own.commit()
+
+    await asyncio.gather(stepped(), stepped())
+    read = await call("GET", f"{COUNTER}/{mp['id']}")
+    assert read["fields"]["count"] == 2
+
 
 async def test_rows_are_made_changed_listed_copied_and_acted_on(
     client, session, acting_user
 ):
+    """A tool's rows and its items are made, changed, listed, previewed and
+    acted on as declared, and copied with their tags and links."""
     a, member = await _counters(client, session, acting_user)
 
     async def call(method: str, path: str, body: Any = None) -> Any:
@@ -217,61 +296,43 @@ async def test_rows_are_made_changed_listed_copied_and_acted_on(
     read = await call("GET", f"{COUNTER}/{counter['id']}")
     assert read["fields"]["count"] == 0
 
-    copy = await call("POST", f"{GROUP}/{group['id']}/duplicate")
-    assert copy["name"] == "Party (Copy)"
-    copied = await call("GET", f"{COUNTER}/?parent_id={copy['id']}")
-    assert [row["name"] for row in copied["items"]] == ["HP"]
-    beside = await call("POST", f"{COUNTER}/{counter['id']}/duplicate")
-    assert (beside["name"], beside["parent_id"]) == ("HP (Copy)", group["id"])
-
-
-async def test_a_copy_keeps_its_tags_and_links_as_a_built_in_tools_does(
-    client, session, acting_user
-):
-    """A copy of a tool's row, and of an item, carries their tags and links,
-    and so does each item copied under the row's copy."""
-    a, _member = await _counters(client, session, acting_user)
+    # A copy of the row, and of an item, carries their tags and links, and
+    # so does each item copied under the row's copy, as a built-in tool's do.
     tag = await create_tag(session, a.guild, name="Boss")
-
-    async def call(method: str, path: str, body: Any = None, **params: Any) -> Any:
-        response = await client.request(
-            method, a.g(path), headers=a.headers, json=body, params=params
-        )
-        assert response.status_code in (200, 201), (path, response.text)
-        return response.json()
-
-    def made(kind: str, place: dict[str, int], name: str) -> Any:
-        body = {**place, "name": name, "tag_ids": [tag.id]}
-        return call("POST", f"/plugin-tools/{kind}/", body)
-
-    group = await made(GROUP, {"initiative_id": a.initiative.id}, "Party")
-    other = await made(GROUP, {"initiative_id": a.initiative.id}, "Other")
-    counter = await made(COUNTER, {"parent_id": group["id"]}, "HP")
+    await session.commit()
+    other = await call(
+        "POST", f"{GROUP}/", {"initiative_id": a.initiative.id, "name": "Other"}
+    )
     for kind, row in ((GROUP, group), (COUNTER, counter)):
-        await call(
-            "POST",
-            "/relationships/",
-            {
+        await call("PATCH", f"{kind}/{row['id']}", {"tag_ids": [tag.id]})
+        linked = await client.post(
+            a.g("/relationships/"),
+            headers=a.headers,
+            json={
                 "source": {"type": kind, "id": row["id"]},
                 "relationship_type": "related_to",
                 "target": {"type": GROUP, "id": other["id"]},
             },
         )
+        assert linked.status_code == 201, linked.text
 
-    copy = await call("POST", f"/plugin-tools/{GROUP}/{group['id']}/duplicate")
-    (copied,) = (await call("GET", f"/plugin-tools/{COUNTER}/", parent_id=copy["id"]))[
-        "items"
-    ]
-    beside = await call("POST", f"/plugin-tools/{COUNTER}/{counter['id']}/duplicate")
+    copy = await call("POST", f"{GROUP}/{group['id']}/duplicate")
+    assert copy["name"] == "Party (Copy)"
+    (copied,) = (await call("GET", f"{COUNTER}/?parent_id={copy['id']}"))["items"]
+    assert copied["name"] == "HP"
+    beside = await call("POST", f"{COUNTER}/{counter['id']}/duplicate")
+    assert (beside["name"], beside["parent_id"]) == ("HP (Copy)", group["id"])
     for kind, row in ((GROUP, copy), (COUNTER, copied), (COUNTER, beside)):
-        read = await call("GET", f"/plugin-tools/{kind}/{row['id']}")
+        read = await call("GET", f"{kind}/{row['id']}")
         assert [each["id"] for each in read["tags"]] == [tag.id], (kind, read)
-        links = await call(
-            "GET", "/relationships/", entity=f"{kind}:{row['id']}", other_type=GROUP
+        links = await client.get(
+            a.g("/relationships/"),
+            headers=a.headers,
+            params={"entity": f"{kind}:{row['id']}", "other_type": GROUP},
         )
-        assert [(e["other"]["type"], e["other"]["id"]) for e in links] == [
+        assert [(e["other"]["type"], e["other"]["id"]) for e in links.json()] == [
             (GROUP, other["id"])
-        ], (kind, links)
+        ], (kind, links.text)
 
 
 async def test_rows_are_tagged_and_trashed_as_a_built_in_tools_are(
@@ -355,61 +416,6 @@ async def test_rows_are_tagged_and_trashed_as_a_built_in_tools_are(
     assert gone.status_code == 204, gone.text
 
 
-async def test_values_and_places_are_held_to_the_declaration(
-    client, session, acting_user
-):
-    a, member = await _counters(client, session, acting_user)
-    created = await client.post(
-        a.g(f"/plugin-tools/{GROUP}/"),
-        headers=a.headers,
-        json={"initiative_id": a.initiative.id, "name": "Party"},
-    )
-    group = created.json()
-
-    async def refused(method: str, path: str, body: Any = None) -> tuple[int, Any]:
-        response = await client.request(
-            method, a.g(f"/plugin-tools/{path}"), headers=a.headers, json=body
-        )
-        return response.status_code, response.json().get("detail")
-
-    item = {"parent_id": group["id"], "name": "HP"}
-    invalid = (422, ToolPluginMessages.FIELD_INVALID)
-    for fields in (
-        {"view_mode": "dial"},
-        {"nothing": 1},
-        {"count": None},
-        {"color": "red"},
-        {"count": 1e12},
-        # Its required fields and its checks.
-        {"step": None},
-        {"step": 0},
-        {"min": 5, "max": 1},
-    ):
-        assert await refused("POST", f"{COUNTER}/", {**item, "fields": fields}) == (
-            invalid
-        ), fields
-    assert await refused(
-        "POST", f"{COUNTER}/", {**item, "people": {"count": member.user.id}}
-    ) == (invalid)
-    placement = (422, ToolPluginMessages.PLACEMENT_INVALID)
-    assert (
-        await refused("POST", f"{COUNTER}/", {"initiative_id": 1, "name": "X"})
-        == placement
-    )
-    assert (
-        await refused("POST", f"{GROUP}/", {"parent_id": group["id"], "name": "X"})
-        == placement
-    )
-    assert await refused("GET", f"stranger.{'x' * 14}/1") == (
-        404,
-        KindMessages.NOT_FOUND,
-    )
-    assert await refused("POST", f"{GROUP}/{group['id']}/actions/nope") == (
-        404,
-        ToolPluginMessages.ACTION_NOT_FOUND,
-    )
-
-
 async def test_an_installed_plugin_reaches_the_tool_by_its_scopes(
     client, session, acting_user, role_session, monkeypatch
 ):
@@ -479,12 +485,13 @@ async def test_an_installed_plugin_reaches_the_tool_by_its_scopes(
     assert response.status_code in (403, 404), response.text
 
 
-async def test_a_tool_off_where_its_row_is_refuses_the_universal_routes(
+async def test_a_tool_off_or_unplaced_where_its_row_is_refuses_the_universal_routes(
     client: Any, session: Any, acting_user: Any
 ):
     """A universal route refuses a tool plug-in's row in an initiative its
-    tool is switched off in, or not placed in, to the community's admin, as
-    it refuses a switched-off built-in tool's."""
+    tool is switched off in, or not placed in, to the community's admins, as
+    it refuses a switched-off built-in tool's. While it is placed there, an
+    admin who is not in the row's initiative changes the row through one."""
     from app.core.tools import Tool
     from app.services.tenant.initiative_tools import write_switches
     from app.testing import add_counter, create_initiative, create_project
@@ -492,6 +499,7 @@ async def test_a_tool_off_where_its_row_is_refuses_the_universal_routes(
 
     admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     guild, initiative = admin.guild, admin.initiative
+    outside = await acting_user(guild=guild, guild_role=CommunityRole.admin)
     elsewhere = await create_initiative(session, guild, admin.user)
     project = await create_project(session, initiative, admin.user)
     await session.commit()
@@ -500,21 +508,27 @@ async def test_a_tool_off_where_its_row_is_refuses_the_universal_routes(
     tools, group, _ = await add_counter(session, guild.id, initiative.id)
     (tool,) = tools.installed
 
-    async def refused(kind: str, row_id: int) -> None:
-        response = await client.put(
-            admin.g(f"/tools/{kind}/{row_id}/comments"),
-            headers=admin.headers,
+    def comments(actor: Any, kind: str, row_id: int) -> Any:
+        return client.put(
+            actor.g(f"/tools/{kind}/{row_id}/comments"),
+            headers=actor.headers,
             json={"comments_enabled": False},
         )
+
+    async def refused(actor: Any, kind: str, row_id: int) -> None:
+        response = await comments(actor, kind, row_id)
         assert response.status_code == 403, (kind, response.text)
         assert response.json()["detail"] == KindMessages.TOOL_NOT_ENABLED, kind
+
+    response = await comments(outside, tool.kind, group)
+    assert response.status_code == 200, response.text
 
     await route_session_to_guild(session, guild.id)
     await write_switches(session, initiative.id, {Tool.project: False})
     await write_switches(session, initiative.id, {tool: False})
     await session.commit()
-    await refused(Tool.project.value, project.id)
-    await refused(tool.kind, group)
+    await refused(admin, Tool.project.value, project.id)
+    await refused(admin, tool.kind, group)
 
     await route_session_to_guild(session, guild.id)
     await write_switches(session, initiative.id, {tool: True})
@@ -525,46 +539,8 @@ async def test_a_tool_off_where_its_row_is_refuses_the_universal_routes(
         json={"placed_initiative_ids": [elsewhere.id]},
     )
     assert placed.status_code == 200, placed.text
-    await refused(tool.kind, group)
-
-
-async def test_an_admin_outside_the_initiative_is_refused_an_unplaced_tools_row(
-    client: Any, session: Any, acting_user: Any
-):
-    """A community admin who is not in the row's initiative changes a tool
-    plug-in's row through a universal route while its install is placed
-    there, and is refused once it is not, as for a switched-off tool."""
-    from app.testing import add_counter, create_initiative
-
-    member = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    guild, initiative = member.guild, member.initiative
-    elsewhere = await create_initiative(session, guild, member.user)
-    await session.commit()
-    admin = await acting_user(guild=guild, guild_role=CommunityRole.admin)
-    seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
-    install = await install_tool_plugin(client, session, seat)
-    tools, group, _ = await add_counter(session, guild.id, initiative.id)
-    (tool,) = tools.installed
-
-    def comments() -> Any:
-        return client.put(
-            admin.g(f"/tools/{tool.kind}/{group}/comments"),
-            headers=admin.headers,
-            json={"comments_enabled": False},
-        )
-
-    response = await comments()
-    assert response.status_code == 200, response.text
-
-    placed = await client.patch(
-        seat.g(f"/plugins/{install['id']}"),
-        headers=seat.headers,
-        json={"placed_initiative_ids": [elsewhere.id]},
-    )
-    assert placed.status_code == 200, placed.text
-    response = await comments()
-    assert response.status_code == 403, response.text
-    assert response.json()["detail"] == KindMessages.TOOL_NOT_ENABLED
+    for actor in (admin, outside):
+        await refused(actor, tool.kind, group)
 
 
 def _with_a_capped_count(manifest: dict[str, Any]) -> dict[str, Any]:
@@ -574,86 +550,13 @@ def _with_a_capped_count(manifest: dict[str, Any]) -> dict[str, Any]:
     return manifest
 
 
-async def test_a_counter_field_steps_within_its_bounds_and_two_steps_both_count(
-    client, session, acting_user, reading_as
+async def test_a_tool_is_read_and_written_as_its_plugin_declares_it(
+    client, session, acting_user
 ):
-    a, _member = await _counters(
-        client, session, acting_user, _with_a_capped_count(counters_tool_manifest())
-    )
-
-    async def call(method: str, path: str, body: Any = None) -> Any:
-        response = await client.request(
-            method, a.g(f"/plugin-tools/{path}"), headers=a.headers, json=body
-        )
-        assert response.status_code in (200, 201), (path, response.text)
-        return response.json()
-
-    group = await call(
-        "POST", f"{GROUP}/", {"initiative_id": a.initiative.id, "name": "G"}
-    )
-    hp = await call(
-        "POST",
-        f"{COUNTER}/",
-        {
-            "parent_id": group["id"],
-            "name": "HP",
-            "fields": {"min": 0, "max": 3, "step": 2},
-        },
-    )
-    at = f"{COUNTER}/{hp['id']}/step"
-
-    async def count(body: dict[str, Any]) -> Any:
-        stepped = await call("POST", at, body)
-        assert stepped["id"] == hp["id"]
-        return stepped["fields"]["count"]
-
-    # By its own step, held to its own max and min; by a signed amount.
-    assert await count({"field": "count"}) == 2
-    assert await count({"field": "count"}) == 3
-    assert await count({"field": "count", "down": True}) == 1
-    assert await count({"field": "count", "by": -100}) == 0
-    assert await count({"field": "count", "by": 0.5}) == 0.5
-
-    async def refused(path: str, body: dict[str, Any]) -> tuple[int, Any]:
-        response = await client.post(
-            a.g(f"/plugin-tools/{path}"), headers=a.headers, json=body
-        )
-        return response.status_code, response.json().get("detail")
-
-    invalid = (422, ToolPluginMessages.FIELD_INVALID)
-    for body in (
-        {"field": "step"},
-        {"field": "nothing"},
-        {"field": "count", "by": 1e12},
-    ):
-        assert await refused(at, body) == invalid, body
-    assert await refused(f"{GROUP}/{group['id']}/step", {"field": "count"}) == invalid
-    status, _ = await refused(at, {"field": "count", "by": 1, "down": True})
-    assert status == 422
-
-    # A step past a check of the table is refused, and changes nothing.
-    mp = await call("POST", f"{COUNTER}/", {"parent_id": group["id"], "name": "MP"})
-    assert await refused(
-        f"{COUNTER}/{mp['id']}/step", {"field": "count", "by": 10}
-    ) == (invalid)
-    read = await call("GET", f"{COUNTER}/{mp['id']}")
-    assert read["fields"]["count"] == 0
-
-    async def stepped() -> None:
-        """One step, on a connection of its own, as two requests make them."""
-        own = await reading_as(a.user.id, a.guild.id)
-        context = require_guild_context(own)
-        located = rows_service.located_kind(context.tools, COUNTER)
-        await rows_service.step(own, located, mp["id"], "count")
-        await own.commit()
-
-    await asyncio.gather(stepped(), stepped())
-    read = await call("GET", f"{COUNTER}/{mp['id']}")
-    assert read["fields"]["count"] == 2
-
-
-async def test_a_tool_is_read_as_its_plugin_declares_it(client, session, acting_user):
-    a, _member = await _counters(client, session, acting_user)
+    """A tool reads as its declaration, by its kind and by an item's, to the
+    members of an initiative it is in; a row's values and its place are held
+    to that declaration."""
+    a, member = await _counters(client, session, acting_user)
 
     response = await client.get(a.g(f"/plugin-tools/{GROUP}"), headers=a.headers)
     assert response.status_code == 200, response.text
@@ -710,6 +613,56 @@ async def test_a_tool_is_read_as_its_plugin_declares_it(client, session, acting_
     )
     assert response.status_code == 404, response.text
 
+    created = await client.post(
+        a.g(f"/plugin-tools/{GROUP}/"),
+        headers=a.headers,
+        json={"initiative_id": a.initiative.id, "name": "Party"},
+    )
+    group = created.json()
+
+    async def refused(method: str, path: str, body: Any = None) -> tuple[int, Any]:
+        response = await client.request(
+            method, a.g(f"/plugin-tools/{path}"), headers=a.headers, json=body
+        )
+        return response.status_code, response.json().get("detail")
+
+    item = {"parent_id": group["id"], "name": "HP"}
+    invalid = (422, ToolPluginMessages.FIELD_INVALID)
+    for fields in (
+        {"view_mode": "dial"},
+        {"nothing": 1},
+        {"count": None},
+        {"color": "red"},
+        {"count": 1e12},
+        # Its required fields and its checks.
+        {"step": None},
+        {"step": 0},
+        {"min": 5, "max": 1},
+    ):
+        assert await refused("POST", f"{COUNTER}/", {**item, "fields": fields}) == (
+            invalid
+        ), fields
+    assert await refused(
+        "POST", f"{COUNTER}/", {**item, "people": {"count": member.user.id}}
+    ) == (invalid)
+    placement = (422, ToolPluginMessages.PLACEMENT_INVALID)
+    assert (
+        await refused("POST", f"{COUNTER}/", {"initiative_id": 1, "name": "X"})
+        == placement
+    )
+    assert (
+        await refused("POST", f"{GROUP}/", {"parent_id": group["id"], "name": "X"})
+        == placement
+    )
+    assert await refused("GET", f"stranger.{'x' * 14}/1") == (
+        404,
+        KindMessages.NOT_FOUND,
+    )
+    assert await refused("POST", f"{GROUP}/{group['id']}/actions/nope") == (
+        404,
+        ToolPluginMessages.ACTION_NOT_FOUND,
+    )
+
 
 async def test_leaving_an_initiative_takes_the_person_off_its_rows(
     client, session, acting_user
@@ -762,19 +715,11 @@ def test_reading_a_tool_leaves_its_declaration_as_declared():
     import copy
 
     from app.db.tool_rows import locate
-    from app.services.marketplace.tool_plugins import (
-        normalize_tool_plugin_definition,
-        tool_kinds,
-    )
+    from app.services.marketplace.tool_plugins import normalize_tool_plugin_definition
 
     manifest = counters_tool_manifest()
     manifest["tool"]["fields"][0]["default"] = "<b>Ready</b> & set"
-    declared = normalize_tool_plugin_definition(manifest)
-    kinds = tool_kinds(declared, listing_uid=COUNTERS_UID)
-    tools = plugin_tools.community_tool_set(
-        [plugin_tools.InstalledTool(COUNTERS_UID, declared)],
-        {kind: 900 + i for i, kind in enumerate(kinds)},
-    )
+    tools = counters_tool_set(normalize_tool_plugin_definition(manifest))
     located = locate(tools, GROUP)
     assert located is not None
     before = copy.deepcopy(dict(located.tool.declaration))
