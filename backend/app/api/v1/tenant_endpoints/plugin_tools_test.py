@@ -310,3 +310,91 @@ async def test_an_installed_plugin_reaches_the_tool_by_its_scopes(
         json={**body, "initiative_id": installed.unplaced.id},
     )
     assert response.status_code in (403, 404), response.text
+
+
+async def test_a_tool_off_where_its_row_is_refuses_the_universal_routes(
+    client: Any, session: Any, acting_user: Any
+):
+    """A universal route refuses a tool plug-in's row in an initiative its
+    tool is switched off in, or not placed in, to the community's admin, as
+    it refuses a switched-off built-in tool's."""
+    from app.core.tools import Tool
+    from app.services.tenant.initiative_tools import write_switches
+    from app.testing import add_counter, create_initiative, create_project
+    from app.testing.schema_harness import route_session_to_guild
+
+    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    guild, initiative = admin.guild, admin.initiative
+    elsewhere = await create_initiative(session, guild, admin.user)
+    project = await create_project(session, initiative, admin.user)
+    await session.commit()
+    seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
+    install = await install_tool_plugin(client, session, seat)
+    tools, group, _ = await add_counter(session, guild.id, initiative.id)
+    (tool,) = tools.installed
+
+    async def refused(kind: str, row_id: int) -> None:
+        response = await client.put(
+            admin.g(f"/tools/{kind}/{row_id}/comments"),
+            headers=admin.headers,
+            json={"comments_enabled": False},
+        )
+        assert response.status_code == 403, (kind, response.text)
+        assert response.json()["detail"] == KindMessages.TOOL_NOT_ENABLED, kind
+
+    await route_session_to_guild(session, guild.id)
+    await write_switches(session, initiative.id, {Tool.project: False})
+    await write_switches(session, initiative.id, {tool: False})
+    await session.commit()
+    await refused(Tool.project.value, project.id)
+    await refused(tool.kind, group)
+
+    await route_session_to_guild(session, guild.id)
+    await write_switches(session, initiative.id, {tool: True})
+    await session.commit()
+    placed = await client.patch(
+        seat.g(f"/plugins/{install['id']}"),
+        headers=seat.headers,
+        json={"placed_initiative_ids": [elsewhere.id]},
+    )
+    assert placed.status_code == 200, placed.text
+    await refused(tool.kind, group)
+
+
+async def test_an_admin_outside_the_initiative_is_refused_an_unplaced_tools_row(
+    client: Any, session: Any, acting_user: Any
+):
+    """A community admin who is not in the row's initiative changes a tool
+    plug-in's row through a universal route while its install is placed
+    there, and is refused once it is not, as for a switched-off tool."""
+    from app.testing import add_counter, create_initiative
+
+    member = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    guild, initiative = member.guild, member.initiative
+    elsewhere = await create_initiative(session, guild, member.user)
+    await session.commit()
+    admin = await acting_user(guild=guild, guild_role=CommunityRole.admin)
+    seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
+    install = await install_tool_plugin(client, session, seat)
+    tools, group, _ = await add_counter(session, guild.id, initiative.id)
+    (tool,) = tools.installed
+
+    def comments() -> Any:
+        return client.put(
+            admin.g(f"/tools/{tool.kind}/{group}/comments"),
+            headers=admin.headers,
+            json={"comments_enabled": False},
+        )
+
+    response = await comments()
+    assert response.status_code == 200, response.text
+
+    placed = await client.patch(
+        seat.g(f"/plugins/{install['id']}"),
+        headers=seat.headers,
+        json={"placed_initiative_ids": [elsewhere.id]},
+    )
+    assert placed.status_code == 200, placed.text
+    response = await comments()
+    assert response.status_code == 403, response.text
+    assert response.json()["detail"] == KindMessages.TOOL_NOT_ENABLED

@@ -124,8 +124,9 @@ async def require_on(
     session: AsyncSession, context: ActorContext, located: Located, initiative_id: int
 ) -> Initiative:
     """The initiative ``initiative_id`` names, once ``located``'s tool is on in
-    it, as a built-in tool's routes ask: a community admin reaches a switched
-    off tool's rows, and is still refused here."""
+    it, as a built-in tool's routes ask: its switch on there, and its install
+    placed there. A community admin reaches such a tool's rows, and is still
+    refused here."""
     initiative = await session.get(Initiative, initiative_id)
     if initiative is None:
         raise HTTPException(

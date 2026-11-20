@@ -1386,7 +1386,7 @@ def _initiative_tool_actions(tools: ToolSet) -> str:
             switch = (
                 f"({switch} AND EXISTS (SELECT 1 FROM plugin_placements pp"
                 " JOIN guild_plugins a ON a.id = pp.install_id"
-                f" WHERE a.listing_uid = '{tool.kind.partition('.')[2].upper()}'"
+                f" WHERE a.listing_uid = '{tool.listing_uid}'"
                 " AND pp.initiative_id = p_initiative_id))"
             )
         # A tool's own default: viewing as its switch is, creating off.
