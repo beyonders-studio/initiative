@@ -1097,7 +1097,8 @@ def test_reorder_item_takes_only_a_finite_position():
 async def test_reorder_single_task_returns_only_affected(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
-    """A reorder sends only the moved task and the response is slimmed to it."""
+    """A reorder sends only the moved tasks and the response is slimmed to
+    them, in position order."""
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
@@ -1116,6 +1117,7 @@ async def test_reorder_single_task_returns_only_affected(
         "project_id": a.project.id,
         "items": [
             {"id": task3.id, "task_status_id": task3.task_status_id, "position": 1.5},
+            {"id": task1.id, "task_status_id": task1.task_status_id, "position": 2.5},
         ],
     }
 
@@ -1123,9 +1125,12 @@ async def test_reorder_single_task_returns_only_affected(
 
     assert response.status_code == 200
     data = response.json()
-    # Only the moved task is returned, and its fractional position round-trips.
-    assert [t["id"] for t in data] == [task3.id]
-    assert data[0]["position"] == 1.5
+    # Only the moved tasks are returned, by position, with fractional positions
+    # round-tripped.
+    assert [(t["id"], t["position"]) for t in data] == [
+        (task3.id, 1.5),
+        (task1.id, 2.5),
+    ]
 
 
 async def test_reorder_rebalances_on_precision_exhaustion(

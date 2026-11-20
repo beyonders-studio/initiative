@@ -115,7 +115,18 @@ async def test_dismissing_removes_it_from_the_next_fetch(
         f"/api/v1/announcements/{key}/dismiss", headers=reader_headers
     )
     assert dismissed.status_code == 204
-    # Seeing it again does not undo the dismissal.
+
+    async def archive() -> list[dict]:
+        listed = await client.get(
+            "/api/v1/announcements",
+            headers=reader_headers,
+            params={"include_dismissed": True},
+        )
+        return listed.json()["items"]
+
+    dismissed_at = (await archive())[0]["dismissed_at"]
+    assert dismissed_at is not None
+    # Seeing it again neither undoes the dismissal nor moves its date.
     seen_again = await client.post(
         f"/api/v1/announcements/{key}/seen", headers=reader_headers
     )
@@ -123,13 +134,9 @@ async def test_dismissing_removes_it_from_the_next_fetch(
 
     after = await client.get("/api/v1/announcements", headers=reader_headers)
     assert after.json()["items"] == []
-    archive = await client.get(
-        "/api/v1/announcements",
-        headers=reader_headers,
-        params={"include_dismissed": True},
-    )
-    assert [item["title"] for item in archive.json()["items"]] == ["Board view is new"]
-    assert archive.json()["items"][0]["dismissed_at"] is not None
+    assert [(item["title"], item["dismissed_at"]) for item in await archive()] == [
+        ("Board view is new", dismissed_at)
+    ]
 
 
 async def test_a_notice_that_asks_for_two_dismissals_survives_the_first(

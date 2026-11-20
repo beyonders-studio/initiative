@@ -197,6 +197,9 @@ async def test_envelope_import_roundtrips_calendar(client, acting_user, session)
     )
     await switch_tools(session, a.initiative, {Tool.calendar: True})
     calendar = await create_calendar(session, a.initiative, a.user, name="Raid Nights")
+    await assign_tag(
+        session, calendar, await create_tag(session, a.guild, name="Raids"), commit=True
+    )
     zero = await create_calendar_event(
         session, calendar, a.user, title="Session Zero", recurrence="RRULE:FREQ=WEEKLY"
     )
@@ -230,6 +233,8 @@ async def test_envelope_import_roundtrips_calendar(client, acting_user, session)
         await session.exec(select(Calendar).where(Calendar.initiative_id == target.id))
     ).one()
     assert imported_calendar.name == "Raid Nights"
+    await tags_service.annotate_tags(session, [imported_calendar])
+    assert [tag.name for tag in annotated_tags(imported_calendar)] == ["Raids"]
     imported = list(
         await session.exec(
             select(CalendarEvent).where(

@@ -69,8 +69,9 @@ def test_schema_fixture_survives_normalization() -> None:
 
 
 def test_hidden_false_is_not_stored() -> None:
-    """Only the flag being set means anything, so ``false`` leaves nothing
-    behind rather than filling every saved workbook with noise."""
+    """Only the flag being set means anything: ``true`` stays on its line,
+    and ``false`` leaves nothing behind rather than filling every saved
+    workbook with noise."""
     normalized = normalize_spreadsheet_content(
         {
             "schema_version": 3,
@@ -83,14 +84,16 @@ def test_hidden_false_is_not_stored() -> None:
                     "columns": {
                         "0": {"hidden": False},
                         "1": {"hidden": False, "width": 90},
+                        "4": {"hidden": True},
                     },
+                    "rows": {"9": {"hidden": True, "height": 30}},
                 }
             ],
         }
     )
-    columns = normalized["sheets"][0]["columns"]
-    assert "0" not in columns
-    assert columns["1"] == {"width": 90}
+    sheet = normalized["sheets"][0]
+    assert sheet["columns"] == {"1": {"width": 90}, "4": {"hidden": True}}
+    assert sheet["rows"] == {"9": {"hidden": True, "height": 30}}
 
 
 def test_a_workbook_keeps_one_sheet_on_show() -> None:

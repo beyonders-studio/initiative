@@ -22,16 +22,18 @@ from app.testing import as_role, create_user
 
 
 @pytest.mark.parametrize(
-    "table",
+    ("table", "column"),
     [
-        "auth_sessions",
-        "auth_providers",
-        "auth_provider_secrets",
-        "user_api_keys",
-        "user_tokens",
+        ("auth_sessions", "refresh_token_hash"),
+        ("auth_providers", "id"),
+        ("auth_provider_secrets", "client_secret_encrypted"),
+        ("user_api_keys", "token_hash"),
+        ("user_tokens", "token"),
     ],
 )
-async def test_a_system_engine_table_is_refused_to_every_request_role(session, table):
+async def test_a_system_engine_table_is_refused_to_every_request_role(
+    session, table, column
+):
     user = await create_user(session)
     roles = (
         "app_user",
@@ -40,7 +42,7 @@ async def test_a_system_engine_table_is_refused_to_every_request_role(session, t
         *(role_name(platform_tier(tier)) for tier in UserRole),
     )
     for role in roles:
-        for statement in (f"SELECT * FROM {table}", f"DELETE FROM {table}"):
+        for statement in (f"SELECT {column} FROM {table}", f"DELETE FROM {table}"):
             async with as_role(session, role, user.id):
                 with pytest.raises(DBAPIError):
                     async with session.begin_nested():

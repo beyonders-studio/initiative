@@ -73,13 +73,18 @@ async def test_archived_work_and_templates_are_left_out_included_or_all_there_is
     client, session, acting_user
 ):
     actor, _, _, shelved = await an_initiative(session, acting_user)
+    # A second shelved task, so the archived and template groups differ in size.
+    await create_task(session, shelved)
     archived = await client.post(
         actor.g(f"/archive/project/{shelved.id}"), headers=actor.headers
     )
     assert archived.status_code == 200, archived.text
 
-    assert await count_tasks(client, actor, []) == [[4]]
-    for condition, only in ((NOT_ARCHIVED, False), (NOT_TEMPLATE, True)):
-        assert await count_tasks(client, actor, [condition]) == [[3]]
+    assert await count_tasks(client, actor, []) == [[5]]
+    for condition, only, kept, left_out in (
+        (NOT_ARCHIVED, False, 3, 2),
+        (NOT_TEMPLATE, True, 4, 1),
+    ):
+        assert await count_tasks(client, actor, [condition]) == [[kept]]
         flipped = {**condition, "value": only}
-        assert await count_tasks(client, actor, [flipped]) == [[1]]
+        assert await count_tasks(client, actor, [flipped]) == [[left_out]]
