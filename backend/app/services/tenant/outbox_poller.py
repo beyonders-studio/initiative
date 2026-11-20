@@ -18,8 +18,9 @@ placement or a scope stops delivery from the next pass on.
 
 A change under a tool plug-in's tool is heard only in an initiative that tool
 is on in now: switched on there, its install placed there, switched on and
-open, as the request standing reads it (:class:`CommunityTools`, read once per
-pass). Its tables are named by its kinds, the names its routes take.
+open, as the request standing reads it (:meth:`CommunityTools.asked`, read for
+a transaction only when a change in it is under one). Its tables are named by
+its kinds, the names its routes take.
 
 That is the right granularity because of what a delivery is. An envelope is
 identifiers and changed column **names**; a consumer reads current state back
@@ -71,7 +72,7 @@ import asyncio
 import logging
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -91,9 +92,10 @@ from app.core.plugin_scopes import (
 from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.db import session as db_session
 from app.db.guild_standing import tools_on_sql
-from app.db.plugin_tools import is_plugin_kind
+from app.db.plugin_tools import is_plugin_kind, tool_set
 from app.db.request_context import SystemGuild, SystemMaintenance
-from app.db.session import session_tools, set_rls_context
+from app.db.schema_provisioning import schema_stamp, stamp_tools
+from app.db.session import set_rls_context
 from app.models.platform.plugin_install import PluginInstall
 from app.models.tenant.event_outbox import EventOutbox
 from app.models.tenant.guild_plugin import GuildPlugin
@@ -132,11 +134,12 @@ def _event_id(subscription_id: int, txn_id: int) -> str:
 @dataclass(frozen=True)
 class CommunityTools:
     """The community's tools as a pass reads them: what a change to an
-    installed tool's table is named, and where each installed tool is on."""
+    installed tool's table is named, and where the tool plug-ins' tools of
+    one transaction's changes are on (:meth:`asked`)."""
 
     tools: ToolSet = BUILTIN_TOOLS
     #: ``"<initiative>:<tool>"`` where a tool is on, as ``app.enabled_tools``
-    #: holds it for a reader reaching every initiative.
+    #: holds it, in the initiatives of the changes :meth:`asked` was given.
     on: frozenset[str] = frozenset()
 
     def name(self, resource_type: str) -> str:
@@ -150,19 +153,28 @@ class CommunityTools:
             return True
         return f"{row.initiative_id}:{row.dac_tool}" in self.on
 
+    async def asked(
+        self, session: AsyncSession, rows: Iterable[EventOutbox]
+    ) -> CommunityTools:
+        """These tools, with :attr:`on` read for ``rows``' changes under a tool
+        plug-in's tool, and nothing read where none is."""
+        initiatives = sorted(
+            {
+                row.initiative_id
+                for row in rows
+                if row.initiative_id and row.dac_tool and is_plugin_kind(row.dac_tool)
+            }
+        )
+        if not initiatives:
+            return self
+        pairs = await session.scalar(
+            text(tools_on_sql(self.tools)), {"initiatives": initiatives}
+        )
+        return replace(self, on=frozenset((pairs or "").split(",")))
+
 
 #: A community with the built-in tools alone.
 BUILT_IN = CommunityTools()
-
-
-async def _community_tools(session: AsyncSession) -> CommunityTools:
-    """The community ``session`` is routed into's tools, and where each tool
-    plug-in's is on."""
-    tools = await session_tools(session)
-    if not tools.installed:
-        return CommunityTools(tools)
-    pairs = await session.scalar(text(tools_on_sql(tools)))
-    return CommunityTools(tools, frozenset((pairs or "").split(",")))
 
 
 def _event_type(row: EventOutbox, community: CommunityTools) -> str:
@@ -668,10 +680,11 @@ async def _drain_subscription(
                 .order_by(EventOutbox.id.asc())
             )
         )
+        heard = await community.asked(session, (row for row, _listing_uid in rows))
         matched = [
             (row, listing_uid)
             for row, listing_uid in rows
-            if _matches(row, subscription, reach, community)
+            if _matches(row, subscription, reach, heard)
         ]
         batch = [row for row, _listing_uid in matched]
         # An emitter is named by its install's listing, so an install that is
@@ -873,7 +886,9 @@ async def drain_guild(
         _subscribed.discard(guild_id)
         return
     _subscribed.add(guild_id)
-    community = await _community_tools(session)
+    # The set this process keeps for the schema's stamp, built where it has none.
+    stamp = await session.scalar(select(schema_stamp(guild_id)))
+    community = CommunityTools(await tool_set(session, stamp_tools(stamp)))
     for subscription_id, reach, subscriber in roster:
         try:
             subscription = await session.get(WebhookSubscription, subscription_id)

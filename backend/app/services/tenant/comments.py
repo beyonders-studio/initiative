@@ -454,10 +454,9 @@ async def _ensure_parent_access(
         # thread, as a wiki's do for its pages.
         located = locate(routed_tools(session), ctx.kind)
         assert located is not None
-        context = guild_context(session)
         tool = located.tool
-        if context is not None and (
-            f"{ctx.initiative_id}:{tool.kind}" not in context.enabled_tools
+        if guild_context(session) is not None and not await tool_on_in(
+            session, await session.get(Initiative, ctx.initiative_id), tool
         ):
             raise CommentPermissionError(
                 KindMessages.TOOL_NOT_ENABLED, params={"kind": tool.kind}

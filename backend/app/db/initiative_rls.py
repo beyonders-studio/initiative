@@ -189,12 +189,8 @@ def tool_present(kind_sql: str, write: bool) -> str:
     """Whether the tool plug-in's tool whose kind ``kind_sql`` (a SQL text
     expression) names is there for this reader to read, or to write: what its
     install's state says, for everyone the system engine is not."""
-    pair = gucs.TOOL_WRITES if write else gucs.TOOL_OPEN
-    head, tail = pair.split("{kind}")
-    return (
-        f"({_P.system} OR ({_P.this_guild}"
-        f" AND ('{head}' || {kind_sql} || '{tail}') = ANY ({_P.field('enabled_tools')})))"
-    )
+    kinds = gucs.WRITABLE_TOOLS if write else gucs.OPEN_TOOLS
+    return f"({_P.system} OR ({_P.this_guild} AND {kind_sql} = ANY ({kinds.once})))"
 
 
 def _switch_leg(tool: ToolRecord, initiative: str, write: bool = False) -> str:

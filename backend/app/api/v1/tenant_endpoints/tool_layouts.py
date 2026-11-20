@@ -121,7 +121,7 @@ async def _resolve_plugin(
         if tool_id is not None or initiative_id is None:
             raise _invalid()
         await _require_initiative(session, context, initiative_id)
-        await plugin_tool_rows.require_on(session, context, located, initiative_id)
+        await plugin_tool_rows.require_on(session, located, initiative_id)
         return _Resolved(
             Target(kind, None, initiative_id),
             _manages(context, initiative_id),
