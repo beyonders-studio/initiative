@@ -1,20 +1,12 @@
 import { useSearch } from "@tanstack/react-router";
-import {
-  CircleCheck,
-  CircleX,
-  Clock,
-  Hourglass,
-  Link2Off,
-  LogIn,
-  TriangleAlert,
-} from "lucide-react";
+import { CircleCheck, CircleX, Clock, Hourglass, LogIn, TriangleAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { LogoIcon } from "@/components/icons/LogoIcon";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 
 /**
- * How a vendor flow ended, in the seven ways it can.
+ * How a vendor flow ended, in the six ways it can.
  *
  * Initiative runs the flow and hands the person back here with one word, and
  * the sentence is written here — once, in every language this product speaks.
@@ -25,8 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/
  * owner turns a request from anybody else into an approval for one of them, so
  * nothing failed and there is nothing to retry yet. `sign_in_required` is
  * the other: the flow is finished only in the browser where the person who
- * started it is signed in. `taken` is a vendor organization already connected
- * to another community on this server, which the page does not name.
+ * started it is signed in.
  */
 const OUTCOMES = {
   connected: { icon: CircleCheck, tone: "text-emerald-600 dark:text-emerald-400" },
@@ -35,7 +26,6 @@ const OUTCOMES = {
   not_recorded: { icon: TriangleAlert, tone: "text-amber-600 dark:text-amber-400" },
   awaiting_approval: { icon: Hourglass, tone: "text-sky-600 dark:text-sky-400" },
   sign_in_required: { icon: LogIn, tone: "text-amber-600 dark:text-amber-400" },
-  taken: { icon: Link2Off, tone: "text-amber-600 dark:text-amber-400" },
 } as const;
 
 type Outcome = keyof typeof OUTCOMES;

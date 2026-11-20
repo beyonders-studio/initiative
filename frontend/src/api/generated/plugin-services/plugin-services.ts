@@ -23,6 +23,7 @@ import type {
 import type {
   HTTPValidationError,
   ListPluginServicesParams,
+  PluginPlatformConnectStart,
   PluginPublisherCreate,
   PluginPublisherRead,
   PluginPublisherUpdate,
@@ -399,11 +400,10 @@ export function useReadPluginService<
 
 /**
  * Suspend everywhere or lift, repoint either address, replace the keys,
- * make it mandatory or not, let vendor installations be shared, set the
- * vendor values, or replace a beta plug-in's communities. Turning sharing
- * off while an installation is connected to more than one community is
- * refused (409), and so is a list of communities for a plug-in that is not
- * beta; one naming a community that does not exist is refused (400).
+ * make it mandatory or not, set the vendor values, or replace a beta
+ * plug-in's communities. A list of communities for a plug-in that is not
+ * beta is refused (409); one naming a community that does not exist is
+ * refused (400).
  *
  * Vendor values the listing's vendor check reads are checked with the
  * vendor before anything is written (:mod:`~app.services.marketplace.vendor_check`):
@@ -1008,6 +1008,201 @@ export const useCompletePluginServiceVendorSetup = <
   TContext
 > => {
   return useMutation(getCompletePluginServiceVendorSetupMutationOptions(options), queryClient);
+};
+/**
+ * Start connecting one of the plug-in's community connections for every
+ * community: the vendor's address to send the operator to. Nothing is
+ * stored until the vendor sends them back. Refused (409) for a connection
+ * the platform cannot make (``for_platform``).
+ * @summary Connect Plugin Service For Every Community
+ */
+export const connectPluginServiceForEveryCommunity = (
+  registrationId: number,
+  connectionId: string,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<PluginPlatformConnectStart>(
+    {
+      url: `/api/v1/plugin-services/${registrationId}/connections/${connectionId}/connect`,
+      method: "POST",
+      signal,
+    },
+    options
+  );
+};
+
+export const getConnectPluginServiceForEveryCommunityMutationKey = () =>
+  ["connectPluginServiceForEveryCommunity"] as const;
+
+export const getConnectPluginServiceForEveryCommunityMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof connectPluginServiceForEveryCommunity>>,
+    TError,
+    ConnectPluginServiceForEveryCommunityMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof connectPluginServiceForEveryCommunity>>,
+  TError,
+  ConnectPluginServiceForEveryCommunityMutationVariables,
+  TContext
+> => {
+  const mutationKey = getConnectPluginServiceForEveryCommunityMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof connectPluginServiceForEveryCommunity>>,
+    ConnectPluginServiceForEveryCommunityMutationVariables
+  > = (props) => {
+    const { registrationId, connectionId } = props ?? {};
+
+    return connectPluginServiceForEveryCommunity(registrationId, connectionId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ConnectPluginServiceForEveryCommunityMutationResult = NonNullable<
+  Awaited<ReturnType<typeof connectPluginServiceForEveryCommunity>>
+>;
+
+export type ConnectPluginServiceForEveryCommunityMutationError = ErrorType<HTTPValidationError>;
+export type ConnectPluginServiceForEveryCommunityMutationVariables = {
+  registrationId: number;
+  connectionId: string;
+};
+
+/**
+ * @summary Connect Plugin Service For Every Community
+ */
+export const useConnectPluginServiceForEveryCommunity = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof connectPluginServiceForEveryCommunity>>,
+      TError,
+      ConnectPluginServiceForEveryCommunityMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof connectPluginServiceForEveryCommunity>>,
+  TError,
+  ConnectPluginServiceForEveryCommunityMutationVariables,
+  TContext
+> => {
+  return useMutation(getConnectPluginServiceForEveryCommunityMutationOptions(options), queryClient);
+};
+/**
+ * End a connection the platform made for every community: each
+ * community reads its own again.
+ * @summary Disconnect Plugin Service For Every Community
+ */
+export const disconnectPluginServiceForEveryCommunity = (
+  registrationId: number,
+  connectionId: string,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<PluginServiceRegistrationRead>(
+    {
+      url: `/api/v1/plugin-services/${registrationId}/connections/${connectionId}`,
+      method: "DELETE",
+      signal,
+    },
+    options
+  );
+};
+
+export const getDisconnectPluginServiceForEveryCommunityMutationKey = () =>
+  ["disconnectPluginServiceForEveryCommunity"] as const;
+
+export const getDisconnectPluginServiceForEveryCommunityMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof disconnectPluginServiceForEveryCommunity>>,
+    TError,
+    DisconnectPluginServiceForEveryCommunityMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof disconnectPluginServiceForEveryCommunity>>,
+  TError,
+  DisconnectPluginServiceForEveryCommunityMutationVariables,
+  TContext
+> => {
+  const mutationKey = getDisconnectPluginServiceForEveryCommunityMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof disconnectPluginServiceForEveryCommunity>>,
+    DisconnectPluginServiceForEveryCommunityMutationVariables
+  > = (props) => {
+    const { registrationId, connectionId } = props ?? {};
+
+    return disconnectPluginServiceForEveryCommunity(registrationId, connectionId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DisconnectPluginServiceForEveryCommunityMutationResult = NonNullable<
+  Awaited<ReturnType<typeof disconnectPluginServiceForEveryCommunity>>
+>;
+
+export type DisconnectPluginServiceForEveryCommunityMutationError = ErrorType<HTTPValidationError>;
+export type DisconnectPluginServiceForEveryCommunityMutationVariables = {
+  registrationId: number;
+  connectionId: string;
+};
+
+/**
+ * @summary Disconnect Plugin Service For Every Community
+ */
+export const useDisconnectPluginServiceForEveryCommunity = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof disconnectPluginServiceForEveryCommunity>>,
+      TError,
+      DisconnectPluginServiceForEveryCommunityMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof disconnectPluginServiceForEveryCommunity>>,
+  TError,
+  DisconnectPluginServiceForEveryCommunityMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getDisconnectPluginServiceForEveryCommunityMutationOptions(options),
+    queryClient
+  );
 };
 /**
  * Every publisher of plug-in services on this deployment (``plugins.manage``).

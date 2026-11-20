@@ -50,6 +50,7 @@ from typing import Any
 from app.core.encryption import SALT_PLUGIN_CONFIG, decrypt_field, encrypt_field
 from app.core.errors import CodedError
 from app.core.messages import GuildPluginMessages
+from app.services.marketplace import registration_lookup
 from app.services.marketplace.manifest_values import is_unique_setting_value
 
 __all__ = [
@@ -69,15 +70,19 @@ __all__ = [
     "decrypt_connection_secrets",
     "definition_connections",
     "definition_settings",
+    "effective_config",
+    "effective_secrets",
     "guild_connection_ref",
     "has_value_map",
     "install_settings",
     "is_satisfied",
     "mint_connection_ref",
     "needs_configuration",
+    "platform_held",
     "prune_to_definition",
     "runs_vendor_flow",
     "setting_value",
+    "static_maps",
     "token_of",
     "without_tokens",
 ]
@@ -526,28 +531,36 @@ def is_satisfied(
 
 
 def installation_meets(
-    plugin: Any, requires: Any, *, members_connect: bool = False
+    plugin: Any,
+    requires: Any,
+    *,
+    members_connect: bool = False,
+    platform: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> bool:
     """Whether a call the installation makes meets ``requires``: the
     community's own connections it names hold a value, every one for
     ``all_of`` and one for ``any_of``. A member's connection never answers the
     installation. With ``members_connect``, one it names counts as held: it is
     the member's to make when they run what asks for it, and they are asked to
-    then. Absent, it asks nothing."""
+    then. One the platform holds (``platform``, :func:`platform_held`) is
+    held. Absent, it asks nothing."""
     if not isinstance(requires, dict):
         return True
     for key, check in (("all_of", all), ("any_of", any)):
         terms = requires.get(key)
         if isinstance(terms, list):
             return check(
-                _community_connection_holds(plugin, term, members_connect)
+                _community_connection_holds(plugin, term, members_connect, platform)
                 for term in terms
             )
     return True
 
 
 def _community_connection_holds(
-    plugin: Any, connection_id: Any, members_connect: bool
+    plugin: Any,
+    connection_id: Any,
+    members_connect: bool,
+    platform: Mapping[str, Mapping[str, Any]] | None,
 ) -> bool:
     connection = (
         connection_by_id(plugin.definition, connection_id)
@@ -558,11 +571,7 @@ def _community_connection_holds(
         return False
     if connection.get("scope") == "interactive":
         return members_connect
-    return is_satisfied(
-        connection,
-        (plugin.config or {}).get(connection_id) or {},
-        (plugin.secret_fields or {}).get(connection_id) or {},
-    )
+    return is_satisfied(connection, *static_maps(plugin, connection_id, platform))
 
 
 def needs_configuration(
@@ -593,11 +602,70 @@ def needs_configuration(
     return False
 
 
-def config_state(plugin: Any) -> ConfigState:
-    """The combined answer the settings page shows for an install."""
+#: What an install reads the platform's connections as when none is held.
+_NONE_HELD: Mapping[str, Mapping[str, Any]] = {}
+
+
+async def platform_held(plugin: Any) -> Mapping[str, Mapping[str, Any]]:
+    """The community connections of ``plugin`` the platform connected for
+    every community, by connection id, each as a stored connection reads.
+    Only a declarative plug-in's can be: Initiative runs everything it does
+    with them."""
+    if not registration_lookup.is_declarative(plugin.definition):
+        return _NONE_HELD
+    snapshot = await registration_lookup.declarative_registration(plugin.listing_uid)
+    return snapshot.platform_connections if snapshot is not None else _NONE_HELD
+
+
+def effective_config(
+    plugin: Any, platform: Mapping[str, Mapping[str, Any]] | None
+) -> dict[str, Any]:
+    """The install's stored plain map, each connection the platform holds
+    read as the platform's in place of the community's own."""
+    return {
+        **(plugin.config or {}),
+        **{key: dict(values) for key, values in (platform or {}).items()},
+    }
+
+
+def effective_secrets(
+    plugin: Any, platform: Mapping[str, Mapping[str, Any]] | None
+) -> dict[str, Any]:
+    """The install's stored secrets map, without the community's own for a
+    connection the platform holds: the platform's holds none."""
+    return {
+        key: values
+        for key, values in (plugin.secret_fields or {}).items()
+        if key not in (platform or {})
+    }
+
+
+def static_maps(
+    plugin: Any,
+    connection_id: str,
+    platform: Mapping[str, Mapping[str, Any]] | None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """One community connection's stored plain map and secrets map: the
+    platform's when it holds the connection, the community's own otherwise."""
+    held = (platform or {}).get(connection_id)
+    if held is not None:
+        return dict(held), {}
+    return (
+        dict((plugin.config or {}).get(connection_id) or {}),
+        dict((plugin.secret_fields or {}).get(connection_id) or {}),
+    )
+
+
+def config_state(
+    plugin: Any, platform: Mapping[str, Mapping[str, Any]] | None = None
+) -> ConfigState:
+    """The combined answer the settings page shows for an install, with the
+    connections the platform holds (:func:`platform_held`) read as made."""
     return ConfigState(
         needs_config=needs_configuration(
-            plugin.definition, plugin.config, plugin.secret_fields
+            plugin.definition,
+            effective_config(plugin, platform),
+            effective_secrets(plugin, platform),
         ),
         state=plugin.config_state
         if plugin.config_state in CONFIG_STATES

@@ -65,7 +65,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.config import settings
 from app.core.encryption import SALT_PLUGIN_CONFIG, decrypt_field, encrypt_field
 from app.core.errors import CodedError
-from app.core.messages import GuildPluginMessages, PluginChannelMessages
+from app.core.messages import (
+    GuildPluginMessages,
+    PluginChannelMessages,
+    PluginServiceMessages,
+)
 from app.core.rules import SURFACE_PLUGINS
 from app.core.security import PluginPlatformSigningNotConfiguredError
 from app.db import cohorts
@@ -88,6 +92,7 @@ from app.services.auth.oidc._http import (
 )
 from app.services.marketplace import (
     expressions,
+    platform_connections,
     plugin_installs,
     registration_lookup,
 )
@@ -151,9 +156,11 @@ __all__ = [
     "forget_minted",
     "landing_url",
     "mint_jwt_bearer",
+    "platform_token",
     "refresh_tokens",
     "seal_tokens",
     "setup_url",
+    "start_platform_url",
     "start_url",
     "unseal_tokens",
     "webhook_url",
@@ -175,8 +182,6 @@ OUTCOMES: frozenset[str] = frozenset(
         "not_recorded",
         "awaiting_approval",
         "sign_in_required",
-        # Another community on this deployment holds the vendor installation.
-        "taken",
     }
 )
 
@@ -443,6 +448,94 @@ async def start_url(
         url = _render_url(install, vendor=vendor, fields=fields)
         return _with_query(url, [("state", encode_state(state))])
     return authorize_url(flow, vendor=vendor, fields=fields, state=state)
+
+
+async def start_platform_url(
+    *, public_id: str, connection_id: str, started_by: int
+) -> str:
+    """Where to send the operator connecting a community connection for every
+    community (:mod:`app.services.marketplace.platform_connections`): the
+    vendor's install page for an installation-style flow, its authorization
+    endpoint otherwise."""
+    held = await platform_connections.load(public_id, connection_id)
+    if held is None:
+        raise ConnectionFlowError(
+            PluginServiceMessages.CONNECTION_NOT_FOR_PLATFORM, status_code=409
+        )
+    vendor = await load_vendor_values(public_id)
+    install = held.flow.get("install_url")
+    state = new_state(
+        guild_id=None,
+        install_id=None,
+        connection_id=connection_id,
+        user_id=None,
+        started_by=started_by,
+        return_path=return_path(public_id, connection_id),
+        pkce=held.flow.get("pkce") is not False,
+        phase="install" if install else "authorize",
+        public_id=public_id,
+    )
+    if install:
+        url = _render_url(install, vendor=vendor, fields=held.fields)
+        return _with_query(url, [("state", encode_state(state))])
+    return authorize_url(held.flow, vendor=vendor, fields=held.fields, state=state)
+
+
+async def _complete_platform(state: ConnectionFlowState, code: str) -> str:
+    """The platform's connection: the code exchanged, the flow's declarative
+    ``after_connect`` asked, and what it answered kept for every community.
+    Answers the landing outcome."""
+    from app.services.marketplace import declarative
+
+    held = await platform_connections.load(state.public_id, state.connection_id)
+    if held is None:
+        return "not_recorded"
+    try:
+        vendor = await load_vendor_values(held.public_id)
+        tokens = await exchange_code(
+            held.flow,
+            vendor=vendor,
+            fields=held.fields,
+            code=code,
+            verifier=state.verifier,
+        )
+    except VendorRefusedError as exc:
+        logger.info("platform connection: the vendor refused the code (%s)", exc)
+        return "refused"
+    except (ConnectionFlowError, OidcHttpError) as exc:
+        logger.warning("platform connection: the code exchange failed (%s)", exc)
+        return "not_recorded"
+    values: dict[str, Any] = {}
+    label: str | None = None
+    declared = held.flow.get("after_connect")
+    if isinstance(declared, dict):
+        params = (
+            {"installation_id": state.installation_id}
+            if state.installation_id is not None
+            else {}
+        )
+        try:
+            answer = await declarative.after_connect(
+                held.definition,
+                declared,
+                params=params,
+                access_token=tokens.access_token,
+                installed={"settings": {}, "aliases": {}},
+            )
+        except HookError as exc:
+            logger.warning("platform connection: after_connect failed (%s)", exc)
+            return "not_recorded"
+        if answer.refused:
+            logger.info("platform connection: after_connect refused (%s)", answer.code)
+            return "refused"
+        values, label = answer.values, answer.account_label
+    return await platform_connections.store(
+        held.public_id,
+        state.connection_id,
+        values=values,
+        account_label=label,
+        actor_user_id=state.started_by,
+    )
 
 
 # --- tokens -----------------------------------------------------------------
@@ -1035,6 +1128,10 @@ async def _person_outcome(
     """
     if signed_in is None or signed_in != state.started_by:
         return "sign_in_required"
+    if state.guild_id is None:
+        # The platform's connection, for every community: what the plug-in
+        # services page asks of whoever started it.
+        return None if await platform_connections.may_connect(signed_in) else "refused"
     if state.user_id is None:
         async with cohorts.system_session(state.guild_id) as session:
             await set_rls_context(session, Unattributed())
@@ -1085,15 +1182,24 @@ async def complete_setup(
     if claimed is None:
         return landing_url(state.return_path, "not_recorded")
 
-    async with cohorts.system_session(state.guild_id) as session:
-        loaded = await _load_for_flow(session, state)
-        if loaded is None:
+    if state.guild_id is None:
+        held = await platform_connections.load(state.public_id, state.connection_id)
+        if held is None:
             return landing_url(state.return_path, "not_recorded")
-        fields = without_tokens((loaded.plugin.config or {}).get(state.connection_id))
+        flow, public_id, fields = held.flow, held.public_id, held.fields
+    else:
+        async with cohorts.system_session(state.guild_id) as session:
+            loaded = await _load_for_flow(session, state)
+            if loaded is None:
+                return landing_url(state.return_path, "not_recorded")
+            fields = without_tokens(
+                (loaded.plugin.config or {}).get(state.connection_id)
+            )
+        flow, public_id = loaded.flow, loaded.public_id
     try:
-        vendor = await load_vendor_values(loaded.public_id)
+        vendor = await load_vendor_values(public_id)
         return authorize_url(
-            loaded.flow,
+            flow,
             vendor=vendor,
             fields=fields,
             state=state.authorizing(claimed),
@@ -1123,6 +1229,8 @@ async def complete_callback(
         return landing_url(state.return_path, outcome)
     if error or not code:
         return landing_url(state.return_path, "refused")
+    if state.guild_id is None:
+        return landing_url(state.return_path, await _complete_platform(state, code))
 
     async with cohorts.system_session(state.guild_id) as session:
         loaded = await _load_for_flow(session, state)
@@ -1307,12 +1415,10 @@ async def _store_community(
 ) -> str:
     """The community's own connection: the managed values, and the token set
     unless the flow is installation-style, whose person's token is not kept.
-    Answers the landing outcome.
-
-    The route the values give the install's vendor webhooks is claimed in the
-    install index before anything is stored, and nothing is stored when
-    another community holds it (``taken``). A store that fails after the claim
-    has the index sweep write the row again from what the community holds."""
+    Answers the landing outcome. The install's row in the install index is
+    written with them, while the install is held, so the vendor's webhooks
+    reach it; a store that fails after it has the index sweep write the row
+    again from what the community holds."""
     plugin = await guild_plugins_service.lock_install(session, plugin_id)
     if plugin is None:
         return "not_recorded"
@@ -1329,12 +1435,8 @@ async def _store_community(
     )
     if tokens is not None:
         config, secrets = seal_tokens(tokens, config=config, secrets=secrets)
-    entries = _replace_entry(plugin.config, connection_id, config)
-    route = plugin_installs.hook_route(plugin.definition, entries)
-    if not await plugin_installs.claim(guild_id, plugin, route):
-        return "taken"
     try:
-        plugin.config = entries
+        plugin.config = _replace_entry(plugin.config, connection_id, config)
         plugin_config_service.guild_connection_ref(plugin, connection_id)
         plugin.config_state = "unverified"
         plugin.config_state_detail = None
@@ -1343,10 +1445,11 @@ async def _store_community(
         await guild_plugins_service.store_secrets(
             session, plugin, _replace_entry(all_secrets, connection_id, secrets)
         )
+        # Written while the install is held, so two connects write their
+        # routes in the order they store their values.
+        await plugin_installs.record(guild_id, plugin)
         await session.commit()
     except Exception:
-        # The route was claimed for values that were not stored: the index
-        # sweep writes the row again from what the community holds.
         await session.rollback()
         await _arm_index_sweep(session)
         raise
@@ -1364,7 +1467,7 @@ def _replace_entry(
 
 async def _arm_index_sweep(session: AsyncSession) -> None:
     """Have the index sweep write the install's row again from what the
-    community holds, after a route was claimed for values not stored."""
+    community holds, after a route was written for values not stored."""
     await session.exec(
         text("SELECT arm_timer(:kind, now())").bindparams(
             kind=plugin_installs.INDEX_SWEEP
@@ -1610,13 +1713,6 @@ async def check_typed(
             GuildPluginMessages.CONNECTION_NOT_CHECKED, status_code=409
         )
     entries = _replace_entry(plugin.config, typed.connection_id, config)
-    if not await plugin_installs.claim(
-        guild_id, plugin, plugin_installs.hook_route(plugin.definition, entries)
-    ):
-        await _not_kept(session, typed, config, secrets)
-        raise plugin_config_service.PluginConfigError(
-            GuildPluginMessages.CONNECTION_TAKEN, status_code=409
-        )
     try:
         before = (dict(plugin.config or {}), dict(all_secrets))
         if any(typed.held):
@@ -1645,6 +1741,7 @@ async def check_typed(
             connection_ids=[typed.connection_id],
             actor_user_id=actor_user_id,
         )
+        await plugin_installs.record(guild_id, plugin)
         await session.commit()
     except Exception:
         await session.rollback()
@@ -1814,6 +1911,23 @@ async def member_token(
     return renewed
 
 
+async def platform_token(
+    public_id: str, connection: Mapping[str, Any], fields: Mapping[str, Any]
+) -> TokenSet:
+    """The token of a connection the platform made for every community,
+    minted from the vendor values and its ``fields``, and shared by every
+    community while it is reused."""
+    spec = token_of(connection)
+    if spec is None or spec.get("type") != "jwt_bearer":
+        raise ConnectionFlowError(PluginChannelMessages.CONNECTION_NO_TOKEN)
+    return await mint_jwt_bearer(
+        spec,
+        vendor=await load_vendor_values(public_id),
+        fields=fields,
+        cache_key=("platform", public_id, str(connection.get("id"))),
+    )
+
+
 async def community_token(
     session: AsyncSession,
     *,
@@ -1822,7 +1936,8 @@ async def community_token(
     connection_id: str,
     guild_id: int,
 ) -> TokenSet:
-    """The community connection's access token: minted for a ``jwt_bearer``
+    """The community connection's access token: the platform's when it holds
+    the connection (:func:`platform_token`), minted for a ``jwt_bearer``
     connection, or its stored token set, refreshed when it is about to expire.
 
     A connection changed while the vendor was asked answers as it stands now,
@@ -1834,6 +1949,9 @@ async def community_token(
     if connection is None:
         raise ConnectionFlowError(PluginChannelMessages.CONNECTION_NOT_FOUND, 404)
     spec = token_of(connection)
+    held = (await plugin_config_service.platform_held(plugin)).get(connection_id)
+    if held is not None:
+        return await platform_token(public_id, connection, without_tokens(held))
     if spec is not None and spec.get("type") == "jwt_bearer":
         vendor = await load_vendor_values(public_id)
         return await mint_jwt_bearer(

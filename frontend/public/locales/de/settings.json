@@ -1175,7 +1175,6 @@
     "operationsOnlyHelp": "Nur die Betriebs-Community kann es finden und installieren. Kopien, die in einer anderen Community installiert sind, funktionieren nicht mehr. Es wird nichts gelöscht.",
     "operationsMandatoryBadge": "In der Betriebs-Community",
     "operationsMandatoryHelp": "Zusammen mit „In jeder Community installieren“ wird es nur in der Betriebs-Community installiert, und deren Administratorinnen und Administratoren können es weder entfernen noch abschalten.",
-    "sharedRoutesHelp": "Erlaubt, dass eine Installation beim Anbieter, etwa eine GitHub-Organisation, mit mehreren Communities auf diesem Server verbunden wird. Ausschalten lässt es sich, sobald jede Installation mit nur einer Community verbunden ist.",
     "keysTitle": "Signaturschlüssel",
     "keysHelp": "Die öffentlichen Schlüssel, mit denen dieses Plug-in seine Nachweise für Zugriffstoken signiert. Das Plug-in ist erst aktiv, wenn es einen eingefügten Schlüsselsatz oder eine Schlüsselsatz-Adresse hat. Beides ist auch möglich.",
     "jwksLabel": "Eingefügter Schlüsselsatz (JWKS)",
@@ -1223,9 +1222,34 @@
     "vendorSetupTitle": "GitHub App erstellen",
     "vendorSetupHelp": "GitHub öffnet sich mit den Berechtigungen und Ereignissen dieses Plug-ins und den Adressen von Initiative. Bestätige dort, und GitHub schickt die Werte der neuen App hierher zurück, sodass du keinen davon tippen oder kopieren musst.",
     "vendorSetupHelpReplace": "Die Werte sind gesetzt. Eine neue GitHub App ersetzt sie durch die Werte der neuen App.",
-    "vendorSetupOrganizationLabel": "GitHub-Organisation",
-    "vendorSetupOrganizationPlaceholder": "Optional",
-    "vendorSetupOrganizationHelp": "Die Organisation, der die neue App gehört. Leer lassen, um sie unter deinem eigenen GitHub-Konto zu erstellen.",
+    "platformConnections": {
+      "title": "Für jede Community verbinden",
+      "help": "Verbinde ein Konto einmal, und jede Community mit diesem Plug-in nutzt es. Solange es verbunden ist, können Communities es weder ändern noch trennen. Bleibt es unverbunden, verbindet jede Community ihr eigenes.",
+      "connect": "Für jede Community verbinden",
+      "connecting": "Wird geöffnet…",
+      "connectedTo": "Für jede Community mit {{account}} verbunden",
+      "notConnected": "Nicht verbunden. Jede Community verbindet ihr eigenes.",
+      "removed": "Beim Anbieter entfernt",
+      "needsVendor": "Lege zuerst oben die Werte des Anbieters fest.",
+      "disconnect": "Trennen",
+      "disconnectTitle": "{{name}} für jede Community trennen?",
+      "disconnectHelp": "Jede Community mit diesem Plug-in nutzt dieses Konto nicht mehr. Communities, die vorher ihr eigenes verbunden hatten, kehren dazu zurück; die übrigen müssen eines verbinden.",
+      "connectError": "Das Verbinden konnte nicht gestartet werden.",
+      "disconnectError": "Konnte nicht getrennt werden."
+    },
+    "vendorSetupOwnerLabel": "Wem gehört die GitHub-App?",
+    "vendorSetupOwner": {
+      "account": {
+        "label": "Deinem GitHub-Konto",
+        "help": "Das Konto, mit dem du bei GitHub angemeldet bist, besitzt sie."
+      },
+      "organization": {
+        "label": "Einer GitHub-Organisation",
+        "help": "Eine Organisation, deren Inhaber du bist, besitzt sie, damit sie nicht vom Konto einer einzelnen Person abhängt."
+      }
+    },
+    "vendorSetupOrganizationLabel": "Name der Organisation",
+    "vendorSetupOrganizationHelp": "So, wie er in ihrer Adresse steht: github.com/<name>.",
     "vendorSetupCreate": "GitHub App erstellen",
     "vendorSetupStarting": "GitHub wird geöffnet…",
     "vendorSetupError": "Die Einrichtung bei GitHub konnte nicht gestartet werden.",
@@ -1250,7 +1274,6 @@
     "allowedOriginsHelp": "Eine pro Zeile. Leer lassen, um nur die Herkunft der Browser-Adresse zu erlauben.",
     "allowedOriginsHelpEdit": "Eine pro Zeile. Leer lassen, um die aktuellen Herkünfte beizubehalten.",
     "mandatoryLabel": "In jeder Community installieren",
-    "sharedRoutesLabel": "Installationen beim Anbieter teilen",
     "created": "Plug-in-Dienst registriert.",
     "saved": "Plug-in-Dienst aktualisiert.",
     "deleted": "Plug-in-Dienst gelöscht.",

@@ -113,7 +113,6 @@ export const PluginServicePage = () => {
         data: {
           ...placement,
           mandatory: values.mandatory,
-          shared_routes: values.sharedRoutes,
           // The whole list, replacing the one stored; only a beta has one.
           ...(registration.availability === PluginAvailability.beta
             ? { beta_community_ids: values.betaCommunities.map((community) => community.id) }

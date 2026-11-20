@@ -107,6 +107,7 @@
     "cleared": "Zugangsdaten gelöscht.",
     "memberSet": "Eine Community-Administration hat das eingerichtet.",
     "memberNotSet": "Eine Community-Administration muss das noch einrichten.",
+    "platformExplainer": "Der Betreiber dieses Servers hat dies für jede Community verbunden, es ist hier also einsatzbereit. Nur er kann es ändern oder trennen.",
     "communityFlowExplainer": "Diese wird beim Anbieter erteilt statt eingetippt. Beim Verbinden öffnet sich dessen Installationsseite, wo du das Konto wählst und was dieses Plug-in sehen darf.",
     "personalExplainer": "Hier meldest du dich als du selbst an, deshalb verbindet jedes Mitglied sein eigenes Konto. Deins sieht sonst niemand.",
     "connect": "Verbinden",
@@ -229,7 +230,7 @@
     },
     "refused": {
       "title": "Nicht verbunden",
-      "body": "Der andere Dienst hat die Anmeldung nicht abgeschlossen. Hier hat sich nichts geändert – versuche es in den Einstellungen des Plug-ins erneut."
+      "body": "Die Verbindung wurde abgelehnt: Der andere Dienst hat die Anmeldung nicht abgeschlossen, oder das Konto gehört nicht dir (bei einer Organisation musst du einer ihrer Inhaber sein). Hier hat sich nichts geändert – versuche es in den Einstellungen des Plug-ins erneut."
     },
     "expired": {
       "title": "Dieser Link ist abgelaufen",
@@ -246,10 +247,6 @@
     "sign_in_required": {
       "title": "Zum Abschließen anmelden",
       "body": "Schließe die Verbindung in dem Browser ab, in dem du bei Initiative angemeldet bist, als die Person, die sie begonnen hat."
-    },
-    "taken": {
-      "title": "Bereits anderswo verbunden",
-      "body": "Diese Organisation ist bereits mit einer anderen Community auf diesem Server verbunden, deshalb hat sich hier nichts geändert. Um sie hier zu verbinden, trenne sie zuerst dort, oder entferne die App beim anderen Dienst aus der Organisation und verbinde sie danach erneut."
     },
     "closeTab": "Du kannst diesen Tab schließen."
   },

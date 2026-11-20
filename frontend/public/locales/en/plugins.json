@@ -107,6 +107,7 @@
     "cleared": "Credential cleared.",
     "memberSet": "A community admin has set this up.",
     "memberNotSet": "A community admin still has to set this up.",
+    "platformExplainer": "This server's operator connected this for every community, so it's ready to use here. Only they can change or disconnect it.",
     "communityFlowExplainer": "This one is granted at the vendor rather than typed. Connecting opens their install page, where you choose the account and what this plug-in may see.",
     "personalExplainer": "This one signs you in as yourself, so each member connects their own account. Nobody else sees yours.",
     "connect": "Connect",
@@ -229,7 +230,7 @@
     },
     "refused": {
       "title": "Not connected",
-      "body": "The other service did not complete the sign-in. Nothing changed here — try again from the plug-in's settings."
+      "body": "The connection was refused: the other service didn't finish the sign-in, or the account isn't one you control (for an organization, you need to be one of its owners). Nothing changed here — try again from the plug-in's settings."
     },
     "expired": {
       "title": "That link has expired",
@@ -246,10 +247,6 @@
     "sign_in_required": {
       "title": "Sign in to finish",
       "body": "Finish connecting in the browser where you're signed in to Initiative, as the person who started it."
-    },
-    "taken": {
-      "title": "Already connected elsewhere",
-      "body": "This organization is already connected to another community on this server, so nothing changed here. To connect it here, disconnect it there first, or remove the app from the organization at the other service and connect again."
     },
     "closeTab": "You can close this tab."
   },

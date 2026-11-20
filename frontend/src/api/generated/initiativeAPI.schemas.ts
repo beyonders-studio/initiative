@@ -4071,6 +4071,7 @@ export interface CommunityPluginConnectionRead {
   runs_flow: boolean;
   status: string | null;
   account_label: string | null;
+  platform: boolean;
   blocked: boolean;
 }
 
@@ -10144,6 +10145,28 @@ export interface PluginParamOptionsResponse {
 }
 
 /**
+ * Where to send the operator to connect it.
+ */
+export interface PluginPlatformConnectStart {
+  connect_url: string;
+}
+
+export type PluginPlatformConnectionReadLabel = { [key: string]: string };
+
+/**
+ * A community connection the platform can connect once for every
+ * community, and what it connected.
+ */
+export interface PluginPlatformConnectionRead {
+  connection_id: string;
+  label: PluginPlatformConnectionReadLabel;
+  connected: boolean;
+  account_label: string | null;
+  connected_at: string | null;
+  removed: boolean;
+}
+
+/**
  * Add a publisher for a prefix, unverified.
  */
 export interface PluginPublisherCreate {
@@ -10274,7 +10297,7 @@ export interface PluginServiceRegistrationRead {
   mandatory: boolean;
   availability: PluginAvailability;
   beta_communities: PluginBetaCommunityRead[];
-  shared_routes: boolean;
+  platform_connections: PluginPlatformConnectionRead[];
   suspended_at: string | null;
   source: string;
   image_digest: string | null;
@@ -10326,7 +10349,6 @@ export interface PluginServiceRegistrationUpdate {
   jwks?: PluginServiceRegistrationUpdateJwks;
   jwks_uri?: string | null;
   mandatory?: boolean | null;
-  shared_routes?: boolean | null;
   suspended?: boolean | null;
   beta_community_ids?: number[] | null;
   vendor_values?: PluginServiceRegistrationUpdateVendorValues;

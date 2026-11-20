@@ -10,7 +10,7 @@ The connection blocks are read off the *pinned* definition rather than the
 catalog, so an install describes the form it was actually configured against.
 """
 
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
@@ -159,6 +159,9 @@ class CommunityPluginConnectionRead(SanitizedBaseModel):
     #: ``connected``, ``expired`` (reconnect) or ``blocked``.
     status: str | None = None
     account_label: str | None = None
+    #: The platform connected this community connection for every community:
+    #: the community reads it as made, and connects or disconnects it no more.
+    platform: bool = False
     blocked: bool = False
 
 
@@ -642,6 +645,7 @@ def serialize_guild_plugin(
     placements: Sequence[Any] = (),
     artifacts: Sequence[dict[str, Any]] = (),
     viewer: AgeViewer,
+    platform: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> CommunityPluginRead:
     """One install as the client sees it.
 
@@ -651,10 +655,12 @@ def serialize_guild_plugin(
     resolves it once. ``placements`` are the install's ``plugin_placements`` rows,
     and ``artifacts`` what it owns at guild scope, loaded by the caller for the
     same reason. ``viewer`` is the person reading, so a surface they are too
-    young for is not offered to them.
+    young for is not offered to them. ``platform`` is the community
+    connections the platform holds for every community
+    (:func:`~app.services.tenant.plugin_config.platform_held`).
     """
     definition = plugin.definition or {}
-    state = plugin_config_service.config_state(plugin)
+    state = plugin_config_service.config_state(plugin, platform)
     age_allows = plugin_age.age_allows(definition, viewer)
     openability = surface_openability(
         plugin, placements=placements, context=context, age_allows=age_allows
@@ -665,6 +671,7 @@ def serialize_guild_plugin(
         context=context,
         age_allows=age_allows,
         frozen=context.content_read_only,
+        platform=platform,
     )
     features = definition.get("features")
     service_state = install_state or InstallState()
@@ -726,6 +733,7 @@ def serialize_connection(
     *,
     member_row: Any = None,
     holds_seat: bool = False,
+    platform: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> CommunityPluginConnectionRead:
     """One connection block for the viewer looking at it.
 
@@ -736,13 +744,15 @@ def serialize_connection(
 
     A guild-scoped connection's values go to ``holds_seat`` alone: the seat is
     who sets them, and everybody else is told only whether they are there.
+    One the platform holds (``platform``) reads as the platform's.
     """
     connection_id = connection.get("id") or ""
     scope = connection.get("scope") or "static"
 
     if scope == "static":
-        stored_config = (plugin.config or {}).get(connection_id) or {}
-        stored_secrets = (plugin.secret_fields or {}).get(connection_id) or {}
+        stored_config, stored_secrets = plugin_config_service.static_maps(
+            plugin, connection_id, platform
+        )
     else:
         stored_config = (member_row.config or {}) if member_row is not None else {}
         stored_secrets = (
@@ -785,6 +795,7 @@ def serialize_connection(
             else None
         ),
         blocked=member_row is not None and member_row.blocked_at is not None,
+        platform=scope == "static" and connection_id in (platform or {}),
     )
 
 
@@ -805,6 +816,7 @@ def serialize_guild_plugin_detail(
     viewer: AgeViewer,
     listing: Any = None,
     entitlement: CommunityPluginEntitlementRead | None = None,
+    platform: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> CommunityPluginDetail:
     """The install and its connections, from the viewer's own perspective.
 
@@ -822,6 +834,7 @@ def serialize_guild_plugin_detail(
         placements=placements,
         artifacts=artifacts,
         viewer=viewer,
+        platform=platform,
     )
     connections = [
         serialize_connection(
@@ -829,6 +842,7 @@ def serialize_guild_plugin_detail(
             connection,
             member_row=member_rows.get(connection.get("id") or ""),
             holds_seat=context.guild_seat,
+            platform=platform,
         )
         for connection in plugin_config_service.definition_connections(
             plugin.definition

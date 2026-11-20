@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **See Community calendar and Community contacts before you install them.** Their marketplace pages picture what each adds to a community, in your light or dark theme.
 - **Counter fields can show as a progress bar or a segmented clock, and open full screen.** Pick the look in the field's settings; a list draws it that way unless its layout says otherwise. On an item, the full-screen button beside a counter field opens it the way the Counters tool does, with big buttons to step it.
 - **Copy a page's link from the desktop app.** The share button beside Reload in the title bar copies the address of the page you're on, ready to open in a browser or send to someone.
+- **Connect a plug-in's account once for every community.** On a plug-in's page under Platform settings › Integrations, **Connect for every community** connects one account, such as a GitHub organization, that every community with the plug-in then uses. Communities see it as connected and can't change or disconnect it; **Disconnect** gives each community its own again.
 - **Quit the desktop app from its taskbar button on Windows.** Right-click it and choose **Quit Initiative**. Closing the window only tucks the app into the tray.
 
 ### Changed
@@ -27,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The desktop app shows you as idle only when you're away from the computer.** Working in other programs keeps you online; it used to count only what you did in Initiative's own window.
 - **Create on My Messages starts a conversation.** The button asks who to talk to, as **Start a conversation** does, instead of offering a task or a file.
 - **A plug-in whose vendor app is already set shows its values first.** Making a new app at the vendor, which would replace them, folds away under them instead of leading the page.
+- **Any number of communities can connect the same GitHub organization.** Whoever owns the organization can connect it in each community they want it in, and each one gets its updates. **Share installations between communities** is gone from a plug-in's settings.
+- **Creating the GitHub App asks who owns it.** Choose your own GitHub account or an organization you own, and give the organization's name only when you pick one.
 - **Plug-in services are a list you can search.** Platform → Integrations shows each plug-in on one line, with its art, name, version and state, a page at a time, and searches by identifier or publisher. Beta and operations-only plug-ins are tagged in colour, a plug-in whose listing the registry signed is tagged **Verified**, and one Initiative publishes is tagged **Built by Initiative**. Each plug-in opens on a page of its own, wide enough to read, where creating the GitHub App comes first and typing the values in yourself is the other way, in the order it happens at the vendor.
 - **The plug-in registry panel is one row.** Under Platform → Integrations, **Plug-in registry** shows **Get updates from the registry** with when it last updated, how many listings it holds and **Refresh now** beside the switch. A registry bundle is offered only once updates are off, and applies as soon as you drop it.
 - **Security cases say what to check, at the priority they deserve.** Each case opens with what its rule usually means and what to look at, and its task takes the rule's priority: a high rule files a high-priority task, a low one a low-priority task.
@@ -38,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A refused connection says why it may have been.** When connecting a plug-in's account is refused, the page says the account may not be one you control (for an organization, you need to be one of its owners), not only that the other service didn't finish.
 - **Events that run past midnight.** On the month calendar, an evening event that ends after midnight is shown with its start time on the day it starts, not as a bar across two days. The list says when it stops on the second day ("Until 12:30am") instead of calling that day "All day". An event that ends at midnight no longer shows on the next day.
 - **Reload in the desktop app no longer leaves a blank window.** The page reloads where you were.
 - **A whiteboard opens straight away.** Opening one could leave it loading until somebody else in it saved or you switched windows, and with nobody else in it, for good.

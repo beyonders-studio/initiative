@@ -107,6 +107,7 @@
     "cleared": "Credencial borrada.",
     "memberSet": "Un administrador de la comunidad ya la ha configurado.",
     "memberNotSet": "Un administrador de la comunidad todavía tiene que configurarla.",
+    "platformExplainer": "El operador de este servidor conectó esto para todas las comunidades, así que está listo para usarse aquí. Solo él puede cambiarlo o desconectarlo.",
     "communityFlowExplainer": "Esta se concede en el proveedor en lugar de escribirse. Al conectar se abre su página de instalación, donde eliges la cuenta y qué puede ver este complemento.",
     "personalExplainer": "Esta te identifica a ti, así que cada miembro conecta su propia cuenta. Nadie más ve la tuya.",
     "connect": "Conectar",
@@ -229,7 +230,7 @@
     },
     "refused": {
       "title": "Sin conectar",
-      "body": "El otro servicio no completó el inicio de sesión. Aquí no ha cambiado nada: inténtalo de nuevo desde los ajustes del complemento."
+      "body": "Se rechazó la conexión: el otro servicio no completó el inicio de sesión o la cuenta no es tuya (en una organización, tienes que ser uno de sus propietarios). Aquí no ha cambiado nada: inténtalo de nuevo desde los ajustes del complemento."
     },
     "expired": {
       "title": "Ese enlace ha caducado",
@@ -246,10 +247,6 @@
     "sign_in_required": {
       "title": "Inicia sesión para terminar",
       "body": "Termina de conectar en el navegador donde has iniciado sesión en Initiative, como la persona que lo empezó."
-    },
-    "taken": {
-      "title": "Ya conectada en otro sitio",
-      "body": "Esta organización ya está conectada a otra comunidad de este servidor, así que aquí no ha cambiado nada. Para conectarla aquí, desconéctala primero allí, o quita la aplicación de la organización en el otro servicio y vuelve a conectarla."
     },
     "closeTab": "Puedes cerrar esta pestaña."
   },

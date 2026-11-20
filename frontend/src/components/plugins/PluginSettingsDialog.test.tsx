@@ -40,6 +40,7 @@ const detail = {
       status: null,
       account_label: null,
       blocked: false,
+      platform: false,
     },
   ],
 } as unknown as CommunityPluginDetail;
