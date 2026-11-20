@@ -52,19 +52,21 @@ def test_a_moderator_holds_moderation_alone():
     assert capabilities_for(UserRole.member) == frozenset()
     moderator = capabilities_for(UserRole.moderator)
     support = capabilities_for(UserRole.support)
+    assert moderator == frozenset(
+        {
+            Capability.USERS_READ,
+            Capability.COMMUNITIES_READ,
+            Capability.CONTENT_MODERATE,
+            Capability.COMMUNITIES_SUSPEND,
+            Capability.ACCESS_REQUEST,
+        }
+    )
     assert {
-        Capability.CONTENT_MODERATE,
-        Capability.COMMUNITIES_SUSPEND,
-        Capability.ACCESS_REQUEST,
-    } <= moderator
-    for capability in (
         Capability.ACCESS_REQUEST_ANY,
         Capability.USERS_MANAGE,
         Capability.USERS_AGE_UNBLOCK,
         Capability.BILLING_SUPPORT,
-    ):
-        assert capability not in moderator
-        assert capability in support
+    } <= support
     assert moderator < support
 
 
