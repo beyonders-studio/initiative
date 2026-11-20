@@ -380,12 +380,16 @@ def _upgrade_schema(converted: list[int]) -> None:
     ):
         if in_use:
             _keep_rules()
-            # A counter's page someone laid out is the plug-in's counter's;
-            # its target, the group, follows with the kind columns below.
+            # What a group laid out for its counters, their lists and a
+            # counter's page, is the plug-in's counter table's under that
+            # group: named by the counter's kind, at the group's id.
+            counter = _literal(KINDS["counter"][0])
             _run(
+                "ALTER TABLE tool_layouts DROP CONSTRAINT IF EXISTS ck_tool_layouts_tool",
                 "ALTER TABLE tool_layouts DROP CONSTRAINT IF EXISTS ck_tool_layouts_kind",
-                f"UPDATE tool_layouts SET kind = {_literal(KINDS['counter'][0])}"
-                " WHERE tool = 'counter_group' AND kind = 'counter'",
+                f"UPDATE tool_layouts SET tool = {counter},"
+                f" kind = CASE kind WHEN 'counter' THEN {counter} ELSE kind END"
+                " WHERE tool = 'counter_group'",
             )
             for table, column in kind_columns:
                 mapping = {old: new for old, (new, _) in KINDS.items()}
@@ -836,10 +840,16 @@ def _downgrade_schema(converted: list[int]) -> None:
             f"UPDATE initiative_rules SET key = {_case('key', back_keys)}"
             f" WHERE install_id IS NULL AND key IN ({_listed(back_keys)})"
         )
+        # A group's counters' layouts are the group's again; the plug-in's
+        # own lists, laid out for a whole initiative, had no built-in place.
+        counter = _literal(KINDS["counter"][0])
         _run(
+            "ALTER TABLE tool_layouts DROP CONSTRAINT IF EXISTS ck_tool_layouts_tool",
             "ALTER TABLE tool_layouts DROP CONSTRAINT IF EXISTS ck_tool_layouts_kind",
-            f"UPDATE tool_layouts SET kind = 'counter'"
-            f" WHERE kind = {_literal(KINDS['counter'][0])}",
+            f"DELETE FROM tool_layouts WHERE tool = {_literal(_GROUP_KIND)}",
+            "UPDATE tool_layouts SET tool = 'counter_group',"
+            f" kind = CASE kind WHEN {counter} THEN 'counter' ELSE kind END"
+            f" WHERE tool = {counter}",
         )
         for table, column in kind_columns:
             _run(

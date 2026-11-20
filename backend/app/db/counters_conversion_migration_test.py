@@ -185,7 +185,8 @@ async def test_a_community_using_counters_keeps_them_as_the_plug_in(
         ),
         {"k": GROUP, "g": group, "i": initiative_a, "u": admin.user.id},
     )
-    # Someone laid out the group's counter page.
+    # Someone laid out the group's counter page: the counter table's page
+    # under that group.
     await (await session.connection()).execute(
         sa.text(
             f"INSERT INTO {s}.tool_layouts (initiative_id, tool, tool_id, kind,"
@@ -194,7 +195,7 @@ async def test_a_community_using_counters_keeps_them_as_the_plug_in(
         ),
         {
             "i": initiative_a,
-            "t": GROUP,
+            "t": COUNTER,
             "g": group,
             "k": COUNTER,
             "d": json.dumps({"header": [], "main": [], "side": []}),
