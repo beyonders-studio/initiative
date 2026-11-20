@@ -227,7 +227,7 @@ def _nodes(bind: Connection, table: str, column: str, kind: str, forward: bool) 
             bind.execute(
                 text(
                     f'UPDATE "{table}" SET "{column}" = CAST(:v AS {kind})'
-                    " WHERE ctid = CAST(:ctid AS tid)"
+                    " WHERE ctid = CAST(CAST(:ctid AS text) AS tid)"
                 ),
                 {"v": json.dumps(rewritten), "ctid": ctid},
             )
@@ -264,8 +264,14 @@ def _apply(forward: bool) -> None:
 
 
 def upgrade() -> None:
-    run_for_each_guild_schema(op.get_bind(), lambda: _apply(True))
+    # Each community is committed on its own; a reference already rewritten
+    # no longer matches, so running it again leaves it as it is.
+    run_for_each_guild_schema(
+        op.get_bind(), lambda: _apply(True), commit_each=op.get_context()
+    )
 
 
 def downgrade() -> None:
-    run_for_each_guild_schema(op.get_bind(), lambda: _apply(False))
+    run_for_each_guild_schema(
+        op.get_bind(), lambda: _apply(False), commit_each=op.get_context()
+    )
