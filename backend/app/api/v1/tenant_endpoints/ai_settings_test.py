@@ -36,6 +36,8 @@ async def _set_mode(client, owner, mode: str):
 
 
 async def test_platform_connection_key_never_returned(client, acting_user):
+    """Neither the operator's own reads nor a member's resolved settings carry
+    the key; the member reads only that AI is available with one."""
     owner = await acting_user()  # platform owner (config.manage)
     await _set_mode(client, owner, "platform")
 
@@ -66,22 +68,6 @@ async def test_platform_connection_key_never_returned(client, acting_user):
         assert "api_key" not in conn
         assert "api_key_encrypted" not in conn
 
-
-async def test_member_reads_that_ai_is_available_without_the_key(client, acting_user):
-    owner = await acting_user()
-    await _set_mode(client, owner, "platform")
-    await client.post(
-        PLATFORM_CONNS,
-        headers=owner.headers,
-        json={
-            "label": "Shared",
-            "provider": "openai",
-            "model": "gpt-4o",
-            "api_key": "sk-secret",
-            "is_default": True,
-        },
-    )
-
     member = await acting_user(guild_role=CommunityRole.member, initiative=True)
     r = await client.get(member.g("/settings/ai/resolved"), headers=member.headers)
     assert r.status_code == 200, r.text
@@ -90,22 +76,6 @@ async def test_member_reads_that_ai_is_available_without_the_key(client, acting_
     assert resolved["enabled"] is True
     assert resolved["has_api_key"] is True
     assert "api_key" not in resolved
-
-
-async def test_member_cannot_set_a_destination(client, acting_user):
-    """Exfil-impossible: a member has no endpoint to create a connection, so
-    they can never point a key at a destination they chose."""
-    owner = await acting_user()
-    await _set_mode(client, owner, "platform")
-    member = await acting_user(guild_role=CommunityRole.member, initiative=True)
-
-    # There is no member connection-create route.
-    r = await client.post(
-        member.g("/settings/ai/connections"),
-        headers=member.headers,
-        json={"label": "evil", "provider": "custom", "base_url": "http://evil"},
-    )
-    assert r.status_code == 403  # the seat only
 
 
 async def test_guild_admin_cannot_save_private_base_url(client, acting_user):
@@ -209,20 +179,28 @@ async def test_disabled_mode_hides_ai(client, acting_user):
 
 async def test_connecting_a_provider_is_the_seat_s(client, acting_user):
     """Which provider a community's work is sent to says what leaves it, so it
-    answers to the seat rather than to running the community."""
+    answers to the seat rather than to running the community — and a member
+    has no route to point a key at a destination they chose."""
     owner = await acting_user()
     await _set_mode(client, owner, "community")
     admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    member = await acting_user(guild_role=CommunityRole.member, guild=admin.guild)
+    connections = admin.g("/settings/ai/connections")
 
-    listed = await client.get(
-        admin.g("/settings/ai/connections"), headers=admin.headers
-    )
+    listed = await client.get(connections, headers=admin.headers)
     assert listed.status_code == 403, listed.text
 
     created = await client.post(
-        admin.g("/settings/ai/connections"),
+        connections,
         headers=admin.headers,
         json={"label": "no", "provider": "openai", "model": "gpt-4o", "api_key": "k"},
+    )
+    assert created.status_code == 403, created.text
+
+    created = await client.post(
+        connections,
+        headers=member.headers,
+        json={"label": "evil", "provider": "custom", "base_url": "http://evil"},
     )
     assert created.status_code == 403, created.text
 

@@ -10,8 +10,7 @@ What survives here from the per-tool copies these replace:
 
 - *the owner shares it* —
   ``dashboards_test.test_set_grants_replaces_sharing`` (the grantee can then
-  write, and the owner's own grant is kept);
-- *a role can be named instead of a person*;
+  write, and the owner's own grant is kept), with a person or a role;
 - *a reader cannot re-share* — the first half of
   ``calendars_test.test_set_calendar_grants_owner_only``. Its second half —
   that revoking every non-owner grant hides the row again — is already proved
@@ -66,8 +65,28 @@ async def _entity(session: AsyncSession, actor, tool: Tool):
 
 @TOOLS
 async def test_the_owner_shares_it_with_somebody(
-    client: AsyncClient, session: AsyncSession, acting_user, tool: Tool
+    client: AsyncClient, session: AsyncSession, acting_user, tool: Tool, monkeypatch
 ):
+    """A guild member who is not in the initiative reaches none of its content,
+    and the refusal is in the tool's own words. Sharing is a write on the thing
+    shared, so reading it is not enough to re-share it. The owner shares it with
+    a person, or names a role instead. Sharing decides who has the thing at
+    all, so everyone in the room is re-checked at once and the ones who remain
+    are told to refetch — with the change's name, never the new sharing
+    itself."""
+    from app.services.content_sockets import resource_room, sockets
+
+    signalled: list[tuple] = []
+    rechecked: list[tuple] = []
+
+    def _record(guild_id, signalled_tool, resource_id, event_type):
+        signalled.append((guild_id, signalled_tool, resource_id, event_type))
+
+    async def _recheck(room):
+        rechecked.append(room)
+
+    monkeypatch.setattr(sockets, "signal", _record)
+    monkeypatch.setattr(sockets, "recheck_room", _recheck)
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
     entity = await _entity(session, a, tool)
     b = await acting_user(
@@ -76,9 +95,20 @@ async def test_the_owner_shares_it_with_somebody(
         initiative=a.initiative,
         initiative_role="member",
     )
+    outsider = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
+    url = a.g(f"/{tool.route_segment}/{entity.id}/grants")
+
+    response = await client.put(url, headers=outsider.headers, json=[])
+    assert response.status_code == 404, response.text
+    assert response.json() == tool.not_found().body
 
     response = await client.put(
-        a.g(f"/{tool.route_segment}/{entity.id}/grants"),
+        url, headers=b.headers, json=[{"user_id": b.user.id, "level": "write"}]
+    )
+    assert response.status_code == 403, response.text
+
+    response = await client.put(
+        url,
         headers=a.headers,
         params={"note": "For Thursday"},
         json=[{"user_id": b.user.id, "level": "write"}],
@@ -88,6 +118,8 @@ async def test_the_owner_shares_it_with_somebody(
     assert [grant["level"] for grant in grants if grant["user_id"] == b.user.id] == [
         "write"
     ]
+    assert (a.guild.id, tool, entity.id, "permissions_changed") in signalled
+    assert rechecked == [resource_room(a.guild.id, tool.value, entity.id)]
     # The owner is kept whether or not the replacement list names them.
     assert [grant["level"] for grant in grants if grant["user_id"] == a.user.id] == [
         "owner"
@@ -95,9 +127,7 @@ async def test_the_owner_shares_it_with_somebody(
     # The person let in is told, with the note; saving the same sharing again
     # tells nobody.
     await client.put(
-        a.g(f"/{tool.route_segment}/{entity.id}/grants"),
-        headers=a.headers,
-        json=[{"user_id": b.user.id, "level": "write"}],
+        url, headers=a.headers, json=[{"user_id": b.user.id, "level": "write"}]
     )
     await drain_notices()
     told = (
@@ -112,13 +142,6 @@ async def test_the_owner_shares_it_with_somebody(
         ("write", "For Thursday")
     ]
 
-
-@TOOLS
-async def test_a_role_can_be_named_instead_of_a_person(
-    client: AsyncClient, session: AsyncSession, acting_user, tool: Tool
-):
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    entity = await _entity(session, a, tool)
     member_role = (
         await session.exec(
             select(InitiativeRoleModel).where(
@@ -127,39 +150,14 @@ async def test_a_role_can_be_named_instead_of_a_person(
             )
         )
     ).one()
-
     response = await client.put(
-        a.g(f"/{tool.route_segment}/{entity.id}/grants"),
-        headers=a.headers,
-        json=[{"role_id": member_role.id, "level": "read"}],
+        url, headers=a.headers, json=[{"role_id": member_role.id, "level": "read"}]
     )
     assert response.status_code == 200, response.text
     grants = response.json()["grants"]
     assert [
         grant["level"] for grant in grants if grant["role_id"] == member_role.id
     ] == ["read"]
-
-
-@TOOLS
-async def test_a_reader_cannot_reshare_it(
-    client: AsyncClient, session: AsyncSession, acting_user, tool: Tool
-):
-    """Sharing is a write on the thing shared, so reading it is not enough."""
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    entity = await _entity(session, a, tool)
-    b = await acting_user(
-        guild_role=CommunityRole.member,
-        guild=a.guild,
-        initiative=a.initiative,
-        initiative_role="member",
-    )
-
-    response = await client.put(
-        b.g(f"/{tool.route_segment}/{entity.id}/grants"),
-        headers=b.headers,
-        json=[{"user_id": b.user.id, "level": "write"}],
-    )
-    assert response.status_code == 403, response.text
 
 
 async def test_sharing_does_not_reach_past_the_role_gate(
@@ -196,66 +194,6 @@ async def test_sharing_does_not_reach_past_the_role_gate(
         b.g(f"/{tool.route_segment}/{entity.id}"), headers=b.headers
     )
     assert seen.status_code in (403, 404)
-
-
-@TOOLS
-async def test_someone_outside_the_initiative_gets_the_tools_not_found(
-    client: AsyncClient, session: AsyncSession, acting_user, tool: Tool
-):
-    """A guild member who is not in the initiative reaches none of its content,
-    and the refusal is in the tool's own words."""
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    entity = await _entity(session, a, tool)
-    outsider = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
-
-    response = await client.put(
-        outsider.g(f"/{tool.route_segment}/{entity.id}/grants"),
-        headers=outsider.headers,
-        json=[],
-    )
-    assert response.status_code == 404, response.text
-    assert response.json() == tool.not_found().body
-
-
-@TOOLS
-async def test_the_room_is_told_that_sharing_moved(
-    client: AsyncClient, session: AsyncSession, acting_user, tool: Tool, monkeypatch
-):
-    """Sharing decides who has the thing at all, so everyone in the room is
-    re-checked at once and the ones who remain are told to refetch — with the
-    change's name, never the new sharing itself."""
-    from app.services.content_sockets import resource_room, sockets
-
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    entity = await _entity(session, a, tool)
-    b = await acting_user(
-        guild_role=CommunityRole.member,
-        guild=a.guild,
-        initiative=a.initiative,
-        initiative_role="member",
-    )
-
-    signalled: list[tuple] = []
-    rechecked: list[tuple] = []
-
-    def _record(guild_id, signalled_tool, resource_id, event_type):
-        signalled.append((guild_id, signalled_tool, resource_id, event_type))
-
-    async def _recheck(room):
-        rechecked.append(room)
-
-    monkeypatch.setattr(sockets, "signal", _record)
-    monkeypatch.setattr(sockets, "recheck_room", _recheck)
-
-    response = await client.put(
-        a.g(f"/{tool.route_segment}/{entity.id}/grants"),
-        headers=a.headers,
-        json=[{"user_id": b.user.id, "level": "write"}],
-    )
-    assert response.status_code == 200, response.text
-
-    assert (a.guild.id, tool, entity.id, "permissions_changed") in signalled
-    assert rechecked == [resource_room(a.guild.id, tool.value, entity.id)]
 
 
 async def _assign(session: AsyncSession, actor, project, person) -> None:

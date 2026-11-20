@@ -8,273 +8,100 @@ and a bad item never blocks the good ones.
 
 from datetime import UTC, datetime
 
+import pytest
 import sqlalchemy as sa
 from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import CommunityRole
+from app.schemas.tenant.resource_grant import MAX_BULK_GRANT_ITEMS
 from app.testing import COUNTERS_UID, add_counter, install_tool_plugin
 from app.testing.factories import (
-    create_guild,
-    create_guild_membership,
-    create_initiative,
-    create_initiative_member,
     create_project,
-    create_user,
     create_wiki,
-    get_auth_headers,
 )
 
-BULK = "/api/v1/c/{guild}/resource-grants/bulk"
 
-
-def _results_by_id(body: dict) -> dict[int, str]:
-    return {r["resource_id"]: r["status"] for r in body["results"]}
-
-
-async def test_bulk_applies_grants_across_many_projects(
-    client: AsyncClient, session: AsyncSession
+async def test_bulk_applies_each_item_on_its_own(
+    client: AsyncClient, session: AsyncSession, acting_user
 ):
-    """A single bulk call shares several projects with a member — all report ``ok``
-    and the grants actually land."""
-    owner = await create_user(session, email="owner@example.com")
-    member = await create_user(session, email="member@example.com")
-    guild = await create_guild(session)
-    await create_guild_membership(session, user=owner, guild=guild)
-    await create_guild_membership(session, user=member, guild=guild)
-    initiative = await create_initiative(session, guild, owner)
-    await create_initiative_member(session, initiative, member, role_name="member")
-    p1 = await create_project(session, initiative, owner)
-    p2 = await create_project(session, initiative, owner)
-    headers = get_auth_headers(owner)
-
-    resp = await client.put(
-        BULK.format(guild=guild.id),
-        headers=headers,
-        json={
-            "items": [
-                {
-                    "resource_type": "project",
-                    "resource_id": p1.id,
-                    "grants": [{"user_id": member.id, "level": "write"}],
-                },
-                {
-                    "resource_type": "project",
-                    "resource_id": p2.id,
-                    "grants": [{"user_id": member.id, "level": "read"}],
-                },
-            ]
-        },
+    """One call shares several resources of different types, each routed to its
+    own adapter, and the grants land. A missing resource is ``not_found`` and an
+    archived one ``forbidden``, without blocking their siblings; a member who
+    cannot manage a project's sharing gets ``forbidden`` and changes nothing."""
+    owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    member = await acting_user(
+        guild=owner.guild, initiative=owner.initiative, initiative_role="member"
     )
-    assert resp.status_code == 200
-    assert _results_by_id(resp.json()) == {p1.id: "ok", p2.id: "ok"}
-
-    # The grants actually applied (visible on the project reads).
-    for pid, level in ((p1.id, "write"), (p2.id, "read")):
-        detail = await client.get(
-            f"/api/v1/c/{guild.id}/projects/{pid}", headers=headers
-        )
-        assert detail.status_code == 200
-        grants = detail.json()["grants"]
-        assert any(g["user_id"] == member.id and g["level"] == level for g in grants), (
-            grants
-        )
-
-
-async def test_bulk_dispatches_across_resource_types(
-    client: AsyncClient, session: AsyncSession
-):
-    """One request mixing a project and a wiki routes each to the
-    right adapter."""
-    owner = await create_user(session, email="owner@example.com")
-    member = await create_user(session, email="member@example.com")
-    guild = await create_guild(session)
-    await create_guild_membership(session, user=owner, guild=guild)
-    await create_guild_membership(session, user=member, guild=guild)
-    initiative = await create_initiative(session, guild, owner)
-    await create_initiative_member(session, initiative, member, role_name="member")
-    project = await create_project(session, initiative, owner)
-    wiki = await create_wiki(session, initiative, owner)
-    headers = get_auth_headers(owner)
-
-    resp = await client.put(
-        BULK.format(guild=guild.id),
-        headers=headers,
-        json={
-            "items": [
-                {
-                    "resource_type": "project",
-                    "resource_id": project.id,
-                    "grants": [{"user_id": member.id, "level": "read"}],
-                },
-                {
-                    "resource_type": "wiki",
-                    "resource_id": wiki.id,
-                    "grants": [{"all_initiative_members": True, "level": "write"}],
-                },
-            ]
-        },
-    )
-    assert resp.status_code == 200
-    statuses = {
-        (r["resource_type"], r["resource_id"]): r["status"]
-        for r in resp.json()["results"]
-    }
-    assert statuses[("project", project.id)] == "ok"
-    assert statuses[("wiki", wiki.id)] == "ok"
-
-
-async def test_bulk_is_best_effort_per_item(client: AsyncClient, session: AsyncSession):
-    """A missing resource (``not_found``) is skipped without blocking a valid item
-    (``ok``) in the same request."""
-    owner = await create_user(session, email="owner@example.com")
-    member = await create_user(session, email="member@example.com")
-    guild = await create_guild(session)
-    await create_guild_membership(session, user=owner, guild=guild)
-    await create_guild_membership(session, user=member, guild=guild)
-    initiative = await create_initiative(session, guild, owner)
-    await create_initiative_member(session, initiative, member, role_name="member")
-    project = await create_project(session, initiative, owner)
-    headers = get_auth_headers(owner)
-
-    resp = await client.put(
-        BULK.format(guild=guild.id),
-        headers=headers,
-        json={
-            "items": [
-                {
-                    "resource_type": "project",
-                    "resource_id": project.id,
-                    "grants": [{"user_id": member.id, "level": "write"}],
-                },
-                {
-                    "resource_type": "project",
-                    "resource_id": 9_999_999,
-                    "grants": [{"user_id": member.id, "level": "read"}],
-                },
-            ]
-        },
-    )
-    assert resp.status_code == 200
-    assert _results_by_id(resp.json()) == {project.id: "ok", 9_999_999: "not_found"}
-
-    # The valid item applied despite its bad sibling.
-    detail = await client.get(
-        f"/api/v1/c/{guild.id}/projects/{project.id}", headers=headers
-    )
-    assert any(g["user_id"] == member.id for g in detail.json()["grants"])
-
-
-async def test_bulk_reports_forbidden_for_unmanageable_item(
-    client: AsyncClient, session: AsyncSession
-):
-    """A member who can't manage a project's sharing gets ``forbidden`` for it, and
-    the resource is left untouched."""
-    owner = await create_user(session, email="owner@example.com")
-    member = await create_user(session, email="member@example.com")
-    guild = await create_guild(session)
-    await create_guild_membership(session, user=owner, guild=guild)
-    await create_guild_membership(session, user=member, guild=guild)
-    initiative = await create_initiative(session, guild, owner)
-    await create_initiative_member(session, initiative, member, role_name="member")
-    project = await create_project(session, initiative, owner)
-    member_headers = get_auth_headers(member)
-
-    resp = await client.put(
-        BULK.format(guild=guild.id),
-        headers=member_headers,
-        json={
-            "items": [
-                {
-                    "resource_type": "project",
-                    "resource_id": project.id,
-                    "grants": [{"user_id": member.id, "level": "write"}],
-                }
-            ]
-        },
-    )
-    assert resp.status_code == 200
-    assert _results_by_id(resp.json()) == {project.id: "forbidden"}
-
-    # Nothing changed — the member did not self-grant write.
-    owner_headers = get_auth_headers(owner)
-    detail = await client.get(
-        f"/api/v1/c/{guild.id}/projects/{project.id}", headers=owner_headers
-    )
-    assert not any(
-        g["user_id"] == member.id and g["level"] == "write"
-        for g in detail.json()["grants"]
-    )
-
-
-async def test_bulk_skips_archived_project_but_applies_the_rest(
-    client: AsyncClient, session: AsyncSession
-):
-    """An archived project can't have its sharing changed (reported ``forbidden``),
-    while a live project in the same request still applies."""
-    owner = await create_user(session, email="owner@example.com")
-    member = await create_user(session, email="member@example.com")
-    guild = await create_guild(session)
-    await create_guild_membership(session, user=owner, guild=guild)
-    await create_guild_membership(session, user=member, guild=guild)
-    initiative = await create_initiative(session, guild, owner)
-    await create_initiative_member(session, initiative, member, role_name="member")
-    live = await create_project(session, initiative, owner)
-    archived = await create_project(session, initiative, owner)
+    p1, p2, untouched, archived = [
+        await create_project(session, owner.initiative, owner.user) for _ in range(4)
+    ]
     archived.archived_at = datetime.now(UTC)
     session.add(archived)
     await session.commit()
-    headers = get_auth_headers(owner)
+    wiki = await create_wiki(session, owner.initiative, owner.user)
+    url = owner.g("/resource-grants/bulk")
+
+    def item(resource_type: str, resource_id: int, level: str, **grantee) -> dict:
+        grantee = grantee or {"user_id": member.user.id}
+        return {
+            "resource_type": resource_type,
+            "resource_id": resource_id,
+            "grants": [{**grantee, "level": level}],
+        }
 
     resp = await client.put(
-        BULK.format(guild=guild.id),
-        headers=headers,
+        url,
+        headers=owner.headers,
         json={
             "items": [
-                {
-                    "resource_type": "project",
-                    "resource_id": live.id,
-                    "grants": [{"user_id": member.id, "level": "read"}],
-                },
-                {
-                    "resource_type": "project",
-                    "resource_id": archived.id,
-                    "grants": [{"user_id": member.id, "level": "read"}],
-                },
+                item("project", p1.id, "write"),
+                item("project", p2.id, "read"),
+                item("wiki", wiki.id, "write", all_initiative_members=True),
+                item("project", 9_999_999, "read"),
+                item("project", archived.id, "read"),
             ]
         },
     )
     assert resp.status_code == 200
-    assert _results_by_id(resp.json()) == {live.id: "ok", archived.id: "forbidden"}
+    assert [(r["resource_type"], r["status"]) for r in resp.json()["results"]] == [
+        ("project", "ok"),
+        ("project", "ok"),
+        ("wiki", "ok"),
+        ("project", "not_found"),
+        ("project", "forbidden"),
+    ]
+
+    resp = await client.put(
+        url,
+        headers=member.headers,
+        json={"items": [item("project", untouched.id, "write")]},
+    )
+    assert resp.status_code == 200
+    assert [r["status"] for r in resp.json()["results"]] == ["forbidden"]
+
+    for pid, level in ((p1.id, "write"), (p2.id, "read"), (untouched.id, None)):
+        detail = await client.get(owner.g(f"/projects/{pid}"), headers=owner.headers)
+        assert detail.status_code == 200
+        levels = [
+            g["level"]
+            for g in detail.json()["grants"]
+            if g["user_id"] == member.user.id
+        ]
+        assert levels == ([level] if level else []), detail.json()["grants"]
 
 
-async def test_bulk_rejects_too_many_items(client: AsyncClient, session: AsyncSession):
-    """A request over the item cap is rejected (422) before any work is done."""
-    from app.schemas.tenant.resource_grant import MAX_BULK_GRANT_ITEMS
-
-    owner = await create_user(session, email="owner@example.com")
-    guild = await create_guild(session)
-    await create_guild_membership(session, user=owner, guild=guild)
-    headers = get_auth_headers(owner)
-
+@pytest.mark.parametrize("count", [0, MAX_BULK_GRANT_ITEMS + 1], ids=["empty", "over"])
+async def test_bulk_rejects_an_item_count_outside_its_bounds(
+    client: AsyncClient, acting_user, count: int
+):
+    """An empty list, or one over the cap, is rejected before any work is done."""
+    owner = await acting_user(guild_role=CommunityRole.member)
     item = {"resource_type": "project", "resource_id": 1, "grants": []}
     resp = await client.put(
-        BULK.format(guild=guild.id),
-        headers=headers,
-        json={"items": [item] * (MAX_BULK_GRANT_ITEMS + 1)},
-    )
-    assert resp.status_code == 422
-
-
-async def test_bulk_rejects_empty_items(client: AsyncClient, session: AsyncSession):
-    """An empty item list is rejected (422)."""
-    owner = await create_user(session, email="owner@example.com")
-    guild = await create_guild(session)
-    await create_guild_membership(session, user=owner, guild=guild)
-    headers = get_auth_headers(owner)
-
-    resp = await client.put(
-        BULK.format(guild=guild.id), headers=headers, json={"items": []}
+        owner.g("/resource-grants/bulk"),
+        headers=owner.headers,
+        json={"items": [item] * count},
     )
     assert resp.status_code == 422
 
@@ -305,7 +132,7 @@ async def test_bulk_shares_a_tool_plugins_row(
     stranger = f"stranger.{'x' * 14}"
 
     resp = await client.put(
-        BULK.format(guild=moderator.guild.id),
+        moderator.g("/resource-grants/bulk"),
         headers=moderator.headers,
         json={
             "items": [
@@ -370,7 +197,7 @@ async def test_unsharing_a_tool_plugins_row_lets_go_of_who_it_names(
     (tool,) = tools.installed
     (item,) = tool.items
     kind, item_kind = tool.kind, tool.children[0].value
-    url = BULK.format(guild=moderator.guild.id)
+    url = moderator.g("/resource-grants/bulk")
 
     async def share(grants: list[dict]) -> None:
         resp = await client.put(
