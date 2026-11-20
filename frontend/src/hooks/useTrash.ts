@@ -19,6 +19,7 @@ import { invalidate, q, type Spec } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useApiMutation } from "@/hooks/useApiMutation";
 import { queryClient } from "@/lib/queryClient";
+import { isToolPluginKind } from "@/lib/toolPlugins";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
 
@@ -56,8 +57,9 @@ export type EntityType = ContentKind | "comment" | "initiative" | "tag";
 
 // Maps entity_type -> what a restore makes stale, so the row reappears in
 // active lists across the app without an explicit reload. Child entities (task,
-// comment) name their parent tool's lists.
-const RESTORED: Record<EntityType, () => Spec> = {
+// comment) name their parent tool's lists; a tool plug-in's rows are read
+// again by kind.
+const RESTORED: Partial<Record<string, () => Spec>> = {
   project: q.allProjects,
   wiki: q.allWikis,
   wiki_page: q.allWikis,
@@ -72,13 +74,14 @@ const RESTORED: Record<EntityType, () => Spec> = {
   collection: q.allCollections,
   dashboard: q.allDashboards,
   contact: q.allContacts,
-};
+} satisfies Record<EntityType, () => Spec>;
 
 export type RestoreTrashVars = {
   // The item's community — restore is community-scoped, and the cross-community /me view
   // surfaces items from several communities, so it travels with each row.
   communityId: number;
-  entityType: EntityType;
+  /** A built-in kind, or a tool plug-in's. */
+  entityType: string;
   entityId: number;
 };
 
@@ -96,7 +99,7 @@ export const useRestoreTrashEntity = (options?: MutationOpts<RestoreResponse, Re
         restoreTrashEntity(communityId, entityType, entityId),
       invalidate: (_restored, { communityId, entityType }) => {
         invalidateTrash(communityId);
-        const restored = RESTORED[entityType];
+        const restored = isToolPluginKind(entityType) ? q.pluginToolRows : RESTORED[entityType];
         if (restored) void invalidate(restored());
       },
       errorKey: "trash:restoreError",
@@ -108,7 +111,7 @@ export type PurgeTrashVars = {
   // Purge is community-scoped + admin-only; only reachable from the community view,
   // but it still travels with the row for consistency with restore.
   communityId: number;
-  entityType: EntityType;
+  entityType: string;
   entityId: number;
 };
 

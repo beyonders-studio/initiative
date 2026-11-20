@@ -24,6 +24,7 @@ from app.services.tenant import plugin_tool_rows as rows_service
 from app.testing import (
     COUNTERS_UID,
     counters_tool_manifest,
+    create_tag,
     guild_url,
     install_tool_plugin,
 )
@@ -214,6 +215,60 @@ async def test_rows_are_made_changed_listed_copied_and_acted_on(
     assert [row["name"] for row in copied["items"]] == ["HP"]
     beside = await call("POST", f"{COUNTER}/{counter['id']}/duplicate")
     assert (beside["name"], beside["parent_id"]) == ("HP (Copy)", group["id"])
+
+
+async def test_rows_are_tagged_and_trashed_as_a_built_in_tools_are(
+    client, session, acting_user
+):
+    """A row and its items carry the tags they are made or changed with, and
+    go to the trash: a tool's row on the delete right, an item on what
+    changing it asks. The trash lists both and puts them back."""
+    a, member = await _counters(client, session, acting_user)
+    tag = await create_tag(session, a.guild, name="Boss")
+
+    async def call(who: Any, method: str, path: str, body: Any = None) -> Any:
+        return await client.request(
+            method, who.g(f"/plugin-tools/{path}"), headers=who.headers, json=body
+        )
+
+    group = (
+        await call(
+            a, "POST", f"{GROUP}/", {"initiative_id": a.initiative.id, "name": "G"}
+        )
+    ).json()
+    counter = (
+        await call(
+            a,
+            "POST",
+            f"{COUNTER}/",
+            {"parent_id": group["id"], "name": "HP", "tag_ids": [tag.id]},
+        )
+    ).json()
+    assert [each["name"] for each in counter["tags"]] == ["Boss"]
+    changed = await call(a, "PATCH", f"{GROUP}/{group['id']}", {"tag_ids": [tag.id]})
+    assert changed.status_code == 200, changed.text
+    assert [each["id"] for each in changed.json()["tags"]] == [tag.id]
+    changed = await call(a, "PATCH", f"{COUNTER}/{counter['id']}", {"tag_ids": []})
+    assert changed.json()["tags"] == []
+
+    for kind, row in ((COUNTER, counter), (GROUP, group)):
+        refused = await call(member, "DELETE", f"{kind}/{row['id']}")
+        assert refused.status_code in (403, 404), refused.text
+    trashed = await call(a, "DELETE", f"{COUNTER}/{counter['id']}")
+    assert trashed.status_code == 204, trashed.text
+    assert (await call(a, "GET", f"{COUNTER}/{counter['id']}")).status_code == 404
+    trashed = await call(a, "DELETE", f"{GROUP}/{group['id']}")
+    assert trashed.status_code == 204, trashed.text
+
+    listing = await client.get(a.g("/trash/"), headers=a.headers)
+    assert {
+        (item["entity_type"], item["entity_id"]) for item in listing.json()["items"]
+    } == {(GROUP, group["id"]), (COUNTER, counter["id"])}
+    restored = await client.post(
+        a.g(f"/trash/{GROUP}/{group['id']}/restore"), headers=a.headers
+    )
+    assert restored.status_code == 200, restored.text
+    assert (await call(a, "GET", f"{GROUP}/{group['id']}")).status_code == 200
 
 
 async def test_values_and_places_are_held_to_the_declaration(

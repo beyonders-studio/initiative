@@ -23,6 +23,7 @@ from app.schemas.query import PageMeta
 from app.schemas.tenant.archive import ToolCan, ToolState
 from app.schemas.tenant.created_by import CreatedByRead
 from app.schemas.tenant.resource_grant import ResourceGrantSchema, initiative_readable
+from app.schemas.tenant.tag import TagSummary
 
 #: Its declared fields' values by key, but the ones naming a person.
 FieldValues = dict[str, MentionStr | bool | int | float | list[str] | None]
@@ -50,6 +51,7 @@ class PluginToolRowCreate(PluginToolValues):
     #: The tool's row's initial sharing, as a built-in tool's create takes it.
     #: An item is shared as its tool is, and takes none.
     grants: list[ResourceGrantSchema] = Field(default_factory=initiative_readable)
+    tag_ids: list[int] = Field(default_factory=list, max_length=100)
 
 
 class PluginToolRowUpdate(PluginToolValues):
@@ -57,6 +59,8 @@ class PluginToolRowUpdate(PluginToolValues):
 
     name: TitleStr | None = Field(default=None, min_length=1, max_length=255)
     position: float | None = Field(default=None, allow_inf_nan=False)
+    #: Its tags, all of them: the ones sent replace the ones it has.
+    tag_ids: list[int] | None = Field(default=None, max_length=100)
 
     _required = reject_null("name", "position")
 
@@ -102,6 +106,7 @@ class PluginToolRowRead(ToolState[ToolCan], CreatedByRead):
     comments_enabled: bool = True
     #: Who the tool's row is shared with; an item answers to its tool's.
     grants: list[ResourceGrantSchema] = Field(default_factory=list)
+    tags: list[TagSummary] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 

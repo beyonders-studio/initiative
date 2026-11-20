@@ -81,6 +81,8 @@
   "/c/$communityId/i/$initiativeId/settings/roles",
   "/c/$communityId/i/$initiativeId/t/$kind/",
   "/c/$communityId/i/$initiativeId/t/$kind/$rowId",
+  "/c/$communityId/i/$initiativeId/t/$kind/layouts/",
+  "/c/$communityId/i/$initiativeId/t/$kind/layouts/$parentId",
   "/c/$communityId/i/$initiativeId/wikis/",
   "/c/$communityId/i/$initiativeId/wikis/$wikiId/",
   "/c/$communityId/i/$initiativeId/wikis/$wikiId/files/$fileId",

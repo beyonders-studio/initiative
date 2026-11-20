@@ -10,14 +10,16 @@ a path parameter, so no tool plug-in adds a route:
 * ``GET /{kind}/``: a page of the tool's rows in an initiative
   (``initiative_id``), or an item's under the row it sits in (``parent_id``);
 * ``POST /{kind}/``: a new one there;
-* ``GET`` and ``PATCH /{kind}/{row_id}``: one row, of the tool or an item;
+* ``GET``, ``PATCH`` and ``DELETE /{kind}/{row_id}``: one row, of the tool
+  or an item, the delete putting it in the trash;
 * ``POST /{kind}/{row_id}/duplicate``: a copy of a row with the items under
   it, as a built-in tool's duplicate makes one;
 * ``POST /{kind}/{row_id}/step``: move one of a row's counter fields;
 * ``POST /{kind}/{row_id}/actions/{action_id}``: run one of its actions;
 * ``/{kind}/{row_id}/ws``: the tool's row's change signal.
 
-Trash, archive, comments, tags, links and sharing are the universal routes'.
+Restoring from the trash, archive, comments, links and sharing are the
+universal routes'.
 Every write tells the tool's room that it changed, and nothing else.
 """
 
@@ -36,12 +38,16 @@ from app.api.deps import (
     ActorSessionDep,
     ActorUserDep,
     CommunityIdPath,
+    GuildContextDep,
+    RLSSessionDep,
+    get_current_active_user,
     plugin_tool_scope,
 )
 from app.core.plugin_scopes import PluginScopeAccess
 from app.db.query import build_paginated_response
 from app.db.session import routed_guild_id, routed_tools
 from app.db.tool_rows import Located, ToolRow, load_row
+from app.models.platform.user import User
 from app.schemas.base import RESERVED_SIGIL_CODE, RESERVED_SIGILS
 from app.schemas.tenant.plugin_tool import (
     PluginToolActionRun,
@@ -54,8 +60,11 @@ from app.schemas.tenant.plugin_tool import (
 )
 from app.schemas.tenant.tool import ToolDuplicateRequest
 from app.services.content_sockets import sockets
+from app.services.permissions import Action
 from app.services.tenant import plugin_tool_rows as rows_service
+from app.services.tenant import tags as tags_service
 from app.services.tenant.names import copy_name
+from app.services.tenant.soft_delete import trash
 
 router = APIRouter(route_class=ActorRoute)
 
@@ -94,6 +103,23 @@ async def _committed(
 
 def _tool_id(row: ToolRow) -> int:
     return int(row.tool["id"])
+
+
+async def _set_tags(
+    session: ActorSessionDep,
+    context: ActorContext,
+    kind: str,
+    row_id: int,
+    tag_ids: list[int],
+) -> None:
+    """Give a row exactly ``tag_ids``, as a built-in item's change does."""
+    await tags_service.set_entity_tags(
+        session,
+        tags_service.tag_links(routed_tools(session))[kind],
+        guild_id=context.guild_id,
+        entity_id=row_id,
+        tag_ids=tag_ids,
+    )
 
 
 @router.get("/{kind}", response_model=PluginToolRead, name="read_plugin_tool")
@@ -177,8 +203,8 @@ async def create_plugin_tool_row(
 ) -> PluginToolRowRead:
     """Add a row: of the tool, in an initiative where its switch is on and the
     caller's role may create it, shared as ``grants`` says; or of an item,
-    under a row of the tool the caller may change. Fields left out start at
-    their defaults."""
+    under a row of the tool the caller may change, tagged with ``tag_ids``.
+    Fields left out start at their defaults."""
     tools = routed_tools(session)
     located = rows_service.located_kind(tools, kind)
     parent = rows_service.parent_column(located)
@@ -223,6 +249,8 @@ async def create_plugin_tool_row(
             grants=body.grants,
         )
         await session.flush()
+    if body.tag_ids:
+        await _set_tags(session, context, kind, row_id, body.tag_ids)
     await rows_service.tell_mentioned(
         session,
         located,
@@ -269,8 +297,8 @@ async def update_plugin_tool_row(
     current_user: ActorUserDep,
     context: ToolWrite,
 ) -> PluginToolRowRead:
-    """Change a row: its name, its place and the fields sent. A counter is
-    held to its bounds."""
+    """Change a row: its name, its place, its tags and the fields sent. A
+    counter is held to its bounds."""
     tools = routed_tools(session)
     located = rows_service.located_kind(tools, kind)
     row = await rows_service.load_authorized(
@@ -287,7 +315,45 @@ async def update_plugin_tool_row(
         name=body.name,
         position=body.position,
     )
+    if body.tag_ids is not None:
+        await _set_tags(session, context, kind, row_id, body.tag_ids)
     return await _committed(session, context, located, row_id, _tool_id(row), "updated")
+
+
+@router.delete(
+    "/{kind}/{row_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    name="delete_plugin_tool_row",
+)
+async def delete_plugin_tool_row(
+    kind: str,
+    row_id: int,
+    session: RLSSessionDep,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    context: GuildContextDep,
+) -> None:
+    """Move a row to the trash with the items under it, as a built-in tool's
+    delete does. A tool's row asks the delete right on it, and an item what
+    changing one asks of its tool, as a task asks of its project."""
+    tools = routed_tools(session)
+    located = rows_service.located_kind(tools, kind)
+    item = rows_service.parent_column(located) is not None
+    row = await rows_service.load_authorized(
+        session,
+        context,
+        located,
+        tools,
+        row_id,
+        action=rows_service.writing(located) if item else Action.delete,
+    )
+    await trash(session, row, deleted_by_user_id=current_user.id)
+    await session.commit()
+    sockets.signal(
+        routed_guild_id(session),
+        located.tool,
+        _tool_id(row),
+        "item_removed" if item else "deleted",
+    )
 
 
 @router.post(

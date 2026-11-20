@@ -143,10 +143,14 @@ async def load_row(
     row_id: int,
     *,
     for_update: bool = False,
+    trashed: bool = False,
 ) -> ToolRow | None:
-    """One row of ``located``'s table, trashed or not, or None where the
-    request does not read it."""
+    """One row of ``located``'s table, or None where the request does not read
+    it or it is in the trash; ``trashed`` reads it there too, as the trash
+    does."""
     statement = select_rows(located, tools).where(located.table.c.id == row_id)
+    if not trashed:
+        statement = statement.where(located.table.c.deleted_at.is_(None))
     if for_update:
         statement = statement.with_for_update(of=located.table)
     found = (await session.exec(statement)).first()

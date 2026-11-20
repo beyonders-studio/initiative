@@ -168,6 +168,7 @@ export function buildToolRowRead(overrides: Partial<PluginToolRowRead> = {}): Pl
     can: writerCan(),
     comments_enabled: true,
     grants: [],
+    tags: [],
     created_at: "2026-11-01T00:00:00.000Z",
     updated_at: "2026-11-02T00:00:00.000Z",
     ...overrides,

@@ -17,11 +17,10 @@
  * as well, and that is the export's default.
  */
 
-import { Archive, Layers, LayoutTemplate } from "lucide-react";
+import { Archive, Layers, LayoutTemplate, type LucideIcon, Puzzle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import type { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { TOOL_ICONS, type ToolView, toolViews } from "@/lib/tools";
+import { isBuiltInTool, TOOL_ICONS, type ToolView, toolViews } from "@/lib/tools";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
 /** What an export takes: either archive state, or both ("all"). */
@@ -31,7 +30,10 @@ const EXPORT_CHOICES: readonly ToolArchiveChoice[] = ["all", "active", "archived
 
 type ToolViewFilterProps =
   | {
-      tool: Tool;
+      /** The tool's kind, a built-in tool's or a tool plug-in's. */
+      tool: string;
+      /** What the live view is drawn with, for a tool plug-in's kind. */
+      icon?: LucideIcon;
       includeAll?: false;
       value: ToolView;
       onChange: (value: ToolView) => void;
@@ -39,7 +41,8 @@ type ToolViewFilterProps =
       counts?: Partial<Record<ToolView, number | undefined>>;
     }
   | {
-      tool: Tool;
+      tool: string;
+      icon?: LucideIcon;
       includeAll: true;
       value: ToolArchiveChoice;
       onChange: (value: ToolArchiveChoice) => void;
@@ -48,6 +51,7 @@ type ToolViewFilterProps =
 
 export const ToolViewFilter = ({
   tool,
+  icon = Puzzle,
   includeAll,
   value,
   onChange,
@@ -59,7 +63,7 @@ export const ToolViewFilter = ({
   // files tool.
   const icons = {
     all: Layers,
-    active: TOOL_ICONS[tool],
+    active: isBuiltInTool(tool) ? TOOL_ICONS[tool] : icon,
     templates: LayoutTemplate,
     archived: Archive,
   } as const;

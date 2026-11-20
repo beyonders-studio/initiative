@@ -5,7 +5,6 @@ import { useTranslation } from "react-i18next";
 import {
   type CommentCreate,
   type CommentRead,
-  type ContentKind,
   ModerationAct,
 } from "@/api/generated/initiativeAPI.schemas";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
@@ -17,7 +16,6 @@ import { useReadOnOpen } from "@/hooks/useNotifications";
 import { linkedCommentId } from "@/lib/entityResolver";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
-import { referenceTypeFor } from "@/lib/references";
 import { referenceRef } from "@/lib/smartChips";
 import { getUserDisplayName } from "@/lib/userDisplay";
 import { Button } from "@/ui/button";
@@ -34,7 +32,7 @@ export interface CommentWithReplies extends CommentRead {
 }
 
 interface CommentSectionProps {
-  entityType: ContentKind;
+  entityType: string;
   entityId: number;
   comments?: CommentRead[];
   onCommentCreated?: (comment: CommentRead) => void;
@@ -178,10 +176,7 @@ export const CommentSection = ({
   // What this thread is a remark about. A comment on a page does not link to
   // the page it is written on, so no composer here offers it — the box at the
   // top, and every reply and edit below.
-  const subject = useMemo(
-    () => referenceRef(referenceTypeFor(entityType), entityId),
-    [entityType, entityId]
-  );
+  const subject = useMemo(() => referenceRef(entityType, entityId), [entityType, entityId]);
 
   const createComment = useCreateComment({
     onSuccess: (comment) => {
