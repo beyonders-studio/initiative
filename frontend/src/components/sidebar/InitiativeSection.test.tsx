@@ -2,7 +2,8 @@
  * An initiative's tools in the sidebar: the built-in ones, then the tools the
  * community's tool plug-ins declare, each where the reader may open it.
  */
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -11,6 +12,7 @@ import {
   initiativeCan,
   TOOL_PLUGIN_UID,
 } from "@/__tests__/factories";
+import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { SidebarProvider } from "@/components/sidebar/sidebar";
@@ -58,6 +60,29 @@ describe("InitiativeSection", () => {
     expect(links.findIndex((text) => text?.startsWith("Projects"))).toBeGreaterThan(
       links.indexOf("Reading")
     );
+  });
+
+  it("marks an installed tool with unread activity as a built-in tool's row", async () => {
+    server.use(
+      http.get("/api/v1/notifications/unread", () =>
+        HttpResponse.json({
+          places: [
+            {
+              community_id: 1,
+              initiative_id: 3,
+              tool: kind,
+              resource_id: null,
+              subject_type: null,
+              subject_id: null,
+            },
+          ],
+        })
+      )
+    );
+    render([kind]);
+
+    const row = await screen.findByRole("link", { name: /Reading/ });
+    expect(await within(row).findByRole("img", { name: "Unread activity" })).toBeInTheDocument();
   });
 
   it("offers to add one where the reader may", async () => {
