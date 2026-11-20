@@ -12,7 +12,7 @@ const CHANGED = "2026-10-01T12:00:00.000Z";
 
 /** Which layout a layout is: its kind, and a task page's type. */
 const sameLayout = (
-  a: ListLayoutRead | DetailLayoutRead,
+  a: ToolLayoutSetRead["layouts"][number],
   b: { kind: string; task_type_id?: number | null }
 ) =>
   a.kind === b.kind &&

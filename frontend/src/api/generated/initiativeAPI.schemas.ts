@@ -8033,10 +8033,22 @@ export interface ListLayoutRead {
 }
 
 /**
+ * How a tool plug-in's table shows one of its rows, named by the table's
+ * kind: as its plug-in ships it until it is changed.
+ */
+export interface ToolPluginDetailLayoutRead {
+  kind: string;
+  task_type_id: number | null;
+  task_type_name: string | null;
+  definition: DetailLayoutDefinitionOutput;
+  updated_at: string | null;
+}
+
+/**
  * One instance's layouts, as its initiative's list of them shows them.
  */
 export interface InitiativeToolLayoutsRead {
-  layouts: (ListLayoutRead | DetailLayoutRead)[];
+  layouts: (ListLayoutRead | DetailLayoutRead | ToolPluginDetailLayoutRead)[];
   can_configure: boolean;
   tool: Tool;
   tool_id: number;
@@ -8183,23 +8195,6 @@ export const ItemKind = {
   calendar_event: "calendar_event",
   counter: "counter",
   post: "post",
-} as const;
-
-/**
- * What a set of layouts is for.
- */
-export type LayoutTarget = (typeof LayoutTarget)[keyof typeof LayoutTarget];
-
-export const LayoutTarget = {
-  project: "project",
-  file: "file",
-  counter_group: "counter_group",
-  calendar: "calendar",
-  dashboard: "dashboard",
-  post: "post",
-  wiki: "wiki",
-  contact: "contact",
-  collection: "collection",
 } as const;
 
 /**
@@ -12469,8 +12464,20 @@ export interface ToolLayoutDefaultWrite {
  * items, in the order the tool names them.
  */
 export interface ToolLayoutSetRead {
-  layouts: (ListLayoutRead | DetailLayoutRead)[];
+  layouts: (ListLayoutRead | DetailLayoutRead | ToolPluginDetailLayoutRead)[];
   can_configure: boolean;
+}
+
+export type ToolPluginLayoutWriteDefinition = { [key: string]: unknown };
+
+/**
+ * One of a tool plug-in's table's layouts as it is changed: a list by its
+ * kind, or its rows' page by the table's. It names the table's own fields,
+ * so the table's declaration checks it, where the target is known.
+ */
+export interface ToolPluginLayoutWrite {
+  kind: "table" | "board" | "gantt" | "calendar" | "masonry" | "grid" | "timeline" | string;
+  definition: ToolPluginLayoutWriteDefinition;
 }
 
 export interface TrashItem {
@@ -14141,13 +14148,15 @@ export type ReadProjectParams = {
 };
 
 export type GetLayoutsParams = {
-  tool: LayoutTarget;
+  /** What the layouts are for */
+  tool: string;
   tool_id?: number | null;
   initiative_id?: number | null;
 };
 
 export type PutLayoutParams = {
-  tool: LayoutTarget;
+  /** What the layouts are for */
+  tool: string;
   tool_id?: number | null;
   initiative_id?: number | null;
 };
@@ -14157,13 +14166,15 @@ export type GetInitiativeLayoutsParams = {
 };
 
 export type PutDefaultLayoutParams = {
-  tool: LayoutTarget;
+  /** What the layouts are for */
+  tool: string;
   tool_id?: number | null;
   initiative_id?: number | null;
 };
 
 export type ResetLayoutParams = {
-  tool: LayoutTarget;
+  /** What the layouts are for */
+  tool: string;
   tool_id?: number | null;
   initiative_id?: number | null;
   task_type_id?: number | null;

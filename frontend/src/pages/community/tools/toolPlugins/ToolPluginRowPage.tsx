@@ -12,6 +12,7 @@ import {
   useRunPluginToolAction,
 } from "@/hooks/usePluginToolRows";
 import { useRouteId } from "@/hooks/useRouteId";
+import { useToolLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import {
   fieldChange,
@@ -20,6 +21,7 @@ import {
   type ToolActionDecl,
   type ToolRow,
   type ToolTable,
+  toolLayoutTarget,
   toolOfKind,
   toolPluginListRoute,
   toolPluginRowRoute,
@@ -36,6 +38,8 @@ import {
 } from "@/ui/dropdown-menu";
 import { Label } from "@/ui/label";
 import { DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
+import type { StoredRegions } from "@/ui/layouts/detailLayout";
+import { detailLayoutOf } from "@/ui/layouts/layoutSet";
 import { Section } from "@/ui/layouts/section";
 import { DetailPageSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { StatusMessage } from "@/ui/status-message";
@@ -189,6 +193,10 @@ export function ToolPluginRowPage() {
     [table, i18n.language]
   );
   const saves = useMemo(() => itemSaves(pluginToolRowSaves(kind), rowId ?? 0), [kind, rowId]);
+  // Its page as the place it is listed in laid it out, or as shipped.
+  const layouts = useToolLayouts(
+    table && row ? toolLayoutTarget(table, row.initiative_id, row.parent_id) : null
+  );
 
   if (installs.status === "loading" || query.isLoading) {
     return (
@@ -236,6 +244,7 @@ export function ToolPluginRowPage() {
       <DetailLayoutView
         detail={detail}
         item={row}
+        layout={detailLayoutOf(layouts.data, table.kind) as StoredRegions | null}
         context={{
           readOnly: !row.can.edit,
           initiativeId: row.initiative_id,

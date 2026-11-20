@@ -71,6 +71,7 @@ import {
   CounterLook,
   type CurrencyCode,
   type DetailLayoutDefinitionInput,
+  type GetLayoutsParams,
   type MetadataType,
   type PluginToolRowRead,
   type PluginToolRowUpdate,
@@ -338,6 +339,32 @@ export const toolPluginListRoute = (initiativeId: number, kind: string): string 
 /** e.g. "/i/12/t/card.abc123/7". */
 export const toolPluginRowRoute = (initiativeId: number, kind: string, id: number): string =>
   `${toolPluginListRoute(initiativeId, kind)}/${id}`;
+
+/** Where a table's layouts are edited: the tool's own rows' in the
+ *  initiative ("/i/12/t/board.abc123/layouts"), an item table's under the row
+ *  its items sit in ("/i/12/t/card.abc123/layouts/7"). */
+export const toolPluginLayoutsRoute = (
+  initiativeId: number,
+  kind: string,
+  under: number | null
+): string =>
+  `${toolPluginListRoute(initiativeId, kind)}/layouts${under === null ? "" : `/${under}`}`;
+
+// --- Layouts ----------------------------------------------------------------
+// A table is laid out in each place its rows are listed: the tool's own rows
+// in their initiative, as a tool the initiative shares is, and an item
+// table's rows under the row they sit in, as an instance of a tool is.
+
+/** The layouts of `table`'s rows where they are listed: in `initiativeId`
+ *  for the tool's own, under the row `parentId` for an item's. */
+export const toolLayoutTarget = (
+  table: Pick<ToolTable, "kind" | "parent">,
+  initiativeId: number,
+  parentId: number | null
+): GetLayoutsParams =>
+  table.parent === null || parentId === null
+    ? { tool: table.kind, initiative_id: initiativeId }
+    : { tool: table.kind, tool_id: parentId };
 
 // --- Rows -------------------------------------------------------------------
 

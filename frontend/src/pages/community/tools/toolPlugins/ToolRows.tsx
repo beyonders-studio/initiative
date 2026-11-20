@@ -9,6 +9,7 @@ import type { TranslateFn } from "@/types/i18n";
 import { Card, CardContent } from "@/ui/card";
 import { DataTable } from "@/ui/data-table";
 import { fieldColumn } from "@/ui/layouts/columns";
+import { indexPaths } from "@/ui/layouts/draft";
 import { type LayoutEnv, withDisplays } from "@/ui/layouts/fields";
 import type { ListView } from "@/ui/layouts/layoutSet";
 import { sortedItems } from "@/ui/layouts/presets";
@@ -17,7 +18,7 @@ import { type LayoutContext, type LayoutNode, LayoutTree } from "@/ui/layouts/tr
 import { toolFields } from "./toolFields";
 
 /** What a grid draws where its layout names no card: the row's name. */
-const NAME_CARD: LayoutNode = {
+export const NAME_CARD: LayoutNode = {
   type: "card",
   children: [{ type: "field", props: { field: "name" } }],
 };
@@ -27,7 +28,8 @@ const NAME_CARD: LayoutNode = {
  * its card, or a table of its columns, each field in its kind's look and each
  * scale or counter as the list's `displays` say. A row's name opens its page.
  * They are drawn in `sorting`'s order, a view that never moves the rows' own
- * order; a table's headers change it.
+ * order; a table's headers change it. With `editing`, as the layout editor
+ * draws them, each part of the card is marked.
  */
 export const ToolRows = ({
   table,
@@ -36,6 +38,7 @@ export const ToolRows = ({
   initiativeId,
   sorting,
   onSortingChange,
+  editing = false,
 }: {
   table: ToolTable;
   list: ListView;
@@ -43,6 +46,7 @@ export const ToolRows = ({
   initiativeId: number;
   sorting: SortingState;
   onSortingChange: (sorting: SortingState) => void;
+  editing?: boolean;
 }) => {
   const { t, i18n } = useTranslation(["plugins", "common", ...LAYOUT_NAMESPACES]);
   const communityPath = useCommunityPath();
@@ -73,9 +77,10 @@ export const ToolRows = ({
         : [],
     [list.kind, columnIds, fields, env]
   );
+  const node = (card as LayoutNode | null | undefined) ?? NAME_CARD;
   const view = useMemo<LayoutContext<ToolRow>>(
-    () => ({ fields, variant: "card", env }),
-    [fields, env]
+    () => ({ fields, variant: "card", env, editing: editing ? indexPaths(node) : undefined }),
+    [fields, env, editing, node]
   );
 
   if (list.kind === "table") {
@@ -90,7 +95,6 @@ export const ToolRows = ({
       />
     );
   }
-  const node = (card as LayoutNode | null | undefined) ?? NAME_CARD;
   const drawn = (row: ToolRow) => (
     <Card className="h-full">
       <CardContent className="space-y-2 p-4">

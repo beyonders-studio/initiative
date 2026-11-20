@@ -365,6 +365,33 @@
     "notFound": "This isn't here",
     "notFoundBody": "It may have been removed, or the tool it belongs to isn't installed in this community.",
     "backToTool": "Back to {{name}}",
-    "actions": "Actions"
+    "actions": "Actions",
+    "layout": {
+      "name": "{{name}} page",
+      "help": "How each one is shown when it's opened. What it leaves out is hidden.",
+      "shipped": "This is the layout its plug-in ships. Changing it makes it this place's own.",
+      "titleHelp": "Each one shows its name.",
+      "hiddenHelp": "Each one can show this. Taken off, it is hidden, and Add puts it back.",
+      "parts": {
+        "byline": "Dates",
+        "notice": "Read-only notice",
+        "actions": "Menu",
+        "relations": "Relations",
+        "comments": "Comments"
+      },
+      "partHelp": {
+        "byline": "When it was added and last changed.",
+        "notice": "Tells a reader who can't change it so.",
+        "actions": "What else can be done with it.",
+        "relations": "What it is linked to.",
+        "comments": "Its conversation."
+      },
+      "noItems": "Add one to see its layout here.",
+      "lists": {
+        "grid": "Each one as a card, in even rows.",
+        "masonry": "Each one as a card, each as tall as it is.",
+        "table": "Each one as a row, its fields in columns."
+      }
+    }
   }
 }

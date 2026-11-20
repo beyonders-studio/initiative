@@ -365,6 +365,33 @@
     "notFound": "Ce n'est pas ici",
     "notFoundBody": "Il a peut-être été supprimé, ou l'outil auquel il appartient n'est pas installé dans cette communauté.",
     "backToTool": "Retour à {{name}}",
-    "actions": "Actions"
+    "actions": "Actions",
+    "layout": {
+      "name": "Page {{name}}",
+      "help": "Comment chacun s'affiche quand on l'ouvre. Ce que la mise en page laisse de côté est masqué.",
+      "shipped": "C'est la mise en page fournie par son plug-in. La modifier la rend propre à cet endroit.",
+      "titleHelp": "Chacun affiche son nom.",
+      "hiddenHelp": "Chacun peut afficher ceci. Retiré, il est masqué, et Ajouter le remet.",
+      "parts": {
+        "byline": "Dates",
+        "notice": "Avis de lecture seule",
+        "actions": "Menu",
+        "relations": "Relations",
+        "comments": "Commentaires"
+      },
+      "partHelp": {
+        "byline": "Quand il a été ajouté et modifié pour la dernière fois.",
+        "notice": "Le signale à qui ne peut pas le modifier.",
+        "actions": "Ce qu'on peut encore en faire.",
+        "relations": "Ce à quoi il est lié.",
+        "comments": "Sa conversation."
+      },
+      "noItems": "Ajoutez-en un pour voir sa mise en page ici.",
+      "lists": {
+        "grid": "Chacun en carte, en rangées régulières.",
+        "masonry": "Chacun en carte, chacune aussi haute qu'elle l'est.",
+        "table": "Chacun en ligne, ses champs en colonnes."
+      }
+    }
   }
 }
