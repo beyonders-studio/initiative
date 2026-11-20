@@ -376,20 +376,8 @@ async def render_to_storage(
 
 
 async def render_artifacts(request: RenderRequest):
-    """Every artifact in the request, one at a time.
-
-    Uses the backend's own streaming path when it has one and falls back to
-    rendering the batch eagerly when it does not — so a second
-    ``RenderBackend`` implementation stays a drop-in, which is the whole point
-    of the seam.
-    """
-    backend = get_backend()
-    stream = getattr(backend, "render_stream", None)
-    if stream is not None:
-        async for artifact in stream(request):
-            yield artifact
-        return
-    for artifact in await backend.render(request):
+    """Every artifact in the request, one at a time."""
+    async for artifact in get_backend().render_stream(request):
         yield artifact
 
 

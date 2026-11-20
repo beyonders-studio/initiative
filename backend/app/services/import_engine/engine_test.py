@@ -10,28 +10,22 @@ from app.services.storage_test import FakeS3Client
 _PAYLOAD = b"PK\x03\x04" + bytes(range(256)) * 600  # spans several read chunks
 
 
-def test_staged_payload_reads_back_from_s3(monkeypatch):
-    backend = S3Storage(bucket="bucket", client=FakeS3Client(), prefix="guild_7/")
-    monkeypatch.setattr(storage_module, "get_guild_storage", lambda _guild: backend)
+def _s3(_tmp_path):
+    return S3Storage(bucket="bucket", client=FakeS3Client(), prefix="guild_7/")
+
+
+def _local(tmp_path):
+    return LocalFilesystemStorage(base_dir=str(tmp_path))
+
+
+@pytest.mark.parametrize("backend", [_s3, _local], ids=["s3", "local"])
+def test_a_staged_payload_reads_back(monkeypatch, tmp_path, backend):
+    store = backend(tmp_path)
+    monkeypatch.setattr(storage_module, "get_guild_storage", lambda _guild: store)
 
     ref = import_engine.stage_payload(7, _PAYLOAD, suffix="zip")
 
     assert import_engine.read_payload(7, ref) == _PAYLOAD
-
-
-def test_staged_payload_reads_back_from_local_storage(monkeypatch, tmp_path):
-    backend = LocalFilesystemStorage(base_dir=str(tmp_path))
-    monkeypatch.setattr(storage_module, "get_guild_storage", lambda _guild: backend)
-
-    ref = import_engine.stage_payload(7, _PAYLOAD, suffix="zip")
-
-    assert import_engine.read_payload(7, ref) == _PAYLOAD
-
-
-def test_missing_payload_reads_as_none(monkeypatch):
-    backend = S3Storage(bucket="bucket", client=FakeS3Client(), prefix="guild_7/")
-    monkeypatch.setattr(storage_module, "get_guild_storage", lambda _guild: backend)
-
     assert import_engine.read_payload(7, "imports/gone.zip") is None
 
 
@@ -47,6 +41,8 @@ async def test_a_payload_opens_as_a_file_from_s3_and_the_copy_is_removed(
     async with import_engine.open_payload(7, ref) as path:
         assert path is not None and path.read_bytes() == _PAYLOAD
     assert not path.exists()
+    async with import_engine.open_payload(7, "imports/gone.zip") as gone:
+        assert gone is None
 
 
 async def test_a_payload_opens_in_place_from_local_storage(monkeypatch, tmp_path):
@@ -58,14 +54,6 @@ async def test_a_payload_opens_in_place_from_local_storage(monkeypatch, tmp_path
         assert path is not None and path.read_bytes() == _PAYLOAD
     # The stored file is the payload itself, and it is left where it is.
     assert path.exists()
-
-
-async def test_a_missing_payload_opens_as_none(monkeypatch):
-    backend = S3Storage(bucket="bucket", client=FakeS3Client(), prefix="guild_7/")
-    monkeypatch.setattr(storage_module, "get_guild_storage", lambda _guild: backend)
-
-    async with import_engine.open_payload(7, "imports/gone.zip") as path:
-        assert path is None
 
 
 async def test_an_upload_spools_to_a_file_removed_after_the_block():
