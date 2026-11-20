@@ -192,6 +192,51 @@ describe("ToolPluginRowPage", () => {
     expect(sent).toEqual({ fields: { about: "Long ones" }, people: {} });
   });
 
+  it("starts each param as a new row's field would, so unchanged answers send", async () => {
+    const definition = shelfDefinition();
+    Object.assign(definition.tool, {
+      fields: [
+        ...definition.tool.fields,
+        { key: "goal", name: { en: "Goal" }, kind: "number", default: 12 },
+        { key: "stars", name: { en: "Stars" }, kind: "counter", counter: { initial: "goal" } },
+        { key: "tint", name: { en: "Tint" }, kind: "color", default: "random" },
+      ],
+      actions: [
+        {
+          id: "rate",
+          name: { en: "Rate" },
+          on: "shelf",
+          params: ["stars", "tint"],
+          write: "{set: {stars: params.stars, tint: params.tint}}",
+        },
+      ],
+    });
+    let sent: unknown = null;
+    server.use(
+      communityHttp.get("/plugins/", () =>
+        HttpResponse.json({ items: [buildToolPlugin({ definition } as never)] })
+      ),
+      communityHttp.get(`/plugin-tools/${shelf}/5`, () =>
+        HttpResponse.json(
+          buildToolRowRead({ kind: shelf, id: 5, initiative_id: 3, name: "Novels" })
+        )
+      ),
+      communityHttp.post(`/plugin-tools/${shelf}/5/actions/rate`, async ({ request }) => {
+        sent = await request.json();
+        return HttpResponse.json(buildToolRowRead({ kind: shelf, id: 5, initiative_id: 3 }));
+      })
+    );
+    render(shelf);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Rate" }));
+    const dialog = await screen.findByRole("alertdialog");
+    await user.click(within(dialog).getByRole("button", { name: "Rate" }));
+
+    await waitFor(() => expect(sent).toEqual({ fields: { stars: 12, tint: null }, people: {} }));
+  });
+
   it("can't run an action again from the menu while it runs", async () => {
     const definition = shelfDefinition();
     Object.assign(definition.tool, {

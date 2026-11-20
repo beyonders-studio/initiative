@@ -355,6 +355,7 @@
     "byline": "Hinzugefügt {{added}} · geändert {{changed}}",
     "fields": {
       "createdAt": "Hinzugefügt",
+      "createdBy": "Hinzugefügt von",
       "updatedAt": "Zuletzt geändert"
     },
     "create": "Neu: {{name}}",

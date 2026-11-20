@@ -9,7 +9,6 @@ import {
   fieldChange,
   fieldStart,
   fieldValue,
-  type ToolFieldDecl,
   type ToolRow,
   type ToolTable,
   toolRow,
@@ -20,19 +19,9 @@ import { sameJson } from "@/ui/layouts/editing";
 
 import { toolDetail } from "./toolDetail";
 
-/** A row of `table` not yet added, each field shown as the server starts it:
- *  a counter at its `initial`, the number or the field it names, and a
- *  colour it picks at random as none yet. */
+/** A row of `table` not yet added, each field shown as the server starts it. */
 export const blankRow = (table: ToolTable, initiativeId: number): ToolRow => {
-  const declared = (field: ToolFieldDecl): unknown => {
-    if (field.kind === "counter") {
-      const initial = field.counter?.initial;
-      const named = table.fields.find((each) => each.key === initial);
-      return (typeof initial === "string" ? (named ? fieldStart(named) : null) : initial) ?? 0;
-    }
-    return field.kind === "color" && field.default === "random" ? null : fieldStart(field);
-  };
-  const start = table.fields.map((field) => fieldChange(field, declared(field)));
+  const start = table.fields.map((field) => fieldChange(field, fieldStart(table.fields, field)));
   return toolRow({
     kind: table.kind,
     id: 0,

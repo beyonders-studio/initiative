@@ -353,10 +353,21 @@ export const toolRow = (read: PluginToolRowRead): ToolRow => ({ ...read, propert
 export const fieldValue = (row: PluginToolRowRead, field: ToolFieldDecl): unknown =>
   (field.kind === "user_reference" ? row.people[field.key] : row.fields[field.key]) ?? null;
 
-/** What a declared field holds where nobody wrote it, as the server starts
- *  it: its default, false for a checkbox, nothing otherwise. */
-export const fieldStart = (field: ToolFieldDecl): unknown =>
-  field.default ?? (field.kind === "checkbox" ? false : null);
+/** What a declared field of a table holds where nobody wrote it, as the
+ *  server starts it (`effective_defaults`): its default, false for a
+ *  checkbox, nothing otherwise. A counter starts at its `initial`, the number
+ *  or the start of the field it names, else 0; a colour the server picks at
+ *  random is none yet. */
+export const fieldStart = (fields: readonly ToolFieldDecl[], field: ToolFieldDecl): unknown => {
+  if (field.kind === "counter") {
+    const initial = field.counter?.initial;
+    if (typeof initial !== "string") return initial ?? 0;
+    const named = fields.find((each) => each.key === initial && each.kind !== "counter");
+    return (named ? fieldStart(fields, named) : null) ?? 0;
+  }
+  if (field.kind === "color" && field.default === "random") return null;
+  return field.default ?? (field.kind === "checkbox" ? false : null);
+};
 
 /** One field's value as a change sends it: a person among its people, any
  *  other kind among its fields. */

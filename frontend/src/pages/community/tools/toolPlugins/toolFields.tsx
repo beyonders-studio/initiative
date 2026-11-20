@@ -3,7 +3,10 @@
  * fields its table declares, each drawn in its kind's look.
  */
 
-import type { MetadataType } from "@/api/generated/initiativeAPI.schemas";
+import { useTranslation } from "react-i18next";
+
+import { ActorKind, MetadataType } from "@/api/generated/initiativeAPI.schemas";
+import { useActorName } from "@/hooks/useActorName";
 import {
   fieldSummary,
   fieldValue,
@@ -13,6 +16,7 @@ import {
   toolText,
 } from "@/lib/toolPlugins";
 import type { FieldDef, FieldRendererProps } from "@/ui/layouts/fields";
+import { PropertyValueCell } from "@/ui/properties/PropertyValueCell";
 import { iconForPropertyType } from "@/ui/properties/propertyTypeIcons";
 
 /** A colour: its swatch, named for whoever cannot see it. */
@@ -25,6 +29,32 @@ const ColorSwatch = ({ value }: FieldRendererProps<ToolRow>) => (
     <span className="sr-only">{String(value)}</span>
   </span>
 );
+
+/** Who added a row, as a built-in tool's byline names them: a member as a
+ *  person field draws one, a plug-in or the system by its name. */
+const Creator = ({ item, field, variant, env }: FieldRendererProps<ToolRow>) => {
+  const { i18n } = useTranslation();
+  const actorName = useActorName();
+  const member = item.created_by_kind === ActorKind.member;
+  const summary = fieldSummary(
+    {
+      key: field.id,
+      name: { [i18n.language]: env.t(field.label) },
+      kind: member ? "user_reference" : "text",
+    },
+    item,
+    i18n.language
+  );
+  return (
+    <PropertyValueCell
+      summary={{
+        ...summary,
+        value: member ? item.created_by : actorName(item.created_by_kind, item.created_by_install),
+      }}
+      variant={variant === "cell" ? "cell" : "chip"}
+    />
+  );
+};
 
 /** The fields every tool row has, as a layout names them. */
 const universal = (): FieldDef<ToolRow>[] => [
@@ -45,6 +75,18 @@ const universal = (): FieldDef<ToolRow>[] => [
     hideable: true,
     requireable: false,
     value: (row) => row.created_at,
+  },
+  {
+    id: "created_by",
+    render: Creator,
+    source: "builtin",
+    label: "plugins:tool.fields.createdBy",
+    icon: iconForPropertyType(MetadataType.user_reference),
+    hideable: true,
+    requireable: false,
+    // A member by id; whoever else added it by their kind.
+    value: (row) =>
+      row.created_by_kind === ActorKind.member ? row.created_by : row.created_by_kind,
   },
   {
     id: "updated_at",

@@ -89,7 +89,7 @@ const RowActions = ({
       // Each param starts as a new row's field would.
       const starts = table.fields
         .filter((field) => action.params?.includes(field.key))
-        .map((field) => fieldChange(field, fieldStart(field)));
+        .map((field) => fieldChange(field, fieldStart(table.fields, field)));
       setAnswers({
         ...row,
         fields: Object.assign({ ...row.fields }, ...starts.map((change) => change.fields)),

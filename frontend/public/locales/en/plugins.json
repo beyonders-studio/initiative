@@ -355,6 +355,7 @@
     "byline": "Added {{added}} · changed {{changed}}",
     "fields": {
       "createdAt": "Added",
+      "createdBy": "Added by",
       "updatedAt": "Last changed"
     },
     "create": "New {{name}}",
