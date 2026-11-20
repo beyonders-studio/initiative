@@ -2208,20 +2208,20 @@ async def test_webhooks_tell_a_tool_plugins_changes_only_where_they_are_heard(
     await call("POST", stepped, {"field": "count"})
     assert await heard() == {to_install: [step], to_community: [step]}
 
+    async def grant(*scopes: str) -> None:
+        await route_session_to_guild(session, guild_id)
+        await session.exec(
+            sa.update(GuildPlugin)
+            .where(GuildPlugin.id == installed.plugin.id)
+            .values(granted_scopes=list(scopes))
+        )
+        await session.commit()
+
     # The install's grant no longer holds the tool's read scope.
-    plugin = await session.get(GuildPlugin, installed.plugin.id)
-    assert plugin is not None
-    plugin.granted_scopes = []
-    session.add(plugin)
-    await session.commit()
+    await grant()
     await call("POST", stepped, {"field": "count"})
     assert await heard() == {to_community: [step]}
-    await route_session_to_guild(session, guild_id)
-    plugin = await session.get(GuildPlugin, installed.plugin.id)
-    assert plugin is not None
-    plugin.granted_scopes = [read]
-    session.add(plugin)
-    await session.commit()
+    await grant(read)
 
     # The tool placed outside A alone: its rows in A change, and nobody hears.
     plugin_path = f"/plugins/{install['id']}"
