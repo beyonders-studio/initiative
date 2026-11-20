@@ -38,6 +38,12 @@ describe("CounterFocus", () => {
     expect(props.onExit).toHaveBeenCalled();
   });
 
+  it("is watched without stepping where it can't be changed", () => {
+    focus({ disabled: true });
+    expect(screen.getByRole("heading", { name: "Lives" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Step Lives/ })).not.toBeInTheDocument();
+  });
+
   it("shows a counter without both bounds as a number", () => {
     focus({ counter: { ...lives, max: null } });
     expect(document.querySelector("svg line")).toBeNull();

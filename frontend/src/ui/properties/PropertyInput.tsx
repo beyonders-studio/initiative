@@ -70,6 +70,8 @@ export interface PropertyInputProps {
    *  without. How a counter is drawn: a number, a bar or a clock; in its own
    *  look without. */
   display?: FieldDisplay | null;
+  /** The id of its text box or checkbox, for a label beside it to name. */
+  id?: string;
   /** A counter's full screen as its page gives it. Without it, it is titled
    *  with the field's name, on the page's colours, and opens on its own. */
   focus?: CounterFocusHost;
@@ -249,18 +251,27 @@ const CounterInput = ({
     look: (display ?? settings.look) as CounterLook,
   };
   const drawn = shown.look !== CounterLook.number && shown.min !== null && shown.max !== null;
-  return (
-    <div className={cn("flex items-center gap-1", className)}>
+  // A reader sees its count, and opens it full screen, but steps nothing.
+  const stepButton = (up: boolean) =>
+    disabled ? null : (
       <Button
         type="button"
         variant="outline"
         size="icon-sm"
-        aria-label={t("input.stepDown", { name: definition.name })}
-        disabled={disabled || (settings.min !== null && count <= settings.min)}
-        onClick={() => step(false)}
+        aria-label={t(up ? "input.stepUp" : "input.stepDown", { name: definition.name })}
+        disabled={
+          up
+            ? settings.max !== null && count >= settings.max
+            : settings.min !== null && count <= settings.min
+        }
+        onClick={() => step(up)}
       >
-        <Minus className="h-4 w-4" />
+        {up ? <Plus className="h-4 w-4" /> : <Minus className="h-4 w-4" />}
       </Button>
+    );
+  return (
+    <div className={cn("flex items-center gap-1", className)}>
+      {stepButton(false)}
       {drawn ? (
         <div className="flex min-w-0 flex-1 justify-center px-2">
           <CounterView
@@ -285,27 +296,20 @@ const CounterInput = ({
           className="w-24 bg-transparent text-center tabular-nums"
         />
       )}
-      <Button
-        type="button"
-        variant="outline"
-        size="icon-sm"
-        aria-label={t("input.stepUp", { name: definition.name })}
-        disabled={disabled || (settings.max !== null && count >= settings.max)}
-        onClick={() => step(true)}
-      >
-        <Plus className="h-4 w-4" />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        className="text-muted-foreground"
-        aria-label={t("input.reset", { name: definition.name })}
-        disabled={disabled || count === withinBounds(settings, settings.initial)}
-        onClick={reset}
-      >
-        <RotateCcw className="h-4 w-4" />
-      </Button>
+      {stepButton(true)}
+      {disabled ? null : (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="text-muted-foreground"
+          aria-label={t("input.reset", { name: definition.name })}
+          disabled={count === withinBounds(settings, settings.initial)}
+          onClick={reset}
+        >
+          <RotateCcw className="h-4 w-4" />
+        </Button>
+      )}
       <Button
         type="button"
         variant="ghost"
@@ -326,7 +330,7 @@ const CounterInput = ({
         disabled={disabled}
         onStep={step}
         onCommit={type}
-        onReset={reset}
+        onReset={disabled ? undefined : reset}
         navigation={focus?.navigation}
       />
     </div>
@@ -351,6 +355,7 @@ export const PropertyInput = ({
   files,
   updatedAt,
   focus,
+  id,
 }: PropertyInputProps) => {
   const { t } = useTranslation("properties");
 
@@ -363,6 +368,7 @@ export const PropertyInput = ({
     case MetadataType.text: {
       return (
         <Input
+          id={id}
           type="text"
           value={coerceString(value)}
           onChange={(e) => {
@@ -379,6 +385,7 @@ export const PropertyInput = ({
     case MetadataType.number: {
       return (
         <Input
+          id={id}
           type="number"
           inputMode="numeric"
           value={coerceNumber(value)}
@@ -403,6 +410,7 @@ export const PropertyInput = ({
       return (
         <div className={cn("flex items-center gap-2", className)}>
           <Input
+            id={id}
             type="number"
             inputMode="decimal"
             step="any"
@@ -455,6 +463,7 @@ export const PropertyInput = ({
       return (
         <div className={cn("flex h-9 items-center", className)}>
           <Checkbox
+            id={id}
             checked={coerceBoolean(value)}
             onCheckedChange={(checked) => onChange(checked === true)}
             disabled={disabled}
@@ -466,6 +475,7 @@ export const PropertyInput = ({
     case MetadataType.url: {
       return (
         <Input
+          id={id}
           type="url"
           value={coerceString(value)}
           onChange={(e) => {

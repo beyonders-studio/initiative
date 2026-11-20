@@ -63,9 +63,9 @@ export interface CounterFocusProps {
 }
 
 /**
- * A counter full screen: its name, its value in its look, and two big
- * buttons that step it. Swiping sideways moves to the next counter where
- * there are others.
+ * A counter full screen: its name, its value in its look, and, unless it is
+ * `disabled`, two big buttons that step it. Swiping sideways moves to the
+ * next counter where there are others.
  */
 export const CounterFocus = ({
   counter,
@@ -206,10 +206,15 @@ export const CounterFocus = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 px-3 pt-2 pb-[max(env(safe-area-inset-bottom),0.75rem)]">
-        {stepButton(false)}
-        {stepButton(true)}
-      </div>
+      {/* A reader watches it, and steps nothing. */}
+      {disabled ? (
+        <div className="pb-[max(env(safe-area-inset-bottom),0.75rem)]" />
+      ) : (
+        <div className="grid grid-cols-2 gap-2 px-3 pt-2 pb-[max(env(safe-area-inset-bottom),0.75rem)]">
+          {stepButton(false)}
+          {stepButton(true)}
+        </div>
+      )}
     </div>
   );
 };

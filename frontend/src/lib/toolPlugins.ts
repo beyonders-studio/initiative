@@ -28,6 +28,7 @@ import {
   type PluginToolRowRead,
   type PluginToolRowUpdate,
   type PluginToolRowUpdateFields,
+  type PluginToolStep,
   type PropertySummary,
 } from "@/api/generated/initiativeAPI.schemas";
 import { initiativeRoute } from "@/lib/tools";
@@ -335,6 +336,11 @@ export const toolLayoutTarget = (
 /** A row of a plug-in's table, the tool's own or an item's, as the kit draws
  *  an item. Its rows hold none of the initiative's properties. */
 export type ToolRow = PluginToolRowRead & { properties: PropertySummary[] };
+
+/** A change to a row as one field's save sends it: an update, or a step of
+ *  one counter field, which the server takes from what the field holds when
+ *  it lands, so two people stepping it at once both count. */
+export type ToolRowChange = PluginToolRowUpdate | { step: PluginToolStep };
 
 /** A row as read, drawn as an item. */
 export const toolRow = (read: PluginToolRowRead): ToolRow => ({ ...read, properties: [] });
