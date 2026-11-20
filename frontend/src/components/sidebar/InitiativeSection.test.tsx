@@ -47,8 +47,8 @@ const render = (view: string[], create: string[] = []) => {
 };
 
 describe("InitiativeSection", () => {
-  it("lists an installed tool after the built-in ones, by its declared name and icon", async () => {
-    render([Tool.wiki, kind, Tool.project]);
+  it("lists an installed tool after the built-in ones, with its add link where the reader may", async () => {
+    render([Tool.wiki, kind, Tool.project], [kind]);
 
     const row = await screen.findByRole("link", { name: "Reading" });
     expect(row).toHaveAttribute("href", `/c/1/i/3/t/${kind}`);
@@ -59,6 +59,11 @@ describe("InitiativeSection", () => {
     // Projects stay last, so their list opens beneath them.
     expect(links.findIndex((text) => text?.startsWith("Projects"))).toBeGreaterThan(
       links.indexOf("Reading")
+    );
+    // The tool's list, its add dialog open, as a built-in tool's create link.
+    expect(screen.getByRole("link", { name: "New Shelf" })).toHaveAttribute(
+      "href",
+      expect.stringContaining(`/c/1/i/3/t/${kind}?create=`)
     );
   });
 
@@ -85,20 +90,11 @@ describe("InitiativeSection", () => {
     expect(await within(row).findByRole("img", { name: "Unread activity" })).toBeInTheDocument();
   });
 
-  it("offers to add one where the reader may", async () => {
-    render([kind], [kind]);
-
-    // The tool's list, its add dialog open, as a built-in tool's create link.
-    expect(await screen.findByRole("link", { name: "New Shelf" })).toHaveAttribute(
-      "href",
-      expect.stringContaining(`/c/1/i/3/t/${kind}?create=`)
-    );
-  });
-
   it("leaves out a tool the reader may not open here", async () => {
     render([Tool.wiki]);
 
     expect(await screen.findByRole("link", { name: /Wikis/ })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Reading" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "New Shelf" })).toBeNull();
   });
 });

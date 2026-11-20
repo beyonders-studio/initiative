@@ -1,14 +1,14 @@
 /**
  * A tool plug-in's row on its own page: its table's declared detail, the rows
- * of each item table under it, and what every tool's items have (access
- * settings, archiving, deleting, tags and its declared actions), each offered
- * only where the row's `can` allows it and sent to the universal route with
- * the row's own kind.
+ * of each item table under it and the dialog that adds one, and what every
+ * tool's items have (access settings, archiving, deleting, tags and its
+ * declared actions), each offered only where the row's `can` allows it and
+ * sent to the universal route with the row's own kind.
  */
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { delay, HttpResponse } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   buildTagSummary,
@@ -26,26 +26,7 @@ import type { PluginToolRowRead, ToolCan } from "@/api/generated/initiativeAPI.s
 
 import { ToolPluginRowPage } from "./ToolPluginRowPage";
 
-const PICKED = buildTagSummary({ id: 99, name: "Classics" });
-
-// The picker's own UI is not what these tests are about: this stub reports the
-// selection it was handed and offers one way to change it.
-vi.mock("@/components/tags/TagPicker", () => ({
-  TagPicker: ({
-    selectedTags,
-    onChange,
-  }: {
-    selectedTags: { id: number; name: string }[];
-    onChange: (tags: { id: number; name: string }[]) => void;
-  }) => (
-    <div>
-      <span data-testid="selected-tags">{selectedTags.map((tag) => tag.name).join(",")}</span>
-      <button type="button" onClick={() => onChange([PICKED])}>
-        pick tag
-      </button>
-    </div>
-  ),
-}));
+const CLASSICS = buildTagSummary({ id: 99, name: "Classics" });
 
 const uid = TOOL_PLUGIN_UID.toLowerCase();
 const shelf = `shelf.${uid}`;
@@ -53,16 +34,11 @@ const book = `book.${uid}`;
 
 const field = (key: string) => ({ type: "field", props: { field: key } });
 
-/** The shelf, its rows' pages placing their actions (a book's, unless its
- *  layout leaves them out as shipped) and tags, and a book's card its tags. */
-const definition = (placeBookActions: boolean) => {
+/** The shelf, its page placing its tags, and a book's card its tags. */
+const definition = () => {
   const made = shelfDefinition();
   made.tool.layouts.detail.main.push(field("tags"));
-  const [books] = made.tool.items;
-  if (placeBookActions) {
-    Object.assign(books.layouts.detail, { header: [field("name"), { type: "actions" }] });
-  }
-  books.layouts.lists[0].card.children.push(field("tags"));
+  made.tool.items[0].layouts.lists[0].card.children.push(field("tags"));
   return made;
 };
 
@@ -78,19 +54,25 @@ const open = (kind: string) =>
     },
   });
 
+/** A page of rows, as the list route answers. */
+const page = (items: PluginToolRowRead[]) => ({
+  items,
+  total_count: items.length,
+  page: 1,
+  page_size: 0,
+  has_next: false,
+  has_prev: false,
+});
+
 /** The page of one row, the shelf's 5 or book 8 on it, of the shelf as
  *  `definition` declares it, with `tool` over its tool block. */
-const show = (
-  kind: string,
-  overrides: Partial<PluginToolRowRead> = {},
-  { placeBookActions = true, tool = {} }: { placeBookActions?: boolean; tool?: object } = {}
-) => {
+const show = (kind: string, overrides: Partial<PluginToolRowRead> = {}, tool: object = {}) => {
   const rowId = kind === shelf ? 5 : 8;
-  const declared = definition(placeBookActions);
+  const declared = definition();
   Object.assign(declared.tool, tool);
   server.use(
     communityHttp.get("/plugins/", () =>
-      HttpResponse.json({ items: [buildToolPlugin({ definition: declared } as never)] })
+      HttpResponse.json({ items: [buildToolPlugin({ definition: declared })] })
     ),
     communityHttp.get(`/plugin-tools/${kind}/${rowId}`, () =>
       HttpResponse.json(
@@ -109,32 +91,17 @@ const show = (
   return open(kind);
 };
 
-/** A page of rows, as the list route answers. */
-const page = (items: PluginToolRowRead[]) => ({
-  items,
-  total_count: items.length,
-  page: 1,
-  page_size: 0,
-  has_next: false,
-  has_prev: false,
-});
-
 /** Middlemarch on the shelf, 200 of its 800 pages read. */
-const middlemarch = () =>
+const middlemarch = (overrides: Partial<PluginToolRowRead> = {}) =>
   buildToolRowRead({
+    kind: book,
     id: 8,
     initiative_id: 3,
     parent_id: 5,
     name: "Middlemarch",
     fields: { pages: 800, read: 200 },
+    ...overrides,
   });
-
-/** The names of what the row's menu offers. */
-const offered = async (): Promise<string[]> => {
-  await userEvent.setup().click(await screen.findByRole("button", { name: "Actions" }));
-  const items = await screen.findAllByRole("menuitem");
-  return items.map((item) => item.textContent ?? "");
-};
 
 describe("ToolPluginRowPage", () => {
   it("draws the row from its declared layout and lists the items under it", async () => {
@@ -142,7 +109,11 @@ describe("ToolPluginRowPage", () => {
     server.use(
       communityHttp.get(`/plugin-tools/${book}/`, ({ request }) =>
         HttpResponse.json(
-          page(new URL(request.url).searchParams.get("parent_id") === "5" ? [middlemarch()] : [])
+          page(
+            new URL(request.url).searchParams.get("parent_id") === "5"
+              ? [middlemarch({ tags: [CLASSICS] })]
+              : []
+          )
         )
       )
     );
@@ -160,12 +131,12 @@ describe("ToolPluginRowPage", () => {
       `/c/1/i/3/t/${book}/8`
     );
     expect(screen.getByRole("img", { name: "200 / 800" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "New Book" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Classics" })).toHaveAttribute("href", "/c/1/tags/99");
   });
 
   it("draws the row and its items as the places they are listed in laid them out", async () => {
     const changed = "2026-11-01T00:00:00Z";
-    const name = { type: "field", props: { field: "name" } };
+    const name = field("name");
     show(shelf, { fields: { about: "Long ones" } });
     server.use(
       communityHttp.get(`/plugin-tools/${book}/`, () => HttpResponse.json(page([middlemarch()]))),
@@ -236,11 +207,47 @@ describe("ToolPluginRowPage", () => {
     expect(await screen.findByDisplayValue("Novels")).toBeInTheDocument();
   });
 
-  it("asks for an action's params and sends them, running it once at a time", async () => {
+  it("says so where no installed tool has the kind", async () => {
+    open("nothing.here");
+
+    expect(await screen.findByText("This isn't here")).toBeInTheDocument();
+  });
+
+  it("adds an item under it, sending only the fields the person set", async () => {
+    let sent: unknown = null;
+    server.use(
+      communityHttp.post(`/plugin-tools/${book}/`, async ({ request }) => {
+        sent = await request.json();
+        return HttpResponse.json(middlemarch({ id: 9, name: "Persuasion" }));
+      })
+    );
+    show(shelf, { can: ownerCan() });
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "New Book" }));
+    const dialog = await screen.findByRole("dialog");
+    const add = within(dialog).getByRole("button", { name: "New Book" });
+    expect(add).toBeDisabled();
+    // Each field starts as the server would start it: a counter at its least.
+    const read = within(dialog).getByRole("group", { name: "Read" });
+    expect(within(read).getByRole("spinbutton")).toHaveValue(0);
+    await user.type(within(dialog).getByRole("textbox", { name: "Name" }), "Persuasion");
+    const pages = within(dialog).getByRole("group", { name: "Pages" });
+    await user.type(within(pages).getByRole("spinbutton"), "474");
+    await user.click(add);
+
+    await waitFor(() =>
+      expect(sent).toEqual({ name: "Persuasion", parent_id: 5, fields: { pages: 474 }, people: {} })
+    );
+  });
+});
+
+describe("a tool plug-in's actions", () => {
+  it("asks for an action's params, each started as a new row's field, and runs it once", async () => {
     let sent: unknown = null;
     let runs = 0;
     server.use(
-      communityHttp.post(`/plugin-tools/${shelf}/5/actions/describe`, async ({ request }) => {
+      communityHttp.post(`/plugin-tools/${shelf}/5/actions/rate`, async ({ request }) => {
         runs += 1;
         sent = await request.json();
         await delay(200);
@@ -251,64 +258,22 @@ describe("ToolPluginRowPage", () => {
       shelf,
       { can: ownerCan() },
       {
-        tool: {
-          actions: [
-            {
-              id: "describe",
-              name: { en: "Describe" },
-              on: "shelf",
-              params: ["about"],
-              write: "{set: {about: params.about}}",
-            },
-          ],
-        },
-      }
-    );
-    const user = userEvent.setup();
-
-    await user.click(await screen.findByRole("button", { name: "Actions" }));
-    await user.click(await screen.findByRole("menuitem", { name: "Describe" }));
-    const dialog = await screen.findByRole("alertdialog");
-    await user.type(within(dialog).getByRole("textbox"), "Long ones");
-    await user.click(within(dialog).getByRole("button", { name: "Describe" }));
-
-    // While it runs, it can't be run again.
-    await waitFor(() => expect(within(dialog).getAllByRole("button").at(-1)).toBeDisabled());
-    await user.click(within(dialog).getAllByRole("button").at(-1) as HTMLElement);
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
-    expect(runs).toBe(1);
-    expect(sent).toEqual({ fields: { about: "Long ones" }, people: {} });
-  });
-
-  it("starts each param as a new row's field would, so unchanged answers send", async () => {
-    let sent: unknown = null;
-    server.use(
-      communityHttp.post(`/plugin-tools/${shelf}/5/actions/rate`, async ({ request }) => {
-        sent = await request.json();
-        return HttpResponse.json(buildToolRowRead({ kind: shelf, id: 5, initiative_id: 3 }));
-      })
-    );
-    show(
-      shelf,
-      { can: ownerCan() },
-      {
-        tool: {
-          fields: [
-            ...shelfDefinition().tool.fields,
-            { key: "goal", name: { en: "Goal" }, kind: "number", default: 12 },
-            { key: "stars", name: { en: "Stars" }, kind: "counter", counter: { initial: "goal" } },
-            { key: "tint", name: { en: "Tint" }, kind: "color", default: "random" },
-          ],
-          actions: [
-            {
-              id: "rate",
-              name: { en: "Rate" },
-              on: "shelf",
-              params: ["stars", "tint"],
-              write: "{set: {stars: params.stars, tint: params.tint}}",
-            },
-          ],
-        },
+        fields: [
+          ...shelfDefinition().tool.fields,
+          { key: "goal", name: { en: "Goal" }, kind: "number", default: 12 },
+          { key: "stars", name: { en: "Stars" }, kind: "counter", counter: { initial: "goal" } },
+          { key: "tint", name: { en: "Tint" }, kind: "color", default: "random" },
+          { key: "owned", name: { en: "Owned" }, kind: "checkbox" },
+        ],
+        actions: [
+          {
+            id: "rate",
+            name: { en: "Rate" },
+            on: "shelf",
+            params: ["about", "stars", "tint", "owned"],
+            write: "{set: params}",
+          },
+        ],
       }
     );
     const user = userEvent.setup();
@@ -316,9 +281,21 @@ describe("ToolPluginRowPage", () => {
     await user.click(await screen.findByRole("button", { name: "Actions" }));
     await user.click(await screen.findByRole("menuitem", { name: "Rate" }));
     const dialog = await screen.findByRole("alertdialog");
+    // The text param's box carries no name of its own.
+    await user.type(within(dialog).getByRole("textbox"), "Long ones");
     await user.click(within(dialog).getByRole("button", { name: "Rate" }));
 
-    await waitFor(() => expect(sent).toEqual({ fields: { stars: 12, tint: null }, people: {} }));
+    // While it runs, it can't be run again.
+    await waitFor(() => expect(within(dialog).getAllByRole("button").at(-1)).toBeDisabled());
+    await user.click(within(dialog).getAllByRole("button").at(-1) as HTMLElement);
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(runs).toBe(1);
+    // A counter starts at the field it names, a colour the server picks is none
+    // yet and a checkbox is off; each is sent unchanged.
+    expect(sent).toEqual({
+      fields: { about: "Long ones", stars: 12, tint: null, owned: false },
+      people: {},
+    });
   });
 
   it("can't run an action again from the menu while it runs", async () => {
@@ -333,7 +310,7 @@ describe("ToolPluginRowPage", () => {
     show(
       shelf,
       { can: ownerCan() },
-      { tool: { actions: [{ id: "bump", name: { en: "Bump" }, on: "shelf", write: "null" }] } }
+      { actions: [{ id: "bump", name: { en: "Bump" }, on: "shelf", write: "null" }] }
     );
     const user = userEvent.setup();
 
@@ -345,92 +322,123 @@ describe("ToolPluginRowPage", () => {
     await user.click(again);
     await waitFor(() => expect(runs).toBe(1));
   });
-
-  it("says so where no installed tool has the kind", async () => {
-    open("nothing.here");
-
-    expect(await screen.findByText("This isn't here")).toBeInTheDocument();
-  });
 });
 
-describe("a tool plug-in's row", () => {
-  it("offers its owner its access settings, archiving and deleting", async () => {
-    show(shelf, { can: ownerCan() });
+describe("a tool plug-in's row and its items", () => {
+  const ARCHIVED = "2026-11-03T00:00:00Z";
 
-    expect(await offered()).toEqual(["Access settings", "Archive", "Delete"]);
-  });
-
-  it.each<[string, ToolCan, string[]]>([
+  // A book is shared as its tool is, so it has no access settings of its own;
+  // its page's layout places no actions, so they head the page.
+  it.each<[string, string, ToolCan, string | null, string[], string, string]>([
     [
-      "a writer, who may archive it but not share or delete it",
+      "the shelf's owner everything",
+      shelf,
+      ownerCan(),
+      null,
+      ["Access settings", "Archive", "Delete"],
+      "Delete",
+      `DELETE plugin-tools/${shelf}/5`,
+    ],
+    [
+      "a writer of the shelf archiving alone",
+      shelf,
       ownerCan({ share: false, delete: false }),
+      null,
       ["Archive"],
+      "Archive",
+      `POST archive/${shelf}/5`,
     ],
     [
-      "the owner of an archived row, who may take it back out",
+      "the owner of an archived shelf taking it back out",
+      shelf,
       readerCan({ unarchive: true }),
+      ARCHIVED,
       ["Unarchive"],
+      "Unarchive",
+      `POST unarchive/${shelf}/5`,
     ],
-  ])("offers %s only that", async (_who, can, names) => {
-    show(shelf, { can, archived_at: names[0] === "Unarchive" ? "2026-11-03T00:00:00Z" : null });
-
-    expect(await offered()).toEqual(names);
-  });
-
-  it("offers a reader nothing at all", async () => {
-    show(shelf, { can: readerCan() });
-
-    expect((await screen.findAllByText("Novels")).length).toBeGreaterThan(0);
-    expect(screen.queryByRole("button", { name: "Actions" })).not.toBeInTheDocument();
-  });
-
-  it.each([
-    ["archive", null, ownerCan()],
-    ["unarchive", "2026-11-03T00:00:00Z", readerCan({ unarchive: true })],
-  ])("sends %s to the universal route by its kind", async (route, archivedAt, can) => {
-    const asked: string[] = [];
+    [
+      "a book's owner all but access settings",
+      book,
+      ownerCan(),
+      null,
+      ["Archive", "Delete"],
+      "Archive",
+      `POST archive/${book}/8`,
+    ],
+    [
+      "whoever may add to a book's tool deleting it",
+      book,
+      ownerCan({ delete: false, edit: false }),
+      null,
+      ["Delete"],
+      "Delete",
+      `DELETE plugin-tools/${book}/8`,
+    ],
+  ])("offers %s, sent by its kind", async (_who, kind, can, archivedAt, offered, pick, asked) => {
+    const sent: string[] = [];
     server.use(
-      communityHttp.post(`/${route}/:kind/:id`, ({ params }) => {
-        asked.push(`${params.kind}/${params.id}`);
+      communityHttp.post("/:route/:kind/:id", ({ params }) => {
+        sent.push(`POST ${params.route}/${params.kind}/${params.id}`);
         return HttpResponse.json({
           entity_type: params.kind,
-          entity_id: 5,
-          archived_at: archivedAt ? null : "2026-11-03T00:00:00Z",
+          entity_id: Number(params.id),
+          archived_at: params.route === "archive" ? ARCHIVED : null,
         });
-      })
-    );
-    show(shelf, { can, archived_at: archivedAt });
-    const user = userEvent.setup();
-
-    await user.click(await screen.findByRole("button", { name: "Actions" }));
-    await user.click(
-      await screen.findByRole("menuitem", { name: route === "archive" ? "Archive" : "Unarchive" })
-    );
-
-    await waitFor(() => expect(asked).toEqual([`${shelf}/5`]));
-  });
-
-  it("puts it in the trash once asked", async () => {
-    const deleted: string[] = [];
-    server.use(
+      }),
       communityHttp.delete("/plugin-tools/:kind/:id", ({ params }) => {
-        deleted.push(`${params.kind}/${params.id}`);
+        sent.push(`DELETE plugin-tools/${params.kind}/${params.id}`);
         return new HttpResponse(null, { status: 204 });
       })
     );
-    show(shelf, { can: ownerCan() });
+    show(kind, { can, archived_at: archivedAt });
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole("button", { name: "Actions" }));
-    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
-    const dialog = await screen.findByRole("alertdialog");
-    expect(deleted).toEqual([]);
-    await user.click(within(dialog).getByRole("button", { name: "Delete" }));
+    const items = await screen.findAllByRole("menuitem");
+    expect(items.map((item) => item.textContent)).toEqual(offered);
+    await user.click(screen.getByRole("menuitem", { name: pick }));
+    if (pick === "Delete") {
+      // Nothing is deleted until it is confirmed.
+      const dialog = await screen.findByRole("alertdialog");
+      expect(sent).toEqual([]);
+      await user.click(within(dialog).getByRole("button", { name: "Delete" }));
+    }
 
-    await waitFor(() => expect(deleted).toEqual([`${shelf}/5`]));
+    await waitFor(() => expect(sent).toEqual([asked]));
   });
 
-  it("shares it through the bulk route by its kind, with the note", async () => {
+  it("shows a reader the row and its tags, and offers nothing to change", async () => {
+    show(shelf, { can: readerCan(), tags: [CLASSICS] });
+
+    expect(await screen.findByText("Classics")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Actions" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+  });
+
+  it("shows a reader an item's fields, each in its kind's look, and why", async () => {
+    show(book, {
+      can: readerCan(),
+      fields: { read: 40, pages: 300, status: "done", cover: "#336699" },
+    });
+
+    expect(await screen.findByRole("heading", { name: "Middlemarch" })).toBeInTheDocument();
+    expect(screen.getByText("300")).toBeInTheDocument();
+    expect(screen.getByText("Read", { selector: "span" })).toBeInTheDocument();
+    expect(screen.getByText("#336699")).toBeInTheDocument();
+    expect(screen.getByText("You can read this, but not change it.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Actions" })).not.toBeInTheDocument();
+  });
+
+  it("gives a writer each declared field's editor, holding the row's value", async () => {
+    show(book, { can: ownerCan(), fields: { pages: 474, status: "unread" } });
+
+    const pages = await screen.findByRole("group", { name: "Pages" });
+    expect(within(pages).getByRole("spinbutton")).toHaveValue(474);
+    expect(screen.getByRole("group", { name: "Status" })).toBeInTheDocument();
+  });
+
+  it("shares the row through the bulk route by its kind, with the note", async () => {
     let sent: unknown = null;
     server.use(
       communityHttp.put("/resource-grants/bulk", async ({ request }) => {
@@ -461,96 +469,26 @@ describe("a tool plug-in's row", () => {
     );
   });
 
-  it("tags it, saved on its own change", async () => {
+  it("tags the row, saved on its own change", async () => {
     let sent: unknown = null;
-    show(shelf, { can: ownerCan() });
-    const row = (tags = [PICKED]) =>
+    const row = (tags: (typeof CLASSICS)[]) =>
       buildToolRowRead({ kind: shelf, id: 5, initiative_id: 3, name: "Novels", tags });
+    show(shelf, { can: ownerCan() });
     server.use(
+      communityHttp.get("/tags/", () => HttpResponse.json([CLASSICS])),
       communityHttp.patch(`/plugin-tools/${shelf}/5`, async ({ request }) => {
         sent = await request.json();
-        return HttpResponse.json(row());
+        return HttpResponse.json(row([CLASSICS]));
       }),
       communityHttp.get(`/plugin-tools/${shelf}/5`, () =>
-        HttpResponse.json(row(sent ? [PICKED] : []))
+        HttpResponse.json(row(sent ? [CLASSICS] : []))
       )
     );
-
-    await userEvent.setup().click(await screen.findByRole("button", { name: "pick tag" }));
-
-    await waitFor(() => expect(sent).toEqual({ tag_ids: [99] }));
-    expect(await screen.findByTestId("selected-tags")).toHaveTextContent("Classics");
-  });
-
-  it("shows a reader its tags and no picker", async () => {
-    show(shelf, { can: readerCan(), tags: [PICKED] });
-
-    expect(await screen.findByText("Classics")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "pick tag" })).not.toBeInTheDocument();
-  });
-
-  it("draws the tags of the items under it on their cards", async () => {
-    show(shelf);
-    server.use(
-      communityHttp.get(`/plugin-tools/${book}/`, () =>
-        HttpResponse.json({
-          items: [
-            buildToolRowRead({ kind: book, id: 8, initiative_id: 3, parent_id: 5, tags: [PICKED] }),
-          ],
-          total_count: 1,
-          page: 1,
-          page_size: 0,
-          has_next: false,
-          has_prev: false,
-        })
-      )
-    );
-
-    expect(await screen.findByRole("link", { name: "Classics" })).toHaveAttribute(
-      "href",
-      "/c/1/tags/99"
-    );
-  });
-});
-
-describe("an item of a tool plug-in", () => {
-  it("is shared as its tool is, so it offers no access settings of its own", async () => {
-    show(book, { can: ownerCan() });
-
-    expect(await offered()).toEqual(["Archive", "Delete"]);
-  });
-
-  it("offers its actions where its page's layout does not place them", async () => {
-    show(book, { can: ownerCan() }, { placeBookActions: false });
-
-    expect(await offered()).toEqual(["Archive", "Delete"]);
-  });
-
-  it("is deleted by whoever may change it, and sent to the trash by its kind", async () => {
-    const deleted: string[] = [];
-    server.use(
-      communityHttp.delete("/plugin-tools/:kind/:id", ({ params }) => {
-        deleted.push(`${params.kind}/${params.id}`);
-        return new HttpResponse(null, { status: 204 });
-      })
-    );
-    show(book, { can: ownerCan({ delete: false, edit: false }) });
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Actions" }));
-    expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["Delete"]);
-    await user.click(screen.getByRole("menuitem", { name: "Delete" }));
-    await user.click(
-      within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Delete" })
-    );
+    await user.click(await screen.findByRole("combobox"));
+    await user.click(await screen.findByRole("option", { name: "Classics" }));
 
-    await waitFor(() => expect(deleted).toEqual([`${book}/8`]));
-  });
-
-  it("offers nothing to someone who may not add to its tool", async () => {
-    show(book, { can: readerCan() });
-
-    expect((await screen.findAllByText("Middlemarch")).length).toBeGreaterThan(0);
-    expect(screen.queryByRole("button", { name: "Actions" })).not.toBeInTheDocument();
+    await waitFor(() => expect(sent).toEqual({ tag_ids: [99] }));
   });
 });
