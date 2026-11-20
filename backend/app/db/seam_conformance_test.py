@@ -37,6 +37,7 @@ from typing import get_args
 
 import pytest
 from fastapi.routing import APIWebSocketRoute, iter_route_contexts
+from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -81,6 +82,7 @@ from app.testing import (
     route_as_install,
 )
 from app.testing.plugin_clients import CLIENT, install_plugin
+from app.testing.tool_plugins import add_counter, install_tool_plugin
 
 pytestmark = pytest.mark.seam
 
@@ -432,6 +434,7 @@ def _opens(
 
 async def test_every_socket_admits_through_the_seam(
     session: AsyncSession,
+    client: AsyncClient,
     acting_user: Callable[..., Awaitable[Actor]],
     socket_client: TestClient,
 ) -> None:
@@ -445,6 +448,10 @@ async def test_every_socket_admits_through_the_seam(
     file = await create_file(session, initiative, owner)
     wiki = await create_wiki(session, initiative, owner)
     page = await create_wiki_page(session, wiki, owner)
+    seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
+    await install_tool_plugin(client, session, seat)
+    tools, tool_row, _ = await add_counter(session, guild.id, initiative.id)
+    (tool,) = tools.installed
 
     base = f"/api/v1/c/{guild.id}"
     #: Every socket, with the reader it admits (the community's administrator)
@@ -461,6 +468,9 @@ async def test_every_socket_admits_through_the_seam(
         ),
         "/api/v1/c/{community_id}/collaboration/wiki-pages/{page_id}/collaborate": (
             f"{base}/collaboration/wiki-pages/{page.id}/collaborate"
+        ),
+        "/api/v1/c/{community_id}/plugin-tools/{kind}/{row_id}/ws": (
+            f"{base}/plugin-tools/{tool.kind}/{tool_row}/ws"
         ),
     }
     served = {
