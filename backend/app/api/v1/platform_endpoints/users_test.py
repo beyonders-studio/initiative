@@ -398,7 +398,9 @@ async def test_search_users_returns_slim_paginated_envelope(client, acting_user)
     """The slim search endpoint returns a UserSummary envelope (no email /
     role / initiative_roles) and honours page_size."""
     caller = await acting_user(guild_role=CommunityRole.member, username="aaa-caller")
-    await acting_user(guild=caller.guild, username="bbb-other")
+    await acting_user(
+        guild_role=CommunityRole.admin, guild=caller.guild, username="bbb-other"
+    )
     await acting_user(guild=caller.guild, username="ccc-third")
 
     response = await client.get(
@@ -435,7 +437,8 @@ async def test_search_users_returns_slim_paginated_envelope(client, acting_user)
     # Asserted as a value, not only as a key. The schema leaves it unset, so a
     # key-set check passes just as happily on an endpoint that never fills it
     # in -- which is the state this test was written against.
-    assert summary["community_role"] == "member"
+    # The roster says who runs the place.
+    assert [item["community_role"] for item in body["items"]] == ["member", "admin"]
     # Nobody set a name in this guild.
     assert summary["display_name"] is None
 
@@ -458,26 +461,6 @@ async def test_search_users_can_list_the_caller_first(client, acting_user):
         "zzz-caller",
         "aaa-other",
     ]
-
-
-async def test_search_users_says_where_each_member_stands(client, acting_user):
-    """The roster says who runs the place.
-
-    A page listing people so somebody can reach one of them has to be able to
-    say which of them to reach about the community itself, and the role comes
-    off the join the query already makes.
-    """
-    admin = await acting_user(guild_role=CommunityRole.admin)
-    member = await acting_user(guild_role=CommunityRole.member, guild=admin.guild)
-
-    response = await client.get(admin.g("/users/search"), headers=admin.headers)
-    assert response.status_code == 200, response.text
-
-    roles = {
-        item["username"]: item["community_role"] for item in response.json()["items"]
-    }
-    assert roles[admin.user.username] == "admin"
-    assert roles[member.user.username] == "member"
 
 
 async def _dm_policy(session, policy: DmPolicy, *users) -> None:
@@ -765,9 +748,14 @@ async def test_user_cannot_update_email_via_patch(client, acting_user):
     assert response.json()["email"] == "original@example.com"
 
 
-async def test_user_can_change_password(client, acting_user):
-    """Changing your own password is confirmed with the current one."""
+async def test_user_can_change_password(client, session, acting_user):
+    """Changing your own password is confirmed with the current one, and
+    records when it was set."""
     a = await acting_user()
+    a.user.password_set_at = None
+    session.add(a.user)
+    await session.commit()
+    user_id = a.user.id
 
     # Missing current password is refused.
     missing = await client.patch(
@@ -795,26 +783,6 @@ async def test_user_can_change_password(client, acting_user):
     )
     assert ok.status_code == 200
 
-
-async def test_changing_a_password_records_when_it_was_set(
-    client, session, acting_user
-):
-    a = await acting_user()
-    a.user.password_set_at = None
-    session.add(a.user)
-    await session.commit()
-    user_id = a.user.id
-
-    response = await client.patch(
-        "/api/v1/me",
-        headers=a.headers,
-        json={
-            "current_password": "testpassword123",
-            "password": "a-new-and-longer-secret-1",
-        },
-    )
-    assert response.status_code == 200
-
     session.expire_all()
     refreshed = await session.get(User, user_id)
     assert refreshed.password_set_at is not None
@@ -838,12 +806,26 @@ async def test_inactive_user_cannot_access_endpoints(client, acting_user):
             {"timezone": "Invalid/Timezone"}, (400,), "timezone", id="not-a-timezone"
         ),
         pytest.param({"week_starts_on": 7}, (400, 422), None, id="weekday-outside-0-6"),
+        # A clock convention the app has no name for never reaches the column.
+        pytest.param(
+            {"time_format": "48"},
+            (400,),
+            "user_invalid_time_format",
+            id="unknown-time-format",
+        ),
+        pytest.param(
+            {"task_completion_visual_feedback": "fireworks"},
+            (422,),
+            "user_invalid_task_completion_visual_feedback",
+            id="unknown-visual-feedback",
+        ),
     ],
 )
 async def test_a_setting_outside_its_range_is_refused(
     client, acting_user, payload, accepted, in_detail
 ):
-    """A timezone the library doesn't know and a weekday past Saturday."""
+    """A timezone the library doesn't know, a weekday past Saturday, and a
+    value no option is named."""
     a = await acting_user()
 
     response = await client.patch("/api/v1/me", headers=a.headers, json=payload)
@@ -853,117 +835,43 @@ async def test_a_setting_outside_its_range_is_refused(
         assert in_detail in response.json()["detail"].lower()
 
 
-async def test_time_format_round_trip(client, acting_user):
-    """Each clock convention round-trips, and a new account answers "system"."""
+@pytest.mark.parametrize(
+    ("field", "default", "values"),
+    [
+        ("time_format", "system", ("12", "system", "24")),
+        (
+            "task_completion_visual_feedback",
+            "none",
+            ("none", "confetti", "heart", "d20", "gold_coin", "random"),
+        ),
+        ("task_completion_audio_feedback", True, (True, False)),
+        ("task_completion_haptic_feedback", True, (True, False)),
+        # Reading a new task's title is on until the account turns it off.
+        ("smart_task_titles", True, (True, False)),
+    ],
+)
+async def test_a_preference_round_trips_from_its_default(
+    client, acting_user, field, default, values
+):
+    """A new account answers the default, each option round-trips through
+    PATCH /me, and a write that leaves the field out keeps it as it was."""
     a = await acting_user()
 
     me = await client.get("/api/v1/me", headers=a.headers)
     assert me.status_code == 200
-    assert me.json()["time_format"] == "system"
+    assert me.json()[field] == default
 
-    for value in ("12", "24", "system"):
+    for value in values:
         response = await client.patch(
-            "/api/v1/me", headers=a.headers, json={"time_format": value}
+            "/api/v1/me", headers=a.headers, json={field: value}
         )
         assert response.status_code == 200, value
-        assert response.json()["time_format"] == value
+        assert response.json()[field] == value
 
-
-async def test_time_format_rejects_unknown(client, acting_user):
-    """A convention the app has no name for never reaches the column."""
-    a = await acting_user()
-
-    response = await client.patch(
-        "/api/v1/me", headers=a.headers, json={"time_format": "48"}
-    )
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == "USER_INVALID_TIME_FORMAT"
-
-
-async def test_task_completion_visual_feedback_round_trip(client, acting_user):
-    """Each known visual-feedback option round-trips through PATCH /me."""
-    a = await acting_user()
-
-    # Default value before any update
-    me = await client.get("/api/v1/me", headers=a.headers)
-    assert me.status_code == 200
-    assert me.json()["task_completion_visual_feedback"] == "none"
-
-    for value in ("confetti", "heart", "d20", "gold_coin", "random", "none"):
-        response = await client.patch(
-            "/api/v1/me",
-            headers=a.headers,
-            json={"task_completion_visual_feedback": value},
-        )
-        assert response.status_code == 200, value
-        assert response.json()["task_completion_visual_feedback"] == value
-
-
-async def test_task_completion_visual_feedback_rejects_unknown(client, acting_user):
-    """Unknown values are rejected with 422 so garbage doesn't reach the column."""
-    a = await acting_user()
-
-    response = await client.patch(
-        "/api/v1/me",
-        headers=a.headers,
-        json={"task_completion_visual_feedback": "fireworks"},
-    )
-
-    assert response.status_code == 422
-    assert response.json()["detail"] == "USER_INVALID_TASK_COMPLETION_VISUAL_FEEDBACK"
-
-
-async def test_task_completion_audio_and_haptic_round_trip(client, acting_user):
-    """Audio + haptic boolean prefs round-trip and default to True."""
-    a = await acting_user()
-
-    # Both default to True for new users.
-    me = await client.get("/api/v1/me", headers=a.headers)
-    assert me.status_code == 200
-    body = me.json()
-    assert body["task_completion_audio_feedback"] is True
-    assert body["task_completion_haptic_feedback"] is True
-
-    # Toggle both off, then both on.
-    for value in (False, True):
-        response = await client.patch(
-            "/api/v1/me",
-            headers=a.headers,
-            json={
-                "task_completion_audio_feedback": value,
-                "task_completion_haptic_feedback": value,
-            },
-        )
-        assert response.status_code == 200, value
-        result = response.json()
-        assert result["task_completion_audio_feedback"] is value
-        assert result["task_completion_haptic_feedback"] is value
-
-
-async def test_smart_task_titles_round_trip(client, acting_user):
-    """Reading a new task's title is on until the account turns it off."""
-    a = await acting_user()
-
-    me = await client.get("/api/v1/me", headers=a.headers)
-    assert me.status_code == 200
-    assert me.json()["smart_task_titles"] is True
-
-    for value in (False, True):
-        response = await client.patch(
-            "/api/v1/me", headers=a.headers, json={"smart_task_titles": value}
-        )
-        assert response.status_code == 200, value
-        assert response.json()["smart_task_titles"] is value
-
-    # Left out of a write, it stays as it was.
-    await client.patch(
-        "/api/v1/me", headers=a.headers, json={"smart_task_titles": False}
-    )
     response = await client.patch(
         "/api/v1/me", headers=a.headers, json={"locale": "en"}
     )
-    assert response.json()["smart_task_titles"] is False
+    assert response.json()[field] == values[-1]
 
 
 def _parse_csv(body: bytes) -> tuple[list[str], list[list[str]]]:
@@ -1184,41 +1092,24 @@ async def test_a_password_change_that_cannot_open_a_session_is_refused(
     assert again.status_code == 200
 
 
-async def test_users_me_reports_linked_identity(client, session, acting_user):
+async def test_me_reports_your_own_linked_identity(client, session, acting_user):
     """/me carries has_federated_identity — the signal the profile and
-    deletion dialogs use to hide the password confirmation for SSO accounts."""
+    deletion dialogs use to hide the password confirmation for SSO accounts.
+    PATCH /me reads the caller's own identity links on their platform tier and
+    carries the answer back, for an empty update and a real one."""
     linked = await acting_user()
     await create_federated_identity(session, linked.user)
     plain = await acting_user()
 
-    response = await client.get("/api/v1/me", headers=linked.headers)
-    assert response.status_code == 200
-    assert response.json()["has_federated_identity"] is True
+    for answer, headers in ((True, linked.headers), (False, plain.headers)):
+        response = await client.get("/api/v1/me", headers=headers)
+        assert response.status_code == 200
+        assert response.json()["has_federated_identity"] is answer
 
-    response = await client.get("/api/v1/me", headers=plain.headers)
-    assert response.status_code == 200
-    assert response.json()["has_federated_identity"] is False
-
-
-async def test_updating_yourself_reports_your_own_linked_identity(
-    client, session, acting_user
-):
-    """PATCH /me reads the caller's own identity links on their platform
-    tier and carries the answer back, for an empty update and a real one."""
-    linked = await acting_user()
-    await create_federated_identity(session, linked.user)
-    plain = await acting_user()
-
-    for body in ({}, {"timezone": "Europe/Berlin"}):
-        response = await client.patch("/api/v1/me", headers=linked.headers, json=body)
-        assert response.status_code == 200, response.text
-        assert response.json()["has_federated_identity"] is True
-
-    response = await client.patch(
-        "/api/v1/me", headers=plain.headers, json={"timezone": "Europe/Berlin"}
-    )
-    assert response.status_code == 200, response.text
-    assert response.json()["has_federated_identity"] is False
+        for body in ({}, {"timezone": "Europe/Berlin"}):
+            response = await client.patch("/api/v1/me", headers=headers, json=body)
+            assert response.status_code == 200, response.text
+            assert response.json()["has_federated_identity"] is answer
 
 
 async def _just_signed_in(session: AsyncSession, user: User) -> dict[str, str]:
@@ -1236,11 +1127,29 @@ async def _just_signed_in(session: AsyncSession, user: User) -> dict[str, str]:
     }
 
 
-async def test_oidc_user_can_self_delete_without_password(client, session):
-    """An SSO-provisioned account holds no usable password, so there is none
-    for the gate to ask for: it deletes with the confirmation phrase alone."""
+@pytest.mark.parametrize("credential", ["oidc", "passkey"])
+async def test_an_account_without_a_password_self_deletes_with_the_phrase(
+    client, session, credential
+):
+    """An SSO-provisioned account, or one that signs in with a passkey, holds
+    no usable password, so there is none for the gate to ask for: it deletes
+    with the confirmation phrase alone."""
     user = await create_user(session, hashed_password=None)
-    await create_federated_identity(session, user, subject="oidc-subject-123")
+    if credential == "oidc":
+        await create_federated_identity(session, user, subject="oidc-subject-123")
+    else:
+        session.add(
+            UserPasskey(
+                user_id=user.id,
+                credential_id=b"delete-account-key",
+                public_key=b"public-key-bytes",
+                rp_id="localhost",
+                sign_count=0,
+                transports=["internal"],
+                name="Laptop",
+            )
+        )
+        await session.commit()
 
     response = await client.post(
         "/api/v1/me/delete-account",
@@ -1256,39 +1165,6 @@ async def test_oidc_user_can_self_delete_without_password(client, session):
     body = response.json()
     assert body["success"] is True
     assert body["action"] == "soft_delete"
-
-
-async def test_a_passkey_only_account_can_self_delete_without_a_password(
-    client, session
-):
-    """The account signs in with a credential and holds no password at all.
-    What it is asked for is the phrase."""
-    user = await create_user(session, hashed_password=None)
-    session.add(
-        UserPasskey(
-            user_id=user.id,
-            credential_id=b"delete-account-key",
-            public_key=b"public-key-bytes",
-            rp_id="localhost",
-            sign_count=0,
-            transports=["internal"],
-            name="Laptop",
-        )
-    )
-    await session.commit()
-
-    response = await client.post(
-        "/api/v1/me/delete-account",
-        headers=await _just_signed_in(session, user),
-        json={
-            "action": "soft_delete",
-            "password": "",
-            "confirmation_text": "DELETE MY ACCOUNT",
-        },
-    )
-
-    assert response.status_code == 200, response.text
-    assert response.json()["action"] == "soft_delete"
 
 
 @pytest.mark.parametrize(
@@ -1526,18 +1402,6 @@ async def test_presence_outlives_the_socket_that_set_it(client, session, acting_
     assert response.json()["presence"] == "busy"
 
 
-async def test_presence_rejects_a_value_that_is_not_one(client, acting_user):
-    a = await acting_user()
-
-    response = await client.patch(
-        "/api/v1/me",
-        headers=a.headers,
-        json={"presence": "invisible"},
-    )
-
-    assert response.status_code == 422
-
-
 @pytest.mark.parametrize(
     ("username", "discriminator", "handle"),
     [
@@ -1662,13 +1526,15 @@ async def test_custom_status_holds_the_line_to_its_length(client, acting_user):
         {"profile_decorations": {"hat": "core.aurora"}},
         {"profile_decorations": {"trophies": ["a", "b", "c", "d", "e", "f", "g"]}},
         {"profile_decorations": {"frame": "core.gold", "frame_tint": ["puce"]}},
+        {"presence": "invisible"},
     ],
 )
 async def test_profile_writes_reject_a_shape_that_is_not_the_shape(
     client, acting_user, payload: dict
 ):
     """Text where an emoji goes, a key nothing wears, a path where an id goes,
-    more trophies than a profile has room for, and a colour that is not one."""
+    more trophies than a profile has room for, a colour that is not one, and
+    a presence that is not one."""
     a = await acting_user()
 
     response = await client.patch("/api/v1/me", headers=a.headers, json=payload)
@@ -1676,10 +1542,13 @@ async def test_profile_writes_reject_a_shape_that_is_not_the_shape(
     assert response.status_code == 422
 
 
-async def test_library_lists_what_ships_with_the_app(client, acting_user):
-    """A fresh account has the shipped set and nothing else, and none of it
-    names a pack — nobody granted it."""
+async def test_library_carries_what_a_pack_granted(client, session, acting_user):
+    """An account has the shipped set, none of which names a pack — nobody
+    granted it. An acquired decoration joins it and says where it came from,
+    so a picker can group by pack — and somebody else's acquisitions are not
+    in it."""
     a = await acting_user()
+    other = await create_user(session)
 
     response = await client.get("/api/v1/me/decorations", headers=a.headers)
 
@@ -1689,13 +1558,6 @@ async def test_library_lists_what_ships_with_the_app(client, acting_user):
     assert all(item["source"] is None for item in items)
     assert {item["kind"] for item in items} == {"banner", "frame", "trophy"}
 
-
-async def test_library_carries_what_a_pack_granted(client, session, acting_user):
-    """An acquired decoration joins the shipped set and says where it came
-    from, so a picker can group by pack — and somebody else's acquisitions are
-    not in it."""
-    a = await acting_user()
-    other = await create_user(session)
     session.add(
         UserDecoration(
             user_id=a.user.id,
@@ -1996,8 +1858,9 @@ async def test_installing_a_pack_twice_changes_nothing(client, session, acting_u
 
 async def test_removing_a_pack_takes_off_what_was_worn(client, session, acting_user):
     """Giving a pack back undresses the profile of its pieces, and leaves
-    another pack's alone."""
+    another pack's alone — and somebody else's library."""
     a = await acting_user()
+    other = await acting_user()
     tabletop = await create_profile_pack(session, uid="PACKTABTP00001", slug="tt")
     music = await create_profile_pack(
         session, uid="PACKBAND000001", public_id="test.music", slug="mu"
@@ -2006,6 +1869,9 @@ async def test_removing_a_pack_takes_off_what_was_worn(client, session, acting_u
         await client.post(
             f"/api/v1/me/decoration-packs/{listing.uid}", headers=a.headers
         )
+    await client.post(
+        f"/api/v1/me/decoration-packs/{tabletop.uid}", headers=other.headers
+    )
     await client.patch(
         "/api/v1/me",
         headers=a.headers,
@@ -2034,21 +1900,6 @@ async def test_removing_a_pack_takes_off_what_was_worn(client, session, acting_u
 
     library = await client.get("/api/v1/me/decorations", headers=a.headers)
     assert "tt.trophy" not in {item["id"] for item in library.json()["items"]}
-
-
-async def test_removing_a_pack_leaves_someone_elses_library_alone(
-    client, session, acting_user
-):
-    a = await acting_user()
-    other = await acting_user()
-    listing = await create_profile_pack(session, uid="PACKTABTP00001", slug="tt")
-    for who in (a, other):
-        await client.post(
-            f"/api/v1/me/decoration-packs/{listing.uid}", headers=who.headers
-        )
-
-    await client.delete(f"/api/v1/me/decoration-packs/{listing.uid}", headers=a.headers)
-
     library = await client.get("/api/v1/me/decorations", headers=other.headers)
     assert "tt.trophy" in {item["id"] for item in library.json()["items"]}
 

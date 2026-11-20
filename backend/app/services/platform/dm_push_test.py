@@ -225,30 +225,6 @@ class TestTheLink:
 class TestDelivery:
     """What the join is for."""
 
-    async def test_a_message_pushes_the_phone_that_can_read_it(
-        self, client, session, acting_user
-    ):
-        a = await acting_user()
-        b = await acting_user()
-        conversation_id, device_id, _, _ = await _channel(client, session, a, b)
-
-        with patch(
-            "app.services.platform.push_notifications.send_push_notification",
-            new_callable=AsyncMock,
-            return_value=(True, False),
-        ) as send:
-            await _send(client, a, conversation_id, device_id)
-
-        assert send.await_count == 1
-        kwargs = send.await_args.kwargs
-        # It names the sender so the notification shade is worth reading, and
-        # carries a path so tapping it lands somewhere.
-        assert kwargs["title"]
-        assert kwargs["data"]["target_path"] == "/messages"
-        # Nothing about which conversation: that would put who-talks-to-whom
-        # through a push service, which is the one thing this is built not to do.
-        assert conversation_id not in repr(send.await_args)
-
     async def test_the_phone_is_still_woken_after_its_sign_in_is_renewed(
         self, client, session, acting_user
     ):
@@ -321,6 +297,14 @@ class TestDelivery:
         await settle()
 
         assert send.await_count == 4
+        kwargs = send.await_args.kwargs
+        # It names the sender so the notification shade is worth reading, and
+        # carries a path so tapping it lands somewhere.
+        assert kwargs["title"]
+        assert kwargs["data"]["target_path"] == "/messages"
+        # Nothing about which conversation: that would put who-talks-to-whom
+        # through a push service, which is the one thing this is built not to do.
+        assert conversation_id not in repr(send.await_args)
         alerts = [frame for frame in desktop.sent if frame["resource"] == "alert"]
         assert len(alerts) == 4
         assert len({str(frame["ids"]) for frame in alerts}) == 1
@@ -393,20 +377,27 @@ class TestDelivery:
 
         assert send.await_count == 0
 
-    async def test_a_silent_send_wakes_nobody(self, client, session, acting_user):
-        """A client reporting that it read something is not news."""
-        a = await acting_user()
-        b = await acting_user()
-        conversation_id, device_id, _, _ = await _channel(client, session, a, b)
 
-        with patch(
-            "app.services.platform.push_notifications.send_push_notification",
-            new_callable=AsyncMock,
-            return_value=(True, False),
-        ) as send:
-            await _send(client, a, conversation_id, device_id, silent=True)
-
-        assert send.await_count == 0
+async def _ask_own_history(
+    client, conversation_id, sender_device, sender_headers, *, wake: bool = True
+):
+    """A silent envelope to the sender's own device, as a history ask sends it
+    (``wake``) or as an ordinary receipt does."""
+    return await client.post(
+        f"/api/v1/me/dm/conversations/{conversation_id}/messages",
+        json={
+            "messages": [
+                {
+                    "recipient_device_id": sender_device,
+                    "message_type": 0,
+                    "payload": base64.b64encode(b"ask").decode(),
+                }
+            ],
+            "silent": True,
+            **({"wake_own_devices": True} if wake else {}),
+        },
+        headers=sender_headers,
+    )
 
 
 class TestWakingOwnDevices:
@@ -428,20 +419,8 @@ class TestWakingOwnDevices:
             new_callable=AsyncMock,
             return_value=(True, False),
         ) as send:
-            response = await client.post(
-                f"/api/v1/me/dm/conversations/{conversation_id}/messages",
-                json={
-                    "messages": [
-                        {
-                            "recipient_device_id": sender_device,
-                            "message_type": 0,
-                            "payload": base64.b64encode(b"ask").decode(),
-                        }
-                    ],
-                    "silent": True,
-                    "wake_own_devices": True,
-                },
-                headers=sender_headers,
+            response = await _ask_own_history(
+                client, conversation_id, sender_device, sender_headers
             )
         assert response.status_code == 200, response.text
 
@@ -472,20 +451,8 @@ class TestWakingOwnDevices:
             new_callable=AsyncMock,
             return_value=(True, False),
         ) as send:
-            await client.post(
-                f"/api/v1/me/dm/conversations/{conversation_id}/messages",
-                json={
-                    "messages": [
-                        {
-                            "recipient_device_id": sender_device,
-                            "message_type": 0,
-                            "payload": base64.b64encode(b"ask").decode(),
-                        }
-                    ],
-                    "silent": True,
-                    "wake_own_devices": True,
-                },
-                headers=sender_headers,
+            await _ask_own_history(
+                client, conversation_id, sender_device, sender_headers
             )
 
         assert send.await_count == 0
@@ -519,20 +486,8 @@ class TestWakingOwnDevices:
             new_callable=AsyncMock,
             return_value=(True, False),
         ) as send:
-            await client.post(
-                f"/api/v1/me/dm/conversations/{conversation_id}/messages",
-                json={
-                    "messages": [
-                        {
-                            "recipient_device_id": sender_device,
-                            "message_type": 0,
-                            "payload": base64.b64encode(b"ask").decode(),
-                        }
-                    ],
-                    "silent": True,
-                    "wake_own_devices": True,
-                },
-                headers=sender_headers,
+            await _ask_own_history(
+                client, conversation_id, sender_device, sender_headers
             )
 
         assert send.await_count == 1
@@ -540,9 +495,11 @@ class TestWakingOwnDevices:
     async def test_an_ordinary_silent_send_still_wakes_nobody(
         self, client, session, acting_user
     ):
+        """A client reporting that it read something is not news, to the other
+        party or to the account's own other phone."""
         a = await acting_user()
         b = await acting_user()
-        conversation_id, _, sender_device, sender_headers = await _channel(
+        conversation_id, device_id, sender_device, sender_headers = await _channel(
             client, session, a, b
         )
         await _install(client, session, a, seed=11)
@@ -552,19 +509,9 @@ class TestWakingOwnDevices:
             new_callable=AsyncMock,
             return_value=(True, False),
         ) as send:
-            await client.post(
-                f"/api/v1/me/dm/conversations/{conversation_id}/messages",
-                json={
-                    "messages": [
-                        {
-                            "recipient_device_id": sender_device,
-                            "message_type": 0,
-                            "payload": base64.b64encode(b"receipt").decode(),
-                        }
-                    ],
-                    "silent": True,
-                },
-                headers=sender_headers,
+            await _send(client, a, conversation_id, device_id, silent=True)
+            await _ask_own_history(
+                client, conversation_id, sender_device, sender_headers, wake=False
             )
 
         assert send.await_count == 0

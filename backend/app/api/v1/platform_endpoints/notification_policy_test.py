@@ -177,7 +177,8 @@ async def test_the_seat_sets_its_communitys_answers(
     ]
     assert stored["allow_push_notifications"] is False
     assert stored["redact_notification_content"] is True
-    assert not (await notification_policy.resolve(session, seat.guild.id)).push
+    resolved = await notification_policy.resolve(session, seat.guild.id)
+    assert (resolved.push, resolved.redact) == (False, True)
 
     # They apply while it holds the ``restrictions`` option they need.
     await guild_administration(session, seat.guild, auth_options=[])
@@ -231,3 +232,9 @@ async def test_one_communitys_answer_does_not_reach_another(
     assert stored["allow_push_notifications"] is True
     assert stored["allow_email_notifications"] is True
     assert stored["redact_notification_content"] is False
+    assert await notification_policy.resolve(session, elsewhere.id) == (
+        notification_policy.UNRESTRICTED
+    )
+    assert await notification_policy.resolve(session, None) == (
+        notification_policy.UNRESTRICTED
+    )

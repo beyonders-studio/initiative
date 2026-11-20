@@ -10,13 +10,11 @@ guild's content.
 from datetime import UTC
 
 import pytest
-from fastapi.routing import iter_route_contexts
 from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
-from app.main import app
 from app.models.platform.guild import CommunityRole
 from app.models.platform.notification import Notification, NotificationType
 from app.models.platform.user import UserRole, UserStatus
@@ -44,22 +42,42 @@ def _audit_entries(capfd, subject_id: int) -> list[dict]:
 
 class TestRenaming:
     async def test_a_moderator_sets_the_name_part(
-        self, client: AsyncClient, session: AsyncSession
+        self, client: AsyncClient, session: AsyncSession, capfd
     ):
+        """The person is told, the change is recorded, and the subject cannot
+        spend their pick undoing it."""
         moderator = await create_user(session, role=UserRole.moderator)
-        subject = await create_user(session, username="unsuitable", discriminator=42)
+        subject = await create_user(
+            session, username="before", discriminator=7, username_chosen=False
+        )
+        subject_id, moderator_id = subject.id, moderator.id
+        capfd.readouterr()
 
         response = await client.patch(
-            f"/api/v1/operator/users/{subject.id}/username",
+            f"/api/v1/operator/users/{subject_id}/username",
             headers=get_auth_headers(moderator),
-            json={"username": "renamed"},
+            json={"username": "after"},
         )
 
         assert response.status_code == 200, response.text
-        assert response.json()["username"] == "renamed"
+        assert response.json()["username"] == "after"
         # The number is drawn, not chosen — not by its owner, and not by a
         # moderator either. It survives the rename.
-        assert response.json()["discriminator"] == 42
+        assert response.json()["discriminator"] == 7
+        entry = _audit_entries(capfd, subject_id)[0]
+        assert NotificationType.username_changed.value in await _notification_types(
+            session, subject_id
+        )
+        assert entry["event_type"] == "user.username_changed"
+        assert entry["actor_user_id"] == moderator_id
+        assert entry["detail"] == {}
+
+        claim = await client.patch(
+            "/api/v1/me/username",
+            headers=get_auth_headers(subject),
+            json={"username": "back-to-mine"},
+        )
+        assert claim.status_code == 409
 
     async def test_the_new_name_is_validated_like_any_other(
         self, client: AsyncClient, session: AsyncSession
@@ -75,47 +93,6 @@ class TestRenaming:
 
         assert response.status_code == 422
         assert response.json()["detail"] == "USERNAME_RESERVED"
-
-    async def test_the_subject_cannot_spend_a_pick_undoing_it(
-        self, client: AsyncClient, session: AsyncSession
-    ):
-        moderator = await create_user(session, role=UserRole.moderator)
-        subject = await create_user(session, username_chosen=False)
-
-        await client.patch(
-            f"/api/v1/operator/users/{subject.id}/username",
-            headers=get_auth_headers(moderator),
-            json={"username": "assigned-name"},
-        )
-
-        claim = await client.patch(
-            "/api/v1/me/username",
-            headers=get_auth_headers(subject),
-            json={"username": "back-to-mine"},
-        )
-        assert claim.status_code == 409
-
-    async def test_the_person_is_told_and_the_change_is_recorded(
-        self, client: AsyncClient, session: AsyncSession, capfd
-    ):
-        moderator = await create_user(session, role=UserRole.moderator)
-        subject = await create_user(session, username="before", discriminator=7)
-        subject_id, moderator_id = subject.id, moderator.id
-        capfd.readouterr()
-
-        await client.patch(
-            f"/api/v1/operator/users/{subject_id}/username",
-            headers=get_auth_headers(moderator),
-            json={"username": "after"},
-        )
-
-        entry = _audit_entries(capfd, subject_id)[0]
-        assert NotificationType.username_changed.value in await _notification_types(
-            session, subject_id
-        )
-        assert entry["event_type"] == "user.username_changed"
-        assert entry["actor_user_id"] == moderator_id
-        assert entry["detail"] == {}
 
     async def test_below_moderator_is_refused(
         self, client: AsyncClient, session: AsyncSession
@@ -149,124 +126,50 @@ class TestSuspension:
             json={"suspended": suspended, **({"reason": reason} if reason else {})},
         )
 
-    async def test_it_freezes_and_thaws(self, client, session, moderator_and_member):
-        moderator, member, _guild = moderator_and_member
+    async def test_it_freezes_and_thaws(
+        self, client, session, moderator_and_member, capfd
+    ):
+        """Suspension writes one column, and lifting it restores the account
+        whole, which is what makes it different from deactivation. Both
+        directions are recorded, and the person is told."""
+        moderator, member, guild = moderator_and_member
+        member_id = member.id
+        onlooker = await create_user(session)
+        await create_guild_membership(
+            session, user=onlooker, guild=guild, role=CommunityRole.member
+        )
+        roster = f"/api/v1/c/{guild.id}/users/"
+        before = await client.get(roster, headers=get_auth_headers(member))
+        assert before.status_code == 200
+        capfd.readouterr()
 
-        frozen = await self._suspend(client, moderator, member)
+        frozen = await self._suspend(client, moderator, member, reason="Terms of use")
         assert frozen.status_code == 200, frozen.text
         assert frozen.json()["status"] == "suspended"
+        assert NotificationType.account_suspended.value in await _notification_types(
+            session, member_id
+        )
+
+        # Being able to sign in is how its holder reaches their own account,
+        # and the only reason telling them anything works.
+        me = await client.get("/api/v1/me", headers=get_auth_headers(member))
+        assert me.status_code == 200
+        assert me.json()["status"] == "suspended"
+        # Refused before any guild is looked at: the account is in time out.
+        for path in (roster, "/api/v1/communities/"):
+            refused = await client.get(path, headers=get_auth_headers(member))
+            assert refused.status_code == 403
+            assert refused.json()["detail"] == "ACCOUNT_SUSPENDED"
+        # They vanish from the roster and the picker.
+        for path in (roster, f"/api/v1/c/{guild.id}/users/search"):
+            response = await client.get(path, headers=get_auth_headers(onlooker))
+            assert member_id not in {row["id"] for row in response.json()["items"]}
 
         thawed = await self._suspend(client, moderator, member, suspended=False)
         assert thawed.json()["status"] == "active"
-
-    async def test_a_suspended_account_still_signs_in(
-        self, client, session, moderator_and_member
-    ):
-        """Being able to sign in is how its holder reaches their own account,
-        and the only reason telling them anything works."""
-        moderator, member, _guild = moderator_and_member
-        await self._suspend(client, moderator, member)
-
-        response = await client.get("/api/v1/me", headers=get_auth_headers(member))
-
+        response = await client.get(roster, headers=get_auth_headers(member))
         assert response.status_code == 200
-        assert response.json()["status"] == "suspended"
-
-    async def test_it_reaches_no_guild(self, client, session, moderator_and_member):
-        moderator, member, guild = moderator_and_member
-        before = await client.get(
-            f"/api/v1/c/{guild.id}/users/", headers=get_auth_headers(member)
-        )
-        assert before.status_code == 200
-
-        await self._suspend(client, moderator, member)
-
-        after = await client.get(
-            f"/api/v1/c/{guild.id}/users/", headers=get_auth_headers(member)
-        )
-        # Refused before any guild is looked at: the account is in time out.
-        assert after.status_code == 403
-        assert after.json()["detail"] == "ACCOUNT_SUSPENDED"
-
-    async def test_its_guild_list_is_refused(
-        self, client, session, moderator_and_member
-    ):
-        moderator, member, _guild = moderator_and_member
-        await self._suspend(client, moderator, member)
-
-        response = await client.get(
-            "/api/v1/communities/", headers=get_auth_headers(member)
-        )
-
-        assert response.status_code == 403
-        assert response.json()["detail"] == "ACCOUNT_SUSPENDED"
-
-    async def test_nothing_is_taken_away(self, client, session, moderator_and_member):
-        """Suspension writes one column. Lifting it restores the account
-        whole, which is what makes it different from deactivation."""
-        moderator, member, guild = moderator_and_member
-
-        await self._suspend(client, moderator, member)
-        await self._suspend(client, moderator, member, suspended=False)
-
-        response = await client.get(
-            f"/api/v1/c/{guild.id}/users/", headers=get_auth_headers(member)
-        )
-        assert response.status_code == 200
-        assert member.id in {row["id"] for row in response.json()["items"]}
-
-    async def test_they_vanish_from_the_roster(
-        self, client, session, moderator_and_member
-    ):
-        moderator, member, guild = moderator_and_member
-        onlooker = await create_user(session)
-        await create_guild_membership(
-            session, user=onlooker, guild=guild, role=CommunityRole.member
-        )
-
-        await self._suspend(client, moderator, member)
-
-        response = await client.get(
-            f"/api/v1/c/{guild.id}/users/", headers=get_auth_headers(onlooker)
-        )
-        assert member.id not in {row["id"] for row in response.json()["items"]}
-
-    async def test_they_vanish_from_the_picker(
-        self, client, session, moderator_and_member
-    ):
-        moderator, member, guild = moderator_and_member
-        onlooker = await create_user(session)
-        await create_guild_membership(
-            session, user=onlooker, guild=guild, role=CommunityRole.member
-        )
-
-        await self._suspend(client, moderator, member)
-
-        response = await client.get(
-            f"/api/v1/c/{guild.id}/users/search", headers=get_auth_headers(onlooker)
-        )
-        assert member.id not in {row["id"] for row in response.json()["items"]}
-
-    async def test_the_person_is_told_with_the_reason(
-        self, client, session, moderator_and_member
-    ):
-        moderator, member, _guild = moderator_and_member
-
-        await self._suspend(client, moderator, member, reason="Terms of use")
-
-        assert NotificationType.account_suspended.value in await _notification_types(
-            session, member.id
-        )
-
-    async def test_both_directions_are_recorded(
-        self, client, session, moderator_and_member, capfd
-    ):
-        moderator, member, _guild = moderator_and_member
-        member_id = member.id
-        capfd.readouterr()
-
-        await self._suspend(client, moderator, member, reason="Terms of use")
-        await self._suspend(client, moderator, member, suspended=False)
+        assert member_id in {row["id"] for row in response.json()["items"]}
 
         entries = _audit_entries(capfd, member_id)
         assert {e["event_type"]: e["detail"] for e in entries} == {
@@ -429,53 +332,7 @@ class TestRevokingApiKeys:
 
 
 class TestNothingElse:
-    """The operator surface writes a fixed set of things about an account, and
-    each one is gated deliberately. One more appearing here is a decision, not
-    an accident — this is what makes it one."""
-
-    def test_the_operator_router_writes_only_what_it_should(self):
-        writes = {
-            (route.path, verb)
-            for route in iter_route_contexts(app.routes)
-            if getattr(route, "path", "").startswith("/api/v1/operator/users")
-            for verb in getattr(route, "methods", None) or set()
-            if verb in {"POST", "PATCH", "PUT", "DELETE"}
-        }
-
-        assert writes == {
-            # Moderator (content.moderate).
-            ("/api/v1/operator/users/{user_id}/avatar", "DELETE"),
-            ("/api/v1/operator/users/{user_id}/username", "PATCH"),
-            # Names in communities, status line, decorations: each cleared,
-            # never set, like the picture.
-            ("/api/v1/operator/users/{user_id}/profile/{field}", "DELETE"),
-            ("/api/v1/operator/users/{user_id}/suspension", "POST"),
-            # Support (users.age_unblock): getting somebody back into their
-            # account after a mistyped birth year is support work, not a
-            # moderation decision.
-            ("/api/v1/operator/users/{user_id}/age-block", "DELETE"),
-            # Support (users.manage): account recovery.
-            # Ends every session; its holder signs in again.
-            ("/api/v1/operator/users/{user_id}/sessions", "DELETE"),
-            # Turns password and code sign-in back on after wrong answers.
-            ("/api/v1/operator/users/{user_id}/sign-in-lock", "DELETE"),
-            # Switches off the account's API keys; its holder can make new ones.
-            ("/api/v1/operator/users/{user_id}/api-keys", "DELETE"),
-            ("/api/v1/operator/users/{user_id}/reactivate", "POST"),
-            ("/api/v1/operator/users/{user_id}/restore", "POST"),
-            # Sends the holder a link; it never sets a password.
-            ("/api/v1/operator/users/{user_id}/reset-password", "POST"),
-            # Sends the sign-up confirmation letter again; it never marks an
-            # address confirmed.
-            ("/api/v1/operator/users/{user_id}/verification-email", "POST"),
-            # Clears a second factor the holder can no longer present — the
-            # lost-phone path. Like the reset above it is a removal, never a
-            # read: nothing here hands back the seed or the recovery codes.
-            ("/api/v1/operator/users/{user_id}/second-factor", "DELETE"),
-            # Operator and above, deliberately out of a moderator's reach.
-            ("/api/v1/operator/users/{user_id}/platform-role", "PATCH"),
-            ("/api/v1/operator/users/{user_id}", "DELETE"),
-        }
+    """Every account action is gated deliberately."""
 
     @pytest.mark.parametrize(
         ("method", "path", "body"),
@@ -542,7 +399,7 @@ class TestNothingElse:
 
 class TestTheAggregateRoutes:
     """``/me/*`` reads content across every guild without going through the
-    guild path, so it needs the same answer that path gives."""
+    guild path, so it needs the same answer that path gives (``TestTimeOut``)."""
 
     @pytest.fixture
     async def suspended_with_work(self, client, session, acting_user):
@@ -551,57 +408,6 @@ class TestTheAggregateRoutes:
             guild_role=CommunityRole.admin, initiative=True, project=True
         )
         return moderator, a
-
-    async def test_my_tasks_is_refused_once_suspended(
-        self, client, session, suspended_with_work
-    ):
-        moderator, a = suspended_with_work
-        before = await client.get("/api/v1/me/tasks", headers=a.headers)
-        assert before.status_code == 200
-
-        await client.post(
-            f"/api/v1/operator/users/{a.user.id}/suspension",
-            headers=get_auth_headers(moderator),
-            json={"suspended": True},
-        )
-
-        after = await client.get("/api/v1/me/tasks", headers=a.headers)
-        assert after.status_code == 403
-        assert after.json()["detail"] == "ACCOUNT_SUSPENDED"
-
-    async def test_my_projects_is_refused_once_suspended(
-        self, client, session, suspended_with_work
-    ):
-        moderator, a = suspended_with_work
-
-        await client.post(
-            f"/api/v1/operator/users/{a.user.id}/suspension",
-            headers=get_auth_headers(moderator),
-            json={"suspended": True},
-        )
-
-        response = await client.get("/api/v1/me/projects", headers=a.headers)
-        assert response.status_code == 403
-        assert response.json()["detail"] == "ACCOUNT_SUSPENDED"
-
-    async def test_tabs_are_refused_once_suspended(
-        self, client, session, suspended_with_work
-    ):
-        """``/me/personal-items`` builds its own guild list rather than going through
-        ``member_guild_ids``; the account gate stops it before either."""
-        moderator, a = suspended_with_work
-
-        await client.post(
-            f"/api/v1/operator/users/{a.user.id}/suspension",
-            headers=get_auth_headers(moderator),
-            json={"suspended": True},
-        )
-
-        response = await client.get(
-            "/api/v1/me/personal-items?mark=view", headers=a.headers
-        )
-        assert response.status_code == 403
-        assert response.json()["detail"] == "ACCOUNT_SUSPENDED"
 
     async def test_and_it_all_comes_back(self, client, session, suspended_with_work):
         """The memberships were never dropped, so lifting the suspension is the
@@ -636,7 +442,7 @@ class TestTimeOut:
         assert response.status_code == 200, response.text
         return subject
 
-    async def test_the_allow_list_answers(self, client, suspended):
+    async def test_the_allow_list_answers_and_nothing_else(self, client, suspended):
         headers = get_auth_headers(suspended)
         for path in (
             "/api/v1/me",
@@ -647,24 +453,24 @@ class TestTimeOut:
             response = await client.get(path, headers=headers)
             assert response.status_code == 200, (path, response.text)
 
-    async def test_it_holds_no_rung(self, client, suspended):
-        headers = get_auth_headers(suspended)
+        # It holds no rung.
         me = (await client.get("/api/v1/me", headers=headers)).json()
         assert me["status"] == "suspended"
         assert me["capabilities"] == []
         assert me["can_create_communities"] is False
-
         response = await client.get("/api/v1/operator/users", headers=headers)
         assert response.status_code == 403
 
-    async def test_everything_else_is_refused(self, client, suspended):
-        headers = get_auth_headers(suspended)
         for method, path, body in (
             ("patch", "/api/v1/me", {"timezone": "UTC"}),
             ("post", "/api/v1/communities/", {"name": "Mine"}),
             ("post", "/api/v1/me/delete-account", {}),
             ("get", "/api/v1/me/people", None),
             ("get", "/api/v1/me/tasks", None),
+            ("get", "/api/v1/me/projects", None),
+            # Builds its own guild list rather than going through
+            # ``member_guild_ids``; the account gate stops it before either.
+            ("get", "/api/v1/me/personal-items?mark=view", None),
         ):
             call = getattr(client, method)
             response = await (

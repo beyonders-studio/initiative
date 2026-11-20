@@ -243,12 +243,14 @@ async def _reread(session: AsyncSession, guild_id: int, model, row_id: int):
     return (await session.exec(select(model).where(model.id == row_id))).one_or_none()
 
 
-# --- the row goes ------------------------------------------------------------
-
-
-async def test_what_they_kept_goes(session: AsyncSession, role_session):
-    """Opens, bookmarks, subscriptions, orders and list views are one person's
-    own: theirs go, and someone else's stay."""
+@pytest.mark.parametrize(
+    "erase",
+    [user_service.soft_delete_user, user_service.hard_delete_user],
+    ids=["soft", "hard"],
+)
+async def test_erasure_leaves_each_row_as_it_should(
+    session: AsyncSession, role_session, erase
+):
     s = await _seed(session)
     await route_session_to_guild(session, s.guild_id)
     for person in (s.victim_id, s.keeper_id):
@@ -263,60 +265,9 @@ async def test_what_they_kept_goes(session: AsyncSession, role_session):
         session.add(
             ViewPreference(user_id=person, scope_key="view:project:1", value={})
         )
-    await session.commit()
-
-    await user_service.hard_delete_user(await role_session("app_admin"), s.victim_id)
-    session.expunge_all()
-    await route_session_to_guild(session, s.guild_id)
-    left = (await session.exec(select(PersonalItem.user_id))).all()
-    assert left == [s.keeper_id]
-    views = (await session.exec(select(ViewPreference.user_id))).all()
-    assert views == [s.keeper_id]
-
-
-async def test_their_grants_go(session: AsyncSession, role_session):
-    """Every per-person DAC grant in the schema, in one delete."""
-    s = await _seed(session)
-    await user_service.hard_delete_user(await role_session("app_admin"), s.victim_id)
-    session.expunge_all()
-    await route_session_to_guild(session, s.guild_id)
-    remaining = (
-        await session.exec(
-            select(ResourceGrant).where(ResourceGrant.user_id == s.victim_id)
-        )
-    ).all()
-    assert remaining == []
-
-
-async def test_what_a_webhook_calls_them_goes(session: AsyncSession, role_session):
-    """A subscription's receiver holds a name for each person it was told
-    about. Theirs goes, as every other outside party's does; the community's
-    and somebody else's stay."""
-    s = await _seed(session)
-    await webhook_refs.name_for_subscriber(
-        guild_id=s.guild_id,
-        plugin=None,
-        subscription_id=s.webhook,
-        actor_ids=(s.victim_id, s.keeper_id),
-    )
-
-    await user_service.soft_delete_user(await role_session("app_admin"), s.victim_id)
-    session.expunge_all()
-    await route_session_to_guild(session, s.guild_id)
-    left = (
-        await session.exec(select(WebhookRef.entity_type, WebhookRef.entity_id))
-    ).all()
-    assert sorted(left) == [("guild", s.guild_id), ("user", s.keeper_id)]
-
-
-async def test_links_to_them_go(session: AsyncSession, role_session):
-    """Every link with them on an end, whichever end; one to somebody else
-    stays."""
-    s = await _seed(session)
     task = relationships.Endpoint("task", s.task_id)
     victim = relationships.Endpoint("user", s.victim_id)
     keeper = relationships.Endpoint("user", s.keeper_id)
-    await route_session_to_guild(session, s.guild_id)
     for source, relationship_type, target in (
         (task, RelationshipType.depends_on, victim),
         (victim, RelationshipType.part_of, task),
@@ -326,131 +277,88 @@ async def test_links_to_them_go(session: AsyncSession, role_session):
             session, source=source, relationship_type=relationship_type, target=target
         )
     await session.commit()
+    await webhook_refs.name_for_subscriber(
+        guild_id=s.guild_id,
+        plugin=None,
+        subscription_id=s.webhook,
+        actor_ids=(s.victim_id, s.keeper_id),
+    )
 
-    await user_service.soft_delete_user(await role_session("app_admin"), s.victim_id)
+    await erase(await role_session("app_admin"), s.victim_id)
     session.expunge_all()
     await route_session_to_guild(session, s.guild_id)
+
+    # --- the row goes ---
+    # Opens, bookmarks, subscriptions, orders and list views are one person's
+    # own: theirs go, and someone else's stay.
+    assert (await session.exec(select(PersonalItem.user_id))).all() == [s.keeper_id]
+    assert (await session.exec(select(ViewPreference.user_id))).all() == [s.keeper_id]
+    # Every per-person DAC grant in the schema, in one delete.
+    assert (
+        await session.exec(
+            select(ResourceGrant).where(ResourceGrant.user_id == s.victim_id)
+        )
+    ).all() == []
+    # A subscription's receiver holds a name for each person it was told
+    # about. Theirs goes; the community's and somebody else's stay.
+    left = (
+        await session.exec(select(WebhookRef.entity_type, WebhookRef.entity_id))
+    ).all()
+    assert sorted(left) == [("guild", s.guild_id), ("user", s.keeper_id)]
+    # Every link with them on an end, whichever end; one to somebody else stays.
     left = (
         await session.exec(
             select(EntityRelationship.source_type, EntityRelationship.target_id)
         )
     ).all()
     assert left == [("task", s.keeper_id)]
+    # Losing the account ends the vendor access it opened and what a plug-in
+    # could do as them.
+    assert (
+        await _reread(session, s.guild_id, GuildPluginUserConnection, s.connection)
+        is None
+    )
+    assert await _reread(session, s.guild_id, PluginMemberConsent, s.consent) is None
+    # The reminder ledger is kept only to not send the same reminder twice: it
+    # can never match again, and it names somebody who is gone.
+    assert await _reread(session, s.guild_id, EventReminderDispatch, s.dispatch) is None
 
-
-# --- the row stays, un-attributed -------------------------------------------
-
-
-async def test_a_batched_line_forgets_who_acted(session: AsyncSession, role_session):
-    """Somebody else's queued lines survive, a reaction's and an assignment's
-    alike; the id and the name of the one who acted do not."""
-    s = await _seed(session)
-    await user_service.hard_delete_user(await role_session("app_admin"), s.victim_id)
+    # --- the row stays, un-attributed ---
+    # Somebody else's queued lines survive, a reaction's and an assignment's
+    # alike; the id and the name of the one who acted do not.
     for line in (s.reaction_line, s.assignment_line):
         row = await _reread(session, s.guild_id, BatchedNotice, line)
         assert row is not None
         assert row.actor_id is None
         assert row.actor_name == ANONYMIZED_MENTION_NAME
 
-
-# --- the row stays, still naming them ----------------------------------------
-
-
-async def test_their_comment_keeps_its_author(session: AsyncSession, role_session):
-    """Authorship is a weak reference: the thread still tells them apart."""
-    s = await _seed(session)
-    await user_service.hard_delete_user(await role_session("app_admin"), s.victim_id)
-    comment = await _reread(session, s.guild_id, Comment, s.comment_id)
-    assert comment is not None
-    assert comment.created_by == s.victim_id
-
-
-async def test_their_reaction_keeps_its_author(session: AsyncSession, role_session):
-    s = await _seed(session)
-    await user_service.hard_delete_user(await role_session("app_admin"), s.victim_id)
-    reaction = await _reread(session, s.guild_id, Reaction, s.reaction_id)
-    assert reaction is not None
-    assert reaction.created_by == s.victim_id
-
-
-async def test_a_block_they_placed_outlives_them(session: AsyncSession, role_session):
-    """A block outlives the membership it was placed on, and the account too."""
-    s = await _seed(session)
-    await user_service.soft_delete_user(await role_session("app_admin"), s.victim_id)
+    # --- the row stays, still naming them ---
+    # Authorship is a weak reference: the thread still tells them apart.
+    for model, row_id in ((Comment, s.comment_id), (Reaction, s.reaction_id)):
+        row = await _reread(session, s.guild_id, model, row_id)
+        assert row is not None
+        assert row.created_by == s.victim_id
+    # A block outlives the membership it was placed on, and the account too; a
+    # consent withdrawal they performed on somebody else's reads the same.
     row = await _reread(
         session, s.guild_id, GuildPluginUserConnection, s.blocked_connection
     )
     assert row is not None
     assert row.blocked_by_id == s.victim_id
-
-
-# --- the erasure path ends what the account opened ---------------------------
-
-
-@pytest.mark.parametrize(
-    "erase",
-    [user_service.soft_delete_user, user_service.hard_delete_user],
-    ids=["soft", "hard"],
-)
-async def test_erasure_ends_what_they_opened_to_plugins(
-    session: AsyncSession, role_session, erase
-):
-    """Losing the account ends the vendor access it opened and what a plug-in
-    could do as them, on both erasure paths."""
-    s = await _seed(session)
-    await erase(await role_session("app_admin"), s.victim_id)
-    assert (
-        await _reread(session, s.guild_id, GuildPluginUserConnection, s.connection)
-        is None
-    )
-    assert await _reread(session, s.guild_id, PluginMemberConsent, s.consent) is None
-
-
-async def test_the_reminder_ledger_forgets_them(session: AsyncSession, role_session):
-    """One row per (event, person), kept only to not send the same reminder
-    twice. It can never match again, and it names somebody who is gone."""
-    s = await _seed(session)
-    await user_service.hard_delete_user(await role_session("app_admin"), s.victim_id)
-    assert await _reread(session, s.guild_id, EventReminderDispatch, s.dispatch) is None
-
-
-# --- the row stays, still naming them ----------------------------------------
-
-
-async def test_a_consent_they_revoked_keeps_naming_them(
-    session: AsyncSession, role_session
-):
-    """Their own consents go; a withdrawal they performed on somebody else's is
-    a record of something they did, and reads like the block above."""
-    s = await _seed(session)
-    await user_service.soft_delete_user(await role_session("app_admin"), s.victim_id)
     row = await _reread(session, s.guild_id, PluginMemberConsent, s.revoked_consent)
     assert row is not None
     assert row.revoked_by_id == s.victim_id
-
-
-async def test_the_join_requests_stay_on_both_sides(
-    session: AsyncSession, role_session
-):
-    """A request carries a message its author wrote, and a ruling names the
-    manager who made it. Erasure keeps both, the way it keeps a comment."""
-    s = await _seed(session)
-    await user_service.hard_delete_user(await role_session("app_admin"), s.victim_id)
+    # A request carries a message its author wrote, and a ruling names the
+    # manager who made it. Erasure keeps both, the way it keeps a comment.
     made = await _reread(session, s.guild_id, InitiativeJoinRequest, s.own_request)
     assert made is not None
     assert made.user_id == s.victim_id
     ruled = await _reread(session, s.guild_id, InitiativeJoinRequest, s.ruled_request)
     assert ruled is not None
     assert ruled.resolved_by == s.victim_id
-
-
-async def test_the_webhook_they_registered_stays(session: AsyncSession, role_session):
-    """A subscription is the community's integration configuration, and its
-    reach is the scope it names rather than anyone's standing — so erasing the
-    person who registered it is not a decision about it. ``created_by`` records
-    who that was, like any other author column."""
-    s = await _seed(session)
-    await user_service.hard_delete_user(await role_session("app_admin"), s.victim_id)
+    # A subscription is the community's integration configuration, and its
+    # reach is the scope it names rather than anyone's standing — so erasing
+    # the person who registered it is not a decision about it.
     row = await _reread(session, s.guild_id, WebhookSubscription, s.webhook)
     assert row is not None
     assert row.active is True

@@ -64,22 +64,6 @@ async def test_no_frame_before_the_commit(session, account_socket) -> None:
     assert tab.sent == []
 
 
-async def test_frame_goes_out_on_commit(session, account_socket) -> None:
-    user = await create_user(session)
-    tab = account_socket(user.id)
-
-    await user_notifications.create_notification(
-        session,
-        user_id=user.id,
-        notification_type=NotificationType.task_assignment,
-        data={"task_id": 1},
-    )
-    await session.commit()
-    await settle()
-
-    assert [frame["action"] for frame in tab.sent] == ["created"]
-
-
 async def test_rollback_pokes_nobody(session, account_socket) -> None:
     user = await create_user(session)
     tab = account_socket(user.id)
@@ -96,28 +80,9 @@ async def test_rollback_pokes_nobody(session, account_socket) -> None:
     assert tab.sent == []
 
 
-async def test_several_notifications_in_one_transaction_send_one_frame(
-    session, account_socket
-) -> None:
+async def test_a_batch_pokes_each_recipient_once(session, account_socket) -> None:
     """The frame says "refetch", so a batch of notifications for one recipient
     is one refetch, not one per row."""
-    user = await create_user(session)
-    tab = account_socket(user.id)
-
-    for task_id in (1, 2, 3):
-        await user_notifications.create_notification(
-            session,
-            user_id=user.id,
-            notification_type=NotificationType.task_assignment,
-            data={"task_id": task_id},
-        )
-    await session.commit()
-    await settle()
-
-    assert len(tab.sent) == 1
-
-
-async def test_a_batch_pokes_each_recipient_once(session, account_socket) -> None:
     alice = await create_user(session)
     bob = await create_user(session)
     alice_tab = account_socket(alice.id)

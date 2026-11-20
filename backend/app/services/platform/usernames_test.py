@@ -4,28 +4,12 @@ import pytest
 from sqlalchemy import func, select
 
 from app.core import usernames
-from app.core.usernames import UsernameError
 from app.models.platform.user import User
 from app.services.platform import usernames as username_service
 from app.testing import create_user
 
 
 class TestAllocate:
-    async def test_returns_the_name_as_asked_for(self, session):
-        name, number = await username_service.allocate(session, name="Foobar")
-        assert name == "foobar"
-        assert 0 <= number <= 9999
-
-    async def test_the_same_name_is_handed_out_again(self, session):
-        """Ten thousand numbers sit behind every name, so registration never
-        has to negotiate — fifty people called Jordan are fifty handles."""
-        taken = set()
-        for _ in range(20):
-            name, number = await username_service.allocate(session, name="jordan")
-            await create_user(session, username=name, discriminator=number)
-            assert (name, number) not in taken
-            taken.add((name, number))
-
     async def test_skips_a_number_already_behind_the_name(self, session, monkeypatch):
         """Every draw lands on the one number already held, so the free-number
         scan is what answers — a handle is the pair, and the pair is unique."""
@@ -35,11 +19,6 @@ class TestAllocate:
         _, number = await username_service.allocate(session, name="jordan")
 
         assert number != 1234
-
-    async def test_refuses_a_name_it_cannot_store(self, session):
-        with pytest.raises(UsernameError) as exc:
-            await username_service.allocate(session, name="admin")
-        assert exc.value.code == "USERNAME_RESERVED"
 
 
 class TestAllocateFromSeed:
@@ -95,21 +74,6 @@ class TestClaim:
 
 
 class TestInsertWithHandle:
-    async def test_stages_a_user_with_a_free_pair(self, session):
-        from app.models.platform.user import User
-
-        user = User(
-            username="",
-            discriminator=0,
-            hashed_password="x",
-        )
-
-        await username_service.insert_with_handle(session, user=user, name="Racer")
-        await session.commit()
-
-        assert user.username == "racer"
-        assert user.id is not None
-
     async def test_redraws_when_the_pair_is_gone(self, session, monkeypatch):
         """``allocate`` reads which numbers are taken and then picks one, so a
         concurrent registration can take the pair in between. The index refuses

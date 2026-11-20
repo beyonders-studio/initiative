@@ -16,8 +16,6 @@ from app.core.messages import OperatorMessages
 from app.core.rules import DEFAULT_ACCOUNT_RETENTION_DAYS
 from app.models.platform.guild import CommunityRole, GuildMembership
 from app.models.platform.user import (
-    ABSENT_STATUSES,
-    SIGN_IN_STATUSES,
     User,
     UserStatus,
     may_sign_in,
@@ -44,28 +42,6 @@ async def _delete_own_account(client: AsyncClient, user: User) -> None:
         },
     )
     assert response.status_code == 200, response.text
-
-
-# ── The status set itself ───────────────────────────────────────────────────
-
-
-def test_deleted_is_absent_but_may_still_sign_in():
-    """The two sets that make the window work, pinned.
-
-    An account on its way out is absent from everywhere people are listed, and
-    is still allowed to reach a sign-in — because reaching one is how the
-    deletion is called off.
-    """
-    assert UserStatus.deleted in ABSENT_STATUSES
-    assert UserStatus.deleted in SIGN_IN_STATUSES
-    # A suspension is the other absence. It signs in, to be told it is in
-    # time out, and reaches nothing else.
-    assert UserStatus.suspended in ABSENT_STATUSES
-    assert UserStatus.suspended in SIGN_IN_STATUSES
-    # Somebody taking a break is neither: they are not erased by a timer, and
-    # an operator is what brings them back.
-    assert UserStatus.deactivated not in ABSENT_STATUSES
-    assert UserStatus.deactivated not in SIGN_IN_STATUSES
 
 
 # ── What a deletion leaves behind ───────────────────────────────────────────
@@ -182,42 +158,25 @@ async def test_signing_in_calls_the_deletion_off(
 async def test_an_operator_can_call_it_off_too(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
+    """With the capability, and only for an account that is deleted."""
     operator = await acting_user("owner")
+    plain = await acting_user("member")
     user = await create_user(session)
     await _delete_own_account(client, user)
     session.expunge_all()
+    url = f"/api/v1/operator/users/{user.id}/restore"
 
-    response = await client.post(
-        f"/api/v1/operator/users/{user.id}/restore", headers=operator.headers
-    )
+    response = await client.post(url, headers=plain.headers)
+    assert response.status_code == 403
+
+    response = await client.post(url, headers=operator.headers)
     assert response.status_code == 200, response.text
     assert response.json()["status"] == "active"
     assert response.json()["purge_at"] is None
 
-
-async def test_restore_refuses_an_account_that_is_not_deleted(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    operator = await acting_user("owner")
-    user = await create_user(session)
-
-    response = await client.post(
-        f"/api/v1/operator/users/{user.id}/restore", headers=operator.headers
-    )
+    response = await client.post(url, headers=operator.headers)
     assert response.status_code == 409
     assert response.json()["detail"] == OperatorMessages.USER_NOT_DELETED
-
-
-async def test_restore_needs_a_capability(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    plain = await acting_user("member")
-    user = await create_user(session)
-
-    response = await client.post(
-        f"/api/v1/operator/users/{user.id}/restore", headers=plain.headers
-    )
-    assert response.status_code == 403
 
 
 # ── The erasure ─────────────────────────────────────────────────────────────

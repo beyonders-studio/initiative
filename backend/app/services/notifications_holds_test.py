@@ -53,50 +53,83 @@ def _paused_until(moment: datetime, *, since: datetime | None = None) -> dict:
 # --- what is holding, and when it lifts --------------------------------------
 
 
-def test_nothing_holds_by_default():
-    assert notification_prefs.holds_in_force({}, tz_name="UTC", now=_at(12)) == []
-
-
-def test_a_running_pause_holds_until_its_end():
-    prefs = _paused_until(_at(9, day=20))
-    holds = notification_prefs.holds_in_force(prefs, tz_name="UTC", now=_at(12))
-    assert [hold.kind for hold in holds] == [HoldKind.pause]
-    assert holds[0].lifts_at == _at(9, day=20)
-
-
-def test_a_lapsed_pause_holds_nothing():
-    prefs = _paused_until(_at(9, day=8))
-    assert notification_prefs.holds_in_force(prefs, tz_name="UTC", now=_at(12)) == []
-
-
-def test_a_pause_booked_for_next_week_holds_nothing_yet():
-    """Booking a holiday is not the same as being on it."""
-    prefs = {
-        "pause": {
-            "since": _at(9, day=25).isoformat(),
-            "until": _at(9, day=30).isoformat(),
-        }
+_BOOKED = {
+    "pause": {
+        "since": _at(9, day=25).isoformat(),
+        "until": _at(9, day=30).isoformat(),
     }
-    assert notification_prefs.holds_in_force(prefs, tz_name="UTC", now=_at(12)) == []
+}
+_SEEN = _at(12) - timedelta(minutes=3)
+
+
+@pytest.mark.parametrize(
+    ("prefs", "last_active_at", "now", "expected"),
+    [
+        # Not knowing where somebody is delivers rather than holds.
+        pytest.param({}, None, _at(12), [], id="nothing-by-default-never-seen"),
+        pytest.param(
+            _paused_until(_at(9, day=20)),
+            None,
+            _at(12),
+            [(HoldKind.pause, _at(9, day=20))],
+            id="a-running-pause-until-its-end",
+        ),
+        pytest.param(_paused_until(_at(9, day=8)), None, _at(12), [], id="lapsed"),
+        # Booking a holiday is not the same as being on it.
+        pytest.param(_BOOKED, None, _at(12), [], id="booked-for-next-week"),
+        pytest.param(
+            _BOOKED,
+            None,
+            _at(12, day=26),
+            [(HoldKind.pause, _at(9, day=30))],
+            id="booked-once-it-starts",
+        ),
+        pytest.param(
+            NIGHT,
+            None,
+            _at(23),
+            [(HoldKind.quiet_hours, _at(7, day=10))],
+            id="the-nightly-window-until-it-closes",
+        ),
+        pytest.param(
+            {},
+            _SEEN,
+            _at(12),
+            [(HoldKind.present, _SEEN + notification_prefs.PRESENT_WITHIN)],
+            id="at-the-keyboard-for-the-idle-window",
+        ),
+        pytest.param({}, _at(10), _at(12), [], id="away-a-while"),
+        pytest.param(
+            {"away": {"respect": False}},
+            _at(12) - timedelta(minutes=1),
+            _at(12),
+            [],
+            id="presence-hold-switched-off",
+        ),
+        # Two clocks disagreeing must not hold somebody's mail indefinitely.
+        pytest.param(
+            {},
+            _at(18),
+            _at(12),
+            [(HoldKind.present, _at(12) + notification_prefs.PRESENT_WITHIN)],
+            id="a-stamp-from-the-future",
+        ),
+    ],
+)
+def test_what_is_holding_and_when_it_lifts(prefs, last_active_at, now, expected):
+    """Push is refused while anything holds."""
+    holds = notification_prefs.holds_in_force(
+        prefs, tz_name="UTC", last_active_at=last_active_at, now=now
+    )
+    assert [(hold.kind, hold.lifts_at) for hold in holds] == expected
     assert notification_prefs.reachable(
         prefs,
         category=MENTIONS,
         channel=Channel.push,
         tz_name="UTC",
-        now=_at(12),
-    )
-
-
-def test_a_pause_booked_for_next_week_holds_once_it_starts():
-    prefs = {
-        "pause": {
-            "since": _at(9, day=25).isoformat(),
-            "until": _at(9, day=30).isoformat(),
-        }
-    }
-    holds = notification_prefs.holds_in_force(prefs, tz_name="UTC", now=_at(12, day=26))
-    assert [hold.kind for hold in holds] == [HoldKind.pause]
-    assert holds[0].lifts_at == _at(9, day=30)
+        last_active_at=last_active_at,
+        now=now,
+    ) is (not expected)
 
 
 def test_mail_timed_to_land_inside_a_booked_pause_waits_for_the_end():
@@ -149,82 +182,7 @@ def test_a_window_closing_before_a_booked_pause_starts_is_still_reported():
     assert lift.kind is HoldKind.quiet_hours
 
 
-def test_the_nightly_window_holds_until_it_closes():
-    holds = notification_prefs.holds_in_force(NIGHT, tz_name="UTC", now=_at(23))
-    assert [hold.kind for hold in holds] == [HoldKind.quiet_hours]
-    assert holds[0].lifts_at == _at(7, day=10)
-
-
-def test_being_at_the_keyboard_holds_for_the_idle_window():
-    seen = _at(12) - timedelta(minutes=3)
-    holds = notification_prefs.holds_in_force(
-        {}, tz_name="UTC", last_active_at=seen, now=_at(12)
-    )
-    assert [hold.kind for hold in holds] == [HoldKind.present]
-    assert holds[0].lifts_at == seen + notification_prefs.PRESENT_WITHIN
-
-
-def test_having_been_away_a_while_holds_nothing():
-    assert (
-        notification_prefs.holds_in_force(
-            {}, tz_name="UTC", last_active_at=_at(10), now=_at(12)
-        )
-        == []
-    )
-
-
-def test_never_seen_reads_as_away():
-    """Not knowing where somebody is delivers rather than holds."""
-    assert (
-        notification_prefs.holds_in_force(
-            {}, tz_name="UTC", last_active_at=None, now=_at(12)
-        )
-        == []
-    )
-
-
-def test_the_presence_hold_can_be_switched_off():
-    prefs = {"away": {"respect": False}}
-    assert (
-        notification_prefs.holds_in_force(
-            prefs,
-            tz_name="UTC",
-            last_active_at=_at(12) - timedelta(minutes=1),
-            now=_at(12),
-        )
-        == []
-    )
-
-
-def test_a_stamp_from_the_future_holds_for_the_ordinary_window():
-    """Two clocks disagreeing must not hold somebody's mail indefinitely."""
-    holds = notification_prefs.holds_in_force(
-        {}, tz_name="UTC", last_active_at=_at(18), now=_at(12)
-    )
-    assert holds[0].lifts_at == _at(12) + notification_prefs.PRESENT_WITHIN
-
-
 # --- what each channel does about them ---------------------------------------
-
-
-@pytest.mark.parametrize(
-    "prefs,extra",
-    [
-        (_paused_until(_at(9, day=20)), {}),
-        (NIGHT, {}),
-        ({}, {"last_active_at": _at(12) - timedelta(minutes=1)}),
-    ],
-    ids=["pause", "quiet-hours", "already-here"],
-)
-def test_push_is_refused_while_anything_holds(prefs, extra):
-    assert not notification_prefs.reachable(
-        prefs,
-        category=MENTIONS,
-        channel=Channel.push,
-        tz_name="UTC",
-        now=_at(23) if prefs is NIGHT else _at(12),
-        **extra,
-    )
 
 
 @pytest.mark.parametrize(
@@ -287,23 +245,6 @@ def test_the_presence_hold_is_never_renewed():
         {}, category=MENTIONS, tz_name="UTC", last_active_at=seen, now=_at(12)
     )
     assert due - _at(12) <= notification_prefs.PRESENT_WITHIN
-
-
-def test_a_pause_holds_even_a_direct_mention():
-    """Standing down means standing down. A hold you have to keep checking is
-    not one."""
-    prefs = _paused_until(_at(9, day=20))
-    due = notification_prefs.email_due_at(
-        prefs, category=MENTIONS, tz_name="UTC", now=_at(12)
-    )
-    assert due == _at(9, day=20)
-    assert not notification_prefs.reachable(
-        prefs,
-        category=MENTIONS,
-        channel=Channel.push,
-        tz_name="UTC",
-        now=_at(12),
-    )
 
 
 # --- which hold lifted -------------------------------------------------------

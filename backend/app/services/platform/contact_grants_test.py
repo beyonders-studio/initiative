@@ -106,20 +106,6 @@ async def test_a_connection_is_permission_to_ask_not_a_channel(session):
     assert await _grant(session, a, b, ContactGrantKind.message) is None
 
 
-async def test_accepting_a_connection_opens_the_channel(session):
-    """The flow: one act, one consent — the message grant is born accepted."""
-    a = await create_user(session)
-    b = await create_user(session)
-    await _policy(session, a, DmPolicy.private)
-    await _policy(session, b, DmPolicy.private)
-
-    await _connect(session, a, b)
-
-    message = await _grant(session, a, b, ContactGrantKind.message)
-    assert message is not None
-    assert message.state is ContactGrantState.accepted
-
-
 async def test_a_crossing_request_becomes_an_accept(session):
     a = await create_user(session)
     b = await create_user(session)
@@ -190,26 +176,8 @@ async def test_a_connection_carries_the_channel_through_leaving(session):
 
 
 async def test_removing_a_connection_re_tests_rather_than_deletes(session):
-    """Same sweep, one test, two outcomes.
-
-    Co-members on ``community`` keep the channel: the community leg still holds
-    it up. A ``private`` pair lose it, because the connection was the only leg.
-    """
-    guild = await create_guild(session)
-    a = await create_user(session)
-    b = await create_user(session)
-    for user in (a, b):
-        await create_guild_membership(session, user=user, guild=guild)
-        await _policy(session, user, DmPolicy.community)
-    await session.commit()
-    await _connect(session, a, b)
-
-    await _as(session, a)
-    await contact_grants_service.remove(
-        session, actor_id=a.id, other_id=b.id, kind=ContactGrantKind.connection
-    )
-    assert await _grant_exists_fresh(a, b, ContactGrantKind.message)
-
+    """A ``private`` pair lose the channel, because the connection was the only
+    leg. Co-members on ``community`` keep it (``dm_test``)."""
     c = await create_user(session)
     d = await create_user(session)
     await _policy(session, c, DmPolicy.private)

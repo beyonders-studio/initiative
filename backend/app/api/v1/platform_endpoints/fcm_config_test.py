@@ -134,13 +134,8 @@ async def test_no_service_account_serves_the_relays_settings(
         "android_via_relay": True,
     }
 
-
-async def test_naming_no_platform_serves_no_relay_id(
-    client, monkeypatch, relay_android
-):
-    """The native shells ask only for the Firebase settings."""
-    _configure(monkeypatch, enabled=True, service_account=False)
-
+    # The native shells ask only for the Firebase settings, and naming no
+    # platform serves no relay id.
     response = await client.get(URL)
 
     assert response.json()["project_id"] == "beyonders-studio-app"
