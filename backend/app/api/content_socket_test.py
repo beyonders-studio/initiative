@@ -172,13 +172,13 @@ async def _watch(guild_id: int, group_id: int, token: str) -> InboundWebSocket:
 
 async def _group(client, session: AsyncSession, acting_user, owner) -> int:
     """Counters installed in ``owner``'s community, and a counter group
-    ``owner`` makes in its initiative."""
+    ``owner`` makes in its initiative, shared with nobody else."""
     seat = await acting_user(guild=owner.guild, guild_role=CommunityRole.superadmin)
     await install_tool_plugin(client, session, seat)
     made = await client.post(
         owner.g(f"/plugin-tools/{GROUP}/"),
         headers=owner.headers,
-        json={"initiative_id": owner.initiative.id, "name": "Scores"},
+        json={"initiative_id": owner.initiative.id, "name": "Scores", "grants": []},
     )
     assert made.status_code == 201, made.text
     return made.json()["id"]
@@ -195,7 +195,8 @@ async def test_a_reader_of_the_counter_group_is_seated_and_told_of_changes(
     room = resource_room(a.guild.id, GROUP, group_id)
     assert sockets.room_size(room) == 1
 
-    sockets.signal(a.guild.id, GROUP, group_id, "updated")
+    tools = await provisioned_tools(a.guild.id)
+    sockets.signal(a.guild.id, tools.by_kind[GROUP], group_id, "updated")
     await settle()
     await websocket.serving  # type: ignore[attr-defined]
 
