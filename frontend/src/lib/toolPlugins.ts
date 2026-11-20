@@ -16,6 +16,7 @@ import { type LucideIcon, type LucideProps, Puzzle } from "lucide-react";
 import { createElement, forwardRef, useEffect, useState } from "react";
 
 import {
+  type CommunityPluginListResponse,
   type CommunityPluginRead,
   CounterLook,
   type CurrencyCode,
@@ -295,6 +296,10 @@ export const installedTools = (
   plugins
     .filter((plugin) => plugin.enabled && plugin.available !== false)
     .flatMap((plugin) => installedTool(plugin) ?? []);
+
+/** What `useCommunityPlugins` selects for the installed tools. */
+export const selectInstalledTools = (data: Pick<CommunityPluginListResponse, "items">) =>
+  installedTools(data.items);
 
 /** The installed tool a kind belongs to, the tool's own or an item's, and its
  *  table; null for a kind none of them has. */

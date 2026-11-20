@@ -18,19 +18,17 @@ import { useTranslation } from "react-i18next";
 import type { ListLayoutReadKind } from "@/api/generated/initiativeAPI.schemas";
 import { ActionsPreview, regionsOf } from "@/components/layouts/details";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
+import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
 import { itemSaves } from "@/hooks/useFieldSave";
 import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
-import {
-  pluginToolRowSaves,
-  useInstalledTools,
-  usePluginToolRows,
-} from "@/hooks/usePluginToolRows";
+import { pluginToolRowSaves, usePluginToolRows } from "@/hooks/usePluginToolRows";
 import { usePropertyEnv } from "@/hooks/usePropertyEnv";
 import { useRouteId } from "@/hooks/useRouteId";
 import { useSaveLayouts, useToolLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import {
   type InstalledTool,
+  selectInstalledTools,
   type ToolTable,
   toolLayoutTarget,
   toolOfKind,
@@ -207,8 +205,8 @@ export const ToolPluginLayoutEditorPage = () => {
   const { layout } = useSearch({ strict: false }) as { layout?: string };
   const initiativeId = useRouteId("initiativeId");
   const parentId = useRouteId("parentId");
-  const installs = useInstalledTools();
-  const found = installs.status === "ready" ? toolOfKind(installs.tools, kind) : null;
+  const installs = useCommunityPlugins({ select: selectInstalledTools }).data;
+  const found = installs ? toolOfKind(installs, kind) : null;
   // An item table's layouts are under a row, and the tool's own under none.
   if (!found || initiativeId === null || (found.table.parent === null) !== (parentId === null)) {
     return null;

@@ -4,7 +4,7 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 
 import type {
   PluginToolActionRun,
@@ -29,34 +29,11 @@ import { invalidate, q } from "@/api/query-keys";
 import type { GrantsChange } from "@/hooks/toolHooks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
-import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
 import type { FieldSaveKind } from "@/hooks/useFieldSave";
 import { fetchAllPages } from "@/lib/fetchAllPages";
-import {
-  type InstalledTool,
-  installedTools,
-  type ToolRow,
-  type ToolTable,
-} from "@/lib/toolPlugins";
+import type { ToolRow, ToolTable } from "@/lib/toolPlugins";
 import type { MutationOpts } from "@/types/mutation";
 import type { LayoutEnv } from "@/ui/layouts/fields";
-
-/** The tools the community's tool plug-ins declare, as far as they are known:
- *  still being read, unread for a failure, or read. */
-export type InstalledTools =
-  | { status: "loading" }
-  | { status: "error"; retry: () => void }
-  | { status: "ready"; tools: InstalledTool[] };
-
-/** The tools the community's tool plug-ins declare, from the installs every
- *  member reads. A reader the installs are not read for has none. */
-export const useInstalledTools = (): InstalledTools => {
-  const { data, isError, isLoading, refetch } = useCommunityPlugins();
-  const tools = useMemo(() => (data ? installedTools(data.items) : []), [data]);
-  if (data) return { status: "ready", tools };
-  if (isError) return { status: "error", retry: () => void refetch() };
-  return isLoading ? { status: "loading" } : { status: "ready", tools };
-};
 
 /** Every row of `table` in one place, the tool's own in an initiative or an
  *  item table's under one row, live or archived, each with what its card

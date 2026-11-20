@@ -4,12 +4,14 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ToolBreadcrumb } from "@/components/tools/ToolBreadcrumb";
+import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
 import { itemSaves } from "@/hooks/useFieldSave";
-import { pluginToolRowSaves, useInstalledTools, usePluginToolRow } from "@/hooks/usePluginToolRows";
+import { pluginToolRowSaves, usePluginToolRow } from "@/hooks/usePluginToolRows";
 import { useRouteId } from "@/hooks/useRouteId";
 import { useToolLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import {
+  selectInstalledTools,
   toolLayoutTarget,
   toolOfKind,
   toolPluginListRoute,
@@ -41,8 +43,8 @@ export function ToolPluginRowPage() {
   const initiativeId = useRouteId("initiativeId");
   // The installs, the row and its page's layouts are read side by side: the
   // kind and the row are the URL's.
-  const installs = useInstalledTools();
-  const found = installs.status === "ready" ? toolOfKind(installs.tools, kind) : null;
+  const installs = useCommunityPlugins({ select: selectInstalledTools });
+  const found = installs.data ? toolOfKind(installs.data, kind) : null;
   const query = usePluginToolRow(kind, rowId);
   const row = useMemo(() => (query.data ? toolRow(query.data) : null), [query.data]);
   const table = found?.table;
@@ -60,15 +62,17 @@ export function ToolPluginRowPage() {
       : toolLayoutTarget(kind, initiativeId, parentId)
   );
 
-  if (installs.status === "loading" || query.isLoading) {
+  if (installs.isLoading || query.isLoading) {
     return (
       <SkeletonRegion>
         <DetailPageSkeleton />
       </SkeletonRegion>
     );
   }
-  if (installs.status === "error") {
-    return <StatusMessage title={t("tool.installsLoadError")} onRetry={installs.retry} />;
+  if (installs.isError) {
+    return (
+      <StatusMessage title={t("tool.installsLoadError")} onRetry={() => void installs.refetch()} />
+    );
   }
   if (!found || !table || !detail || !row || initiativeId === null) {
     return (
