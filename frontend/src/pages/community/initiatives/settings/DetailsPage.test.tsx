@@ -22,6 +22,7 @@ vi.mock("@/lib/mascotToast", () => ({
 }));
 
 import { toast } from "@/lib/mascotToast";
+import { TOOLS } from "@/lib/tools";
 
 import { DetailsPage } from "./DetailsPage";
 
@@ -293,7 +294,8 @@ describe("DetailsPage", () => {
       expect(reading).toHaveAttribute("aria-checked", "true");
       const cards = screen.getAllByRole("switch");
       expect(cards.at(-1)).toBe(reading);
-      expect(cards).toHaveLength(9);
+      // Every built-in tool, then the plug-in placed here and not the other.
+      expect(cards).toHaveLength(TOOLS.length + 1);
       const row = reading.closest("[data-slot='tool-card']") as HTMLElement;
       expect(within(row).getByText("A tool from the Reading plug-in.")).toBeInTheDocument();
       expect(within(row).getByText(/Visible to Member/)).toBeInTheDocument();
