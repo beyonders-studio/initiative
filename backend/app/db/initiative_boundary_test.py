@@ -2048,8 +2048,9 @@ async def test_notices_and_marks_keep_a_tool_plugins_rows_in_their_initiative(
             )
         ).all()
         if data.get("comment_id") == answered.json()["id"]
+        # A tool plug-in's row opens on its own page, in its initiative.
         and data.get("target_path")
-        == f"/go/{item_kind.replace('_', '-')}/{rows[item_kind]}"
+        == f"/i/{admin.initiative.id}/t/{item_kind}/{rows[item_kind]}"
     }
     assert told == {
         moderator_a.user.id: NotificationType.comment_reply,

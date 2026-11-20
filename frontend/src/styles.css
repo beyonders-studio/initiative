@@ -102,14 +102,6 @@ html[data-color-finish="metallic"] {
     color-mix(in oklch, white var(--sheen-low), transparent) 68%,
     transparent 85%
   );
-  --sheen-border: linear-gradient(
-    135deg,
-    var(--metal) 0%,
-    var(--border) 35%,
-    color-mix(in oklch, var(--metal) 50%, white) 50%,
-    var(--border) 65%,
-    var(--metal) 100%
-  );
   --sheen-polish: linear-gradient(
     180deg,
     color-mix(in oklch, white 30%, transparent) 0%,
@@ -160,11 +152,53 @@ html[data-color-finish="metallic"]
     .border-b,
     .border-l
   ):not([class*="hover:bg-"], input, textarea, select, :focus) {
+  /* Declared here rather than on the root so each surface's own
+     `--sheen-shift` reaches its stops. */
+  --sheen-border: linear-gradient(
+    135deg,
+    var(--metal) 0%,
+    var(--border) calc(35% + var(--sheen-shift)),
+    color-mix(in oklch, var(--metal) 50%, white) calc(50% + var(--sheen-shift)),
+    var(--border) calc(65% + var(--sheen-shift)),
+    var(--metal) 100%
+  );
   border-color: transparent;
   background:
     var(--sheen-over, none) padding-box,
     linear-gradient(var(--sheen-fill), var(--sheen-fill)) padding-box,
     var(--sheen-border) border-box;
+}
+
+/* As a card scrolls through the view, the light along its border slides with
+   it, as if the card passed under a fixed lamp. Only cards: a popover or
+   dialog runs its own enter animation, which this would replace. */
+@property --sheen-shift {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+
+@keyframes sheen-drift {
+  from {
+    --sheen-shift: -25%;
+  }
+  to {
+    --sheen-shift: 25%;
+  }
+}
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    html[data-color-finish="metallic"]
+      .bg-card:is(.border, .border-x, .border-y, .border-t, .border-r, .border-b, .border-l):not(
+        [class*="hover:bg-"],
+        [class*="animate-"],
+        :focus
+      ) {
+      animation: sheen-drift linear both;
+      animation-timeline: view();
+    }
+  }
 }
 
 html[data-color-finish="metallic"]

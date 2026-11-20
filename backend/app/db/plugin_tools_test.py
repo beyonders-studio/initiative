@@ -127,7 +127,7 @@ async def _columns(session: AsyncSession, schema: str) -> dict[str, set[str]]:
     [
         ("key", "Counter_group"),
         ("key", 'counter"; DROP TABLE tasks; --'),
-        ("key", "a" * 41),
+        ("key", "a" * 18),
         ("field", "id"),
         ("field", "parent_id"),
         ("field", "view mode"),

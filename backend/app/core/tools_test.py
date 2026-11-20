@@ -313,9 +313,11 @@ def test_tag_link_specs_carry_the_uniform_contract():
     from app.services.tenant.tags import TAG_LINKS
 
     for name, spec in TAG_LINKS.items():
+        assert spec.kind == name, name
         assert spec.kind in ENDPOINT_KINDS, name
-        assert ENDPOINT_KINDS[spec.kind].table == spec.entity.__tablename__, name
-        assert spec.kind.value == name, name
+        endpoint = ENDPOINT_KINDS[spec.kind]
+        assert endpoint.table == spec.table.name == spec.entity.__tablename__, name
+        assert endpoint.code == spec.code, name
 
 
 def test_every_tag_target_has_a_spec():
@@ -340,11 +342,11 @@ def test_a_tag_assignment_is_an_edge_like_any_other():
 
 
 def test_the_generic_tool_tags_route_is_the_only_tool_set_tags_surface():
-    # ONE generic route serves every tool — its {tool} path param is the Tool
-    # enum itself, so a new member is covered with no new endpoint. The
-    # content-level extras (tasks, events) take ``tag_ids`` on
-    # their own PATCH; the exact equality means a re-added set-tags route
-    # fails here.
+    # ONE generic route serves every tool in the community's tool set — its
+    # {tool} path param is any kind the set holds, a tool plug-in's included,
+    # so a new tool is covered with no new endpoint. The content-level extras
+    # (tasks, events) take ``tag_ids`` on their own PATCH; the exact equality
+    # means a re-added set-tags route fails here.
     from app.main import app
 
     spec = app.openapi()
@@ -359,10 +361,9 @@ def test_the_generic_tool_tags_route_is_the_only_tool_set_tags_surface():
     tool_param = next(
         p for p in spec["paths"][generic]["put"]["parameters"] if p["name"] == "tool"
     )
-    schema = tool_param["schema"]
-    ref = schema.get("$ref") or schema["allOf"][0]["$ref"]
-    enum_values = spec["components"]["schemas"][ref.rsplit("/", 1)[-1]]["enum"]
-    assert set(enum_values) == {t.value for t in Tool}
+    # A string, not the Tool enum: an installed tool's kind is no member of it.
+    assert tool_param["schema"]["type"] == "string"
+    assert "enum" not in tool_param["schema"]
 
 
 def test_every_tool_mounts_its_list_route():
