@@ -23,6 +23,7 @@ import { useCommunityPath } from "@/lib/communityUrl";
 import { toast } from "@/lib/mascotToast";
 import {
   fieldChange,
+  fieldChanges,
   fieldStart,
   fieldValue,
   type ToolActionDecl,
@@ -31,6 +32,7 @@ import {
   toolPluginListRoute,
   toolPluginRowRoute,
   toolText,
+  withChange,
 } from "@/lib/toolPlugins";
 import type { DialogProps } from "@/types/dialog";
 import { Button } from "@/ui/button";
@@ -141,33 +143,26 @@ export const RowActions = ({
     const given = (action.params ?? []).flatMap((key) =>
       table.fields
         .filter((field) => field.key === key)
-        .map((field) => fieldChange(field, fieldValue(answers, field)))
+        .map((field) => [field, fieldValue(answers, field)] as const)
     );
     run.mutate(
-      {
-        rowId: row.id,
-        actionId: action.id,
-        ...(given.length > 0
-          ? {
-              fields: Object.assign({}, ...given.map((change) => change.fields)),
-              people: Object.assign({}, ...given.map((change) => change.people)),
-            }
-          : {}),
-      },
+      { rowId: row.id, actionId: action.id, ...(given.length > 0 ? fieldChanges(given) : {}) },
       { onSuccess }
     );
   };
   const start = (action: ToolActionDecl) => {
     if (action.confirm || action.params?.length) {
       // Each param starts as a new row's field would.
-      const starts = table.fields
-        .filter((field) => action.params?.includes(field.key))
-        .map((field) => fieldChange(field, fieldStart(table.fields, field)));
-      setAnswers({
-        ...row,
-        fields: Object.assign({ ...row.fields }, ...starts.map((change) => change.fields)),
-        people: Object.assign({ ...row.people }, ...starts.map((change) => change.people)),
-      });
+      setAnswers(
+        withChange(
+          row,
+          fieldChanges(
+            table.fields
+              .filter((field) => action.params?.includes(field.key))
+              .map((field) => [field, fieldStart(table.fields, field)])
+          )
+        )
+      );
       setAsking(action);
     } else {
       go(action);
@@ -262,14 +257,9 @@ export const RowActions = ({
                     row={answers}
                     label={label}
                     value={fieldValue(answers, field)}
-                    onChange={(value) => {
-                      const change = fieldChange(field, value);
-                      setAnswers((held) => ({
-                        ...held,
-                        fields: { ...held.fields, ...change.fields },
-                        people: { ...held.people, ...change.people },
-                      }));
-                    }}
+                    onChange={(value) =>
+                      setAnswers((held) => withChange(held, fieldChange(field, value)))
+                    }
                     initiativeId={row.initiative_id}
                     canOpen={{ tool: table.kind, id: row.id }}
                   />

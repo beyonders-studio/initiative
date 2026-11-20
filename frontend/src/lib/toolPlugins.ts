@@ -392,6 +392,28 @@ export const fieldChange = (
     ? { people: { [field.key]: value as number | null } }
     : { fields: { [field.key]: value as PluginToolRowUpdateFields[string] } };
 
+/** Several fields' values as a change sends them, each as `fieldChange`
+ *  puts it. */
+export const fieldChanges = (
+  values: readonly (readonly [ToolFieldDecl, unknown])[]
+): Required<Pick<PluginToolRowUpdate, "fields" | "people">> => {
+  const changes = values.map(([field, value]) => fieldChange(field, value));
+  return {
+    fields: Object.assign({}, ...changes.map((change) => change.fields)),
+    people: Object.assign({}, ...changes.map((change) => change.people)),
+  };
+};
+
+/** `row` holding the values `change` sends. */
+export const withChange = <R extends Pick<PluginToolRowRead, "fields" | "people">>(
+  row: R,
+  change: Pick<PluginToolRowUpdate, "fields" | "people">
+): R => ({
+  ...row,
+  fields: { ...row.fields, ...change.fields },
+  people: { ...row.people, ...change.people },
+});
+
 /** A counter's bound as one row holds it: the number given, or the value of
  *  the field it names. */
 const boundOf = (row: PluginToolRowRead, bound: ToolBound | undefined): number | null => {
