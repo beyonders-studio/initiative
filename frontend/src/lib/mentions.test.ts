@@ -85,7 +85,8 @@ describe("what gets written into the comment", () => {
     const kind = "counter_group.tsjvtcm0s7gv2x";
     expect(entityMentionSyntax(kind, "Q1", 7)).toBe("#counter-group.tsjvtcm0s7gv2x[Q1](7)");
     expect(typeForTrigger(typeTrigger(kind))).toBe(kind);
-    expect(typeForTrigger("counter-group")).toBe(SearchEntityType.counter_group);
+    expect(typeForTrigger("calendar-event")).toBe(SearchEntityType.calendar_event);
+    expect(typeForTrigger("counter-group")).toBeUndefined();
     for (const word of ["counter.TSJV", "counter.a.b", "counter.", "1counter.abc"]) {
       expect(typeForTrigger(word)).toBeUndefined();
     }

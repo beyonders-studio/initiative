@@ -48,7 +48,7 @@ describe("resolveEntityPath", () => {
 
   it("addresses a reference to a tool plug-in's row as its /go link spells it", () => {
     expect(entityRefTypeFor("counter_group.abc123")).toBe("counter-group.abc123");
-    expect(entityRefTypeFor("counter_group")).toBe("counter-group");
+    expect(entityRefTypeFor("calendar_event")).toBe("calendar-event");
     expect(entityRefTypeFor("counter_group.ABC")).toBeNull();
   });
 

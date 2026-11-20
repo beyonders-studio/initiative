@@ -88,5 +88,6 @@ def test_the_word_after_a_hash_is_the_kind_kebabed():
     assert kind_for_trigger("counter-group.tsjvtcm0s7gv2x") == (
         "counter_group.tsjvtcm0s7gv2x"
     )
-    assert kind_for_trigger("counter-group") is SearchEntityType.counter_group
+    assert kind_for_trigger("calendar-event") is SearchEntityType.calendar_event
+    assert kind_for_trigger("counter-group") is None
     assert kind_for_trigger("wiki-page") is SearchEntityType.wiki_page
