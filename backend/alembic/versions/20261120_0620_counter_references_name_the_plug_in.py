@@ -132,8 +132,7 @@ def _as_json(value: Any) -> Any:
 @contextmanager
 def _held(bind: Connection, table: str) -> Iterator[None]:
     """Unforce the table's row security and hold its user triggers, restoring
-    both afterwards. A failure rolls the whole revision back, these changes
-    with it, so nothing is restored on that path."""
+    both afterwards."""
     forced = bind.execute(
         text("SELECT relforcerowsecurity FROM pg_class WHERE oid = to_regclass(:t)"),
         {"t": table},
@@ -141,144 +140,127 @@ def _held(bind: Connection, table: str) -> Iterator[None]:
     if forced:
         bind.exec_driver_sql(f'ALTER TABLE "{table}" NO FORCE ROW LEVEL SECURITY')
     bind.exec_driver_sql(f'ALTER TABLE "{table}" DISABLE TRIGGER USER')
-    yield
-    bind.exec_driver_sql(f'ALTER TABLE "{table}" ENABLE TRIGGER USER')
-    if forced:
-        bind.exec_driver_sql(f'ALTER TABLE "{table}" FORCE ROW LEVEL SECURITY')
+    try:
+        yield
+    finally:
+        bind.exec_driver_sql(f'ALTER TABLE "{table}" ENABLE TRIGGER USER')
+        if forced:
+            bind.exec_driver_sql(f'ALTER TABLE "{table}" FORCE ROW LEVEL SECURITY')
 
 
-def _columns(bind: Connection) -> list[tuple[str, str, str]]:
-    """Every text and JSON column of the schema's tables, and its type. A
-    ``character varying`` with a length holds a name, never a body."""
-    return [
-        (table, column, kind)
-        for table, column, kind in bind.execute(
-            text(
-                "SELECT c.relname, a.attname, format_type(a.atttypid, a.atttypmod)"
-                " FROM pg_class c JOIN pg_attribute a ON a.attrelid = c.oid"
-                " WHERE c.relnamespace = current_schema()::regnamespace"
-                " AND c.relkind = 'r' AND a.attnum > 0 AND NOT a.attisdropped"
-                " AND format_type(a.atttypid, a.atttypmod)"
-                " IN ('text', 'character varying', 'json', 'jsonb')"
-                " ORDER BY c.relname, a.attnum"
-            )
-        ).all()
-    ]
+def _columns(bind: Connection) -> dict[str, list[tuple[str, str]]]:
+    """Every text and JSON column of the schema's tables and its type, by
+    table. A ``character varying`` with a length holds a name, never a body."""
+    columns: dict[str, list[tuple[str, str]]] = {}
+    for table, column, kind in bind.execute(
+        text(
+            "SELECT c.relname, a.attname, format_type(a.atttypid, a.atttypmod)"
+            " FROM pg_class c JOIN pg_attribute a ON a.attrelid = c.oid"
+            " WHERE c.relnamespace = current_schema()::regnamespace"
+            " AND c.relkind = 'r' AND a.attnum > 0 AND NOT a.attisdropped"
+            " AND format_type(a.atttypid, a.atttypmod)"
+            " IN ('text', 'character varying', 'json', 'jsonb')"
+            " ORDER BY c.relname, a.attnum"
+        )
+    ).all():
+        columns.setdefault(table, []).append((column, kind))
+    return columns
 
 
-def _matches(bind: Connection, table: str, column: str, pattern: str) -> bool:
-    return bool(
-        bind.execute(
-            text(
-                f'SELECT EXISTS (SELECT 1 FROM "{table}"'
-                f' WHERE CAST("{column}" AS text) ~ :p)'
-            ),
-            {"p": pattern},
-        ).scalar()
-    )
-
-
-def _live_bodies(bind: Connection, forward: bool) -> None:
+def _live_bodies(bind: Connection, table: str, lexical: str, forward: bool) -> None:
     """Rewrite each body whose Yjs state names a kind to rewrite, through the
     editor, its JSON with it."""
     needles = _YJS_FORWARD if forward else _YJS_BACK
     found = " OR ".join(
         f"position(CAST(:n{i} AS bytea) IN yjs_state) > 0" for i in range(len(needles))
     )
-    params = {f"n{i}": needle for i, needle in enumerate(needles)}
-    started = False
-    for table, lexical in _LIVE_BODIES:
-        if not bind.execute(text("SELECT to_regclass(:t)"), {"t": table}).scalar():
+    rows = bind.execute(
+        text(
+            f'SELECT id, content, yjs_state FROM "{table}"'
+            f" WHERE {lexical} AND yjs_state IS NOT NULL AND ({found})"
+        ),
+        {f"n{i}": needle for i, needle in enumerate(needles)},
+    ).all()
+    if rows:
+        # An editor that cannot start fails the revision here.
+        await_only(editor_engine.bootstrap(None))
+    for row_id, content, state in rows:
+        try:
+            reading = await_only(editor_engine.render(bytes(state)))
+        except editor_engine.EditorError:
+            # A state the editor refuses opens nowhere: the body is its JSON,
+            # which the pass over JSON columns rewrites.
             continue
-        rows = bind.execute(
+        rewritten = _rewrite(reading, forward)
+        if rewritten == reading:
+            continue
+        doc = Doc()
+        doc.apply_update(bytes(state))
+        doc.apply_update(await_only(editor_engine.apply(bytes(state), rewritten)))
+        bind.execute(
             text(
-                f"SELECT id, content, yjs_state FROM {table}"
-                f" WHERE {lexical} AND yjs_state IS NOT NULL AND ({found})"
+                f'UPDATE "{table}" SET content = CAST(:c AS jsonb),'
+                " yjs_state = :s, yjs_updated_at = now() WHERE id = :id"
             ),
-            params,
-        ).all()
-        if not rows:
-            continue
-        with _held(bind, table):
-            for row_id, content, state in rows:
-                if not started:
-                    # An editor that cannot start fails the revision here.
-                    await_only(editor_engine.bootstrap(None))
-                    started = True
-                try:
-                    reading = await_only(editor_engine.render(bytes(state)))
-                except editor_engine.EditorError:
-                    # A state the editor refuses opens nowhere: the body is
-                    # its JSON, which the pass over JSON columns rewrites.
-                    continue
-                rewritten = _rewrite(reading, forward)
-                if rewritten == reading:
-                    continue
-                doc = Doc()
-                doc.apply_update(bytes(state))
-                doc.apply_update(
-                    await_only(editor_engine.apply(bytes(state), rewritten))
-                )
-                body = _rewrite(_as_json(content), forward)
-                bind.execute(
-                    text(
-                        f"UPDATE {table} SET content = CAST(:c AS jsonb),"
-                        " yjs_state = :s, yjs_updated_at = now() WHERE id = :id"
-                    ),
-                    {"c": json.dumps(body), "s": bytes(doc.get_update()), "id": row_id},
-                )
+            {
+                "c": json.dumps(_rewrite(_as_json(content), forward)),
+                "s": bytes(doc.get_update()),
+                "id": row_id,
+            },
+        )
 
 
-def _bodies(bind: Connection, forward: bool) -> None:
-    """Rewrite the reference nodes in every JSON column, row by row."""
+def _nodes(bind: Connection, table: str, column: str, kind: str, forward: bool) -> None:
+    """Rewrite the reference nodes in one JSON column, row by row."""
     pattern = _NODE_FORWARD if forward else _NODE_BACK
-    for table, column, kind in _columns(bind):
-        if kind not in ("json", "jsonb") or not _matches(bind, table, column, pattern):
-            continue
-        with _held(bind, table):
-            rows = bind.execute(
-                text(
-                    f'SELECT CAST(ctid AS text), "{column}" FROM "{table}"'
-                    f' WHERE CAST("{column}" AS text) ~ :p'
-                ),
-                {"p": pattern},
-            ).all()
-            for ctid, value in rows:
-                value = _as_json(value)
-                rewritten = _rewrite(value, forward)
-                if rewritten == value:
-                    continue
-                bind.execute(
-                    text(
-                        f'UPDATE "{table}" SET "{column}" = CAST(:v AS {kind})'
-                        " WHERE ctid = CAST(:ctid AS tid)"
-                    ),
-                    {"v": json.dumps(rewritten), "ctid": ctid},
-                )
-
-
-def _running_text(bind: Connection, forward: bool) -> None:
-    """Rewrite the ``#`` references in every text and JSON column."""
-    pattern, replacement = _TEXT_FORWARD if forward else _TEXT_BACK
-    for table, column, kind in _columns(bind):
-        if not _matches(bind, table, column, pattern):
-            continue
-        with _held(bind, table):
+    rows = bind.execute(
+        text(
+            f'SELECT CAST(ctid AS text), "{column}" FROM "{table}"'
+            f' WHERE CAST("{column}" AS text) ~ :p'
+        ),
+        {"p": pattern},
+    ).all()
+    for ctid, value in rows:
+        value = _as_json(value)
+        rewritten = _rewrite(value, forward)
+        if rewritten != value:
             bind.execute(
                 text(
-                    f'UPDATE "{table}" SET "{column}" = CAST(regexp_replace('
-                    f"CAST(\"{column}\" AS text), :p, :r, 'g') AS {kind})"
-                    f' WHERE CAST("{column}" AS text) ~ :p'
+                    f'UPDATE "{table}" SET "{column}" = CAST(:v AS {kind})'
+                    " WHERE ctid = CAST(:ctid AS tid)"
                 ),
-                {"p": pattern, "r": replacement},
+                {"v": json.dumps(rewritten), "ctid": ctid},
             )
 
 
+def _running_text(
+    bind: Connection, table: str, column: str, kind: str, forward: bool
+) -> None:
+    """Rewrite the ``#`` references in one text or JSON column."""
+    pattern, replacement = _TEXT_FORWARD if forward else _TEXT_BACK
+    bind.execute(
+        text(
+            f'UPDATE "{table}" SET "{column}" = CAST(regexp_replace('
+            f"CAST(\"{column}\" AS text), :p, :r, 'g') AS {kind})"
+            f' WHERE CAST("{column}" AS text) ~ :p'
+        ),
+        {"p": pattern, "r": replacement},
+    )
+
+
 def _apply(forward: bool) -> None:
+    """Each table, with its row security unforced so every row is read: its
+    Yjs states, then its JSON columns' nodes, then every column's text."""
     bind = op.get_bind()
-    _live_bodies(bind, forward)
-    _bodies(bind, forward)
-    _running_text(bind, forward)
+    live = dict(_LIVE_BODIES)
+    for table, columns in _columns(bind).items():
+        with _held(bind, table):
+            if table in live:
+                _live_bodies(bind, table, live[table], forward)
+            for column, kind in columns:
+                if kind in ("json", "jsonb"):
+                    _nodes(bind, table, column, kind, forward)
+                _running_text(bind, table, column, kind, forward)
 
 
 def upgrade() -> None:

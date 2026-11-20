@@ -106,10 +106,11 @@ export type ActiveMention = MentionQuery & {
   canCreate: boolean;
 };
 
-//: `@word`, or `#word`, or `#type:word` — anchored to the end of what has been
-//: typed, and only at a word boundary so an email address is not a mention.
+//: `@word`, or `#word`, or `#type:word` (a tool plug-in's type with its `.` and
+//: uid) — anchored to the end of what has been typed, and only at a word
+//: boundary so an email address is not a mention.
 const USER_PATTERN = /(^|[\s([{])@([^\s@#]*)$/;
-const ENTITY_PATTERN = /(^|[\s([{])#([\w-]*)(?::([^\s#]*))?$/;
+const ENTITY_PATTERN = /(^|[\s([{])#([\w-]*(?:\.[a-z0-9]*)?)(?::([^\s#]*))?$/;
 //: `[[name` — open brackets, then whatever is being named. Closing them is
 //: not required: the picker commits, the way it does for `@` and `#`.
 const LINK_PATTERN = /\[\[([^\]\n]*)$/;

@@ -54,6 +54,15 @@ describe("the mention being typed", () => {
     });
   });
 
+  it("narrows to a tool plug-in's kind, spelled as /go spells it", () => {
+    expect(activeMention("see #counter-group.tsjvtcm0s7gv2x:q1")).toMatchObject({
+      types: ["counter_group.tsjvtcm0s7gv2x"],
+      query: "q1",
+      length: "#counter-group.tsjvtcm0s7gv2x:q1".length,
+    });
+    expect(activeMention("see #counter.TSJV:q1")).toBeNull();
+  });
+
   it("reads @ as people and # as things", () => {
     expect(activeMention("hi @al")?.user).toBe(true);
     expect(activeMention("hi #al")?.user).toBe(false);
