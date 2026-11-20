@@ -35,21 +35,33 @@ const answerWithPeople = (...people: ReturnType<typeof buildUserSummary>[]) =>
   );
 
 describe("CommentContent", () => {
-  it("renders markdown inline formatting", () => {
-    const { container } = renderContent("Ship **now**, not *later*.");
+  it("renders markdown: inline formatting, lists, headings, code, GFM tables and strikethrough", () => {
+    const { container } = renderContent(
+      [
+        "Ship **now**, not *later*.",
+        "",
+        "## Plan",
+        "",
+        "- first",
+        "- second",
+        "",
+        "Run `pnpm test` first.",
+        "",
+        "| a | b |",
+        "| - | - |",
+        "| 1 | 2 |",
+        "",
+        "~~dropped~~",
+      ].join("\n")
+    );
 
     expect(container.querySelector("strong")).toHaveTextContent("now");
     expect(container.querySelector("em")).toHaveTextContent("later");
-  });
-
-  it("renders lists, headings, and code", () => {
-    const { container } = renderContent(
-      ["## Plan", "", "- first", "- second", "", "Run `pnpm test` first."].join("\n")
-    );
-
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Plan");
     expect(container.querySelectorAll("li")).toHaveLength(2);
     expect(container.querySelector("code")).toHaveTextContent("pnpm test");
+    expect(container.querySelectorAll("th")).toHaveLength(2);
+    expect(container.querySelector("del")).toHaveTextContent("dropped");
   });
 
   it("renders fenced code blocks without interpreting their contents", () => {
@@ -58,15 +70,6 @@ describe("CommentContent", () => {
     const code = container.querySelector("pre code");
     expect(code).toHaveTextContent("@[Ada](3) **not bold**");
     expect(container.querySelector("strong")).toBeNull();
-  });
-
-  it("renders GFM tables and strikethrough", () => {
-    const { container } = renderContent(
-      ["| a | b |", "| - | - |", "| 1 | 2 |", "", "~~dropped~~"].join("\n")
-    );
-
-    expect(container.querySelectorAll("th")).toHaveLength(2);
-    expect(container.querySelector("del")).toHaveTextContent("dropped");
   });
 
   it("keeps single newlines as line breaks", () => {

@@ -5,10 +5,7 @@ way ``files_formats_migration_test`` runs 20261026_0540."""
 
 from __future__ import annotations
 
-import importlib.util
 import json
-from pathlib import Path
-from types import ModuleType
 
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
@@ -16,17 +13,7 @@ from sqlalchemy import text
 
 from app.models.platform.user_view_preference import UserViewPreference
 from app.testing import create_file, create_guild, create_initiative, create_user
-
-_VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
-
-
-def _load(name: str) -> ModuleType:
-    path = _VERSIONS / name
-    spec = importlib.util.spec_from_file_location(path.stem, path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+from app.testing.later_revisions import load_revision
 
 
 def _in(schema: str, step):
@@ -70,7 +57,7 @@ async def test_files_of_a_category_s_formats_take_them(session) -> None:
     bundle = await uploaded("bundle.zip", "application/zip")
     notes = await uploaded("notes.txt", "text/plain")
     await session.commit()
-    files = _load("20261027_0548_files_take_their_categories.py")
+    files = load_revision("20261027_0548_files_take_their_categories.py")
 
     async def types() -> dict[int, tuple[str, str]]:
         result = await (await session.connection()).execute(
@@ -124,7 +111,7 @@ async def test_a_saved_files_view_filters_by_compressed(session) -> None:
     }
     session.add_all(rows.values())
     await session.commit()
-    kind = _load("20261027_0549_compressed_files_kind.py")
+    kind = load_revision("20261027_0549_compressed_files_kind.py")
 
     async def values() -> dict[str, dict]:
         result = await (await session.connection()).execute(

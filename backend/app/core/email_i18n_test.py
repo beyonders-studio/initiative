@@ -5,11 +5,8 @@ import pytest
 from app.core.email_i18n import email_t, translate
 
 
-def test_translate_resolves_email_namespace_by_default():
+def test_email_namespace_is_the_default_and_holds_rich_email_copy():
     assert translate("verification.subject", "en") == "Verify your Initiative account"
-
-
-def test_email_namespace_holds_rich_email_copy():
     # The email namespace carries subject + title + body for a notification.
     assert translate("event.invitation.subject", "en", event="Raid Night") == (
         "You're invited: Raid Night"
@@ -60,9 +57,6 @@ def test_translate_localizes_per_locale():
         )
         == "Léa a mentionné Donjon dans Quête"
     )
-
-
-def test_access_grant_level_word_is_localized():
     body = translate(
         "accessGrant.approved.body",
         "fr",
@@ -71,6 +65,7 @@ def test_access_grant_level_word_is_localized():
         level=translate("accessGrant.levelReadWrite", "fr", namespace="notifications"),
     )
     assert body == "Votre accès en lecture-écriture à Guilde a été approuvé"
+    assert email_t("verification.subject", "fr") == "Vérifiez votre compte Initiative"
 
 
 def test_translate_falls_back_to_english_for_untranslated_locale():
@@ -86,10 +81,6 @@ def test_translate_returns_key_when_missing_everywhere():
     assert translate("event.nope.missing", "en", namespace="notifications") == (
         "event.nope.missing"
     )
-
-
-def test_email_t_is_backward_compatible():
-    assert email_t("verification.subject", "fr") == "Vérifiez votre compte Initiative"
 
 
 def test_plural_selection_uses_count():

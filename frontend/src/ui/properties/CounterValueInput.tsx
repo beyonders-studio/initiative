@@ -6,6 +6,8 @@ interface CounterValueInputProps {
   /** Server-side count (string). The input syncs to this when not actively edited. */
   value: string;
   step?: string;
+  /** Shown as it is, read but not typed into: a reader's, drawn at full
+   *  strength, since it may be a scoreboard on the room's screen. */
   disabled?: boolean;
   /** Called with the typed value after blur, debounce, or Enter. */
   onCommit: (value: string) => void;
@@ -121,7 +123,7 @@ export const CounterValueInput = ({
       onChange={handleChange}
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
-      disabled={disabled}
+      readOnly={disabled}
       step={step}
       aria-label={ariaLabel}
       style={{
@@ -134,7 +136,7 @@ export const CounterValueInput = ({
       className={cn(
         "max-w-full appearance-none border-0 bg-transparent p-0 text-center font-mono font-semibold tabular-nums",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-current focus-visible:ring-offset-1 focus-visible:ring-offset-transparent",
-        "disabled:cursor-not-allowed disabled:opacity-60",
+        "read-only:cursor-default",
         "[&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
         sizeClass,
         className

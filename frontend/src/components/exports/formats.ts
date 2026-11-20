@@ -77,9 +77,10 @@ export const TOOL_EXPORT_FORMATS: Partial<Record<Tool, ExportFormatOption[]>> = 
   })
 );
 
-/** Formats a selection of one tool's rows can export: the tool's own, or for
- * files the ones every selected file's type shares. Null for a tool
- * with no export source. */
+/** Formats a selection of one built-in tool's rows can export: the tool's
+ * own, or for files the ones every selected file's type shares. Null for a
+ * tool with no export source. A tool plug-in's are its read's
+ * (`genericFormatOptions`). */
 export function selectionExportFormats(
   tool: Tool,
   items: { file_type?: FileType }[]
@@ -102,8 +103,9 @@ export const AGGREGATE_EXPORT_TOOLS: Tool[] = SIDEBAR_TOOLS.filter(
   (tool) => !NON_EXPORTABLE_TOOLS.has(tool)
 );
 
-/** A report's choices, labelled as anything but a tool's own export is. */
-const reportOptions = (formats: readonly string[]): ExportFormatOption[] =>
+/** Formats labelled as anything but a built-in tool's own export is: a
+ *  report's choices, and a tool plug-in's. */
+export const genericFormatOptions = (formats: readonly string[]): ExportFormatOption[] =>
   formats.map((format) => ({ format, labelKey: GENERIC_FORMAT_LABELS[format] }));
 
 /** Report-mode format choices per tool, from the tool's record. Files are
@@ -111,12 +113,15 @@ const reportOptions = (formats: readonly string[]): ExportFormatOption[] =>
 export const REPORT_TOOL_FORMATS: Partial<Record<Tool, ExportFormatOption[]>> = Object.fromEntries(
   TOOLS.flatMap((tool) => {
     const formats = toolReportFormats(tool);
-    return formats.length ? [[tool, reportOptions(formats)]] : [];
+    return formats.length ? [[tool, genericFormatOptions(formats)]] : [];
   })
 );
 
 /** Report-mode per-type file formats, from the files record. Whiteboards,
  * links and uploads ride in their canonical format and offer no choice. */
 export const REPORT_FILE_FORMATS = Object.fromEntries(
-  Object.entries(FILE_TYPE_REPORT_FORMATS).map(([type, formats]) => [type, reportOptions(formats)])
+  Object.entries(FILE_TYPE_REPORT_FORMATS).map(([type, formats]) => [
+    type,
+    genericFormatOptions(formats),
+  ])
 ) as Record<keyof typeof FILE_TYPE_REPORT_FORMATS, ExportFormatOption[]>;

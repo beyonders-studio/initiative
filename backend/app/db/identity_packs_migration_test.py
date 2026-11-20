@@ -10,9 +10,9 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import text
 
-from app.db.tool_layouts_migration_test import _load
 from app.models.platform.user_decoration import UserDecoration
 from app.testing import create_marketplace_listing, create_user
+from app.testing.later_revisions import load_revision
 
 _PRIDE = "5MT2WPY8CHRK61"
 _BOOKS = "M0X4JT8PW2GHK6"
@@ -64,7 +64,7 @@ async def test_the_packs_and_every_record_of_them_go(session) -> None:
         )
     await session.commit()
 
-    migration = _load("20261026_0537_identity_packs_leave")
+    migration = load_revision("20261026_0537_identity_packs_leave")
 
     def upgrade(sync_session) -> None:
         with Operations.context(MigrationContext.configure(sync_session.connection())):

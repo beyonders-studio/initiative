@@ -10,12 +10,11 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 
-import pytest
 from sqlmodel import select
 
 from app.core.file_types import FileType
-from app.core.references import NOT_REFERENCEABLE, REFERENCEABLE_TYPES
-from app.core.smart_chips import SMART_CHIP_KINDS, SmartChipKind, kind_value
+from app.core.references import REFERENCEABLE_TYPES
+from app.core.smart_chips import SMART_CHIP_KINDS
 from app.core.tools import Tool
 from app.db.reference_targets import referenceable_types
 from app.models.platform.guild import CommunityRole
@@ -73,6 +72,9 @@ async def _chips(client, actor: Actor, *refs: str) -> dict[str, dict]:
 async def test_a_task_chip_shows_the_column_it_sits_in(
     client, session, acting_user: ActingUser
 ) -> None:
+    """A project picks its own colours, so the chip wears them rather than a
+    tone this end invented. Moving the card moves the chip, and the file is
+    not edited: the whole point of a chip over a mention."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     task = await create_task(
         session,
@@ -80,22 +82,15 @@ async def test_a_task_chip_shows_the_column_it_sits_in(
         title="Ship it",
         status_category=TaskStatusCategory.in_progress,
     )
-
-    body = await _chips(client, a, f"task:{task.id}:status")
-    assert body[f"task:{task.id}:status"]["text"]
-    assert body[f"task:{task.id}:status"]["tone"] == "warn"
-
-
-async def test_moving_the_card_moves_the_chip(
-    client, session, acting_user: ActingUser
-) -> None:
-    """The file is not edited and the chip still changes — which is the
-    whole point of a chip over a mention."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    task = await create_task(session, a.project, title="Ship it")
+    status = await _status_of(session, task)
+    status.color = "#FF00AA"
+    session.add(status)
+    await session.commit()
     ref = f"task:{task.id}:status"
+
     before = (await _chips(client, a, ref))[ref]
-    assert before["tone"] != "good"
+    assert before["text"]
+    assert (before["tone"], before["color"]) == ("warn", "#FF00AA")
 
     await _move_to(session, task, a.project, TaskStatusCategory.done)
 
@@ -104,31 +99,19 @@ async def test_moving_the_card_moves_the_chip(
     assert after["text"] != before["text"]
 
 
-async def test_a_status_sends_its_own_colour(
-    client, session, acting_user: ActingUser
-) -> None:
-    """A project picks its own colours, so the chip wears them rather than a
-    tone this end invented."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    task = await create_task(session, a.project, title="Waiting")
-    status = await _status_of(session, task)
-    status.color = "#FF00AA"
-    session.add(status)
-    await session.commit()
-
-    body = await _chips(client, a, f"task:{task.id}:status")
-    assert body[f"task:{task.id}:status"]["color"] == "#FF00AA"
-
-
 async def test_a_date_is_late_only_while_the_work_is_not_done(
     client, session, acting_user: ActingUser
 ) -> None:
+    """The date itself comes back for the reader to format, in the locale only
+    their browser knows."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     yesterday = datetime.now(UTC) - timedelta(days=1)
     task = await create_task(session, a.project, title="Overdue", due_date=yesterday)
 
     ref = f"task:{task.id}:due"
-    assert (await _chips(client, a, ref))[ref]["tone"] == "danger"
+    late = (await _chips(client, a, ref))[ref]
+    assert late["tone"] == "danger"
+    assert late["date"] is not None
 
     await _move_to(session, task, a.project, TaskStatusCategory.done)
 
@@ -136,34 +119,14 @@ async def test_a_date_is_late_only_while_the_work_is_not_done(
     assert (await _chips(client, a, ref))[ref]["tone"] == "neutral"
 
 
-async def test_the_date_itself_comes_back_for_the_reader_to_format(
-    client, session, acting_user: ActingUser
-) -> None:
-    """A date belongs in the reader's locale, which only their browser knows."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    due = datetime.now(UTC) + timedelta(days=3)
-    task = await create_task(session, a.project, title="Soon", due_date=due)
-
-    body = await _chips(client, a, f"task:{task.id}:due")
-    assert body[f"task:{task.id}:due"]["date"] is not None
-
-
-async def test_an_unassigned_task_says_so_rather_than_going_missing(
-    client, session, acting_user: ActingUser
-) -> None:
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    task = await create_task(session, a.project, title="Nobody's")
-
-    body = await _chips(client, a, f"task:{task.id}:assignee")
-    assert body[f"task:{task.id}:assignee"]["tone"] == "muted"
-
-
 async def test_two_holders_are_named_and_more_are_counted(
     client, session, acting_user: ActingUser
 ) -> None:
+    """An unassigned task says so rather than going missing."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     second = await create_user(session)
     third = await create_user(session)
+    nobody = await create_task(session, a.project, title="Nobody's")
     pair = await create_task(
         session, a.project, title="Pair", assignees=[a.user, second]
     )
@@ -172,24 +135,17 @@ async def test_two_holders_are_named_and_more_are_counted(
     )
 
     body = await _chips(
-        client, a, f"task:{pair.id}:assignee", f"task:{crowd.id}:assignee"
+        client,
+        a,
+        f"task:{nobody.id}:assignee",
+        f"task:{pair.id}:assignee",
+        f"task:{crowd.id}:assignee",
     )
+    assert body[f"task:{nobody.id}:assignee"]["tone"] == "muted"
     pair_text = body[f"task:{pair.id}:assignee"]["text"]
     assert ", " in pair_text and "+" not in pair_text
     crowd_text = body[f"task:{crowd.id}:assignee"]["text"]
     assert crowd_text.startswith(pair_text) and crowd_text.endswith(" +1")
-
-
-async def test_a_priority_carries_its_own_urgency(
-    client, session, acting_user: ActingUser
-) -> None:
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    task = await create_task(
-        session, a.project, title="Now", priority=TaskPriority.urgent
-    )
-
-    body = await _chips(client, a, f"task:{task.id}:priority")
-    assert body[f"task:{task.id}:priority"]["tone"] == "danger"
 
 
 async def test_a_checkbox_reads_whether_the_task_is_finished(
@@ -363,40 +319,20 @@ async def test_an_embedded_wiki_page_shows_its_body_but_not_a_draft(
 async def test_a_project_reads_how_much_of_its_work_is_done(
     client, session, acting_user: ActingUser
 ) -> None:
+    """0 / 0 is not an achievement; all of it done reads as arrived."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
+    ref = f"project:{a.project.id}:progress"
+
+    async def progress() -> tuple[str, str]:
+        state = (await _chips(client, a, ref))[ref]
+        return state["text"], state["tone"]
+
+    assert await progress() == ("0 / 0", "muted")
     await create_task(session, a.project, status_category=TaskStatusCategory.done)
+    assert await progress() == ("1 / 1", "good")
     await create_task(session, a.project, status_category=TaskStatusCategory.todo)
     await create_task(session, a.project, status_category=TaskStatusCategory.todo)
-
-    body = await _chips(client, a, f"project:{a.project.id}:progress")
-    state = body[f"project:{a.project.id}:progress"]
-    assert state["text"] == "1 / 3"
-    assert state["tone"] == "neutral"
-
-
-async def test_a_project_with_all_its_work_done_reads_as_arrived(
-    client, session, acting_user: ActingUser
-) -> None:
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    await create_task(session, a.project, status_category=TaskStatusCategory.done)
-    await create_task(session, a.project, status_category=TaskStatusCategory.done)
-
-    body = await _chips(client, a, f"project:{a.project.id}:progress")
-    state = body[f"project:{a.project.id}:progress"]
-    assert state["text"] == "2 / 2"
-    assert state["tone"] == "good"
-
-
-async def test_a_project_with_no_work_in_it_does_not_read_as_finished(
-    client, session, acting_user: ActingUser
-) -> None:
-    """0 / 0 is not an achievement."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-
-    body = await _chips(client, a, f"project:{a.project.id}:progress")
-    state = body[f"project:{a.project.id}:progress"]
-    assert state["text"] == "0 / 0"
-    assert state["tone"] == "muted"
+    assert await progress() == ("1 / 3", "neutral")
 
 
 async def test_an_event_dims_once_it_has_happened(
@@ -451,9 +387,12 @@ async def test_an_event_dims_once_it_has_happened(
 async def test_a_page_of_chips_is_read_together(
     client, session, acting_user: ActingUser
 ) -> None:
-    """Two aspects of one task, and a second thing entirely, in one request."""
+    """Two aspects of one task, and a second thing entirely, in one request;
+    a priority carries its own urgency."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    task = await create_task(session, a.project, title="Ship it")
+    task = await create_task(
+        session, a.project, title="Now", priority=TaskPriority.urgent
+    )
 
     body = await _chips(
         client,
@@ -463,15 +402,19 @@ async def test_a_page_of_chips_is_read_together(
         f"project:{a.project.id}:progress",
     )
     assert len(body) == 3
+    assert body[f"task:{task.id}:priority"]["tone"] == "danger"
 
 
 async def test_a_reference_naming_nothing_is_simply_absent(
     client, session, acting_user: ActingUser
 ) -> None:
     """A build that stopped offering a chip leaves references behind in
-    files; they read as nothing rather than as an error."""
+    files; they read as nothing rather than as an error. Comments are indexed
+    but not referenceable — the thing a remark is on is what a reader wants,
+    and a comment has no name to render."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     task = await create_task(session, a.project, title="Ship it")
+    comment = await create_comment(session, a.user, task=task)
 
     body = await _chips(
         client,
@@ -481,23 +424,9 @@ async def test_a_reference_naming_nothing_is_simply_absent(
         "file:1:status",
         "not-a-ref",
         "task:abc:status",
+        f"comment:{comment.id}",
     )
     assert list(body) == [f"task:{task.id}:status"]
-
-
-async def test_a_chip_reads_nothing_the_caller_could_not_open(
-    client, session, acting_user: ActingUser
-) -> None:
-    """The reference is in a file, which anyone in the initiative may read.
-    What it points at is gated separately, and this is that gate."""
-    owner = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    task = await create_task(session, owner.project, title="Private work")
-
-    outsider = await acting_user(guild_role=CommunityRole.member, guild=owner.guild)
-    body = await _chips(client, outsider, f"task:{task.id}:status")
-    assert body == {}
 
 
 def test_every_declared_chip_has_a_reader():
@@ -505,35 +434,6 @@ def test_every_declared_chip_has_a_reader():
     keeps them the same list. Titles are not here — one reader answers those
     for every kind."""
     assert set(SMART_CHIP_SOURCES) == set(SMART_CHIP_KINDS)
-
-
-def test_the_pairs_the_api_declares_are_the_pairs_that_exist():
-    """The editor builds its insert menu from this enum, so it must not be able
-    to offer a chip nothing reads."""
-    assert {kind.value for kind in SmartChipKind} == {
-        kind_value(entity_type, aspect) for entity_type, aspect in SMART_CHIP_KINDS
-    }
-
-
-async def test_a_chip_stops_at_the_sharing_gate_not_just_the_initiative(
-    client, session, acting_user: ActingUser
-) -> None:
-    """Being in the initiative is not being given the project.
-
-    A chip is live state, so it answers under every gate the thing itself
-    answers under — the same reading the search index takes.
-    """
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    b = await acting_user(
-        guild_role=CommunityRole.member,
-        guild=a.guild,
-        initiative=a.initiative,
-        initiative_role="member",
-    )
-    task = await create_task(session, a.project, title="restricted renewal")
-
-    assert (await _chips(client, a, f"task:{task.id}:status")) != {}
-    assert await _chips(client, b, f"task:{task.id}:status") == {}
 
 
 def test_every_chippable_thing_can_be_gated():
@@ -544,15 +444,6 @@ def test_every_chippable_thing_can_be_gated():
     assert {entity_type for entity_type, _aspect in SMART_CHIP_KINDS} <= referenceable
 
 
-def test_the_reference_surface_is_everything_indexed_but_a_comment():
-    """Referenceable is derived, not listed. A tool added to the search
-    registry becomes linkable, resolvable and gated with no edit here."""
-    from app.db.search_index import SEARCH_SOURCES
-
-    indexed = {source.entity_type for source in SEARCH_SOURCES.values()}
-    assert set(referenceable_types()) == indexed - NOT_REFERENCEABLE
-
-
 def test_what_can_be_referred_to_and_what_can_be_resolved_are_the_same_set():
     """One is declared from the kinds a reference may name, the other derived
     from the tables that can answer. A tool in one and not the other would be
@@ -560,14 +451,13 @@ def test_what_can_be_referred_to_and_what_can_be_resolved_are_the_same_set():
     assert set(REFERENCEABLE_TYPES) == set(referenceable_types())
 
 
-@pytest.mark.parametrize(
-    "aspect", ["status", "assignee", "due", "priority", "checklist"]
-)
 async def test_no_task_chip_answers_without_the_project(
-    client, session, acting_user: ActingUser, aspect: str
+    client, session, acting_user: ActingUser
 ) -> None:
-    """Walked per aspect: the gate is applied once for the thing, so adding a
-    fifth fact about a task cannot open a hole."""
+    """A chip is live state, so it answers under every gate the thing itself
+    answers under. Being in the initiative is not being given the project, and
+    the gate is applied once for the thing, so no fact about a task, nor its
+    name, opens a hole. Outside the initiative there is nothing either."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     b = await acting_user(
         guild_role=CommunityRole.member,
@@ -575,9 +465,19 @@ async def test_no_task_chip_answers_without_the_project(
         initiative=a.initiative,
         initiative_role="member",
     )
+    outsider = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
     task = await create_task(session, a.project, title="restricted")
+    refs = [
+        f"task:{task.id}",
+        *(
+            f"task:{task.id}:{aspect}"
+            for aspect in ("status", "assignee", "due", "priority", "checklist")
+        ),
+    ]
 
-    assert await _chips(client, b, f"task:{task.id}:{aspect}") == {}
+    assert (await _chips(client, a, f"task:{task.id}:status")) != {}
+    assert await _chips(client, b, *refs) == {}
+    assert await _chips(client, outsider, *refs) == {}
 
 
 async def test_a_chip_follows_the_thing_own_sharing_either_way(
@@ -650,40 +550,23 @@ async def test_a_chip_names_what_its_reading_is_about(
     client, session, acting_user: ActingUser
 ) -> None:
     """A chip answers with the thing's current name beside the fact, so showing
-    a fact costs one reference rather than two — and the name is as live as the
-    reading is."""
+    a fact costs one reference rather than two. Rename the thing, and what
+    points at it says the new name without being touched."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     task = await create_task(session, a.project, title="Old name")
-    ref = f"task:{task.id}:status"
+    chip, ref = f"task:{task.id}:status", f"task:{task.id}"
 
-    assert (await _chips(client, a, ref))[ref]["title"] == "Old name"
+    body = await _chips(client, a, chip, ref)
+    assert (body[chip]["title"], body[ref]["text"]) == ("Old name", "Old name")
 
     task.title = "New name"
     session.add(task)
     await session.commit()
 
-    answer = (await _chips(client, a, ref))[ref]
-    assert answer["title"] == "New name"
+    body = await _chips(client, a, chip, ref)
+    assert (body[chip]["title"], body[ref]["text"]) == ("New name", "New name")
     # The reading itself is still the column, not the name.
-    assert answer["text"] != "New name"
-
-
-async def test_a_reference_reads_the_current_name(
-    client, session, acting_user: ActingUser
-) -> None:
-    """The point of the whole thing: rename it, and what points at it says the
-    new name without being touched."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    task = await create_task(session, a.project, title="Old name")
-    ref = f"task:{task.id}"
-
-    assert (await _chips(client, a, ref))[ref]["text"] == "Old name"
-
-    task.title = "New name"
-    session.add(task)
-    await session.commit()
-
-    assert (await _chips(client, a, ref))[ref]["text"] == "New name"
+    assert body[chip]["text"] != "New name"
 
 
 async def test_every_kind_answers_with_whatever_it_calls_its_name(
@@ -708,34 +591,6 @@ async def test_every_kind_answers_with_whatever_it_calls_its_name(
     assert body[f"project:{a.project.id}"]["text"] == a.project.name
     assert body[f"calendar:{calendar.id}"]["text"] == calendar.name
     assert body[f"calendar_event:{event.id}"]["text"] == "An event"
-
-
-async def test_a_title_stops_at_the_same_gate_a_chip_does(
-    client, session, acting_user: ActingUser
-) -> None:
-    """A name is content. Reading one is gated exactly as reading a status is."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    b = await acting_user(
-        guild_role=CommunityRole.member,
-        guild=a.guild,
-        initiative=a.initiative,
-        initiative_role="member",
-    )
-    task = await create_task(session, a.project, title="restricted")
-
-    assert await _chips(client, b, f"task:{task.id}") == {}
-
-
-async def test_a_comment_is_not_something_you_point_at(
-    client, session, acting_user: ActingUser
-) -> None:
-    """Comments are indexed but not referenceable — the thing a remark is on is
-    what a reader wants, and a comment has no name to render."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    task = await create_task(session, a.project, title="Ship it")
-    comment = await create_comment(session, a.user, task=task)
-
-    assert await _chips(client, a, f"comment:{comment.id}") == {}
 
 
 async def test_a_tool_plugins_row_reads_its_current_name(

@@ -5,27 +5,11 @@ channel."""
 
 from __future__ import annotations
 
-import importlib.util
-from pathlib import Path
-
-_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "alembic"
-    / "versions"
-    / "20261018_0522_notification_rows_by_relationship.py"
-)
-
-
-def _regroup():
-    spec = importlib.util.spec_from_file_location(_PATH.stem, _PATH)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.regroup
+from app.testing.later_revisions import load_revision
 
 
 def test_one_row_decides_and_the_rest_go() -> None:
-    regroup = _regroup()
+    regroup = load_revision("20261018_0522_notification_rows_by_relationship").regroup
     assert regroup(
         {
             "categories": {
@@ -49,7 +33,7 @@ def test_one_row_decides_and_the_rest_go() -> None:
 
 def test_a_communitys_level_becomes_its_mute_or_its_rows() -> None:
     off = {channel: False for channel in ("in_app", "email", "push", "desktop")}
-    assert _regroup()(
+    assert load_revision("20261018_0522_notification_rows_by_relationship").regroup(
         {
             "guilds": {
                 "1": {"level": "nothing"},

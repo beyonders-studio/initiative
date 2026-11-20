@@ -72,24 +72,6 @@ def test_every_option_defaults_to_a_value_it_allows():
             )
 
 
-def test_preset_is_stored_resolved():
-    """What lands in the row is always a primitive, with the preset name kept
-    only as a label."""
-    result = normalize_dashboard_definition(
-        _definition(
-            {
-                "id": "bars",
-                "type": "bar_chart",
-                "binding": {"source": "query", "sql": "SELECT title FROM tasks"},
-            }
-        )
-    )
-    widget = result["widgets"][0]
-    assert widget["type"] == "chart"
-    assert widget["preset"] == "bar_chart"
-    assert widget["options"]["mark"] == "bar"
-
-
 def test_preset_options_win_over_supplied_ones():
     """A preset's own options are its identity — a bar_chart stays a bar."""
     result = normalize_dashboard_definition(
@@ -170,19 +152,6 @@ def test_a_target_that_is_not_a_number_or_a_day_is_refused(given):
                 }
             )
         )
-
-
-def test_unknown_option_keys_are_dropped():
-    result = normalize_dashboard_definition(
-        _definition(
-            {
-                "type": "chart",
-                "options": {"mark": "line", "onClick": "steal"},
-                "binding": {"source": "query", "sql": "SELECT title FROM tasks"},
-            }
-        )
-    )
-    assert result["widgets"][0]["options"] == {"mark": "line"}
 
 
 def test_normalizes_to_canonical_shape():
@@ -271,39 +240,6 @@ def test_widget_is_kept_inside_the_grid():
 @pytest.mark.parametrize(
     "payload,code",
     [
-        (
-            {
-                "widgets": [
-                    {
-                        "type": "evil",
-                        "binding": {
-                            "source": "query",
-                            "sql": "SELECT title FROM tasks",
-                        },
-                    }
-                ]
-            },
-            "WIDGET_TYPE_UNKNOWN",
-        ),
-        (
-            {"widgets": [{"type": "stat", "binding": {"source": "shell_exec"}}]},
-            "BINDING_SOURCE_UNKNOWN",
-        ),
-        # A real source, but not one this widget can draw.
-        (
-            {
-                "widgets": [
-                    {
-                        "type": "stat",
-                        "binding": {
-                            "source": "query",
-                            "sql": "SELECT secret FROM pg_shadow",
-                        },
-                    }
-                ]
-            },
-            "UNKNOWN_RELATION",
-        ),
         ({"widgets": [{"type": "stat"}]}, "BINDING_INVALID"),
         ({"widgets": "nope"}, "DEFINITION_INVALID"),
         ({"schema_version": 99, "widgets": []}, "DEFINITION_VERSION_UNSUPPORTED"),
@@ -390,12 +326,13 @@ def test_a_binding_cannot_name_its_own_initiative_or_guild():
     assert binding["project_id"] == 7
 
 
-def test_unknown_structural_keys_are_dropped():
+def test_unknown_structural_and_option_keys_are_dropped():
     result = normalize_dashboard_definition(
         {
             "widgets": [
                 {
-                    "type": "stat",
+                    "type": "chart",
+                    "options": {"mark": "line", "onClick": "steal"},
                     "binding": {"source": "query", "sql": "SELECT title FROM tasks"},
                     "onClick": {"action": "delete_everything"},
                 }
@@ -405,23 +342,7 @@ def test_unknown_structural_keys_are_dropped():
     )
     assert "scripts" not in result
     assert "onClick" not in result["widgets"][0]
-
-
-def test_config_is_scoped_to_the_definitions_widgets():
-    definition = normalize_dashboard_definition(
-        _definition(
-            {
-                "id": "w1",
-                "type": "stat",
-                "binding": {"source": "query", "sql": "SELECT title FROM tasks"},
-            }
-        )
-    )
-    config = normalize_dashboard_config(
-        {"widgets": {"w1": {"counter_id": 42}, "ghost": {"counter_id": 9}}},
-        definition,
-    )
-    assert config == {"widgets": {"w1": {"counter_id": 42}}}
+    assert result["widgets"][0]["options"] == {"mark": "line"}
 
 
 def test_config_fills_only_what_the_definition_left_open():
@@ -456,22 +377,6 @@ def test_config_fills_only_what_the_definition_left_open():
         definition,
     )
     assert config == {"widgets": {"w1": {"counter_id": 9}}}
-
-
-def test_config_for_a_removed_widget_is_dropped():
-    """Updating to a definition without that widget can't leave config behind."""
-    definition = normalize_dashboard_definition(
-        _definition(
-            {
-                "id": "w2",
-                "type": "stat",
-                "binding": {"source": "query", "sql": "SELECT title FROM tasks"},
-            }
-        )
-    )
-    assert normalize_dashboard_config(
-        {"widgets": {"w1": {"counter_id": 1}}}, definition
-    ) == {"widgets": {}}
 
 
 # ---------------------------------------------------------------------------

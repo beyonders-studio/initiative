@@ -1025,7 +1025,8 @@ class TestTokens:
         self, client: AsyncClient, acting_user, session, vendor, registration
     ):
         """A ``jwt_bearer`` connection's token is minted with the vendor key and
-        reused until shortly before it expires."""
+        reused until shortly before it expires; what was minted goes with the
+        connection's values."""
         a = await acting_user(guild_role=CommunityRole.superadmin)
         plugin = await _install(
             session,
@@ -1054,23 +1055,6 @@ class TestTokens:
         assert claims["iss"] == "4242"
         assert claims["exp"] - claims["iat"] == 540
         assert body is None
-
-    async def test_a_cleared_connections_minted_tokens_are_forgotten(
-        self, client: AsyncClient, acting_user, session, vendor, registration
-    ):
-        """What was minted for a connection goes with its values."""
-        a = await acting_user(guild_role=CommunityRole.superadmin)
-        plugin = await _install(
-            session,
-            a,
-            config={"workspace": {"owner": "acme", "installation_id": "42"}},
-            connection_refs={"workspace": "gcr_workspace"},
-        )
-        minted = await client.post(
-            TOKEN_ROUTE.format(ref="gcr_workspace"),
-            headers=_install_headers(a.guild, plugin),
-        )
-        assert minted.status_code == 200, minted.text
         assert len(plugin_connection_flows._minted) == 1
 
         cleared = await client.delete(
@@ -1672,29 +1656,22 @@ class TestRevocation:
 
 
 class TestVendorLiveness:
-    async def test_a_registration_missing_a_required_value_is_not_live(
-        self, session: AsyncSession
+    @pytest.mark.parametrize(
+        ("required", "live"),
+        [(["client_id", "client_secret"], False), (["client_id"], True)],
+    )
+    async def test_a_registration_is_live_with_every_required_value_set(
+        self, session: AsyncSession, required, live
     ):
         await create_plugin_service_registration(
             session,
             public_id="tests.needs",
             base_url="https://needs.example.test",
-            vendor_required=["client_id", "client_secret"],
+            vendor_required=required,
             vendor_values=sealed_vendor_values({"client_id": "x"}),
         )
         snapshot = (await load_registrations(force=True))["tests.needs"]
-        assert snapshot.live is False
-
-    async def test_every_required_value_set_is_live(self, session: AsyncSession):
-        await create_plugin_service_registration(
-            session,
-            public_id="tests.ready",
-            base_url="https://ready.example.test",
-            vendor_required=["client_id"],
-            vendor_values=sealed_vendor_values({"client_id": "x"}),
-        )
-        snapshot = (await load_registrations(force=True))["tests.ready"]
-        assert snapshot.live is True
+        assert snapshot.live is live
 
 
 # ---------------------------------------------------------------------------

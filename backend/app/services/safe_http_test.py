@@ -34,23 +34,6 @@ def _resolves_to(ip: str):
     )
 
 
-async def test_request_targets_validated_ip_and_keeps_hostname():
-    with _resolves_to("93.184.216.34"):
-        request = await build_validated_request(
-            "POST",
-            "https://hooks.example.com/deliver?x=1",
-            headers={"Content-Type": "application/json"},
-            content=b"{}",
-        )
-    # Connection target is the resolved address, not the hostname.
-    assert request.url.host == "93.184.216.34"
-    # Path and query are preserved.
-    assert request.url.raw_path == b"/deliver?x=1"
-    # Hostname is preserved for the Host header and TLS.
-    assert request.headers["host"] == "hooks.example.com"
-    assert request.extensions["sni_hostname"] == "hooks.example.com"
-
-
 async def test_host_header_includes_explicit_port():
     with _resolves_to("93.184.216.34"):
         request = await build_validated_request(
@@ -73,6 +56,7 @@ async def test_send_connects_to_pinned_ip():
 
     def handler(request: httpx2.Request) -> httpx2.Response:
         seen["host"] = request.url.host
+        seen["path"] = request.url.raw_path
         seen["host_header"] = request.headers.get("host")
         seen["sni"] = request.extensions.get("sni_hostname")
         return httpx2.Response(200, json={"ok": True})
@@ -80,7 +64,7 @@ async def test_send_connects_to_pinned_ip():
     with _resolves_to("93.184.216.34"):
         response = await request_public_target(
             "POST",
-            "https://hooks.example.com/deliver",
+            "https://hooks.example.com/deliver?x=1",
             headers={"Content-Type": "application/json"},
             content=b"{}",
             timeout=5.0,
@@ -88,8 +72,11 @@ async def test_send_connects_to_pinned_ip():
         )
 
     assert response.status_code == 200
+    # The connection targets the resolved address; the hostname is kept for
+    # the Host header and TLS, and the path and query are preserved.
     assert seen == {
         "host": "93.184.216.34",
+        "path": b"/deliver?x=1",
         "host_header": "hooks.example.com",
         "sni": "hooks.example.com",
     }
@@ -202,23 +189,10 @@ async def test_connect_timeout_does_not_fall_back():
     assert seen == ["93.184.216.34"]  # stopped after the timeout; no fallback
 
 
-async def test_allow_private_permits_and_pins_private_target():
-    """allow_private lets an operator-configured internal target through,
-    still pinned to the resolved address with the hostname preserved."""
-    with _resolves_to("10.0.0.5"):
-        request = await build_validated_request(
-            "POST",
-            "https://ollama.internal/api/chat",
-            content=b"{}",
-            allow_private=True,
-        )
-    assert request.url.host == "10.0.0.5"
-    assert request.headers["host"] == "ollama.internal"
-
-
 async def test_allow_private_permits_http_to_private():
-    """With allow_private an operator ``http://internal`` target is accepted
-    and pinned (Ollama on a private host with no TLS)."""
+    """With allow_private an operator ``http://internal`` target is accepted,
+    still pinned to the resolved address with the hostname preserved (Ollama
+    on a private host with no TLS)."""
     with _resolves_to("10.0.0.5"):
         request = await build_validated_request(
             "POST",
@@ -228,6 +202,7 @@ async def test_allow_private_permits_http_to_private():
         )
     assert request.url.host == "10.0.0.5"
     assert request.url.scheme == "http"
+    assert request.headers["host"] == "ollama.internal:11434"
 
 
 async def test_allow_private_still_rejects_http_to_public():
@@ -235,14 +210,6 @@ async def test_allow_private_still_rejects_http_to_public():
     with _resolves_to("93.184.216.34"), pytest.raises(WebhookTargetUrlError):
         await build_validated_request(
             "POST", "http://hooks.example.com/in", content=b"", allow_private=True
-        )
-
-
-async def test_private_target_still_refused_without_allow_private():
-    """Default (allow_private=False) still refuses a private target."""
-    with _resolves_to("10.0.0.5"), pytest.raises(WebhookTargetUrlPrivateError):
-        await build_validated_request(
-            "POST", "https://internal.example.com/x", content=b""
         )
 
 

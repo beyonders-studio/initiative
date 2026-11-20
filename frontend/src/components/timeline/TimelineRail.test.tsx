@@ -47,20 +47,19 @@ describe("TimelineRail", () => {
     vi.useRealTimers();
   });
 
-  it("offers every period as its own button", () => {
-    renderRail();
+  // The rail is a drag surface with real buttons inside it. A tap on a button
+  // fires the button's own click AND bubbles through the rail's pointerup, so
+  // without a guard one activation runs a consumer's callback twice.
+  it("offers every period as its own button, handing back the whole stop once per tap", async () => {
+    const onPick = vi.fn();
+    renderRail({ onPick });
 
     for (const stop of stops) {
       expect(screen.getByRole("button", { name: label(stop) })).toBeInTheDocument();
     }
-  });
-
-  it("hands back the whole stop, not just its period", async () => {
-    const onPick = vi.fn();
-    renderRail({ onPick });
-
     await userEvent.click(screen.getByRole("button", { name: "Month 2025-12" }));
 
+    expect(onPick).toHaveBeenCalledTimes(1);
     expect(onPick).toHaveBeenCalledWith(stops[2]);
   });
 
@@ -116,23 +115,6 @@ describe("TimelineRail", () => {
     expect(Number.parseInt(ticks[1].style.width, 10)).toBeGreaterThanOrEqual(30);
   });
 
-  // The rail lives beside a feed somebody is reading. Anything drawn outside
-  // its own width lands on that feed — which is exactly what a year label
-  // positioned `right-full` did. The one deliberate exception is the drag
-  // bubble, a transient readout that is meant to float clear of the rail.
-  // The rail is a drag surface with real buttons inside it. A tap on a button
-  // fires the button's own click AND bubbles through the rail's pointerup, so
-  // without a guard one activation runs a consumer's callback twice — harmless
-  // for a board that just scrolls, not for whatever reuses this next.
-  it("picks once for one tap on a stop", async () => {
-    const onPick = vi.fn();
-    renderRail({ onPick });
-
-    await userEvent.click(screen.getByRole("button", { name: "Month 2026-03" }));
-
-    expect(onPick).toHaveBeenCalledTimes(1);
-  });
-
   // The rail overlays the feed on a phone, so what it costs when nobody is
   // using it is the whole point: nothing drawn, and nothing to tap by accident
   // over the notice underneath.
@@ -181,6 +163,10 @@ describe("TimelineRail", () => {
     expect(onPick).not.toHaveBeenCalled();
   });
 
+  // The rail lives beside a feed somebody is reading. Anything drawn outside
+  // its own width lands on that feed — which is exactly what a year label
+  // positioned `right-full` did. The one deliberate exception is the drag
+  // bubble, a transient readout that is meant to float clear of the rail.
   it("keeps its labels inside its own width", () => {
     const source = fs
       .readFileSync(path.resolve(__dirname, "./TimelineRail.tsx"), "utf-8")

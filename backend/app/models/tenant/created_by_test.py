@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import re
 
-import pytest
 from sqlmodel import SQLModel
 
 from app.db import base  # noqa: F401  # populates SQLModel.metadata with every table
@@ -75,12 +74,6 @@ def test_created_by_stays_inside_the_guild_schema():
     )
 
 
-@pytest.mark.parametrize("table", sorted(_authored_tables()))
-def test_authored_tables_have_the_column(table: str):
-    columns = SQLModel.metadata.tables[table].columns
-    assert "created_by" in columns, f"{table} is missing created_by"
-
-
 #: A "last editor" column under any name. Matching the concept rather than one
 #: spelling is the point — the whole reason this file exists is that the same
 #: idea wore five different names.
@@ -110,12 +103,14 @@ def test_nothing_carries_a_last_editor_column():
     )
 
 
-@pytest.mark.parametrize("table", sorted(SQLModel.metadata.tables))
-def test_no_table_reintroduces_a_retired_spelling(table: str):
+def test_no_table_reintroduces_a_retired_spelling():
     """Every table, both schemas — the retired spellings are retired for good."""
-    columns = set(SQLModel.metadata.tables[table].columns.keys())
-    clashes = columns & set(RETIRED_SPELLINGS)
+    clashes = {
+        f"{name}.{column.key}"
+        for name, table in SQLModel.metadata.tables.items()
+        for column in table.columns
+        if column.key in RETIRED_SPELLINGS
+    }
     assert not clashes, (
-        f"{table} names an authorship column {sorted(clashes)}. "
-        "It is spelled created_by."
+        f"Authorship columns {sorted(clashes)}. It is spelled created_by."
     )

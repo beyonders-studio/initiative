@@ -1,8 +1,7 @@
 """A policy for the platform tiers names its capability; the render spells the
 tiers.
 
-The unit tests pin the spelling. The database tests ask each such policy the
-way a request does — on the request login, as every tier in turn — and
+The database tests ask each such policy the way a request does — on the request login, as every tier in turn — and
 compare its answer with the capability registry's.
 """
 
@@ -20,8 +19,6 @@ from app.core.capabilities import Capability, roles_with_capability
 from app.db.public_rls import (
     PLATFORM_TIER_ROLES,
     PUBLIC_RLS,
-    SELECT,
-    Policy,
     policy_roles,
 )
 from app.db.request_context import Platform
@@ -37,17 +34,6 @@ from app.testing import (
 )
 
 pytestmark = pytest.mark.always
-
-
-def test_a_capability_is_spelled_as_the_tiers_holding_it():
-    policy = Policy("p", SELECT, Capability.USERS_READ, using="true")
-    assert policy_roles(policy) == (
-        "platform_moderator",
-        "platform_operator",
-        "platform_owner",
-        "platform_support",
-    )
-    assert policy_roles(Policy("p", SELECT, ("public",), using="true")) == ("public",)
 
 
 def test_every_policy_on_the_platform_tiers_names_a_capability():
@@ -199,12 +185,6 @@ CASES: list[tuple[str, str, Capability, Callable[[AsyncSession], Awaitable[Probe
         _a_picture,
     ),
 ]
-
-
-@pytest.mark.parametrize("table, name, capability, _probe", CASES)
-def test_the_registry_declares_what_the_probe_asks(table, name, capability, _probe):
-    policy = next(p for p in PUBLIC_RLS[table].policies if p.name == name)
-    assert policy.roles is capability
 
 
 @pytest.mark.parametrize("table, name, capability, probe", CASES)

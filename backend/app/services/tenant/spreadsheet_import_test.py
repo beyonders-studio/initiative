@@ -37,48 +37,40 @@ def workbook(**sheet) -> dict:
 # ── CSV ──────────────────────────────────────────────────────────────────────
 
 
-def test_a_csv_becomes_one_sheet_named_after_its_file() -> None:
-    sheets = parse_spreadsheet_file("Q1 sales.csv", b"a,b\n1,2\n")
-
-    assert len(sheets) == 1
-    assert sheets[0]["name"] == "Q1 sales"
-
-
-def test_numbers_arrive_as_numbers_and_text_as_text() -> None:
-    sheets = parse_spreadsheet_file("x.csv", b"Widget,3,4.5,-2\n")
-
-    assert sheets[0]["cells"] == {
-        "0:0": "Widget",
-        "0:1": 3,
-        "0:2": 4.5,
-        "0:3": -2,
-    }
-
-
-def test_a_formula_stays_a_formula() -> None:
-    """``=`` text is how this app stores a formula; the grid evaluates it."""
-    sheets = parse_spreadsheet_file("x.csv", b"=1+1\n")
-
-    assert sheets[0]["cells"]["0:0"] == "=1+1"
-
-
-def test_empty_fields_leave_no_cell() -> None:
-    sheets = parse_spreadsheet_file("x.csv", b"a,,c\n")
-
-    assert sheets[0]["cells"] == {"0:0": "a", "0:2": "c"}
-
-
-def test_a_tsv_is_split_on_tabs() -> None:
-    sheets = parse_spreadsheet_file("x.tsv", b"a\tb\n")
-
-    assert sheets[0]["cells"] == {"0:0": "a", "0:1": "b"}
-
-
-def test_a_file_that_is_not_a_spreadsheet_is_refused() -> None:
-    with pytest.raises(FileContentError) as excinfo:
-        parse_spreadsheet_file("notes.pdf", b"%PDF-1.4")
-
-    assert excinfo.value.code == FileMessages.SPREADSHEET_UNREADABLE_FILE
+@pytest.mark.parametrize(
+    ("filename", "data", "cells"),
+    [
+        ("x.csv", b"a,,c\n", {"0:0": "a", "0:2": "c"}),
+        ("x.tsv", b"a\tb\n", {"0:0": "a", "0:1": "b"}),
+        # ``00123`` is a part number or a postcode far more often than it is
+        # the number 123, and making it one cannot be undone.
+        (
+            "x.csv",
+            b"00123,0,0.5,123\n",
+            {"0:0": "00123", "0:1": 0, "0:2": 0.5, "0:3": 123},
+        ),
+        ("x.csv", b"TRUE,false,Maybe\n", {"0:0": True, "0:1": False, "0:2": "Maybe"}),
+        # The rule lives twice — here and in ``coerceScalar`` on the client —
+        # so this is the check that the two still say the same thing. ``=``
+        # text is how this app stores a formula; the grid evaluates it.
+        (
+            "x.csv",
+            b" 42 ,1e3,-7,=A1,.7,-.25,1e309\n",
+            {
+                "0:0": 42,
+                "0:1": 1000.0,
+                "0:2": -7,
+                "0:3": "=A1",
+                "0:4": 0.7,
+                "0:5": -0.25,
+                "0:6": "1e309",
+            },
+        ),
+    ],
+    ids=["empty-fields", "tsv", "leading-zero", "booleans", "clipboard-rule"],
+)
+def test_a_field_reads_as_what_it_says(filename, data, cells) -> None:
+    assert parse_spreadsheet_file(filename, data)[0]["cells"] == cells
 
 
 def test_an_xlsx_that_is_not_one_is_refused() -> None:
@@ -212,44 +204,6 @@ def test_every_tab_of_a_workbook_arrives() -> None:
 
     assert [s["name"] for s in back] == ["Q1", "Q2"]
     assert [s["cells"]["0:0"] for s in back] == ["one", "two"]
-
-
-# ── what a field means ───────────────────────────────────────────────────────
-
-
-def test_a_leading_zero_keeps_its_field_as_text() -> None:
-    """``00123`` is a part number or a postcode far more often than it is the
-    number 123, and making it one cannot be undone."""
-    sheets = parse_spreadsheet_file("x.csv", b"00123,0,0.5,123\n")
-
-    assert sheets[0]["cells"] == {
-        "0:0": "00123",
-        "0:1": 0,
-        "0:2": 0.5,
-        "0:3": 123,
-    }
-
-
-def test_true_and_false_arrive_as_booleans() -> None:
-    sheets = parse_spreadsheet_file("x.csv", b"TRUE,false,Maybe\n")
-
-    assert sheets[0]["cells"] == {"0:0": True, "0:1": False, "0:2": "Maybe"}
-
-
-def test_a_field_reads_the_same_from_a_file_as_from_the_clipboard() -> None:
-    """The rule lives twice — here and in ``coerceScalar`` on the client — so
-    this is the check that the two still say the same thing."""
-    sheets = parse_spreadsheet_file("x.csv", b" 42 ,1e3,-7,=A1,.7,-.25,1e309\n")
-
-    assert sheets[0]["cells"] == {
-        "0:0": 42,
-        "0:1": 1000.0,
-        "0:2": -7,
-        "0:3": "=A1",
-        "0:4": 0.7,
-        "0:5": -0.25,
-        "0:6": "1e309",
-    }
 
 
 # ── refusing what cannot be carried whole ────────────────────────────────────

@@ -8,7 +8,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import text
 
-from app.db.pre_075_shapes_migration_test import _load, _run, _sql
+from app.db.pre_075_shapes_migration_test import _run, _sql
 from app.models.tenant.initiative import InitiativeRoleModel
 from app.models.tenant.plugin_placement import PluginPlacement
 from app.services.tenant.initiatives import get_member_role
@@ -19,9 +19,9 @@ from app.testing import (
     create_user,
     route_session_to_guild,
 )
-from app.testing.later_revisions import step_newest
+from app.testing.later_revisions import load_revision, step_newest
 
-migration = _load("20261110_0606_plug_ins_answer_to_the_communitys_roles.py")
+migration = load_revision("20261110_0606_plug_ins_answer_to_the_communitys_roles.py")
 
 
 @pytest.mark.fresh_guild_schema

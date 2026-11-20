@@ -41,7 +41,8 @@ export type ExportWizardScope =
   | { kind: "community" }
   | {
       kind: "entities";
-      tool: Tool;
+      /** A built-in tool, or a tool plug-in's kind. */
+      tool: string;
       ids: number[];
       /** The formats on offer: json under "Backup", the rest under "Report". */
       formats: ExportFormatOption[];
@@ -228,7 +229,7 @@ interface ContentFilter {
 }
 
 /** Tools whose content has a filter of its own. */
-const CONTENT_FILTERS: Partial<Record<Tool, ContentFilter>> = {
+const CONTENT_FILTERS: Partial<Record<string, ContentFilter>> = {
   [Tool.calendar]: {
     params: ({ events }) => ({ events: dateRangeParams(events) }),
     prompt: "wizard.content.prompt",
@@ -247,7 +248,7 @@ const CONTENT_FILTERS: Partial<Record<Tool, ContentFilter>> = {
 
 /** One tool's `filters` entry: its list filters, and its content filter. */
 const toolExportFilters = (
-  tool: Tool,
+  tool: string,
   listFilters: ToolListFilters | undefined,
   content: ContentFilters,
   backup: boolean
@@ -429,12 +430,7 @@ function ToolFilterSection({
 function useDescribeFilters() {
   const { t } = useTranslation(["exports", "projects"]);
   const formatRange = useFormatDateRange();
-  return (
-    tool: Tool,
-    filters: Record<string, unknown>,
-    content: ContentFilters,
-    backup: boolean
-  ): string => {
+  return (filters: Record<string, unknown>, content: ContentFilters, backup: boolean): string => {
     const parts: string[] = [];
     if ("events" in filters) parts.push(formatRange(content.events));
     if ("tasks" in filters) {
@@ -886,7 +882,7 @@ function AggregateExportWizard({
                 <p key={tool} className="text-muted-foreground text-xs">
                   {t("wizard.confirm.toolFilters", {
                     tool: toolLabel(tool),
-                    filters: describeFilters(tool, filters, content, mode === "backup"),
+                    filters: describeFilters(filters, content, mode === "backup"),
                   })}
                 </p>
               ))}
@@ -1078,7 +1074,7 @@ function EntitiesExportWizard({
             </p>
             {Object.keys(filters).length > 0 ? (
               <p className="text-muted-foreground text-xs">
-                {describeFilters(tool, filters, content, backup)}
+                {describeFilters(filters, content, backup)}
               </p>
             ) : null}
           </div>

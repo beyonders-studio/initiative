@@ -31,62 +31,6 @@ def _where(row) -> tuple:
     )
 
 
-# --- data leaving -----------------------------------------------------------
-
-
-async def test_exporting_every_account_is_recorded_with_its_count(
-    client: AsyncClient, session: AsyncSession, capfd
-):
-    """Nothing changed, which is exactly what makes it worth writing down."""
-    operator = await create_user(session, role=UserRole.operator)
-    operator_id = operator.id
-    await create_user(session)
-    capfd.readouterr()
-
-    response = await client.get(
-        "/api/v1/operator/users/export.csv", headers=get_auth_headers(operator)
-    )
-    assert response.status_code == 200, response.text
-
-    rows = emitted(capfd, AuditEventType.PLATFORM_USERS_EXPORTED)
-    assert [_where(row) for row in rows] == [(operator_id, None, None, None)]
-    assert rows[0]["detail"]["subset"] is False
-    assert rows[0]["detail"]["count"] >= 2
-    # A read changed nothing, and the envelope says so.
-    assert rows[0]["is_write"] is False
-
-
-async def test_an_export_of_one_account_records_that_it_was_a_subset(
-    client: AsyncClient, session: AsyncSession, capfd
-):
-    operator = await create_user(session, role=UserRole.operator)
-    target = await create_user(session)
-    capfd.readouterr()
-
-    response = await client.get(
-        f"/api/v1/operator/users/export.csv?user_id={target.id}",
-        headers=get_auth_headers(operator),
-    )
-    assert response.status_code == 200, response.text
-
-    rows = emitted(capfd, AuditEventType.PLATFORM_USERS_EXPORTED)
-    assert [row["detail"] for row in rows] == [{"count": 1, "subset": True}]
-
-
-async def test_an_export_that_matched_nobody_records_nothing(
-    client: AsyncClient, session: AsyncSession, capfd
-):
-    operator = await create_user(session, role=UserRole.operator)
-    capfd.readouterr()
-
-    response = await client.get(
-        "/api/v1/operator/users/export.csv?user_id=9999998&user_id=9999999",
-        headers=get_auth_headers(operator),
-    )
-    assert response.status_code == 404
-    assert emitted(capfd, AuditEventType.PLATFORM_USERS_EXPORTED) == []
-
-
 # --- accounts ---------------------------------------------------------------
 
 

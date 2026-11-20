@@ -1,5 +1,6 @@
-"""The deferred link pass: what resolves, what is counted, and what is not
-written twice."""
+"""The deferred link pass: what is counted and what is not written twice.
+That links resolve, and one out of the selection is counted, is tested
+through the imports in ``imports_test``."""
 
 import pytest
 
@@ -28,49 +29,6 @@ def test_a_link_missing_an_end_is_not_a_link():
     collector.link(None, RelationshipType.depends_on, "jira:ACME-2")
     collector.link("jira:ACME-1", RelationshipType.depends_on, None)
     assert collector.pending_count == 0
-
-
-async def test_links_resolve_once_both_ends_exist(session, acting_user):
-    """The whole point: an edge between two things written by two different
-    entries becomes a row, and the order they arrived in does not matter."""
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    blocker = await create_task(session, a.project, title="Pour the footings")
-    blocked = await create_task(session, a.project, title="Raise the frame")
-
-    collector = LinkCollector()
-    # The link is recorded BEFORE the far end is registered, which is the
-    # situation the pass exists for.
-    collector.link("jira:ACME-2", RelationshipType.depends_on, "jira:ACME-1")
-    collector.register("jira:ACME-2", SearchEntityType.task, blocked.id)
-    collector.register("jira:ACME-1", SearchEntityType.task, blocker.id)
-
-    resolution = await collector.resolve(session, created_by=a.user.id)
-    assert (resolution.created, resolution.unresolved) == (1, 0)
-
-    assert await relationships_service.related_ids(
-        session,
-        Endpoint(kind=SearchEntityType.task, id=blocked.id),
-        relationship_type=RelationshipType.depends_on,
-        other_kind=SearchEntityType.task,
-    ) == [blocker.id]
-
-
-async def test_a_link_out_of_the_selection_is_counted_not_failed(session, acting_user):
-    """A Jira project links to issues nobody selected all the time. That is
-    a number in the report, not a failed import."""
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    task = await create_task(session, a.project, title="Fit the door")
-
-    collector = LinkCollector()
-    collector.register("jira:ACME-1", SearchEntityType.task, task.id)
-    collector.link("jira:ACME-1", RelationshipType.related_to, "jira:OTHER-9")
-
-    resolution = await collector.resolve(session, created_by=a.user.id)
-    assert (resolution.created, resolution.unresolved) == (0, 1)
 
 
 async def test_a_ref_pointing_at_itself_writes_nothing(session, acting_user):

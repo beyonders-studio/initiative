@@ -62,22 +62,20 @@ describe("loadWhiteboardScene", () => {
 });
 
 describe("stampWhiteboardSceneCache / clearWhiteboardSceneCache", () => {
-  it("stamps a scene that a subsequent load resolves as newer than an older server copy", () => {
+  it("stamps a scene that a subsequent load resolves as newer than an older server copy, and clears it", () => {
     stampWhiteboardSceneCache(DOC_ID, scene("local"));
     const result = loadWhiteboardScene(DOC_ID, "2000-01-01T00:00:00Z", scene("rest"));
     expect(result.fromCache).toBe(true);
     expect(result.scene.elements).toEqual([{ id: "local" }]);
-  });
 
-  it("clear removes the entry", () => {
-    stampWhiteboardSceneCache(DOC_ID, scene("local"));
     clearWhiteboardSceneCache(DOC_ID);
     expect(getItem(KEY)).toBeNull();
   });
 });
 
 describe("clearAllWhiteboardSceneCaches", () => {
-  it("takes every whiteboard's scene off the device", () => {
+  it("takes every whiteboard's scene off the device, and leaves everything else", () => {
+    setItem("initiative-language", "en");
     stampWhiteboardSceneCache(DOC_ID, scene("one"));
     stampWhiteboardSceneCache(DOC_ID + 1, scene("two"));
 
@@ -85,14 +83,6 @@ describe("clearAllWhiteboardSceneCaches", () => {
 
     expect(getItem(KEY)).toBeNull();
     expect(getItem(`wb-scene-${DOC_ID + 1}`)).toBeNull();
-  });
-
-  it("leaves everything that is not a scene alone", () => {
-    setItem("initiative-language", "en");
-    stampWhiteboardSceneCache(DOC_ID, scene("one"));
-
-    clearAllWhiteboardSceneCaches();
-
     expect(getItem("initiative-language")).toBe("en");
   });
 });

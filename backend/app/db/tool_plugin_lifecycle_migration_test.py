@@ -5,23 +5,13 @@ plug-in's state. Run in one transaction rolled back at the end.
 
 from __future__ import annotations
 
-import importlib.util
-from pathlib import Path
 from types import ModuleType
 
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import text
 
-_VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
-
-
-def _load(name: str) -> ModuleType:
-    spec = importlib.util.spec_from_file_location(name, _VERSIONS / f"{name}.py")
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+from app.testing.later_revisions import load_revision
 
 
 def _step(migration: ModuleType, forward: bool):
@@ -53,7 +43,7 @@ async def _state(session) -> tuple:
 
 
 async def test_down_and_up_again(session) -> None:
-    uninstalls = _load("20261118_0617_a_community_uninstalls_a_tool_plugin")
+    uninstalls = load_revision("20261118_0617_a_community_uninstalls_a_tool_plugin")
     assert await _state(session) == (1, True)
 
     await session.run_sync(_step(uninstalls, forward=False))

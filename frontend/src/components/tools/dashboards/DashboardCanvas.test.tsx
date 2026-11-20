@@ -77,33 +77,39 @@ const render = (
 const surface = (container: HTMLElement) => container.querySelector("[style*='radial-gradient']");
 
 describe("DashboardCanvas", () => {
-  it("invites the author to add a widget when the canvas is empty", () => {
-    render(EMPTY_DEFINITION, true);
+  it.each([
+    [true, "Add a widget to start showing your data."],
+    [false, "Someone with edit access can add widgets to it."],
+  ])("says who can fill an empty canvas (may edit: %s)", (canEdit, invitation) => {
+    render(EMPTY_DEFINITION, canEdit);
     expect(screen.getByText("This dashboard has no widgets yet.")).toBeInTheDocument();
-    expect(screen.getByText("Add a widget to start showing your data.")).toBeInTheDocument();
+    expect(screen.getByText(invitation)).toBeInTheDocument();
   });
 
-  it("tells a viewer without write access who can fill it instead", () => {
-    render(EMPTY_DEFINITION, false);
-    expect(screen.getByText("Someone with edit access can add widgets to it.")).toBeInTheDocument();
-  });
-
-  it("offers no authoring affordances without write access", () => {
-    render(withStat(), false);
+  it("offers no authoring affordances without write access, and never reports a layout change", () => {
+    const onLayoutChange = render(withStat(), false);
     // The per-widget menu is the entry point to configure and remove; without
     // write there is nothing to open.
     expect(screen.queryByRole("button", { name: /options for/i })).toBeNull();
-  });
-
-  it("offers the widget menu with write access", () => {
-    render(withStat(), true);
-    expect(screen.getByRole("button", { name: /options for/i })).toBeInTheDocument();
-  });
-
-  it("never reports a layout change for a read-only canvas", () => {
+    expect(onLayoutChange.container.querySelector(".react-resizable-hide")).not.toBeNull();
+    // Dots promise that things snap into place; without write access they don't.
+    expect(surface(onLayoutChange.container)).toBeNull();
     // A static canvas must never write the dashboard's row on someone else's
     // behalf, whatever the grid reports.
-    const onLayoutChange = render(withStat(), false);
+    expect(onLayoutChange).not.toHaveBeenCalled();
+  });
+
+  it("gives an author the widget menu, a resize handle and the grid, and does not write on open", () => {
+    const onLayoutChange = render(withStat(), true);
+    const { container } = onLayoutChange;
+    expect(screen.getByRole("button", { name: /options for/i })).toBeInTheDocument();
+    expect(container.querySelector(".react-resizable-handle")).not.toBeNull();
+    expect(container.querySelector(".react-resizable-hide")).toBeNull();
+    expect(surface(container)).not.toBeNull();
+    // Pinned as an end-to-end guarantee rather than a test of one guard: today
+    // the grid does not report a change on mount at this width, and the
+    // definition comparison in the handler covers the widths where it does.
+    // Either way, viewing a dashboard must never bump its updated_at.
     expect(onLayoutChange).not.toHaveBeenCalled();
   });
 
@@ -117,43 +123,11 @@ describe("DashboardCanvas", () => {
     expect(onLayoutChange).not.toHaveBeenCalled();
   });
 
-  it("gives an author a resize handle", () => {
-    const { container } = render(withStat(), true);
-    expect(container.querySelector(".react-resizable-handle")).not.toBeNull();
-    expect(container.querySelector(".react-resizable-hide")).toBeNull();
-  });
-
-  it("hides the resize handle from a viewer", () => {
-    const { container } = render(withStat(), false);
-    expect(container.querySelector(".react-resizable-hide")).not.toBeNull();
-  });
-
   it("stops a resize at each widget's catalog size floor", () => {
     // A Gantt squeezed to two columns is unreadable, so a resize lands on the
     // floor rather than being refused. The grid enforces it live from each
     // item's minW/minH; this pins the value that gets saved.
     const shrunk = applyLayout(withStat(), catalog, [{ i: "w1", x: 0, y: 0, w: 1, h: 1 }]);
     expect(shrunk.widgets[0].grid).toMatchObject({ w: 2, h: 2 });
-  });
-
-  it("draws the grid for someone who can arrange it", () => {
-    const { container } = render(withStat(), true);
-    expect(surface(container)).not.toBeNull();
-  });
-
-  it("draws no grid for a viewer", () => {
-    // Dots promise that things snap into place; without write access they don't.
-    const { container } = render(withStat(), false);
-    expect(surface(container)).toBeNull();
-  });
-
-  it("opening a dashboard does not write its layout", () => {
-    // Pinned as an end-to-end guarantee rather than a test of one guard: today
-    // the grid does not report a change on mount at this width, and the
-    // definition comparison in the handler covers the widths where it does.
-    // Either way, viewing a dashboard must never bump its updated_at — so if a
-    // future grid release starts emitting here, this fails.
-    const onLayoutChange = render(withStat(), true);
-    expect(onLayoutChange).not.toHaveBeenCalled();
   });
 });

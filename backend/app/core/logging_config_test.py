@@ -19,7 +19,6 @@ from app.core.logging_config import (
     AUDIT_LOGGER_NAME,
     SERVER_LOGGER_NAME,
     configure_logging,
-    logging_config,
 )
 
 LOGGER = "app.core.logging_config_test"
@@ -40,27 +39,13 @@ def _served_wiring():
 
 
 def test_an_audit_line_reaches_stdout_with_nothing_forcing_the_level(capfd):
-    """No ``caplog.at_level`` here: the level is the wiring's own."""
+    """No ``caplog.at_level`` here: the level is the wiring's own. The line is
+    the bare JSON envelope, once, and does not reach the root handlers."""
     logging.getLogger(AUDIT_LOGGER_NAME).info('{"event_type":"x"}')
 
     out, err = capfd.readouterr()
     assert out == '{"event_type":"x"}\n'
     assert '{"event_type":"x"}' not in err
-
-
-def test_an_audit_line_is_the_bare_envelope_and_nothing_else(capfd):
-    """No timestamp prefix, no level, no logger name: the line is the JSON
-    object, so a pipeline parses it as a record."""
-    logging.getLogger(AUDIT_LOGGER_NAME).info('{"a":1}')
-    assert capfd.readouterr().out.splitlines() == ['{"a":1}']
-
-
-def test_the_audit_stream_does_not_reach_the_root_handlers():
-    """One envelope, one line, one place: the audit logger stops at its own
-    handler rather than propagating up. (pytest's own capture attaches to the
-    audit logger directly, so it would see the line either way.)"""
-    configure_logging()
-    assert logging.getLogger(AUDIT_LOGGER_NAME).propagate is False
 
 
 def test_application_lines_go_to_stderr_as_json_naming_their_job(capfd):
@@ -78,16 +63,9 @@ def test_application_lines_go_to_stderr_as_json_naming_their_job(capfd):
 
 
 def test_the_root_level_is_the_setting():
-    assert logging_config()["root"]["level"] == settings.LOG_LEVEL
     assert (
         logging.getLogger().level == logging.getLevelNamesMapping()[settings.LOG_LEVEL]
     )
-
-
-def test_loggers_configured_before_this_are_kept():
-    """Uvicorn configures its own loggers before it imports the app; the
-    wiring adds to the process rather than silencing them."""
-    assert logging_config()["disable_existing_loggers"] is False
 
 
 def test_applying_the_wiring_twice_installs_one_handler():

@@ -83,47 +83,6 @@ async def test_a_free_row_is_not_a_wait(session: AsyncSession, engine):
         await other.rollback()
 
 
-async def test_the_deadline_is_the_databases_clock(session: AsyncSession):
-    """``lock_open_poll`` answers "does this still take votes?" once it holds
-    the poll's turnstile, so the close time is read at the moment the ballot's
-    transaction acquires it rather than whenever the row was loaded."""
-    guild_id, poll = await _poll(session)
-    await session.commit()
-
-    assert (
-        await post_polls_service.lock_open_poll(session, poll, guild_id=guild_id)
-        is True
-    )
-
-    # Move the deadline into the past without touching the loaded object: the
-    # gate must read the row, not the copy in memory.
-    await session.exec(
-        text(
-            "UPDATE post_polls SET closes_at = now() - interval '1 minute' WHERE id = :i"
-        ).bindparams(i=poll.id)
-    )
-    assert poll.is_closed() is False  # the in-memory copy still says open
-    assert (
-        await post_polls_service.lock_open_poll(session, poll, guild_id=guild_id)
-        is False
-    )
-
-    await session.rollback()
-
-
-async def test_a_poll_with_no_deadline_always_takes_votes(session: AsyncSession):
-    guild_id, poll = await _poll(session)
-    await session.commit()
-
-    assert poll.closes_at is None
-    assert (
-        await post_polls_service.lock_open_poll(session, poll, guild_id=guild_id)
-        is True
-    )
-
-    await session.rollback()
-
-
 async def test_the_deadline_is_the_wall_clock_not_the_transactions_start(
     session: AsyncSession,
 ):

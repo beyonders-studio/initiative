@@ -44,6 +44,8 @@ describe("ConfirmBirthdate", () => {
     expect(screen.getByText("How old are you?")).toBeInTheDocument();
     expect(screen.getByText(/We don't sell your data\./)).toBeInTheDocument();
     expect(screen.getByText(/encrypted and use it only to check age limits/)).toBeInTheDocument();
+    // No billing, so no policy to link.
+    expect(screen.queryByRole("link", { name: "Privacy Policy" })).not.toBeInTheDocument();
   });
 
   it("links the privacy policy where billing is linked", () => {
@@ -54,12 +56,6 @@ describe("ConfirmBirthdate", () => {
       "href",
       "/legal/privacy"
     );
-  });
-
-  it("links nothing where there is no billing, and so no policy", () => {
-    render();
-
-    expect(screen.queryByRole("link", { name: "Privacy Policy" })).not.toBeInTheDocument();
   });
 
   it("asks nothing it can be talked past: the only other way off is signing out", async () => {

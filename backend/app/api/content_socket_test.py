@@ -8,6 +8,7 @@ its sharing admits the reader.
 
 import asyncio
 import json
+from types import SimpleNamespace
 
 import pytest
 from fastapi import status
@@ -18,14 +19,21 @@ from app.api.content_socket import MSG_AUTH, read_auth_frame, serve_tool_stream
 from app.core.security import SESSION_COOKIE_NAME
 from app.db.plugin_tools import provisioned_tools
 from app.models.platform.guild import CommunityRole
-from app.services.content_sockets import resource_room, sockets
+from app.services.content_sockets import (
+    ContentSockets,
+    Credential,
+    Subscriber,
+    Wire,
+    resource_room,
+    sockets,
+)
 from app.testing import (
     COUNTERS_UID,
     get_auth_token,
     install_tool_plugin,
     switch_tools,
 )
-from app.testing.sockets import settle
+from app.testing.sockets import FakeWebSocket, settle
 
 
 class InboundWebSocket:
@@ -256,25 +264,41 @@ async def test_a_member_the_counter_group_is_not_shared_with_is_refused(
 # ── a held socket ───────────────────────────────────────────────────────────
 
 
+async def _hold(websocket, monkeypatch, heartbeat: float, on_bytes) -> ContentSockets:
+    """Seat ``websocket`` in a fresh register's room for file 3 and hold it
+    open until the client hangs up."""
+    register = ContentSockets()
+    monkeypatch.setattr(content_socket, "sockets", register)
+    monkeypatch.setattr(content_socket, "HEARTBEAT_SECONDS", heartbeat)
+    room = resource_room(1, "file", 3)
+
+    async def keep(_session, _user):
+        return frozenset({room})
+
+    sub = Subscriber(
+        websocket=websocket,
+        user=SimpleNamespace(id=1),  # type: ignore[arg-type]
+        guild_id=1,
+        wire=Wire.bytes,
+        authorize=keep,
+        credential=Credential(),
+        rooms=frozenset({room}),
+    )
+    register.join(sub)
+    try:
+        await content_socket.hold_open(sub, on_bytes=on_bytes)
+        await settle()
+    finally:
+        if register._loop_task is not None:
+            register._loop_task.cancel()
+    return register
+
+
 async def test_a_held_socket_hands_on_binary_frames_and_beats_when_quiet(
     monkeypatch,
 ) -> None:
     """Every socket beats the same way, the collaboration socket included, so
     one client-side check notices a connection that has stopped carrying."""
-    from types import SimpleNamespace
-
-    from app.services.content_sockets import (
-        ContentSockets,
-        Credential,
-        Subscriber,
-        Wire,
-    )
-    from app.testing.sockets import FakeWebSocket
-
-    register = ContentSockets()
-    monkeypatch.setattr(content_socket, "sockets", register)
-    monkeypatch.setattr(content_socket, "HEARTBEAT_SECONDS", 0.01)
-
     inbound = [
         {"type": "websocket.receive", "bytes": b"\x02edit"},
         None,  # the client says nothing for a while
@@ -293,27 +317,8 @@ async def test_a_held_socket_hands_on_binary_frames_and_beats_when_quiet(
             return frame
 
     websocket = Client()
-
-    async def keep(_session, _user):
-        return frozenset({resource_room(1, "file", 3)})
-
-    sub = Subscriber(
-        websocket=websocket,  # type: ignore[arg-type]
-        user=SimpleNamespace(id=1),  # type: ignore[arg-type]
-        guild_id=1,
-        wire=Wire.bytes,
-        authorize=keep,
-        credential=Credential(),
-        rooms=frozenset({resource_room(1, "file", 3)}),
-    )
-    register.join(sub)
     received: list[bytes] = []
-    try:
-        await content_socket.hold_open(sub, on_bytes=received.append)
-        await settle()
-    finally:
-        if register._loop_task is not None:
-            register._loop_task.cancel()
+    register = await _hold(websocket, monkeypatch, 0.01, received.append)
 
     assert received == [b"\x02edit"]
     assert content_socket.HEARTBEAT_FRAME in websocket.sent
@@ -324,20 +329,6 @@ async def test_a_socket_that_keeps_talking_is_still_beaten_to(monkeypatch) -> No
     """Someone typing alone in a file sends constantly and is sent nothing
     back — edits are relayed to everyone else. The beat is measured from what
     the server last said, so their client still hears one and keeps the socket."""
-    from types import SimpleNamespace
-
-    from app.services.content_sockets import (
-        ContentSockets,
-        Credential,
-        Subscriber,
-        Wire,
-    )
-    from app.testing.sockets import FakeWebSocket
-
-    register = ContentSockets()
-    monkeypatch.setattr(content_socket, "sockets", register)
-    monkeypatch.setattr(content_socket, "HEARTBEAT_SECONDS", 0.05)
-
     # An edit every 10ms for 300ms: never quiet for a whole beat.
     edits = 30
 
@@ -352,25 +343,6 @@ async def test_a_socket_that_keeps_talking_is_still_beaten_to(monkeypatch) -> No
             return {"type": "websocket.receive", "bytes": b"\x02edit"}
 
     websocket = Typist()
-
-    async def keep(_session, _user):
-        return frozenset({resource_room(1, "file", 3)})
-
-    sub = Subscriber(
-        websocket=websocket,  # type: ignore[arg-type]
-        user=SimpleNamespace(id=1),  # type: ignore[arg-type]
-        guild_id=1,
-        wire=Wire.bytes,
-        authorize=keep,
-        credential=Credential(),
-        rooms=frozenset({resource_room(1, "file", 3)}),
-    )
-    register.join(sub)
-    try:
-        await content_socket.hold_open(sub, on_bytes=lambda _data: None)
-        await settle()
-    finally:
-        if register._loop_task is not None:
-            register._loop_task.cancel()
+    await _hold(websocket, monkeypatch, 0.05, lambda _data: None)
 
     assert websocket.sent.count(content_socket.HEARTBEAT_FRAME) >= 2

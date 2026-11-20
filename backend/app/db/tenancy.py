@@ -61,9 +61,6 @@ __all__ = [
     "PRIVATE_ROW_SHARED_READ",
     "PRIVATE_ROW_TABLES",
     "SHARED_TABLES",
-    "is_guild_scoped",
-    "is_initiative_scoped",
-    "is_shared",
 ]
 
 # --- Shared (stay in the ``public`` schema) ---------------------------------
@@ -441,19 +438,3 @@ OPERATIONS_TABLES: frozenset[str] = frozenset(
 
 # Union of every table that has an explicit placement decision.
 ALL_CLASSIFIED_TABLES: frozenset[str] = SHARED_TABLES | GUILD_SCOPED_TABLES
-
-
-def is_guild_scoped(table_name: str) -> bool:
-    """Return True if ``table_name`` moves into per-guild schemas."""
-    return table_name in GUILD_SCOPED_TABLES
-
-
-def is_shared(table_name: str) -> bool:
-    """Return True if ``table_name`` stays in the ``public`` schema."""
-    return table_name in SHARED_TABLES
-
-
-def is_initiative_scoped(table_name: str) -> bool:
-    """Return True if ``table_name`` carries the initiative-member RLS policies
-    (vs being guild-level / structural / own-row and exempt)."""
-    return table_name in INITIATIVE_SCOPED_TABLES

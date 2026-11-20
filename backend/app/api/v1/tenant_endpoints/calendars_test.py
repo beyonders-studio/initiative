@@ -83,6 +83,10 @@ async def test_create_calendar(client: AsyncClient, acting_user, session):
     assert ("owner", False, a.user.id) in grant_shapes
     assert ("read", True, None) in grant_shapes
 
+    read = await client.get(a.g(f"/calendars/{data['id']}"), headers=a.headers)
+    assert read.status_code == 200
+    assert read.json()["can"]["delete"] is True
+
 
 async def test_create_calendar_requires_feature_enabled(
     client: AsyncClient, acting_user, session
@@ -124,19 +128,6 @@ async def test_create_calendar_non_pm_forbidden(
     )
 
     assert response.status_code == 403
-
-
-async def test_get_calendar(client: AsyncClient, acting_user, session):
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    await _calendars_enabled(session, a.initiative)
-    calendar = await create_calendar(session, a.initiative, a.user, name="Mine")
-
-    response = await client.get(a.g(f"/calendars/{calendar.id}"), headers=a.headers)
-
-    assert response.status_code == 200
-    data = response.json()
-    assert data["id"] == calendar.id
-    assert data["can"]["delete"] is True
 
 
 async def test_list_calendars_dac_filtered(client: AsyncClient, acting_user, session):
@@ -234,7 +225,7 @@ async def test_update_calendar_requires_write(
 async def test_delete_calendar_owner_only_and_cascades(
     client: AsyncClient, acting_user, session
 ):
-    """Delete is owner (or guild admin); the soft delete cascades to the
+    """Delete is owner or guild admin; the soft delete cascades to the
     calendar's events."""
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
     await _calendars_enabled(session, a.initiative)
@@ -279,36 +270,23 @@ async def test_delete_calendar_owner_only_and_cascades(
     ).one()
     assert row.deleted_at is not None
 
-
-async def test_guild_admin_can_delete_any_calendar(
-    client: AsyncClient, acting_user, session
-):
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    await _calendars_enabled(session, a.initiative)
-    calendar = await create_calendar(session, a.initiative, a.user, name="Anyone's")
+    anyones = await create_calendar(session, a.initiative, a.user, name="Anyone's")
     admin = await acting_user(guild_role=CommunityRole.admin, guild=a.guild)
-
     response = await client.delete(
-        admin.g(f"/calendars/{calendar.id}"), headers=admin.headers
+        admin.g(f"/calendars/{anyones.id}"), headers=admin.headers
     )
-
     assert response.status_code == 204
 
 
 async def test_calendar_counts_by_initiative(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
-    """Grouped counts mirror the list: DAC-visible calendars in calendars-enabled
-    initiatives, and never a guild calendar — the sidebar rows the counts sit on
-    are initiative rows, and a guild calendar belongs to none of them."""
+    """Grouped counts never count a guild calendar — the sidebar rows the counts
+    sit on are initiative rows, and a guild calendar belongs to none of them."""
     admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     await _calendars_enabled(session, admin.initiative)
-    disabled_initiative = await create_initiative(
-        session, admin.guild, admin.user, tools={Tool.calendar: False}
-    )
 
     await create_calendar(session, admin.initiative, admin.user, name="Team")
-    await create_calendar(session, disabled_initiative, admin.user, name="Hidden")
     await create_guild_calendar(session, admin.guild, admin.user)
 
     response = await client.get(
@@ -429,7 +407,7 @@ async def test_guild_scope_lists_only_the_guild_s_own(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
     """``scope=community`` is the calendar plug-in's own list: guild calendars, and no
-    initiative's."""
+    initiative's. Unscoped, both are listed; under an initiative, only its own."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     await _calendars_enabled(session, a.initiative)
     await create_calendar(session, a.initiative, a.user, name="Team")
@@ -444,6 +422,13 @@ async def test_guild_scope_lists_only_the_guild_s_own(
     body = response.json()
     assert [c["id"] for c in body["items"]] == [guild_calendar.id]
     assert body["total_count"] == 1
+
+    every = await client.get(a.g("/calendars/"), headers=a.headers)
+    assert sorted(c["name"] for c in every.json()["items"]) == ["Holidays", "Team"]
+    scoped = await client.get(
+        a.g("/calendars/"), headers=a.headers, params={"initiative_id": a.initiative.id}
+    )
+    assert [c["name"] for c in scoped.json()["items"]] == ["Team"]
 
 
 async def test_a_guild_calendar_is_hidden_when_it_is_not_shared(

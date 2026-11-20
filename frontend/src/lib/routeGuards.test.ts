@@ -15,22 +15,14 @@ const web: GuardServerState = {
  * tree. Tests here pin both edges.
  */
 describe("routeGuardSignature", () => {
-  it("distinguishes loading from settled-anonymous", () => {
-    const loading = routeGuardSignature({ loading: true, user: null }, web);
-    const anonymous = routeGuardSignature({ loading: false, user: null }, web);
-    expect(loading).not.toBe(anonymous);
-  });
-
-  it("distinguishes settled-anonymous from signed in", () => {
-    const anonymous = routeGuardSignature({ loading: false, user: null }, web);
-    const signedIn = routeGuardSignature({ loading: false, user: { id: 7 } }, web);
-    expect(anonymous).not.toBe(signedIn);
-  });
-
-  it("changes when the signed-in user changes", () => {
-    const alice = routeGuardSignature({ loading: false, user: { id: 1 } }, web);
-    const bob = routeGuardSignature({ loading: false, user: { id: 2 } }, web);
-    expect(alice).not.toBe(bob);
+  it("tells loading, settled-anonymous and each signed-in user apart", () => {
+    const signatures = [
+      routeGuardSignature({ loading: true, user: null }, web),
+      routeGuardSignature({ loading: false, user: null }, web),
+      routeGuardSignature({ loading: false, user: { id: 1 } }, web),
+      routeGuardSignature({ loading: false, user: { id: 2 } }, web),
+    ];
+    expect(new Set(signatures).size).toBe(signatures.length);
   });
 
   it("is stable when the user object is replaced with an equivalent one", () => {

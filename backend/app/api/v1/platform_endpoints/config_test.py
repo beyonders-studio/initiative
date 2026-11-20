@@ -18,34 +18,30 @@ from app.services.captcha_config import ResolvedCaptchaConfig
 from app.services.tenant.attachments import MAX_FILE_SIZE
 
 
-async def test_config_exposes_upload_cap(client: AsyncClient):
-    """The SPA reads the server-enforced upload cap from config so the limit
-    has a single source of truth (no mirrored frontend constant)."""
-    response = await client.get("/api/v1/config")
-
-    assert response.status_code == 200
-    assert response.json()["max_upload_bytes"] == MAX_FILE_SIZE
-
-
-async def test_config_exposes_native_version_floor(client: AsyncClient):
-    """The landing page builds its Android and desktop download links from the
-    releases those apps were last rebuilt for, the floors this server ships."""
-    response = await client.get("/api/v1/config")
-
-    assert response.status_code == 200
-    assert response.json()["min_native_version"] == get_min_native_version()
-    assert response.json()["min_desktop_version"] == get_min_desktop_version()
-
-
-async def test_config_omits_billing_when_url_unset(client: AsyncClient, monkeypatch):
-    """Self-host default: no BILLING_URL ⇒ ``billing: null`` so the SPA hides
-    every tier/upgrade/manage surface (the usage panel still renders)."""
+async def test_config_is_unauthenticated_and_says_what_a_self_host_offers(
+    client: AsyncClient, monkeypatch
+):
+    """The SPA reads this before anyone signs in. It carries the
+    server-enforced upload cap, so the limit has one source of truth, and the
+    native and desktop floors the landing page builds its download links from.
+    A self-host default configures nothing optional: no billing (the SPA hides
+    every tier surface), no cookie notice, no guests, and no cookie category
+    to ask about."""
     monkeypatch.setattr(settings, "BILLING_URL", None)
+    monkeypatch.setattr(settings, "FARO_COLLECTOR_URL", None)
 
     response = await client.get("/api/v1/config")
 
     assert response.status_code == 200
-    assert response.json()["billing"] is None
+    body = response.json()
+    assert body["max_upload_bytes"] == MAX_FILE_SIZE
+    assert body["min_native_version"] == get_min_native_version()
+    assert body["min_desktop_version"] == get_min_desktop_version()
+    assert body["billing"] is None
+    assert body["cookie_consent_enabled"] is False
+    assert body["guests_enabled"] is False
+    assert body["cookie_categories"] == []
+    assert body["faro_collector_url"] is None
 
 
 @pytest.mark.parametrize(
@@ -107,15 +103,6 @@ async def test_config_reports_operator_handoff_when_signing_configured(
 
     assert response.status_code == 200
     assert response.json()["billing"]["operator_handoff"] is True
-
-
-async def test_config_endpoint_is_unauthenticated(client: AsyncClient):
-    """The SPA needs to read this before any user is logged in. No
-    cookie, no Authorization header — must still return 200."""
-    # No auth headers, no cookies
-    response = await client.get("/api/v1/config")
-
-    assert response.status_code == 200
 
 
 # --- Captcha exposure -----------------------------------------------------
@@ -184,33 +171,6 @@ async def test_captcha_frame_is_absent_without_a_captcha(client: AsyncClient):
     response = await client.get("/api/v1/config/captcha")
 
     assert response.status_code == 404
-
-
-async def test_config_says_cookie_consent_and_guests_are_off_by_default(
-    client: AsyncClient,
-):
-    """The SPA reads the switches here: the cookie notice is for somebody who
-    has not signed in, and a deployment without guests shows nothing about
-    them. Off unless an owner turned them on."""
-    response = await client.get("/api/v1/config")
-
-    assert response.status_code == 200
-    assert response.json()["cookie_consent_enabled"] is False
-    assert response.json()["guests_enabled"] is False
-
-
-async def test_config_asks_about_nothing_a_deployment_does_not_do(
-    client: AsyncClient, monkeypatch
-):
-    """The chooser offers a switch per category here. Self-host default:
-    nothing optional is configured, so there is nothing to offer."""
-    monkeypatch.setattr(settings, "FARO_COLLECTOR_URL", None)
-
-    response = await client.get("/api/v1/config")
-
-    assert response.status_code == 200
-    assert response.json()["cookie_categories"] == []
-    assert response.json()["faro_collector_url"] is None
 
 
 async def test_config_names_the_collector_and_asks_about_analytics(

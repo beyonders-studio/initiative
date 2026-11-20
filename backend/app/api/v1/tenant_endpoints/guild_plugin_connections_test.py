@@ -35,6 +35,7 @@ from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.audit_events import AuditEventType
 from app.core.encryption import SALT_PLUGIN_CONFIG, encrypt_field
 from app.core.messages import GuildMessages, GuildPluginMessages, MarketplaceMessages
 from app.models.platform.guild import CommunityRole
@@ -52,6 +53,7 @@ from app.testing import (
     create_marketplace_listing,
     create_plugin_service_registration,
     create_plugin_user_connection,
+    emitted,
     marketplace_uid,
     route_session_to_guild,
     sealed_vendor_values,
@@ -894,13 +896,23 @@ class TestConnect:
             "https://github.test/login/oauth/authorize"
         )
         query = parse_qs(connect.query)
+        # Pinned exactly, so anything added to this URL is added deliberately.
+        assert set(query) == {
+            "response_type",
+            "client_id",
+            "redirect_uri",
+            "state",
+            "code_challenge",
+            "code_challenge_method",
+        }
         assert query["client_id"] == ["client-123"]
         assert query["redirect_uri"] == [callback_url()]
         assert query["response_type"] == ["code"]
         assert query["code_challenge_method"] == ["S256"]
         assert query["state"][0]
         # The client's secret is the deployment's, and never in an address.
-        assert "client-secret-456" not in body["connect_url"]
+        for smell in ("client-secret-456", "Bearer", "iat_"):
+            assert smell not in body["connect_url"]
         assert await _rows(session, a.guild.id) == []
 
     async def test_a_typed_connection_is_not_connected_to(
@@ -1043,7 +1055,7 @@ class TestConnect:
 
 
 class TestConnectionVisibility:
-    async def test_a_second_member_does_not_see_the_firsts_connection(
+    async def test_a_member_sees_their_own_connection_and_not_anothers(
         self, client: AsyncClient, acting_user, session: AsyncSession
     ):
         """One member's vendor account is not another member's business. The
@@ -1057,28 +1069,20 @@ class TestConnectionVisibility:
         await _connected(session, first, plugin)
 
         body = (
+            await client.get(first.g(f"/plugins/{plugin.id}"), headers=first.headers)
+        ).json()
+        github = next(c for c in body["connections"] if c["id"] == "github")
+        assert github["status"] == "connected"
+        assert github["values"] == {"login": "someone"}
+        assert "gho_member" not in str(body)
+
+        body = (
             await client.get(second.g(f"/plugins/{plugin.id}"), headers=second.headers)
         ).json()
         github = next(c for c in body["connections"] if c["id"] == "github")
         assert github["status"] is None
         assert github["satisfied"] is False
         assert github["blocked"] is False
-
-    async def test_the_connecting_member_sees_their_own(
-        self, client: AsyncClient, acting_user, session: AsyncSession
-    ):
-        a = await acting_user(guild_role=CommunityRole.admin)
-        plugin = await _install(session, a)
-        member = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
-        await _connected(session, member, plugin)
-
-        body = (
-            await client.get(member.g(f"/plugins/{plugin.id}"), headers=member.headers)
-        ).json()
-        github = next(c for c in body["connections"] if c["id"] == "github")
-        assert github["status"] == "connected"
-        assert github["values"] == {"login": "someone"}
-        assert "gho_member" not in str(body)
 
     async def test_a_member_may_not_read_the_members_view(
         self, client: AsyncClient, acting_user, session: AsyncSession
@@ -1097,17 +1101,27 @@ class TestConnectionVisibility:
         self, client: AsyncClient, acting_user, session: AsyncSession
     ):
         """Admins have full authority over their guild, and knowing who reaches
-        an outside system through it is part of that."""
+        an outside system through it is part of that. Revoking beats reading:
+        no admin workflow needs the bytes, and the handle is between the
+        platform and the plug-in, so the view carries neither."""
         a = await acting_user(guild_role=CommunityRole.superadmin)
         plugin = await _install(session, a)
         first = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
         second = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
-        for actor in (first, second):
-            await _connected(session, actor, plugin)
+        refs = [
+            (await _connected(session, actor, plugin)).connection_ref
+            for actor in (first, second)
+        ]
 
-        body = (
-            await client.get(a.g(f"/plugins/{plugin.id}/members"), headers=a.headers)
-        ).json()
+        response = await client.get(
+            a.g(f"/plugins/{plugin.id}/members"), headers=a.headers
+        )
+        assert response.status_code == 200, response.text
+        for ref in refs:
+            assert ref not in response.text
+        assert "config_secrets" not in response.text
+        assert "gho_member" not in response.text
+        body = response.json()
         assert sorted(item["user_id"] for item in body["items"]) == sorted(
             [first.user.id, second.user.id]
         )
@@ -1131,23 +1145,6 @@ class TestConnectionVisibility:
         ]
         github = next(s for s in paged["summary"] if s["connection_id"] == "github")
         assert github["connected_count"] == 2
-
-    async def test_the_members_view_carries_no_values_and_no_handles(
-        self, client: AsyncClient, acting_user, session: AsyncSession
-    ):
-        """Revoking beats reading: no admin workflow needs the bytes, and the
-        handle is between the platform and the plug-in."""
-        a = await acting_user(guild_role=CommunityRole.admin)
-        plugin = await _install(session, a)
-        member = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
-        started = await _connected(session, member, plugin)
-        ref = started.connection_ref
-
-        response = await client.get(
-            a.g(f"/plugins/{plugin.id}/members"), headers=a.headers
-        )
-        assert ref not in response.text
-        assert "config_secrets" not in response.text
 
     async def test_another_guilds_admin_sees_nothing(
         self, client: AsyncClient, acting_user, session: AsyncSession
@@ -1189,18 +1186,7 @@ class TestGovernance:
         assert await _rows(session, a.guild.id) == []
         assert [i.reason for i in recorded_revocations] == ["admin_revoked"]
 
-    async def test_a_revoked_member_may_connect_again(
-        self, client: AsyncClient, acting_user, session: AsyncSession
-    ):
-        a = await acting_user(guild_role=CommunityRole.admin)
-        plugin = await _install(session, a)
-        member = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
-        await _connected(session, member, plugin)
-        await client.delete(
-            a.g(f"/plugins/{plugin.id}/members/{member.user.id}/connections/github"),
-            headers=a.headers,
-        )
-
+        # A revoke is not a block: they may connect again.
         again = await client.post(
             member.g(f"/plugins/{plugin.id}/connections/github/connect"),
             headers=member.headers,
@@ -1227,6 +1213,12 @@ class TestGovernance:
         )
         assert blocked.status_code == 204
         assert [i.reason for i in recorded_revocations] == ["blocked"]
+        (row,) = await _rows(session, a.guild.id)
+        assert row.blocked_at is not None
+        assert row.blocked_by_id == a.user.id
+        assert row.secret_fields == {}
+        assert await load_connection_secrets(session, row) == {}
+        assert row.status == "blocked"
 
         retry = await client.post(
             member.g(f"/plugins/{plugin.id}/connections/github/connect"),
@@ -1234,28 +1226,6 @@ class TestGovernance:
         )
         assert retry.status_code == 403
         assert retry.json()["detail"] == GuildPluginMessages.CONNECTION_BLOCKED
-
-    async def test_a_block_leaves_a_tombstone_holding_no_values(
-        self, client: AsyncClient, acting_user, session: AsyncSession
-    ):
-        a = await acting_user(guild_role=CommunityRole.superadmin)
-        plugin = await _install(session, a)
-        member = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
-        await _connected(session, member, plugin)
-        await client.post(
-            a.g(
-                f"/plugins/{plugin.id}/members/{member.user.id}/connections/github/block"
-            ),
-            headers=a.headers,
-        )
-
-        rows = await _rows(session, a.guild.id)
-        assert len(rows) == 1
-        assert rows[0].blocked_at is not None
-        assert rows[0].blocked_by_id == a.user.id
-        assert rows[0].secret_fields == {}
-        assert await load_connection_secrets(session, rows[0]) == {}
-        assert rows[0].status == "blocked"
 
     async def test_a_members_values_are_theirs_alone(
         self, acting_user, session: AsyncSession, reading_as
@@ -1289,38 +1259,25 @@ class TestGovernance:
             seen = (await asking.exec(select(GuildPluginUserConnection))).all()
             assert (len(held), len(seen)) == (values, rows), reader
 
-    async def test_a_member_can_be_blocked_before_ever_connecting(
-        self, client: AsyncClient, acting_user, session: AsyncSession
-    ):
-        a = await acting_user(guild_role=CommunityRole.superadmin)
-        plugin = await _install(session, a)
-        member = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
-
-        response = await client.post(
-            a.g(
-                f"/plugins/{plugin.id}/members/{member.user.id}/connections/github/block"
-            ),
-            headers=a.headers,
-        )
-        assert response.status_code == 204
-        retry = await client.post(
-            member.g(f"/plugins/{plugin.id}/connections/github/connect"),
-            headers=member.headers,
-        )
-        assert retry.status_code == 403
-
     async def test_lifting_a_block_lets_them_connect_again(
         self, client: AsyncClient, acting_user, session: AsyncSession
     ):
+        """A member can be blocked before ever connecting."""
         a = await acting_user(guild_role=CommunityRole.superadmin)
         plugin = await _install(session, a)
         member = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
-        await client.post(
+        blocked = await client.post(
             a.g(
                 f"/plugins/{plugin.id}/members/{member.user.id}/connections/github/block"
             ),
             headers=a.headers,
         )
+        assert blocked.status_code == 204
+        refused = await client.post(
+            member.g(f"/plugins/{plugin.id}/connections/github/connect"),
+            headers=member.headers,
+        )
+        assert refused.status_code == 403
 
         lifted = await client.delete(
             a.g(
@@ -1407,7 +1364,7 @@ def _tool_definition() -> dict:
 
 class TestUpgrade:
     async def test_upgrading_re_pins_to_the_current_version(
-        self, client: AsyncClient, acting_user, session: AsyncSession
+        self, client: AsyncClient, acting_user, session: AsyncSession, capfd
     ):
         await create_marketplace_listing(
             session,
@@ -1437,6 +1394,7 @@ class TestUpgrade:
         offered = await client.get(a.g(f"/plugins/{plugin_id}"), headers=a.headers)
         assert offered.json()["update_version"] == "1.1.0"
 
+        capfd.readouterr()
         response = await client.post(
             a.g(f"/plugins/{plugin_id}/upgrade"), headers=a.headers
         )
@@ -1444,6 +1402,11 @@ class TestUpgrade:
         assert response.json()["listing_version"] == "1.1.0"
         # And the button goes away rather than offering the version just taken.
         assert response.json()["update_version"] is None
+
+        (row,) = emitted(capfd, AuditEventType.PLUGIN_UPDATED)
+        assert row["actor_user_id"] == a.user.id
+        assert row["target"] == {"type": "plugin", "id": plugin_id}
+        assert row["detail"] == {"area": "version", "from": "1.0.0", "to": "1.1.0"}
 
     async def test_a_service_out_of_service_still_upgrades_its_installs(
         self,
@@ -1559,6 +1522,16 @@ class TestUninstallKillsAccess:
             headers=a.headers,
             json={"values": {"admin": VALID_ADMIN_VALUES}},
         )
+        # A block on a plug-in that is no longer installed constrains nothing,
+        # so its tombstone goes too.
+        blocked = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
+        await client.post(
+            a.g(
+                f"/plugins/{plugin.id}/members/{blocked.user.id}/connections/github/block"
+            ),
+            headers=a.headers,
+        )
+        recorded_revocations.clear()
 
         response = await client.delete(a.g(f"/plugins/{plugin.id}"), headers=a.headers)
         assert response.status_code == 204
@@ -1569,22 +1542,6 @@ class TestUninstallKillsAccess:
         assert any(i.connection_ref for i in recorded_revocations)
         assert any(i.connection_ref is None for i in recorded_revocations)
 
-    async def test_uninstalling_takes_blocked_tombstones_too(
-        self, client: AsyncClient, acting_user, session: AsyncSession
-    ):
-        """A block on a plug-in that is no longer installed constrains nothing."""
-        a = await acting_user(guild_role=CommunityRole.superadmin)
-        plugin, member = await _connected_member(client, acting_user, session, a)
-        await client.post(
-            a.g(
-                f"/plugins/{plugin.id}/members/{member.user.id}/connections/github/block"
-            ),
-            headers=a.headers,
-        )
-
-        await client.delete(a.g(f"/plugins/{plugin.id}"), headers=a.headers)
-        assert await _rows(session, a.guild.id) == []
-
 
 class TestRelationshipCascades:
     async def test_leaving_a_guild_ends_the_connections_made_in_it(
@@ -1594,8 +1551,12 @@ class TestRelationshipCascades:
         session: AsyncSession,
         recorded_revocations,
     ):
+        """Their access elsewhere is a relationship that has not ended."""
         a = await acting_user(guild_role=CommunityRole.admin)
+        b = await acting_user(guild_role=CommunityRole.admin)
         _, member = await _connected_member(client, acting_user, session, a)
+        plugin_b = await _install(session, b)
+        await _connected(session, b, plugin_b)
 
         response = await client.delete(
             f"/api/v1/communities/{a.guild.id}/leave", headers=member.headers
@@ -1603,6 +1564,7 @@ class TestRelationshipCascades:
         assert response.status_code == 204, response.text
         assert await _rows(session, a.guild.id) == []
         assert [i.reason for i in recorded_revocations] == ["left_guild"]
+        assert len(await _rows(session, b.guild.id)) == 1
 
     async def test_being_removed_from_a_guild_ends_them_too(
         self,
@@ -1623,22 +1585,6 @@ class TestRelationshipCascades:
         # A plain admin never reads the member's values; the platform hands
         # the vendor the token all the same.
         assert set(recorded_revocations[0].sealed_tokens) == {"access_token"}
-
-    async def test_leaving_does_not_touch_another_guild(
-        self, client: AsyncClient, acting_user, session: AsyncSession
-    ):
-        """Their access elsewhere is a relationship that has not ended."""
-        a = await acting_user(guild_role=CommunityRole.admin)
-        b = await acting_user(guild_role=CommunityRole.admin)
-        _, member = await _connected_member(client, acting_user, session, a)
-        plugin_b = await _install(session, b)
-        await _connected(session, b, plugin_b)
-
-        await client.delete(
-            f"/api/v1/communities/{a.guild.id}/leave", headers=member.headers
-        )
-        assert await _rows(session, a.guild.id) == []
-        assert len(await _rows(session, b.guild.id)) == 1
 
     async def test_a_block_survives_the_member_leaving(
         self, client: AsyncClient, acting_user, session: AsyncSession

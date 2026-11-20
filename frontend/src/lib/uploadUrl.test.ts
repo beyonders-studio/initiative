@@ -23,34 +23,23 @@ const getUploadTokenMock = vi.mocked(getUploadToken);
 // so the default-path tests cover the web (same-origin, cookie-auth) flow.
 
 describe("resolveFileVersionDownloadUrl", () => {
-  it("builds the community-scoped version download path", () => {
+  it("builds the community-scoped version download path, apart from the current file's", () => {
     expect(resolveFileVersionDownloadUrl(5, 3, 7)).toBe("/api/v1/c/7/files/5/versions/3/download");
-  });
-
-  it("appends inline=1 when requested", () => {
     expect(resolveFileVersionDownloadUrl(5, 3, 7, true)).toBe(
       "/api/v1/c/7/files/5/versions/3/download?inline=1"
     );
-  });
-
-  it("returns null when ids are missing", () => {
+    expect(resolveFileVersionDownloadUrl(5, 3, 7)).not.toBe(resolveFileDownloadUrl(5, 7));
+    // Nothing when an id is missing.
     expect(resolveFileVersionDownloadUrl(0, 3, 7)).toBeNull();
     expect(resolveFileVersionDownloadUrl(5, 0, 7)).toBeNull();
     expect(resolveFileVersionDownloadUrl(5, 3, 0)).toBeNull();
   });
-
-  it("differs from the current-file download path", () => {
-    expect(resolveFileVersionDownloadUrl(5, 3, 7)).not.toBe(resolveFileDownloadUrl(5, 7));
-  });
 });
 
 describe("resolveUploadUrl (web)", () => {
-  it("returns same-origin /uploads/ path unchanged with no token query param", () => {
+  it("returns a same-origin /uploads/ path or a data URI unchanged, with no token", () => {
     // Web flow: HttpOnly cookie authenticates the <img> load — no ?token=.
     expect(resolveUploadUrl("/uploads/avatars/abc.png")).toBe("/uploads/avatars/abc.png");
-  });
-
-  it("passes through data URIs untouched", () => {
     expect(resolveUploadUrl("data:image/png;base64,AAAA")).toBe("data:image/png;base64,AAAA");
   });
 });
@@ -69,7 +58,12 @@ describe("resolveUploadUrl (native)", () => {
     const url = resolveUploadUrl("/uploads/avatars/abc.png");
 
     expect(url).toBe("http://10.0.2.2:8000/uploads/avatars/abc.png?token=scoped-upload-token");
-    expect(getUploadTokenMock).toHaveBeenCalled();
+
+    // And omits it when none is available yet.
+    getUploadTokenMock.mockReturnValue(null);
+    expect(resolveUploadUrl("/uploads/avatars/abc.png")).toBe(
+      "http://10.0.2.2:8000/uploads/avatars/abc.png"
+    );
   });
 
   it("keeps the server's path prefix on native", () => {
@@ -81,16 +75,6 @@ describe("resolveUploadUrl (native)", () => {
 
     expect(resolveUploadUrl("/uploads/avatars/abc.png")).toBe(
       "https://example.test/initiative/uploads/avatars/abc.png"
-    );
-  });
-
-  it("omits the token when none is available yet", () => {
-    vi.spyOn(Capacitor, "isNativePlatform").mockReturnValue(true);
-    vi.spyOn(apiClient.defaults, "baseURL", "get").mockReturnValue("http://10.0.2.2:8000/api/v1");
-    getUploadTokenMock.mockReturnValue(null);
-
-    expect(resolveUploadUrl("/uploads/avatars/abc.png")).toBe(
-      "http://10.0.2.2:8000/uploads/avatars/abc.png"
     );
   });
 });
@@ -105,24 +89,19 @@ describe("resolveArtworkUrl", () => {
     );
   });
 
-  it("keeps bundled artwork bundle-relative on native", () => {
-    // Shipped with the web bundle: the native app already holds the file, so
-    // sending the request to the API origin would be a needless round trip.
+  it("keeps bundled artwork bundle-relative on native, and addresses mirrored artwork at the API", () => {
     vi.spyOn(Capacitor, "isNativePlatform").mockReturnValue(true);
     vi.spyOn(apiClient.defaults, "baseURL", "get").mockReturnValue("http://10.0.2.2:8000/api/v1");
+    getUploadTokenMock.mockReturnValue("scoped-upload-token");
 
+    // Shipped with the web bundle: the native app already holds the file, so
+    // sending the request to the API origin would be a needless round trip.
     expect(resolveArtworkUrl("/marketplace/core-guild-calendar.svg")).toBe(
       "/marketplace/core-guild-calendar.svg"
     );
     expect(resolveArtworkUrl("/icons/logo.svg")).toBe("/icons/logo.svg");
-  });
-
-  it("addresses mirrored registry artwork at the API origin on native", () => {
     // Served only by the API: bundle-relative it resolves inside the app's own
-    // origin and the image breaks.
-    vi.spyOn(Capacitor, "isNativePlatform").mockReturnValue(true);
-    vi.spyOn(apiClient.defaults, "baseURL", "get").mockReturnValue("http://10.0.2.2:8000/api/v1");
-
+    // origin and the image breaks. The media route is public, so no token.
     expect(resolveArtworkUrl("/api/v1/marketplace/media/abc123")).toBe(
       "http://10.0.2.2:8000/api/v1/marketplace/media/abc123"
     );
@@ -139,14 +118,6 @@ describe("resolveArtworkUrl", () => {
     expect(resolveArtworkUrl("/api/v1/marketplace/media/abc123")).toBe(
       "https://example.test/initiative/api/v1/marketplace/media/abc123"
     );
-  });
-
-  it("adds no token — the media route is public", () => {
-    vi.spyOn(Capacitor, "isNativePlatform").mockReturnValue(true);
-    vi.spyOn(apiClient.defaults, "baseURL", "get").mockReturnValue("http://10.0.2.2:8000/api/v1");
-    getUploadTokenMock.mockReturnValue("scoped-upload-token");
-
-    expect(resolveArtworkUrl("/api/v1/marketplace/media/abc123")).not.toContain("token=");
   });
 
   it("passes absolute URLs and data URIs through, and null for nothing", () => {

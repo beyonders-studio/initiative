@@ -179,21 +179,23 @@ describe("AnnouncementCenter", () => {
     expect(screen.getByText(/shows 2 more times/i)).toBeInTheDocument();
   });
 
-  it("holds a route-triggered notice until the reader is on that page", async () => {
-    listResponds([announcement({ trigger_route: "/c/*/settings" })]);
+  it.each([
+    ["/c/7/files", false],
+    ["/c/7/settings", true],
+  ])(
+    "holds a route-triggered notice until the reader is on that page (%s)",
+    async (route, shown) => {
+      listResponds([announcement({ trigger_route: "/c/*/settings" })]);
 
-    renderCenter({ route: "/c/7/files" });
+      renderCenter({ route });
 
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-  });
-
-  it("shows a route-triggered notice on a matching page", async () => {
-    listResponds([announcement({ trigger_route: "/c/*/settings" })]);
-
-    renderCenter({ route: "/c/7/settings" });
-
-    expect(await screen.findByText("Board view is new")).toBeInTheDocument();
-  });
+      if (shown) {
+        expect(await screen.findByText("Board view is new")).toBeInTheDocument();
+      } else {
+        await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      }
+    }
+  );
 
   it("shows nothing when there is nothing to say", async () => {
     listResponds([]);

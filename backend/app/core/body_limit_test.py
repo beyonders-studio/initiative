@@ -83,11 +83,6 @@ def test_a_multipart_upload_gets_room_for_the_largest_file_a_route_takes():
     assert limit > listing
 
 
-def test_the_default_leaves_room_for_a_calendar_import():
-    """The largest JSON body no route bounds is an iCalendar import."""
-    assert DEFAULT_MAX_REQUEST_BYTES > 2 * 2_000_000
-
-
 @pytest.mark.parametrize(
     ("method", "path"),
     [

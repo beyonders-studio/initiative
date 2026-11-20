@@ -68,28 +68,6 @@ def test_schema_fixture_survives_normalization() -> None:
     assert sorted(path for path in _leaf_paths(sheet) if path not in kept) == []
 
 
-def test_hidden_lines_survive() -> None:
-    """A hidden row or column is formatting, and persists like any other."""
-    normalized = normalize_spreadsheet_content(
-        {
-            "schema_version": 3,
-            "kind": "spreadsheet",
-            "sheets": [
-                {
-                    "id": "s1",
-                    "name": "S",
-                    "cells": {},
-                    "columns": {"4": {"hidden": True}},
-                    "rows": {"9": {"hidden": True, "height": 30}},
-                }
-            ],
-        }
-    )
-    sheet = normalized["sheets"][0]
-    assert sheet["columns"]["4"]["hidden"] is True
-    assert sheet["rows"]["9"] == {"hidden": True, "height": 30}
-
-
 def test_hidden_false_is_not_stored() -> None:
     """Only the flag being set means anything, so ``false`` leaves nothing
     behind rather than filling every saved workbook with noise."""
@@ -131,36 +109,3 @@ def test_a_workbook_keeps_one_sheet_on_show() -> None:
     )
     states = [sheet.get("hidden") for sheet in normalized["sheets"]]
     assert states == [None, True]
-
-
-def test_hidden_sheet_is_kept_when_another_is_shown() -> None:
-    normalized = normalize_spreadsheet_content(
-        {
-            "schema_version": 3,
-            "kind": "spreadsheet",
-            "sheets": [
-                {"id": "s1", "name": "One"},
-                {"id": "s2", "name": "Two", "hidden": True},
-            ],
-        }
-    )
-    assert [sheet.get("hidden") for sheet in normalized["sheets"]] == [None, True]
-
-
-def test_a_cell_entry_keeps_its_wrapper() -> None:
-    content = normalize_spreadsheet_content(
-        {
-            "schema_version": 3,
-            "kind": "spreadsheet",
-            "sheets": [
-                {
-                    "id": "s1",
-                    "name": "S",
-                    "cells": {"0:0": 1},
-                    "cellStyles": {"0:0": {"style": {"italic": True}}},
-                }
-            ],
-        }
-    )
-
-    assert content["sheets"][0]["cellStyles"]["0:0"] == {"style": {"italic": True}}

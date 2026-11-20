@@ -49,7 +49,7 @@ describe("AcceptTerms", () => {
     logout.mockReset();
   });
 
-  it("offers both documents to read before there is anything to agree to", () => {
+  it("offers both documents to read, and signing out rather than a decline", () => {
     render();
 
     expect(screen.getByRole("link", { name: "Terms of Service" })).toHaveAttribute(
@@ -60,6 +60,11 @@ describe("AcceptTerms", () => {
       "href",
       "/legal/privacy"
     );
+    // A decline button would have to mean something — deleting the account, or
+    // leaving it in a state nothing else in the app knows about. Signing out is
+    // the honest version and they can already do it.
+    expect(screen.getByRole("button", { name: /sign out/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /decline|no thanks/i })).not.toBeInTheDocument();
   });
 
   it("records the agreement and re-reads the account", async () => {
@@ -71,16 +76,6 @@ describe("AcceptTerms", () => {
     // The screen is drawn from the account's own record, so it only goes away
     // once the account has been read again.
     expect(refreshUser).toHaveBeenCalled();
-  });
-
-  it("offers signing out rather than a decline", () => {
-    render();
-
-    // A decline button would have to mean something — deleting the account, or
-    // leaving it in a state nothing else in the app knows about. Signing out is
-    // the honest version and they can already do it.
-    expect(screen.getByRole("button", { name: /sign out/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /decline|no thanks/i })).not.toBeInTheDocument();
   });
 
   it("says so and stays put when the agreement could not be recorded", async () => {

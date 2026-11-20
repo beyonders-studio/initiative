@@ -23,16 +23,12 @@ VERSION = "/api/v1/version"
 SIGN_IN = "/api/v1/auth/token"
 
 
-async def test_a_response_carries_the_id_of_the_request(client: AsyncClient):
+async def test_each_response_carries_the_id_of_its_own_request(client: AsyncClient):
     answered = await client.get(VERSION)
     assert answered.status_code == 200
     assert audit_context.clean_request_id(answered.headers[REQUEST_ID_HEADER])
-
-
-async def test_each_request_is_named_once(client: AsyncClient):
-    first = await client.get(VERSION)
     second = await client.get(VERSION)
-    assert first.headers[REQUEST_ID_HEADER] != second.headers[REQUEST_ID_HEADER]
+    assert answered.headers[REQUEST_ID_HEADER] != second.headers[REQUEST_ID_HEADER]
 
 
 async def test_a_supplied_id_is_ignored_where_nothing_sits_in_front(

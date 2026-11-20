@@ -1,8 +1,5 @@
-import importlib.util
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
-from pathlib import Path
-from types import ModuleType
 
 import pytest
 from alembic.migration import MigrationContext
@@ -15,6 +12,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings
 from app.testing import create_task
+from app.testing.later_revisions import load_revision
 
 
 @pytest.fixture
@@ -28,20 +26,6 @@ async def provisioner() -> AsyncIterator[AsyncEngine]:
         yield engine
     finally:
         await engine.dispose()
-
-
-def _migration() -> ModuleType:
-    path = (
-        Path(__file__).resolve().parents[2]
-        / "alembic"
-        / "versions"
-        / "20261020_0528_fixed_task_recurrence_anchor.py"
-    )
-    spec = importlib.util.spec_from_file_location(path.stem, path)
-    assert spec is not None and spec.loader is not None
-    migration = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(migration)
-    return migration
 
 
 def _run(connection: Connection, step: Callable[[], None]) -> None:
@@ -123,7 +107,7 @@ async def test_old_tasks_keep_their_existing_continuation_and_consumed_count(
         recurrence_occurrence_count=3,
     )
     await _prepare_migration_owner(session, a.guild.id)
-    migration = _migration()
+    migration = load_revision("20261020_0528_fixed_task_recurrence_anchor")
     async with provisioner.begin() as connection:
         await connection.execute(
             text("SELECT set_config('search_path', :path, true)"),
@@ -185,7 +169,7 @@ async def test_a_backfill_exception_restores_force_rls_before_returning(
         due_date=datetime(2026, 10, 5, tzinfo=UTC),
     )
     await _prepare_migration_owner(session, a.guild.id)
-    migration = _migration()
+    migration = load_revision("20261020_0528_fixed_task_recurrence_anchor")
     execute = migration.op.execute
     lifted = []
 
@@ -249,7 +233,7 @@ async def test_a_sql_backfill_error_rolls_back_columns_data_and_rls(
         {"due": "invalid date for rollback test", "id": task.id},
     )
     await _prepare_migration_owner(session, a.guild.id)
-    migration = _migration()
+    migration = load_revision("20261020_0528_fixed_task_recurrence_anchor")
 
     async with provisioner.connect() as connection:
         transaction = await connection.begin()
@@ -312,7 +296,7 @@ async def test_guarded_tasks_receive_the_backfill_and_keep_their_state(
         **{state: moment},
     )
     await _prepare_migration_owner(session, a.guild.id)
-    migration = _migration()
+    migration = load_revision("20261020_0528_fixed_task_recurrence_anchor")
     async with provisioner.begin() as connection:
         await connection.execute(
             text("SELECT set_config('search_path', :path, true)"),

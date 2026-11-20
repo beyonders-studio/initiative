@@ -267,6 +267,15 @@ async def test_a_write_needs_the_write_scope(
         assert response.status_code == 403, response.text
         assert response.json()["detail"] == PluginMessages.SCOPE_REQUIRED
 
+    # With the scope, a task in a project it only reads is still not its to
+    # change.
+    response = await client.patch(
+        guild_url(gid, f"/tasks/{task.id}"),
+        headers=install_headers(installed, WRITE),
+        json={"title": "Mine now"},
+    )
+    assert response.status_code == 403, response.text
+
 
 async def test_creates_a_task_assigned_by_reference_and_names_nobody(
     client, session, acting_user, role_session
@@ -321,16 +330,8 @@ async def test_creates_a_task_assigned_by_reference_and_names_nobody(
     assert person.status_code == 200, person.text
     assert [a["id"] for a in person.json()["assignees"]] == [installed.seat.user.id]
 
-
-async def test_an_assignee_named_by_row_id_or_foreign_reference_is_refused(
-    client, session, acting_user, role_session
-):
-    installed = await install_plugin(session, acting_user, role_session, granted=WRITE)
-    headers = install_headers(installed, WRITE)
-    gid = installed.guild.id
-    seat_ref = await _reference_for_seat(client, session, installed, headers)
-    project_id = await _own_project(client, installed, headers, "The plug-in's")
-
+    # An assignee named by row id, or by a reference it did not hand out, is
+    # refused.
     for named in (installed.seat.user.id, seat_ref[:-2] + "zz"):
         response = await client.post(
             guild_url(gid, "/tasks/"),
@@ -561,20 +562,3 @@ async def test_makes_a_project_from_a_template_with_its_task_links(
             ActorKind.plugin,
         )
     ]
-
-
-async def test_a_task_in_a_project_it_only_reads_is_not_its_to_change(
-    client, session, acting_user, role_session
-):
-    installed = await install_plugin(session, acting_user, role_session, granted=WRITE)
-    project = await create_project(session, installed.placed, installed.seat.user)
-    await create_resource_grant(session, project, all_initiative_members=True)
-    task = await create_task(session, project, title="Theirs")
-    headers = install_headers(installed, WRITE)
-
-    response = await client.patch(
-        guild_url(installed.guild.id, f"/tasks/{task.id}"),
-        headers=headers,
-        json={"title": "Mine now"},
-    )
-    assert response.status_code == 403, response.text

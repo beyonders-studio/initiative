@@ -13,6 +13,7 @@ from sqlalchemy import text
 from app.core.messages import KindMessages, RelationshipMessages
 from app.core.relationships import RelationshipType
 from app.models.platform.guild import CommunityRole
+from app.models.tenant.relationship import EntityRelationship
 from app.services.platform import app_settings as app_settings_service
 from app.services.platform import rules
 from app.testing import (
@@ -110,9 +111,14 @@ async def test_the_same_pair_is_refused_twice(
     assert (
         await client.post(_url(a), headers=a.headers, json=payload)
     ).status_code == 201
-    again = await client.post(_url(a), headers=a.headers, json=payload)
-    assert again.status_code == 409
-    assert again.json()["detail"] == RelationshipMessages.EXISTS
+    # ``attached`` is symmetric: the pair named the other way round is the
+    # same edge, not a second one.
+    reversed_payload = {**payload, "source": payload["target"]}
+    reversed_payload["target"] = payload["source"]
+    for body in (payload, reversed_payload):
+        again = await client.post(_url(a), headers=a.headers, json=body)
+        assert again.status_code == 409
+        assert again.json()["detail"] == RelationshipMessages.EXISTS
 
 
 async def test_a_thing_cannot_be_linked_to_itself(
@@ -219,16 +225,16 @@ async def test_a_link_you_made_is_yours_to_remove(
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
+    """Taking a link back is remembered — nothing else records that somebody
+    linked two things and then took it back — and the pair links again, since
+    the unique key covers live rows only."""
     doc = await create_file(session, a.initiative, a.user)
-    created = await client.post(
-        _url(a),
-        headers=a.headers,
-        json={
-            "source": {"type": "project", "id": a.project.id},
-            "relationship_type": "attached",
-            "target": {"type": "file", "id": doc.id},
-        },
-    )
+    payload = {
+        "source": {"type": "project", "id": a.project.id},
+        "relationship_type": "attached",
+        "target": {"type": "file", "id": doc.id},
+    }
+    created = await client.post(_url(a), headers=a.headers, json=payload)
     edge_id = created.json()["id"]
 
     removed = await client.delete(a.g(f"/relationships/{edge_id}"), headers=a.headers)
@@ -238,6 +244,13 @@ async def test_a_link_you_made_is_yours_to_remove(
         _url(a), headers=a.headers, params={"entity": f"project:{a.project.id}"}
     )
     assert listing.json() == []
+    await route_session_to_guild(session, a.guild.id)
+    kept = await session.get(EntityRelationship, edge_id)
+    assert kept is not None
+    assert (kept.removed_at is not None, kept.removed_by) == (True, a.user.id)
+    again = await client.post(_url(a), headers=a.headers, json=payload)
+    assert again.status_code == 201, again.text
+    assert again.json()["id"] != edge_id
 
 
 async def test_a_task_link_is_addressed_by_the_same_surface(

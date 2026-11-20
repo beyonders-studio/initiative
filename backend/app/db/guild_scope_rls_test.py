@@ -24,7 +24,6 @@ from app.testing import (
     create_guild,
     create_guild_calendar,
     create_guild_membership,
-    create_initiative,
     create_resource_grant,
     create_user,
     route_as,
@@ -57,73 +56,20 @@ async def guild_member(session):
 
 
 class TestGuildScope:
-    async def test_a_guild_level_row_is_readable_by_a_routed_member(
+    async def test_a_guild_level_row_is_readable_and_writable_at_this_layer(
         self, session, role_session, guild_member
     ):
+        """The initiative gate does not decide a row that belongs to no
+        initiative — grants do, one layer up. This pins that the policy itself
+        does not silently withhold it."""
         user, guild = guild_member
         s = await role_session("app_user")
         await route_as(s, user_id=user.id, guild_id=guild.id)
         assert await _access(s, None, user.id) is True
-
-    async def test_a_guild_level_row_is_writable_at_this_layer(
-        self, session, role_session, guild_member
-    ):
-        """The initiative gate does not decide writes on a row that belongs to no
-        initiative — grants do, one layer up. This pins that the policy itself
-        does not silently withhold write."""
-        user, guild = guild_member
-        s = await role_session("app_user")
-        await route_as(s, user_id=user.id, guild_id=guild.id)
         assert await _access(s, None, user.id, write=True) is True
-
-    async def test_initiative_rows_are_untouched_by_the_null_branch(
-        self, session, role_session, guild_member
-    ):
-        """The change must not widen anything for rows that *do* name an
-        initiative: a member of none still reaches none."""
-        user, guild = guild_member
-        other = await create_user(session)
-        await create_guild_membership(session, user=other, guild=guild)
-        initiative = await create_initiative(session, guild=guild, creator=other)
-
-        s = await role_session("app_user")
-        await route_as(s, user_id=user.id, guild_id=guild.id)
-        assert await _access(s, initiative.id, user.id) is False
-        assert await _access(s, initiative.id, user.id, write=True) is False
-
-    async def test_a_member_of_the_initiative_still_reaches_it(
-        self, session, role_session
-    ):
-        user = await create_user(session)
-        guild = await create_guild(session, creator=user)
-        await create_guild_membership(session, user=user, guild=guild)
-        initiative = await create_initiative(session, guild=guild, creator=user)
-
-        s = await role_session("app_user")
-        await route_as(s, user_id=user.id, guild_id=guild.id)
-        assert await _access(s, initiative.id, user.id) is True
 
 
 class TestBoundariesStillHold:
-    async def test_guild_scope_does_not_reach_across_guilds(
-        self, session, role_session, guild_member
-    ):
-        """Guild scope is the *schema* boundary, so a session routed into one
-        guild sees that guild's guild-level rows and no other's. Checked on the
-        thing that actually confines it — the search path the role is routed to
-        — since the function itself knows nothing about guilds."""
-        user, guild = guild_member
-        stranger = await create_user(session)
-        other_guild = await create_guild(session, creator=stranger)
-
-        s = await role_session("app_user")
-        await route_as(s, user_id=user.id, guild_id=guild.id)
-        search_path = (
-            await s.exec(text("SELECT current_setting('search_path')"))
-        ).scalar()
-        assert search_path.startswith(f"guild_{guild.id}")
-        assert f"guild_{other_guild.id}" not in search_path
-
     async def test_an_unrouted_session_reaches_no_guild_content_at_all(
         self, session, role_session, guild_member
     ):

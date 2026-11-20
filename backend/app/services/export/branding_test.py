@@ -1,7 +1,6 @@
-"""Unit tests for export branding: icon staging + the render-request seam."""
+"""Which guild icons a PDF report's header stages."""
 
-from app.services.export.branding import apply_brand, icon_asset
-from app.services.export.contract import RenderItem, RenderRequest
+from app.services.export.branding import icon_asset
 
 
 def test_icon_asset_names_the_file_by_its_type():
@@ -24,16 +23,3 @@ def test_icon_asset_rejects_empty_and_oversized():
     assert icon_asset("image/png", b"") is None
     assert icon_asset("image/png", None) is None
     assert icon_asset("image/png", b"x" * (branding._MAX_ICON_BYTES + 1)) is None
-
-
-async def test_apply_brand_passes_through_non_pdf_untouched():
-    """Only PDF reports carry a header; a csv/xlsx/json request is returned
-    unchanged (and the session is never touched, so None is safe here)."""
-    request = RenderRequest(
-        guild_id=1,
-        template_id="task-table",
-        format="csv",
-        batch=(RenderItem(key="tasks", data={"rows": []}),),
-    )
-    result = await apply_brand(request, session=None)
-    assert result is request

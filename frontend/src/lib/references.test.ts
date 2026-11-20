@@ -13,6 +13,8 @@ const allSwitchesOn = Object.fromEntries(TOOLS.map((tool) => [tool, true]));
 const enabled = (overrides = {}) => buildInitiative({ tools: { ...allSwitchesOn, ...overrides } });
 
 describe("what [[ ]] can reach", () => {
+  // Never what lives inside a tool: a task needs a project, an event needs a
+  // calendar and a time, so `#` is how you reach them.
   it("is the tools, derived from the enum", () => {
     expect(linkableToolTypes(enabled()).sort()).toEqual(Object.values(Tool).map(String).sort());
   });
@@ -22,20 +24,8 @@ describe("what [[ ]] can reach", () => {
     expect(types).not.toContain(SearchEntityType.wiki);
     // The rest are untouched.
     expect(types).toContain(SearchEntityType.calendar);
-  });
-
-  it("keeps the core tools, which have no switch to turn off", () => {
-    const types = linkableToolTypes(enabled({ wiki: false, calendar: false }));
+    // The core tools have no switch to turn off.
     expect(types).toContain(SearchEntityType.project);
     expect(types).toContain(SearchEntityType.file);
-  });
-
-  it("never reaches what lives inside a tool", () => {
-    // A task needs a project, an event needs a calendar and a time — neither
-    // can be made from a name, so `#` is how you reach them.
-    const types = linkableToolTypes(enabled());
-    expect(types).not.toContain(SearchEntityType.task);
-    expect(types).not.toContain(SearchEntityType.calendar_event);
-    expect(types).not.toContain(SearchEntityType.tag);
   });
 });

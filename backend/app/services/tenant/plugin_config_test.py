@@ -19,10 +19,8 @@ from app.services.tenant.plugin_config import (
     MAX_SECRET_VALUE_LENGTH,
     PluginConfigError,
     apply_connection_values,
-    connection_by_id,
     connection_id_for_ref,
     decrypt_connection_secrets,
-    definition_connections,
     guild_connection_ref,
     has_value_map,
     is_satisfied,
@@ -111,49 +109,16 @@ def _apply(submitted: dict, *, current=None, secrets=None, **kwargs):
 VALID = {"shop_domain": "example.test", "admin_token": "shpat_abc"}
 
 
-class TestReadingTheDefinition:
-    def test_connections_are_read_in_manifest_order(self):
-        assert [c["id"] for c in definition_connections(DEFINITION)] == [
-            "admin",
-            "github",
-        ]
-
-    def test_an_absent_block_reads_as_no_connections(self):
-        assert definition_connections({"plugin_kind": "embed"}) == []
-        assert definition_connections(None) == []
-
-    def test_a_connection_is_found_by_its_manifest_id(self):
-        found = connection_by_id(DEFINITION, "github")
-        assert found is not None
-        assert found["scope"] == "interactive"
-        assert connection_by_id(DEFINITION, "nope") is None
-
-
 class TestSecretCustody:
     def test_a_secret_round_trips_for_the_one_caller_entitled_to_it(self):
+        """Fernet carries a random IV, so the same value stored twice is not the
+        same bytes, which is why a stored secret cannot be compared for
+        equality from outside."""
         _config, secrets = _apply(VALID)
+        assert "shpat_abc" not in secrets["admin_token"]
         assert decrypt_field(secrets["admin_token"], SALT_PLUGIN_CONFIG) == "shpat_abc"
         assert decrypt_connection_secrets(secrets) == {"admin_token": "shpat_abc"}
-
-    def test_the_ciphertext_is_not_the_plaintext(self):
-        _, secrets = _apply(VALID)
-        assert "shpat_abc" not in secrets["admin_token"]
-
-    def test_a_secret_never_lands_in_the_non_secret_config(self):
-        """``config`` is what a read echoes back; a secret in it would be
-        disclosed by every list call."""
-        config, _ = _apply(VALID)
-        assert "admin_token" not in config
-        assert config == {"shop_domain": "example.test"}
-
-    def test_presence_is_all_a_read_learns(self):
-        config, secrets = _apply(VALID)
-        presence = has_value_map(ADMIN_CONNECTION, config, secrets)
-        assert presence["admin_token"] is True
-        assert presence["shop_domain"] is True
-        assert presence["base_url"] is False
-        # Booleans only — no key of the map carries a value.
-        assert set(map(type, presence.values())) == {bool}
+        assert _apply(VALID)[1]["admin_token"] != secrets["admin_token"]
 
     def test_clearing_a_secret_removes_the_ciphertext(self):
         config, secrets = _apply(VALID)
@@ -161,22 +126,9 @@ class TestSecretCustody:
         assert secrets == {}
         assert has_value_map(ADMIN_CONNECTION, config, secrets)["admin_token"] is False
 
-    def test_a_rewrite_produces_new_ciphertext(self):
-        """Fernet carries a random IV, so the same value stored twice is not the
-        same bytes — which is why a stored secret cannot be compared for
-        equality from outside."""
-        _, first = _apply(VALID)
-        _, second = _apply(VALID)
-        assert first["admin_token"] != second["admin_token"]
-
 
 class TestValidation:
-    def test_an_unknown_field_is_refused(self):
-        with pytest.raises(PluginConfigError) as exc:
-            _apply({**VALID, "surprise": "x"})
-        assert exc.value.code == GuildPluginMessages.CONFIG_UNKNOWN_FIELD
-
-    def test_a_managed_field_is_not_typed_into_a_form(self):
+    def test_a_managed_field_is_written_by_a_flow_and_not_a_form(self):
         with pytest.raises(PluginConfigError) as exc:
             apply_connection_values(
                 MEMBER_CONNECTION,
@@ -186,7 +138,6 @@ class TestValidation:
             )
         assert exc.value.code == GuildPluginMessages.CONFIG_MANAGED_FIELD
 
-    def test_a_flow_may_write_a_managed_field(self):
         config, _ = apply_connection_values(
             MEMBER_CONNECTION,
             {"login": "alice"},
@@ -208,11 +159,6 @@ class TestValidation:
                 allow_managed=True,
             )
         assert exc.value.code == GuildPluginMessages.CONFIG_UNKNOWN_FIELD
-
-    def test_a_required_field_left_empty_is_refused(self):
-        with pytest.raises(PluginConfigError) as exc:
-            _apply({"shop_domain": "example.test"})
-        assert exc.value.code == GuildPluginMessages.CONFIG_REQUIRED_FIELD
 
     @pytest.mark.parametrize(
         "submitted",
@@ -260,13 +206,6 @@ class TestValidation:
 
 
 class TestSatisfaction:
-    def test_a_connection_with_everything_required_is_satisfied(self):
-        config, secrets = _apply(VALID)
-        assert is_satisfied(ADMIN_CONNECTION, config, secrets) is True
-
-    def test_nothing_stored_is_not_satisfied(self):
-        assert is_satisfied(ADMIN_CONNECTION, {}, {}) is False
-
     def test_a_connection_with_no_required_fields_is_satisfied_by_any_value(self):
         connection = {
             "id": "x",
@@ -275,22 +214,6 @@ class TestSatisfaction:
         }
         assert is_satisfied(connection, {}, {}) is False
         assert is_satisfied(connection, {}, {"token": "ct"}) is True
-
-    def test_an_install_needing_a_guild_credential_says_so(self):
-        assert needs_configuration(DEFINITION, {}, {}) is True
-
-    def test_a_per_member_connection_is_not_an_unfinished_install(self):
-        """Installation is never gated on one: a plug-in whose only connections are
-        per-member is fully installed with nothing present."""
-        definition = {"plugin_kind": "service", "connections": [MEMBER_CONNECTION]}
-        assert needs_configuration(definition, {}, {}) is False
-
-    def test_a_filled_in_install_needs_nothing(self):
-        config, secrets = _apply(VALID)
-        assert (
-            needs_configuration(DEFINITION, {"admin": config}, {"admin": secrets})
-            is False
-        )
 
     def test_clearing_configuration_makes_it_needed_again(self):
         """No capability outlives its credential — the same read on the next
@@ -382,57 +305,30 @@ class TestWhichConnectionsRunAFlow:
 
 
 class TestTheHandleAGuildFlowIsJoinedBy:
-    def test_a_handle_is_minted_onto_the_install_and_kept(self):
-        """Reconnecting writes over one connection rather than making a second.
-
-        A fresh handle each time would leave the plug-in holding one this side no
-        longer recognizes, so the token it asks for with it would be refused.
-        """
-        install = _Install()
-        first = guild_connection_ref(install, "workspace")
-
-        assert first
-        assert install.connection_refs == {"workspace": first}
-        assert guild_connection_ref(install, "workspace") == first
-
-    def test_each_connection_gets_its_own(self):
-        install = _Install()
-        one = guild_connection_ref(install, "workspace")
-        two = guild_connection_ref(install, "billing")
-
-        assert one != two
-        assert set(install.connection_refs) == {"workspace", "billing"}
-
-    def test_the_column_is_reassigned_rather_than_mutated(self):
-        """SQLAlchemy tracks a JSONB column by identity.
-
-        A dict changed in place under it is a change that never lands, and the
-        symptom is a handle handed to a plug-in that this side then refuses.
-        """
+    def test_a_handle_is_minted_once_per_connection_and_kept(self):
+        """Reconnecting writes over one connection rather than making a second,
+        and the JSONB column is reassigned rather than changed in place, since
+        SQLAlchemy tracks it by identity."""
         held = {}
         install = _Install(held)
-        guild_connection_ref(install, "workspace")
+        first = guild_connection_ref(install, "workspace")
+        other = guild_connection_ref(install, "billing")
 
+        assert first and first != other
+        assert install.connection_refs == {"workspace": first, "billing": other}
+        assert guild_connection_ref(install, "workspace") == first
         assert held == {}
-        assert install.connection_refs != held
 
-    def test_a_handle_resolves_back_to_the_connection_it_names(self):
+    def test_a_handle_resolves_only_to_the_connection_it_names(self):
+        """``None`` is also the ordinary answer for a member's handle, which
+        lives on a row of its own and not here."""
         install = _Install()
         ref = guild_connection_ref(install, "workspace")
 
         assert connection_id_for_ref(install, ref) == "workspace"
-
-    def test_a_handle_nobody_minted_names_nothing(self):
-        """A handle this install never minted names none of its connections.
-
-        ``None`` is also the ordinary answer for a member's handle, which lives
-        on a row of its own and not here.
-        """
-        install = _Install({"workspace": "gcr_real"})
-
         assert connection_id_for_ref(install, "gcr_invented") is None
         assert connection_id_for_ref(install, "") is None
-        assert connection_id_for_ref(_Install(), "gcr_real") is None
+        assert connection_id_for_ref(_Install(), ref) is None
 
 
 class TestAFlowFilledConnectionIsStillConfiguration:

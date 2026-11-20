@@ -19,16 +19,15 @@ actually carries.
 from __future__ import annotations
 
 import ast
-import importlib.util
 import re
 from pathlib import Path
-from types import ModuleType
 
 import pytest
 from sqlalchemy import text
 
 from app.models.tenant.initiative import PermissionKey
 from app.testing import create_guild, create_initiative, create_user
+from app.testing.later_revisions import load_revision
 
 VERSIONS_DIR = Path(__file__).resolve().parents[2] / "alembic" / "versions"
 BASELINE_DIR = VERSIONS_DIR.parent / "baseline"
@@ -78,15 +77,6 @@ def _backfill_migrations() -> dict[Path, set[str]]:
     return found
 
 
-def _load(path: Path) -> ModuleType:
-    """Import a migration by path — they are not on the import path."""
-    spec = importlib.util.spec_from_file_location(path.stem, path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
 def test_every_permission_key_has_a_backfill_migration() -> None:
     backfilled = _baseline_keys()
     for keys in _backfill_migrations().values():
@@ -116,7 +106,7 @@ async def test_backfill_writes_only_the_missing_rows(session) -> None:
             f"{newest.name} was written for the rules' key before {key.name} "
             "changed it; the next backfill names the key as it now stands"
         )
-    migration = _load(newest)
+    migration = load_revision(newest.name)
     # A key a later tool's removal retired is not one this build stores.
     known = {key.value for key in PermissionKey}
     defaults = {

@@ -51,6 +51,7 @@ describe("ReactionBar", () => {
     expect(screen.getByText(THUMBS)).not.toHaveClass("grayscale");
     // One of something is what the emoji already says.
     expect(screen.getByRole("button", { name: /🎉, 1 reaction/i })).toHaveTextContent(/^🎉$/);
+    expect(screen.getByRole("button", { name: /add a reaction/i })).toBeInTheDocument();
   });
 
   it("marks the viewer's own reaction as pressed", () => {
@@ -63,23 +64,14 @@ describe("ReactionBar", () => {
     expect(screen.getByRole("button", { name: /🎉/ })).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("sends the chip's emoji to the toggle route", async () => {
+  it("sends the chip's emoji to the toggle route, and shows the state the server replies with", async () => {
     const toggled = captureToggle([buildReactionGroup({ emoji: THUMBS, count: 2, reacted: true })]);
-    renderBar([buildReactionGroup({ emoji: THUMBS, count: 1 })]);
-
-    await userEvent.click(screen.getByRole("button", { name: /👍/ }));
-
-    await waitFor(() => expect(toggled.body()).not.toBeNull());
-    expect(toggled.body()).toEqual({ emoji: THUMBS });
-  });
-
-  it("shows the state the server replies with", async () => {
-    captureToggle([buildReactionGroup({ emoji: THUMBS, count: 2, reacted: true })]);
     renderBar([buildReactionGroup({ emoji: THUMBS, count: 1 })]);
 
     await userEvent.click(screen.getByRole("button", { name: /👍, 1 reaction/i }));
 
     expect(await screen.findByRole("button", { name: /👍, 2 reactions/i })).toBeInTheDocument();
+    expect(toggled.body()).toEqual({ emoji: THUMBS });
   });
 
   it("gives way to fresh data instead of pinning our own last answer", async () => {
@@ -101,11 +93,6 @@ describe("ReactionBar", () => {
     );
 
     expect(screen.getByRole("button", { name: /👍, 5 reactions/i })).toBeInTheDocument();
-  });
-
-  it("offers the add button when the viewer may react", () => {
-    renderBar([]);
-    expect(screen.getByRole("button", { name: /add a reaction/i })).toBeInTheDocument();
   });
 
   it("gives a thumbs up in one tap", async () => {

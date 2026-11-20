@@ -11,11 +11,8 @@ the provisioning login with row security forced, as a revision runs."""
 
 from __future__ import annotations
 
-import importlib.util
 import json
 from collections.abc import Callable
-from pathlib import Path
-from types import ModuleType
 from typing import Any
 
 import sqlalchemy as sa
@@ -28,6 +25,7 @@ from app.db.schema_provisioning import guild_schema_name
 from app.models.platform.guild import CommunityRole
 from app.services import editor_engine
 from app.testing import create_comment, create_file, create_post, create_task
+from app.testing.later_revisions import load_revision
 from app.testing.tool_plugins import (
     add_counter,
     install_tool_plugin,
@@ -37,21 +35,6 @@ from app.testing.tool_plugins import (
 GROUP = "counter_group.tsjvtcm0s7gv2x"
 COUNTER = "counter.tsjvtcm0s7gv2x"
 
-_MIGRATION = (
-    Path(__file__).resolve().parents[2]
-    / "alembic"
-    / "versions"
-    / "20261120_0620_counter_references_name_the_plug_in.py"
-)
-
-
-def _load() -> ModuleType:
-    spec = importlib.util.spec_from_file_location(_MIGRATION.stem, _MIGRATION)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
 
 #: The tables the test writes content into.
 _WRITTEN = ("comments", "tasks", "posts", "files", "p_tsjvtcm0s7gv2x_counter_group")
@@ -60,7 +43,7 @@ _WRITTEN = ("comments", "tasks", "posts", "files", "p_tsjvtcm0s7gv2x_counter_gro
 async def _run(session: AsyncSession, guild_id: int, forward: bool) -> None:
     """The revision one way or the other in ``guild_id``'s schema alone, as a
     revision runs, with every table the test wrote into forced."""
-    migration = _load()
+    migration = load_revision("20261120_0620_counter_references_name_the_plug_in")
 
     def step() -> None:
         forced = op.get_bind().execute(

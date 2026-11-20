@@ -187,24 +187,6 @@ async def test_starting_values_are_set_and_cleared(
     assert emptied.json()["starting_values"] is None
 
 
-async def test_a_new_projects_bug_starts_with_an_outline_in_its_makers_language(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    await _speaks(session, a.user, "fr")
-
-    created = await client.post(
-        a.g("/projects/"),
-        json={"name": "Jeu", "initiative_id": a.initiative.id},
-        headers=a.headers,
-    )
-
-    starts = [t["starting_values"] for t in created.json()["task_types"]]
-    assert starts[0] is None
-    assert starts[1]["description"].startswith("**Ce qui s’est passé**")
-    assert starts[2:] == [None, None]
-
-
 async def test_types_copy_from_another_project_with_their_pages(
     client: AsyncClient, session: AsyncSession, acting_user
 ):

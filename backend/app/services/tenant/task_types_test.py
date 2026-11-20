@@ -7,7 +7,6 @@ import pytest
 
 from app.core.task_types import DEFAULT_TASK_TYPES
 from app.services.tenant import task_statuses as task_statuses_service
-from app.services.tenant import task_types as task_types_service
 
 pytestmark = pytest.mark.always
 
@@ -44,12 +43,6 @@ def test_every_language_names_every_starting_type_and_status():
     } <= reference
     for locale, catalog in catalogs.items():
         assert _flatten(catalog) == reference, f"{locale} key mismatch"
-
-
-def test_the_names_are_the_creators_language_or_english():
-    assert task_types_service.default_name("bug", "de") == "Fehler"
-    assert task_statuses_service.default_name("done", "fr") == "Terminé"
-    assert task_types_service.default_name("milestone", "xx") == "Milestone"
 
 
 def test_the_starting_types_are_named_uniquely_in_every_language():

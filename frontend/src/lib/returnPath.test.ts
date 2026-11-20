@@ -11,16 +11,16 @@ describe("the page a sign-in returns to", () => {
     expect(returnPath("/c/1/search?q=riverside#top")).toBe("/c/1/search?q=riverside#top");
   });
 
-  it("has nothing for anywhere else", () => {
-    expect(returnPath("//example.test/take-me")).toBeNull();
-    expect(returnPath("/\\example.test/take-me")).toBeNull();
-    expect(returnPath("https://example.test/take-me")).toBeNull();
-    expect(returnPath("profile/security")).toBeNull();
-  });
-
-  it("has nothing when there was no trip to finish", () => {
-    expect(returnPath(undefined)).toBeNull();
-    expect(returnPath(null)).toBeNull();
-    expect(returnPath("")).toBeNull();
+  it.each([
+    "//example.test/take-me",
+    "/\\example.test/take-me",
+    "https://example.test/take-me",
+    "profile/security",
+    // No trip to finish.
+    undefined,
+    null,
+    "",
+  ])("has nothing for %j", (next) => {
+    expect(returnPath(next)).toBeNull();
   });
 });

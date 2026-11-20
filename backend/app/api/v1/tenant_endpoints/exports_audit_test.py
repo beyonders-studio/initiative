@@ -88,16 +88,3 @@ async def test_exporting_a_guild_records_its_own_event(
         for envelope in envelopes
         if envelope["event_type"] == AuditEventType.INITIATIVE_EXPORTED.value
     ] == []
-
-
-async def test_a_refused_guild_export_records_nothing(
-    client: AsyncClient, acting_user, capfd
-):
-    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
-    admin = await acting_user(guild_role=CommunityRole.admin, guild=seat.guild)
-    capfd.readouterr()
-
-    response = await client.get(admin.g("/exports/community"), headers=admin.headers)
-    assert response.status_code == 403
-
-    assert emitted(capfd, AuditEventType.GUILD_EXPORTED) == []

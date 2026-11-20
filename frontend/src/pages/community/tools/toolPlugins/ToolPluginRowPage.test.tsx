@@ -281,8 +281,9 @@ describe("a tool plug-in's actions", () => {
     await user.click(await screen.findByRole("button", { name: "Actions" }));
     await user.click(await screen.findByRole("menuitem", { name: "Rate" }));
     const dialog = await screen.findByRole("alertdialog");
-    // The text param's box carries no name of its own.
-    await user.type(within(dialog).getByRole("textbox"), "Long ones");
+    // Each param is named by its declared name.
+    expect(within(dialog).getByRole("checkbox", { name: "Owned" })).not.toBeChecked();
+    await user.type(within(dialog).getByRole("textbox", { name: "About" }), "Long ones");
     await user.click(within(dialog).getByRole("button", { name: "Rate" }));
 
     // While it runs, it can't be run again.
@@ -490,5 +491,99 @@ describe("a tool plug-in's row and its items", () => {
     await user.click(await screen.findByRole("option", { name: "Classics" }));
 
     await waitFor(() => expect(sent).toEqual({ tag_ids: [99] }));
+  });
+});
+
+describe("a counter on its row's page", () => {
+  /** A book on the shelf, its pages read counted in the bar its list draws,
+   *  on its cover's colour. */
+  const novel = (id: number, name: string) =>
+    middlemarch({ id, name, fields: { pages: 800, read: 200, cover: "#1e3a8a" }, can: ownerCan() });
+
+  it("is drawn in its list's look, and full screen as its row, stepping to the rows beside it", async () => {
+    const { router } = show(book, novel(8, "Middlemarch"));
+    server.use(
+      communityHttp.get(`/plugin-tools/${book}/`, () =>
+        HttpResponse.json(page([novel(7, "Emma"), novel(8, "Middlemarch"), novel(9, "Persuasion")]))
+      ),
+      communityHttp.get(`/plugin-tools/${book}/9`, () => HttpResponse.json(novel(9, "Persuasion")))
+    );
+    const user = userEvent.setup();
+
+    // A bar, as the list's `displays` say, not a box for a number.
+    expect(await screen.findByText("/ 800")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Open Read full screen" }));
+    const full = await screen.findByRole("dialog");
+    expect(within(full).getByRole("heading", { name: "Middlemarch" })).toBeInTheDocument();
+    expect(full.firstElementChild).toHaveStyle({ background: "#1e3a8a" });
+    expect(await within(full).findByText("2 / 3")).toBeInTheDocument();
+    expect(router.state.location.search).toEqual({ focus: "read" });
+
+    await user.click(within(full).getByRole("button", { name: "Next counter" }));
+    await waitFor(() => expect(router.state.location.pathname).toMatch(/\/9$/));
+    expect(router.state.location.search).toEqual({ focus: "read" });
+    expect(
+      await within(await screen.findByRole("dialog")).findByRole("heading", { name: "Persuasion" })
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Exit full screen" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(router.state.location.search).toEqual({});
+  });
+
+  it("names the row it is an item of in its crumb", async () => {
+    server.use(
+      communityHttp.get(`/plugin-tools/${shelf}/5`, () =>
+        HttpResponse.json(
+          buildToolRowRead({ kind: shelf, id: 5, initiative_id: 3, name: "Novels" })
+        )
+      )
+    );
+    show(book, novel(8, "Middlemarch"));
+
+    expect(await screen.findByRole("link", { name: "Novels" })).toBeInTheDocument();
+  });
+
+  it("steps through the step route on its page and full screen, each step counting", async () => {
+    const steps: unknown[] = [];
+    let read = 200;
+    server.use(
+      communityHttp.post(`/plugin-tools/${book}/8/step`, async ({ request }) => {
+        const step = (await request.json()) as { down?: boolean };
+        steps.push(step);
+        read += step.down ? -1 : 1;
+        return HttpResponse.json({
+          ...novel(8, "Middlemarch"),
+          fields: { ...novel(8, "").fields, read },
+        });
+      }),
+      communityHttp.patch(`/plugin-tools/${book}/8`, () => {
+        throw new Error("a step is not a save");
+      })
+    );
+    show(book, novel(8, "Middlemarch"));
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Step Read up" }));
+    await waitFor(() => expect(steps).toEqual([{ field: "read" }]));
+    await user.click(screen.getByRole("button", { name: "Open Read full screen" }));
+    const full = await screen.findByRole("dialog");
+    await user.click(within(full).getByRole("button", { name: "Step Middlemarch down" }));
+
+    await waitFor(() => expect(steps).toEqual([{ field: "read" }, { field: "read", down: true }]));
+  });
+
+  it("opens full screen for a reader, who watches it and steps nothing", async () => {
+    show(book, { ...novel(8, "Middlemarch"), can: readerCan() });
+    const user = userEvent.setup();
+
+    expect(await screen.findByText("/ 800")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Step Read up" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Open Read full screen" }));
+    const full = await screen.findByRole("dialog");
+    expect(within(full).getByRole("heading", { name: "Middlemarch" })).toBeInTheDocument();
+    expect(within(full).getByText("/ 800")).toBeInTheDocument();
+    expect(within(full).queryByRole("button", { name: /^Step / })).not.toBeInTheDocument();
   });
 });

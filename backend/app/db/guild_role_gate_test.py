@@ -6,6 +6,7 @@ so what comes back is what the policies allowed.
 
 from __future__ import annotations
 
+import pytest
 from sqlmodel import select
 
 from app.models.platform.guild import CommunityRole
@@ -24,11 +25,12 @@ async def _names(reading_as, guild_id, actor) -> list[str]:
     return sorted(await session.exec(select(Wiki.name)))
 
 
-async def test_a_role_that_cannot_engage_the_tool_is_refused(
-    session, acting_user, reading_as
+@pytest.mark.parametrize(("enabled", "names"), [(False, []), (True, ["Stock counts"])])
+async def test_the_role_permission_decides(
+    session, acting_user, reading_as, enabled, names
 ):
-    """Shared with them, in their initiative — and still not theirs to reach,
-    because their role does not hold wikis."""
+    """Shared with them, in their initiative — and reached only when their
+    role holds wikis."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     b = await acting_user(
         guild_role=CommunityRole.member,
@@ -38,26 +40,9 @@ async def test_a_role_that_cannot_engage_the_tool_is_refused(
     )
     wiki = await create_wiki(session, a.initiative, a.user, name="Stock counts")
     await create_resource_grant(session, wiki, user=b.user)
-    # The factory's member may use the initiative's tools, as somebody the
-    # sharing picker would have offered. This one may not.
-    await grant_role_permission(session, a.initiative, "wikis_enabled", enabled=False)
+    await grant_role_permission(session, a.initiative, "wikis_enabled", enabled=enabled)
 
-    assert await _names(reading_as, a.guild.id, b) == []
-
-
-async def test_the_role_permission_admits_them(session, acting_user, reading_as):
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    b = await acting_user(
-        guild_role=CommunityRole.member,
-        guild=a.guild,
-        initiative=a.initiative,
-        initiative_role="member",
-    )
-    wiki = await create_wiki(session, a.initiative, a.user, name="Stock counts")
-    await create_resource_grant(session, wiki, user=b.user)
-    await grant_role_permission(session, a.initiative, "wikis_enabled")
-
-    assert await _names(reading_as, a.guild.id, b) == ["Stock counts"]
+    assert await _names(reading_as, a.guild.id, b) == names
 
 
 async def test_a_manager_role_needs_no_row(session, acting_user, reading_as):

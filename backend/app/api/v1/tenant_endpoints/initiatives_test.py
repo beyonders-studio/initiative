@@ -9,7 +9,7 @@ Tests the initiative API endpoints at /api/v1/initiatives including:
 - Managing initiative members (add, remove, update roles)
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 import pytest
 from httpx2 import AsyncClient
@@ -19,7 +19,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.messages import GuildMessages, GuildPluginMessages, InitiativeMessages
 from app.core.notification_categories import NotificationCategory
 from app.core.tools import Tool
-from app.models.platform.access_grant import AccessGrant
 from app.models.platform.email_outbox import EmailOutboxItem
 from app.models.platform.guild import CommunityRole
 from app.models.platform.notification import Notification, NotificationType
@@ -38,6 +37,7 @@ from app.services.tenant.guild_plugins import set_placed_initiatives
 from app.services.tenant.initiative_tools import tool_on_sql
 from app.testing import (
     COUNTERS_UID,
+    create_access_grant,
     create_guild_plugin,
     create_resource_grant,
     create_tool_entity,
@@ -49,35 +49,6 @@ from app.testing import (
 from app.testing.factories import create_guild_membership, create_initiative
 from app.testing.schema_harness import route_session_to_guild
 from app.testing.sockets import open_account_socket
-
-
-async def _live_grant(
-    session: AsyncSession,
-    *,
-    user,
-    guild,
-    approver,
-    level: str,
-    purpose: str = "content",
-):
-    """An approved, currently-live access grant — the PAM branch of GuildContext."""
-    now = datetime.now(UTC)
-    session.add(
-        AccessGrant(
-            user_id=user.id,
-            guild_id=guild.id,
-            purpose=purpose,
-            access_level=level,
-            status="approved",
-            reason="ticket",
-            requested_duration_minutes=60,
-            requested_by_id=user.id,
-            approved_by_id=approver.id,
-            decided_at=now,
-            expires_at=now + timedelta(hours=1),
-        )
-    )
-    await session.commit()
 
 
 async def _initiative_with_owner(session: AsyncSession, acting_user, **overrides):
@@ -293,13 +264,7 @@ async def test_reading_an_initiative_by_id_answers_each_caller(
     )
     if caller == "grantee":
         actor = await acting_user("support")
-        await _live_grant(
-            session,
-            user=actor.user,
-            guild=owner.guild,
-            approver=owner.user,
-            level="read",
-        )
+        await create_access_grant(session, user=actor.user, guild=owner.guild)
     else:
         actor = await acting_user(guild_role=CommunityRole.member, guild=owner.guild)
 
@@ -332,8 +297,8 @@ async def test_a_live_grant_lists_the_whole_guild_it_reaches(
     owner = await acting_user(guild_role=CommunityRole.admin)
     await create_initiative(session, owner.guild, owner.user, name="Apollo")
     grantee = await acting_user(tier)
-    await _live_grant(
-        session, user=grantee.user, guild=owner.guild, approver=owner.user, level=level
+    await create_access_grant(
+        session, user=grantee.user, guild=owner.guild, access_level=level
     )
 
     response = await client.get(
@@ -417,7 +382,9 @@ async def test_creating_an_initiative_records_what_it_was_given(
     expected_policy: str,
 ):
     """The creation payload lands as given, and a join policy nobody mentioned
-    settles on the closed one."""
+    settles on the closed one. The creator is its manager — the moderator role
+    here, because the creator is a guild admin — and the read reports their
+    role and the headcount rather than the roster."""
     admin = await acting_user(guild_role=CommunityRole.admin)
 
     response = await client.post(
@@ -437,24 +404,6 @@ async def test_creating_an_initiative_records_what_it_was_given(
     assert data["description"] == "A test initiative"
     assert data["color"] == "#FF0000"
     assert data["join_policy"] == expected_policy
-
-
-async def test_create_initiative_makes_creator_manager(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Creating an initiative makes the creator a manager — the moderator role
-    here, because the creator is a guild admin — and the read reports their
-    role and the headcount rather than the roster."""
-    admin = await acting_user(guild_role=CommunityRole.admin)
-
-    payload = {"name": "New Initiative"}
-
-    response = await client.post(
-        admin.g("/initiatives/"), headers=admin.headers, json=payload
-    )
-
-    assert response.status_code == 201
-    data = response.json()
     assert "members" not in data
     assert (data["member_count"], data["role_display_name"]) == (1, "Moderator")
     rows = (await _roster(client, admin, data["id"]))["items"]
@@ -566,7 +515,10 @@ async def test_search_initiative_members_slim_and_filtered(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
     """The slim members search returns a UserSummary envelope and filters by
-    name, with the same membership gate as the full roster."""
+    name, with the same membership gate as the full roster. A near miss matches
+    exactly as the guild's picker does, and ``user_id`` resolves a known
+    selection over the same member set — a guild member outside the initiative
+    is never resolved through it."""
     admin = await acting_user(guild_role=CommunityRole.admin)
     initiative = await create_initiative(
         session, admin.guild, admin.user, name="Search Initiative"
@@ -577,7 +529,7 @@ async def test_search_initiative_members_slim_and_filtered(
         initiative=initiative,
         initiative_role="member",
         email="alice@example.com",
-        username="wonderland",
+        username="moonwhisper",
     )
     bob = await acting_user(
         guild_role=CommunityRole.member,
@@ -618,12 +570,27 @@ async def test_search_initiative_members_slim_and_filtered(
     response = await client.get(
         admin.g(f"/initiatives/{initiative.id}/members/search"),
         headers=admin.headers,
-        params={"search": "wonder"},
+        params={"search": "moon"},
     )
     assert response.status_code == 200
     body = response.json()
     assert body["total_count"] == 1
-    assert body["items"][0]["username"] == "wonderland"
+    assert body["items"][0]["username"] == "moonwhisper"
+
+    response = await client.get(
+        admin.g(f"/initiatives/{initiative.id}/members/search"),
+        headers=admin.headers,
+        params={"search": "moonwhsiper"},
+    )
+    assert alice.user.username in {u["username"] for u in response.json()["items"]}
+
+    outsider = await acting_user(guild_role=CommunityRole.member, guild=admin.guild)
+    response = await client.get(
+        admin.g(f"/initiatives/{initiative.id}/members/search"),
+        headers=admin.headers,
+        params={"user_id": [alice.user.id, outsider.user.id]},
+    )
+    assert [item["id"] for item in response.json()["items"]] == [alice.user.id]
 
     # A term outside her handle finds nobody while she has no name here...
     response = await client.get(
@@ -644,41 +611,6 @@ async def test_search_initiative_members_slim_and_filtered(
         params={"search": "Alice"},
     )
     assert response.json()["total_count"] == 1
-
-
-async def test_search_initiative_members_filters_by_user_id(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """`user_id` resolves a known selection, narrowing the same member set —
-    a guild member outside the initiative is never resolved through it."""
-    admin = await acting_user(guild_role=CommunityRole.admin)
-    initiative = await create_initiative(
-        session, admin.guild, admin.user, name="Id Filter Initiative"
-    )
-    alice = await acting_user(
-        guild_role=CommunityRole.member,
-        guild=admin.guild,
-        initiative=initiative,
-        initiative_role="member",
-        email="alice-ids@example.com",
-        username="alice-ids",
-    )
-    outsider = await acting_user(
-        guild_role=CommunityRole.member,
-        guild=admin.guild,
-        email="outsider-ids@example.com",
-    )
-
-    response = await client.get(
-        admin.g(f"/initiatives/{initiative.id}/members/search"),
-        headers=admin.headers,
-        params={"user_id": [alice.user.id, outsider.user.id]},
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["total_count"] == 1
-    assert [item["username"] for item in body["items"]] == ["alice-ids"]
 
 
 @pytest.mark.parametrize(
@@ -836,43 +768,6 @@ async def test_add_user_not_in_guild_fails(
     assert response.json()["detail"] == "USER_NOT_IN_COMMUNITY"
 
 
-async def test_update_initiative_member_role(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Test updating an initiative member's role."""
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    member = await acting_user(
-        guild_role=CommunityRole.member,
-        guild=admin.guild,
-        initiative=admin.initiative,
-        initiative_role="member",
-    )
-
-    # Look up the PM role ID for this initiative
-    from sqlmodel import select
-
-    from app.models.tenant.initiative import InitiativeRoleModel
-
-    pm_role_stmt = select(InitiativeRoleModel).where(
-        InitiativeRoleModel.initiative_id == admin.initiative.id,
-        InitiativeRoleModel.name == "project_manager",
-    )
-    pm_role = (await session.exec(pm_role_stmt)).one()
-
-    payload = {"role_id": pm_role.id}
-
-    response = await client.patch(
-        admin.g(f"/initiatives/{admin.initiative.id}/members/{member.user.id}"),
-        headers=admin.headers,
-        json=payload,
-    )
-
-    assert response.status_code == 200
-    rows = (await _roster(client, admin, admin.initiative.id))["items"]
-    member_roles = {m["user"]["id"]: m["role_name"] for m in rows}
-    assert member_roles[member.user.id] == "project_manager"
-
-
 async def test_member_roster_reports_a_custom_role_as_itself(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
@@ -920,6 +815,7 @@ async def test_member_roster_reports_a_custom_role_as_itself(
     [
         ("guild admin", "member", "moderator"),
         ("project manager", None, "moderator"),
+        ("project manager", "member", "moderator"),
         ("guild admin", "project_manager", "project_manager"),
     ],
 )
@@ -1263,12 +1159,8 @@ async def _joiner(acting_user, session: AsyncSession, kind: str, owner, initiati
     if kind == "guild admin":
         return await acting_user(guild_role=CommunityRole.admin, guild=owner.guild)
     grantee = await acting_user("support")
-    await _live_grant(
-        session,
-        user=grantee.user,
-        guild=owner.guild,
-        approver=owner.user,
-        level="read_write",
+    await create_access_grant(
+        session, user=grantee.user, guild=owner.guild, access_level="read_write"
     )
     return grantee
 
@@ -2057,12 +1949,11 @@ async def _resolver(acting_user, session: AsyncSession, kind: str, owner, initia
         else (("content", "read_write"),)
     )
     for purpose, level in held:
-        await _live_grant(
+        await create_access_grant(
             session,
             user=holder.user,
             guild=owner.guild,
-            approver=owner.user,
-            level=level,
+            access_level=level,
             purpose=purpose,
         )
     return holder
@@ -2387,29 +2278,6 @@ async def test_a_knock_lands_even_when_no_mail_goes_out(
         )
         == 1
     )
-
-
-async def test_initiative_member_search_finds_a_misspelled_name(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """One rule for looking people up, wherever the picker is. An initiative's
-    roster matches a near miss exactly as the guild's does."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    member = await acting_user(
-        guild_role=CommunityRole.member,
-        guild=a.guild,
-        initiative=a.initiative,
-        initiative_role="member",
-        username="moonwhisper",
-    )
-
-    response = await client.get(
-        a.g(f"/initiatives/{a.initiative.id}/members/search"),
-        headers=a.headers,
-        params={"search": "moonwhsiper"},
-    )
-    assert response.status_code == 200, response.text
-    assert member.user.username in {u["username"] for u in response.json()["items"]}
 
 
 async def test_changing_what_an_initiative_allows_rechecks_its_members(

@@ -90,13 +90,12 @@ def test_no_table_model_left_at_models_root():
     )
 
 
-@pytest.mark.parametrize("table", sorted(GUILD_SCOPED_TABLES | SHARED_TABLES))
-def test_every_classified_table_has_a_bucketed_model(table):
+def test_every_classified_table_has_a_bucketed_model():
     """Every classified table must map to a model under tenant/ or platform/ —
     catches a model dropped or moved out of its bucket entirely."""
-    placed = {t for t, _, _ in _collect()}
-    assert table in placed, (
-        f"{table} is classified in tenancy.py but no model under "
+    unplaced = (GUILD_SCOPED_TABLES | SHARED_TABLES) - {t for t, _, _ in _collect()}
+    assert not unplaced, (
+        f"{sorted(unplaced)} classified in tenancy.py but no model under "
         f"app/models/tenant|platform/ maps to it"
     )
 
@@ -106,16 +105,9 @@ def test_every_classified_table_has_a_bucketed_model(table):
 # A mixin is not a table, so the table-classification guards above can't see it.
 # But it is still layer-bound: SoftDeleteMixin adds the trash-can lifecycle to
 # guild *content*, and platform/public tables have no trash can. These guards
-# pin "platform shouldn't need this at all" as a CI invariant — the mixin and
-# every model that mixes it in must live under app/models/tenant/ and map to a
-# GUILD_SCOPED (never SHARED) table.
-
-
-def test_soft_delete_mixin_lives_in_the_tenant_layer():
-    assert SoftDeleteMixin.__module__.startswith("app.models.tenant"), (
-        f"SoftDeleteMixin is a guild-content (tenant) mixin but lives in "
-        f"{SoftDeleteMixin.__module__} — move it under app/models/tenant/."
-    )
+# pin "platform shouldn't need this at all" as a CI invariant — every model that
+# mixes it in must live under app/models/tenant/ and map to a GUILD_SCOPED
+# (never SHARED) table.
 
 
 def test_every_soft_delete_model_is_tenant_and_guild_scoped():

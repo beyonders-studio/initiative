@@ -10,84 +10,62 @@ const section = (heading: string, startsPage = false): AnnouncementSection => ({
 });
 
 describe("splitIntoPages", () => {
-  it("keeps an unbroken list as a single page", () => {
-    const pages = splitIntoPages([section("a"), section("b")]);
-    expect(pages).toHaveLength(1);
-    expect(pages[0]).toHaveLength(2);
-  });
-
-  it("breaks where a section says so", () => {
-    const pages = splitIntoPages([section("a"), section("b", true), section("c")]);
-    expect(pages.map((page) => page.map((s) => s.heading))).toEqual([["a"], ["b", "c"]]);
-  });
-
-  it("does not open with an empty page when the first section breaks", () => {
-    const pages = splitIntoPages([section("a", true), section("b")]);
-    expect(pages.map((page) => page.map((s) => s.heading))).toEqual([["a", "b"]]);
-  });
-
-  it("has no pages when there are no sections", () => {
-    expect(splitIntoPages([])).toEqual([]);
+  it.each([
+    ["an unbroken list is one page", [section("a"), section("b")], [["a", "b"]]],
+    [
+      "breaks where a section says so",
+      [section("a"), section("b", true), section("c")],
+      [["a"], ["b", "c"]],
+    ],
+    [
+      "opens with no empty page when the first breaks",
+      [section("a", true), section("b")],
+      [["a", "b"]],
+    ],
+    ["no sections, no pages", [], []],
+  ])("%s", (_why, sections, expected) => {
+    expect(splitIntoPages(sections).map((page) => page.map((s) => s.heading))).toEqual(expected);
   });
 });
 
 describe("matchesTriggerRoute", () => {
-  it("matches an exact path", () => {
-    expect(matchesTriggerRoute("/settings/platform", "/settings/platform")).toBe(true);
-    expect(matchesTriggerRoute("/settings/platform", "/settings")).toBe(false);
-  });
-
-  it("ignores a trailing slash on either side", () => {
-    expect(matchesTriggerRoute("/settings/", "/settings")).toBe(true);
-    expect(matchesTriggerRoute("/settings", "/settings/")).toBe(true);
-  });
-
-  it("treats * as exactly one segment", () => {
-    expect(matchesTriggerRoute("/c/*/settings", "/c/12/settings")).toBe(true);
-    expect(matchesTriggerRoute("/c/*/settings", "/c/12/34/settings")).toBe(false);
-    expect(matchesTriggerRoute("/c/*/settings", "/c/12/settings/users")).toBe(false);
-  });
-
-  it("treats ** as the rest of the path, including none of it", () => {
-    expect(matchesTriggerRoute("/c/**", "/c/12/i/3/projects/9")).toBe(true);
-    expect(matchesTriggerRoute("/c/**", "/c")).toBe(true);
-    expect(matchesTriggerRoute("/c/**", "/settings")).toBe(false);
-  });
-
-  it("combines the two wildcards", () => {
-    expect(matchesTriggerRoute("/c/*/i/*/projects/**", "/c/1/i/2/projects/3/tasks/4")).toBe(true);
-    expect(matchesTriggerRoute("/c/*/i/*/projects/**", "/c/1/i/2/files/3")).toBe(false);
+  // `*` is exactly one segment, `**` the rest of the path including none of it,
+  // and a trailing slash on either side is ignored.
+  it.each([
+    ["/settings/platform", "/settings/platform", true],
+    ["/settings/platform", "/settings", false],
+    ["/settings/", "/settings", true],
+    ["/settings", "/settings/", true],
+    ["/c/*/settings", "/c/12/settings", true],
+    ["/c/*/settings", "/c/12/34/settings", false],
+    ["/c/*/settings", "/c/12/settings/users", false],
+    ["/c/**", "/c/12/i/3/projects/9", true],
+    ["/c/**", "/c", true],
+    ["/c/**", "/settings", false],
+    ["/c/*/i/*/projects/**", "/c/1/i/2/projects/3/tasks/4", true],
+    ["/c/*/i/*/projects/**", "/c/1/i/2/files/3", false],
+  ])("%s against %s is %s", (pattern, path, expected) => {
+    expect(matchesTriggerRoute(pattern, path)).toBe(expected);
   });
 });
 
 describe("validateTriggerRoute", () => {
-  it("accepts an empty field — the trigger is optional", () => {
-    expect(validateTriggerRoute("")).toBeNull();
-    expect(validateTriggerRoute("   ")).toBeNull();
-  });
-
-  it("accepts the patterns the matcher understands", () => {
-    expect(validateTriggerRoute("/settings/platform")).toBeNull();
-    expect(validateTriggerRoute("/c/*/settings")).toBeNull();
-    expect(validateTriggerRoute("/c/*/i/*/projects/**")).toBeNull();
-  });
-
-  it("catches a missing leading slash", () => {
-    expect(validateTriggerRoute("c/*/settings")).toBe("needsSlash");
-    expect(validateTriggerRoute("https://example.test/x")).toBe("needsSlash");
-    expect(validateTriggerRoute("//example.test/x")).toBe("needsSlash");
-  });
-
-  it("catches spaces", () => {
-    expect(validateTriggerRoute("/c/* /settings")).toBe("whitespace");
-  });
-
-  it("catches a wildcard glued to a segment, which could never match", () => {
-    expect(validateTriggerRoute("/c/*settings")).toBe("wildcardSegment");
-    expect(validateTriggerRoute("/c/**/x**")).toBe("wildcardSegment");
-  });
-
-  it("catches anything written after **", () => {
-    expect(validateTriggerRoute("/c/**/settings")).toBe("doubleStarNotLast");
+  it.each([
+    // An empty field is fine: the trigger is optional.
+    ["", null],
+    ["   ", null],
+    ["/settings/platform", null],
+    ["/c/*/settings", null],
+    ["/c/*/i/*/projects/**", null],
+    ["c/*/settings", "needsSlash"],
+    ["https://example.test/x", "needsSlash"],
+    ["//example.test/x", "needsSlash"],
+    ["/c/* /settings", "whitespace"],
+    // A wildcard glued to a segment could never match.
+    ["/c/*settings", "wildcardSegment"],
+    ["/c/**/x**", "wildcardSegment"],
+    ["/c/**/settings", "doubleStarNotLast"],
+  ])("%j is %s", (pattern, expected) => {
+    expect(validateTriggerRoute(pattern)).toBe(expected);
   });
 });

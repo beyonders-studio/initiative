@@ -38,17 +38,20 @@ async def _speaks(session: AsyncSession, user, locale: str) -> None:
 async def test_a_new_project_starts_with_four_types_in_its_makers_language(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
+    """A language the app does not speak starts in English."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    await _speaks(session, a.user, "de")
 
-    created = await client.post(
-        a.g("/projects/"),
-        json={"name": "Umzug", "initiative_id": a.initiative.id},
-        headers=a.headers,
-    )
-    assert created.status_code == 201, created.text
-    body = created.json()
+    async def create(locale: str) -> dict:
+        await _speaks(session, a.user, locale)
+        created = await client.post(
+            a.g("/projects/"),
+            json={"name": "Umzug", "initiative_id": a.initiative.id},
+            headers=a.headers,
+        )
+        assert created.status_code == 201, created.text
+        return created.json()
 
+    body = await create("de")
     assert [t["name"] for t in body["task_types"]] == [
         "Aufgabe",
         "Fehler",
@@ -67,22 +70,13 @@ async def test_a_new_project_starts_with_four_types_in_its_makers_language(
         "In Arbeit",
         "Erledigt",
     ]
+    # Its Bug starts a task with an outline, in the same language.
+    starts = [t["starting_values"] for t in body["task_types"]]
+    assert starts[1]["description"].startswith("**Was ist passiert?**")
+    assert [starts[0], *starts[2:]] == [None, None, None]
 
-
-async def test_a_language_the_app_does_not_speak_starts_in_english(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    await _speaks(session, a.user, "xx")
-
-    created = await client.post(
-        a.g("/projects/"),
-        json={"name": "Moving", "initiative_id": a.initiative.id},
-        headers=a.headers,
-    )
-
-    assert created.status_code == 201, created.text
-    assert [t["name"] for t in created.json()["task_types"]] == [
+    body = await create("xx")
+    assert [t["name"] for t in body["task_types"]] == [
         "Task",
         "Bug",
         "Idea",
@@ -90,24 +84,10 @@ async def test_a_language_the_app_does_not_speak_starts_in_english(
     ]
 
 
-async def test_list_returns_the_types_in_order(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    await _types(session, a.project)
-    await session.commit()
-
-    response = await client.get(_types_url(a, a.project.id), headers=a.headers)
-
-    assert response.status_code == 200
-    assert [t["name"] for t in response.json()] == ["Task", "Bug", "Idea", "Milestone"]
-
-
 async def test_create_adds_a_type_at_the_end(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
+    """A name is taken whatever its case."""
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
@@ -125,22 +105,11 @@ async def test_create_adds_a_type_at_the_end(
     assert (body["name"], body["position"], body["is_default"]) == ("Chore", 4, False)
     assert (body["icon"], body["layout_preset"]) == ("repeat", "repeat")
 
-
-async def test_a_name_is_taken_whatever_its_case(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    await _types(session, a.project)
-    await session.commit()
-
-    response = await client.post(
+    taken = await client.post(
         _types_url(a, a.project.id), json={"name": " bug "}, headers=a.headers
     )
-
-    assert response.status_code == 409
-    assert response.json()["detail"] == "TASK_TYPE_NAME_TAKEN"
+    assert taken.status_code == 409
+    assert taken.json()["detail"] == "TASK_TYPE_NAME_TAKEN"
 
 
 async def test_a_type_started_from_another_takes_its_look_and_its_page(
@@ -375,13 +344,16 @@ async def test_the_last_type_stays(
     assert response.json()["detail"] == "TASK_TYPE_CANNOT_REMOVE_LAST"
 
 
-async def test_a_type_cannot_take_its_own_tasks(
+async def test_another_projects_type_is_not_found(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
+    """Nor can a type being deleted take its own tasks."""
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
+    elsewhere = await create_project(session, a.initiative, a.user, name="Elsewhere")
     bug = (await _types(session, a.project))[1]
+    other = (await _types(session, elsewhere))[1]
     await session.commit()
 
     response = await client.request(
@@ -390,21 +362,8 @@ async def test_a_type_cannot_take_its_own_tasks(
         json={"fallback_type_id": bug.id},
         headers=a.headers,
     )
-
     assert response.status_code == 400
     assert response.json()["detail"] == "TASK_TYPE_FALLBACK_MUST_DIFFER"
-
-
-async def test_another_projects_type_is_not_found(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    elsewhere = await create_project(session, a.initiative, a.user, name="Elsewhere")
-    await _types(session, a.project)
-    other = (await _types(session, elsewhere))[1]
-    await session.commit()
 
     response = await client.patch(
         a.g(f"/projects/{a.project.id}/task-types/{other.id}"),

@@ -57,17 +57,11 @@ describe("CommunityContextMenu invite action", () => {
     mintHandoff.mockReset();
   });
 
-  it("offers the invite action while a seat is free", async () => {
-    setup({ max_users: 3, member_count: 2 });
-
-    await openMenu();
-
-    const item = await screen.findByRole("menuitem", { name: "Invite members" });
-    expect(item).not.toHaveAttribute("aria-disabled", "true");
-  });
-
-  it("offers it when the community has no cap at all", async () => {
-    setup({ max_users: null, member_count: 42 });
+  it.each([
+    ["while a seat is free", 3, 2],
+    ["when the community has no cap at all", null, 42],
+  ])("offers the invite action %s", async (_label, max_users, member_count) => {
+    setup({ max_users, member_count });
 
     await openMenu();
 
@@ -131,69 +125,24 @@ describe("CommunityContextMenu billing action", () => {
     openSpy.mockRestore();
   });
 
-  it("is not offered on a self-hosted install", async () => {
-    setup({ id: 42 });
-
-    await openMenu();
-    expect(await screen.findByRole("menuitem", { name: /settings/i })).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "Manage billing" })).not.toBeInTheDocument();
-  });
-
-  it("is offered to support holding the seat with write access", async () => {
-    state.billing = { url: "https://billing.example.com" };
-    const community = {
-      ...buildCommunity({
-        role: "superadmin",
-        name: "Alpha",
-        can: communityCan("superadmin", { configure: true }),
-      }),
+  const grantee = (configure: boolean) =>
+    ({
       accessType: "grant",
       grantSettingsLevel: "superadmin",
-    } as CommunityRead;
-    renderPage(
-      () => (
-        <CommunityContextMenu community={community}>
-          <button type="button">Alpha</button>
-        </CommunityContextMenu>
-      ),
-      { communities: { communities: [], activeCommunityId: community.id } }
-    );
+      can: communityCan("superadmin", { configure }),
+    }) as Partial<CommunityRead>;
 
-    await openMenu();
-    expect(await screen.findByRole("menuitem", { name: "Manage billing" })).toBeInTheDocument();
-  });
-
-  it("is not offered to support whose grant only reads", async () => {
-    state.billing = { url: "https://billing.example.com" };
-    const community = {
-      ...buildCommunity({
-        role: "superadmin",
-        name: "Alpha",
-        can: communityCan("superadmin", { configure: false }),
-      }),
-      accessType: "grant",
-      grantSettingsLevel: "superadmin",
-    } as CommunityRead;
-    renderPage(
-      () => (
-        <CommunityContextMenu community={community}>
-          <button type="button">Alpha</button>
-        </CommunityContextMenu>
-      ),
-      { communities: { communities: [], activeCommunityId: community.id } }
-    );
+  it.each([
+    ["on a self-hosted install", null, {}, false],
+    ["to support holding the seat with write access", true, grantee(true), true],
+    ["to support whose grant only reads", true, grantee(false), false],
+    ["to an ordinary admin", true, { role: "admin", can: communityCan("admin") }, false],
+  ] as const)("is offered %s: %s", async (_label, hosted, overrides, offered) => {
+    state.billing = hosted ? { url: "https://billing.example.com" } : null;
+    setup({ id: 42, ...overrides });
 
     await openMenu();
     expect(await screen.findByRole("menuitem", { name: /settings/i })).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "Manage billing" })).not.toBeInTheDocument();
-  });
-
-  it("is not offered to an ordinary admin", async () => {
-    state.billing = { url: "https://billing.example.com" };
-    setup({ id: 42, role: "admin", can: communityCan("admin") });
-
-    await openMenu();
-    expect(await screen.findByRole("menuitem", { name: /settings/i })).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "Manage billing" })).not.toBeInTheDocument();
+    expect(Boolean(screen.queryByRole("menuitem", { name: "Manage billing" }))).toBe(offered);
   });
 });

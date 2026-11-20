@@ -245,22 +245,14 @@ async def test_put_sets_values(
     assert values[text.id] == "alpha"
     assert float(values[number.id]) == 7.5
 
-
-@surfaces
-async def test_put_of_nothing_clears_what_was_there(
-    client: AsyncClient, session: AsyncSession, acting_user, surface: Surface
-):
-    a, parent = await _scene(surface, session, acting_user)
-    entity = await surface.make(session, a, parent, "E")
-    defn = await create_property_definition(
-        session, a.initiative, name="Tag", type=MetadataType.text
+    refused = await _write(
+        client, a, surface, entity, [{"property_id": number.id, "value": "nope"}]
     )
-    await _write(
-        client, a, surface, entity, [{"property_id": defn.id, "value": "seed"}]
-    )
+    assert refused.status_code == 400
+    assert refused.json()["detail"] == "PROPERTY_INVALID_VALUE_FOR_TYPE"
 
+    # A put of nothing clears what was there.
     response = await _write(client, a, surface, entity, [])
-
     assert response.status_code == 200
     assert response.json() == []
     assert await _stored(session, surface, entity) == []
@@ -442,24 +434,6 @@ async def test_an_option_change_is_held_to_its_definition(
 # ---------------------------------------------------------------------------
 # Values are held to their definition
 # ---------------------------------------------------------------------------
-
-
-@surfaces
-async def test_put_refuses_a_value_the_type_cannot_read(
-    client: AsyncClient, session: AsyncSession, acting_user, surface: Surface
-):
-    a, parent = await _scene(surface, session, acting_user)
-    entity = await surface.make(session, a, parent, "E")
-    defn = await create_property_definition(
-        session, a.initiative, name="Count", type=MetadataType.number
-    )
-
-    response = await _write(
-        client, a, surface, entity, [{"property_id": defn.id, "value": "not a number"}]
-    )
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == "PROPERTY_INVALID_VALUE_FOR_TYPE"
 
 
 @pytest.mark.parametrize(

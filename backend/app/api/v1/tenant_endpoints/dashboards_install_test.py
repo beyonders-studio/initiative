@@ -30,9 +30,6 @@ from app.testing import (
 )
 
 INSTALL_UID = marketplace_uid("sprinthealth")
-WITHDRAWN_UID = marketplace_uid("withdrawn")
-TOO_NEW_UID = marketplace_uid("toonew")
-OTHER_API_UID = marketplace_uid("otherapi")
 
 
 def _definition(
@@ -73,52 +70,69 @@ class TestInstall:
     async def test_installing_pins_the_listing_and_its_version(
         self, client: AsyncClient, acting_user, session, listing
     ):
-        a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-        await _enable(session, a.initiative)
-
-        response = await client.post(
-            a.g("/dashboards/"),
-            headers=a.headers,
-            json={
-                "name": "Sprint health",
-                "initiative_id": a.initiative.id,
-                "listing_uid": INSTALL_UID,
-            },
-        )
-
-        assert response.status_code == 201, response.text
-        body = response.json()
-        assert body["listing_uid"] == INSTALL_UID
-        assert body["listing_version"] == "1.0.0"
-        assert body["definition"]["widgets"][0]["type"] == "stat"
-        assert body["can"]["delete"] is True
-
-    async def test_the_body_comes_from_the_catalog_not_the_request(
-        self, client: AsyncClient, acting_user, session, listing
-    ):
         """Naming a listing and *also* sending a definition installs the
-        listing's. Provenance records what the server resolved, not what the
-        request contained."""
+        listing's: provenance records what the server resolved, not what the
+        request contained. Each install counts once, as a number rather than a
+        record of who — there is no column that could say."""
         a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
         await _enable(session, a.initiative)
 
-        response = await client.post(
-            a.g("/dashboards/"),
-            headers=a.headers,
-            json={
-                "name": "Sprint health",
-                "initiative_id": a.initiative.id,
-                "listing_uid": INSTALL_UID,
-                "definition": _definition(widget_type="table"),
-            },
-        )
+        for name in ("First", "Second"):
+            response = await client.post(
+                a.g("/dashboards/"),
+                headers=a.headers,
+                json={
+                    "name": name,
+                    "initiative_id": a.initiative.id,
+                    "listing_uid": INSTALL_UID,
+                    "definition": _definition(widget_type="table"),
+                },
+            )
+            assert response.status_code == 201, response.text
+            body = response.json()
+            assert body["listing_uid"] == INSTALL_UID
+            assert body["listing_version"] == "1.0.0"
+            assert body["definition"]["widgets"][0]["type"] == "stat"
+            assert body["can"]["delete"] is True
 
-        assert response.status_code == 201, response.text
-        assert response.json()["definition"]["widgets"][0]["type"] == "stat"
+        await session.refresh(listing)
+        assert listing.installs_count == 2
+        assert not hasattr(listing, "guild_id")
 
-    async def test_an_unknown_listing_is_a_404(
-        self, client: AsyncClient, acting_user, session
+    @pytest.mark.parametrize(
+        ("listed", "status", "detail"),
+        [
+            (None, 404, MarketplaceMessages.LISTING_NOT_FOUND),
+            ({"available": False}, 409, MarketplaceMessages.LISTING_UNAVAILABLE),
+            # Refused rather than quietly installing an older version: the
+            # guild would get something other than the listing page showed.
+            (
+                {"min_app_version": "999.0.0"},
+                409,
+                MarketplaceMessages.LISTING_VERSION_INCOMPATIBLE,
+            ),
+            # A plug-in API contract this deployment does not serve, with
+            # words of its own; one it serves installs.
+            (
+                {"min_plugin_api": "99.0"},
+                409,
+                MarketplaceMessages.LISTING_PLUGIN_API_INCOMPATIBLE,
+            ),
+            (
+                {"min_plugin_api": ".".join(PLUGIN_API_VERSION.split(".")[:2])},
+                201,
+                None,
+            ),
+        ],
+    )
+    async def test_what_a_listing_needs_decides_whether_it_installs(
+        self, client: AsyncClient, acting_user, session, listed, status, detail
     ):
+        uid = marketplace_uid("needs")
+        if listed is not None:
+            await create_marketplace_listing(
+                session, uid=uid, public_id="tests.needs", **listed
+            )
         a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
         await _enable(session, a.initiative)
 
@@ -126,117 +140,14 @@ class TestInstall:
             a.g("/dashboards/"),
             headers=a.headers,
             json={
-                "name": "Nope",
+                "name": "Listed",
                 "initiative_id": a.initiative.id,
-                "listing_uid": marketplace_uid("nothere"),
+                "listing_uid": uid,
             },
         )
-        assert response.status_code == 404
-        assert response.json()["detail"] == MarketplaceMessages.LISTING_NOT_FOUND
-
-    async def test_a_withdrawn_listing_cannot_be_installed(
-        self, client: AsyncClient, acting_user, session
-    ):
-        await create_marketplace_listing(
-            session, uid=WITHDRAWN_UID, public_id="tests.gone2", available=False
-        )
-        a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-        await _enable(session, a.initiative)
-
-        response = await client.post(
-            a.g("/dashboards/"),
-            headers=a.headers,
-            json={
-                "name": "Gone",
-                "initiative_id": a.initiative.id,
-                "listing_uid": WITHDRAWN_UID,
-            },
-        )
-        assert response.status_code == 409
-        assert response.json()["detail"] == MarketplaceMessages.LISTING_UNAVAILABLE
-
-    async def test_a_listing_needing_a_newer_app_is_refused(
-        self, client: AsyncClient, acting_user, session
-    ):
-        await create_marketplace_listing(
-            session,
-            uid=TOO_NEW_UID,
-            public_id="tests.toonew2",
-            min_app_version="999.0.0",
-        )
-        a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-        await _enable(session, a.initiative)
-
-        response = await client.post(
-            a.g("/dashboards/"),
-            headers=a.headers,
-            json={
-                "name": "Too new",
-                "initiative_id": a.initiative.id,
-                "listing_uid": TOO_NEW_UID,
-            },
-        )
-        # Refused rather than quietly installing an older version: the guild
-        # would get something other than the listing page showed them.
-        assert response.status_code == 409
-        assert (
-            response.json()["detail"]
-            == MarketplaceMessages.LISTING_VERSION_INCOMPATIBLE
-        )
-
-    async def test_a_listing_needing_a_plugin_api_not_served_here_is_refused(
-        self, client: AsyncClient, acting_user, session
-    ):
-        """A version built against a plug-in API contract this deployment
-        does not serve (another major, or a newer minor) is refused, with
-        words of its own."""
-        await create_marketplace_listing(
-            session,
-            uid=OTHER_API_UID,
-            public_id="tests.otherapi",
-            min_plugin_api="99.0",
-        )
-        a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-        await _enable(session, a.initiative)
-
-        response = await client.post(
-            a.g("/dashboards/"),
-            headers=a.headers,
-            json={
-                "name": "Other API",
-                "initiative_id": a.initiative.id,
-                "listing_uid": OTHER_API_UID,
-            },
-        )
-        assert response.status_code == 409
-        assert (
-            response.json()["detail"]
-            == MarketplaceMessages.LISTING_PLUGIN_API_INCOMPATIBLE
-        )
-
-    async def test_a_listing_needing_the_plugin_api_served_here_installs(
-        self, client: AsyncClient, acting_user, session
-    ):
-        major, minor, *_ = PLUGIN_API_VERSION.split(".")
-        await create_marketplace_listing(
-            session,
-            uid=OTHER_API_UID,
-            public_id="tests.otherapi",
-            min_plugin_api=f"{major}.{minor}",
-        )
-        a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-        await _enable(session, a.initiative)
-
-        response = await client.post(
-            a.g("/dashboards/"),
-            headers=a.headers,
-            json={
-                "name": "This API",
-                "initiative_id": a.initiative.id,
-                "listing_uid": OTHER_API_UID,
-            },
-        )
-        assert response.status_code == 201, response.text
+        assert response.status_code == status, response.text
+        if detail:
+            assert response.json()["detail"] == detail
 
     async def test_installing_still_needs_the_create_permission(
         self, client: AsyncClient, acting_user, session, listing
@@ -262,29 +173,6 @@ class TestInstall:
             },
         )
         assert response.status_code == 403
-
-    async def test_installing_counts_once_and_records_no_guild(
-        self, client: AsyncClient, acting_user, session, listing
-    ):
-        a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-        await _enable(session, a.initiative)
-
-        for name in ("First", "Second"):
-            response = await client.post(
-                a.g("/dashboards/"),
-                headers=a.headers,
-                json={
-                    "name": name,
-                    "initiative_id": a.initiative.id,
-                    "listing_uid": INSTALL_UID,
-                },
-            )
-            assert response.status_code == 201, response.text
-
-        await session.refresh(listing)
-        assert listing.installs_count == 2
-        # A number, not a record of who: there is no column that could say.
-        assert not hasattr(listing, "guild_id")
 
 
 class TestUpgrade:
@@ -460,18 +348,16 @@ class TestInstalledListings:
     ):
         """The dashboard list is paginated; this answer is not. A browse surface
         deriving 'already installed' from a page would mark some installs and
-        miss others."""
+        miss others. A dashboard authored here is not counted, and the literal
+        path is not read as a dashboard id."""
         a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
         await _enable(session, a.initiative)
-        for name in ("One", "Two", "Three"):
+        bodies = [{"listing_uid": INSTALL_UID}] * 3 + [{"definition": _definition()}]
+        for body in bodies:
             response = await client.post(
                 a.g("/dashboards/"),
                 headers=a.headers,
-                json={
-                    "name": name,
-                    "initiative_id": a.initiative.id,
-                    "listing_uid": INSTALL_UID,
-                },
+                json={"name": "Board", "initiative_id": a.initiative.id, **body},
             )
             assert response.status_code == 201, response.text
 
@@ -480,36 +366,6 @@ class TestInstalledListings:
         )
         assert response.status_code == 200, response.text
         assert response.json()["counts"] == {INSTALL_UID: 3}
-
-    async def test_a_dashboard_authored_here_is_not_counted(
-        self, client: AsyncClient, acting_user, session
-    ):
-        a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-        await _enable(session, a.initiative)
-        await client.post(
-            a.g("/dashboards/"),
-            headers=a.headers,
-            json={
-                "name": "Mine",
-                "initiative_id": a.initiative.id,
-                "definition": _definition(),
-            },
-        )
-        response = await client.get(
-            a.g("/dashboards/installed-listings"), headers=a.headers
-        )
-        assert response.json()["counts"] == {}
-
-    async def test_the_literal_path_is_not_read_as_a_dashboard_id(
-        self, client: AsyncClient, acting_user, session
-    ):
-        a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-        await _enable(session, a.initiative)
-        response = await client.get(
-            a.g("/dashboards/installed-listings"), headers=a.headers
-        )
-        assert response.status_code == 200
-        assert "counts" in response.json()
 
 
 class TestCatalogIsolation:

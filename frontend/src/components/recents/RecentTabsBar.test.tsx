@@ -38,31 +38,9 @@ describe("RecentTabsBar", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("renders one tab per item with its name and entity-specific icons", () => {
+  it("renders a tab per item, linked to its community-scoped detail page", () => {
     const items = [
-      buildRecentProjectItem({ name: "Lost Mines", icon: "⚒️" }),
-      buildRecentFileItem({ name: "Session Notes" }),
-      buildRecentWikiItem({ name: "HP Trackers" }),
-    ];
-    renderWithProviders(
-      <RecentTabsBar
-        items={items}
-        onClose={() => {}}
-        onCloseOthers={() => {}}
-        onCloseAll={() => {}}
-      />
-    );
-
-    expect(screen.getByText("Lost Mines")).toBeInTheDocument();
-    expect(screen.getByText("Session Notes")).toBeInTheDocument();
-    expect(screen.getByText("HP Trackers")).toBeInTheDocument();
-    // Project emoji icon should be rendered alongside the name.
-    expect(screen.getByText("⚒️")).toBeInTheDocument();
-  });
-
-  it("links each item to its community-scoped detail page", () => {
-    const items = [
-      buildRecentProjectItem({ entity_id: 11, name: "ProjectX" }),
+      buildRecentProjectItem({ entity_id: 11, name: "ProjectX", icon: "⚒️" }),
       buildRecentFileItem({ entity_id: 22, name: "DocY" }),
       buildRecentWikiItem({ entity_id: 44, name: "GroupW" }),
     ];
@@ -84,6 +62,8 @@ describe("RecentTabsBar", () => {
       "href",
       "/c/1/i/5/wikis/44"
     );
+    // The project's emoji icon is rendered alongside its name.
+    expect(screen.getByText("⚒️")).toBeInTheDocument();
   });
 
   // Only calendars can be community-level (a plug-in installs one). Those keep a

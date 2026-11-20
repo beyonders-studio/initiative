@@ -9,9 +9,11 @@ content with a key in hand.
 from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.audit_events import AuditEventType
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserRole
 from app.models.tenant._mixins import ActorKind
+from app.testing import emitted
 from app.testing.factories import (
     create_access_grant,
     create_calendar,
@@ -44,8 +46,9 @@ def _api_access(guild_id: int, user_id: int) -> str:
 
 
 async def test_the_seat_sets_a_members_api_access_and_the_roster_reads_it(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, capfd
 ):
+    """Each change is recorded against the member; a restatement is not."""
     seat = await create_user(session)
     member = await create_user(session)
     guild = await create_guild(session, creator=seat)
@@ -65,6 +68,7 @@ async def test_the_seat_sets_a_members_api_access_and_the_roster_reads_it(
     roster = f"/api/v1/c/{guild.id}/users/"
     assert allowed(await client.get(roster, headers=headers)) is True
 
+    capfd.readouterr()
     off = await client.put(
         _api_access(guild.id, member.id),
         headers=headers,
@@ -72,6 +76,22 @@ async def test_the_seat_sets_a_members_api_access_and_the_roster_reads_it(
     )
     assert off.status_code == 204, off.text
     assert allowed(await client.get(roster, headers=headers)) is False
+    (row,) = emitted(capfd, AuditEventType.GUILD_MEMBER_API_ACCESS_CHANGED)
+    assert (row["actor_user_id"], row["target_user_id"], row["guild_id"]) == (
+        seat.id,
+        member.id,
+        guild.id,
+    )
+    assert row["target"] == {"type": "guild", "id": guild.id}
+    assert row["detail"] == {"api_keys_allowed": False}
+
+    again = await client.put(
+        _api_access(guild.id, member.id),
+        headers=headers,
+        json={"api_keys_allowed": False},
+    )
+    assert again.status_code == 204, again.text
+    assert emitted(capfd, AuditEventType.GUILD_MEMBER_API_ACCESS_CHANGED) == []
 
     on = await client.put(
         _api_access(guild.id, member.id),

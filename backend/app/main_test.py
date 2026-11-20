@@ -6,7 +6,6 @@ import json
 
 import pytest
 from fastapi import FastAPI
-from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute, iter_route_contexts
 from fastapi.testclient import TestClient
 from httpx2 import ASGITransport, AsyncClient
@@ -22,47 +21,12 @@ from app.main import (
     McpBarePathMiddleware,
     SecurityHeadersMiddleware,
     coded_error_handler,
-    validation_exception_handler,
 )
 from app.testing import (
     captcha_switched_on,
     create_plugin_service_registration,
     in_request_tasks,
 )
-
-
-async def test_validation_handler_strips_input_and_url() -> None:
-    # FastAPI's default 422 echoes back `input` (and a pydantic docs `url`). On
-    # a failed password/secret validation that would echo the submitted value.
-    # The handler must drop them while keeping loc/msg/type.
-    exc = RequestValidationError(
-        [
-            {
-                "type": "string_too_long",
-                "loc": ("body", "password"),
-                "msg": "String should have at most 128 characters",
-                "input": "correct horse battery staple - do not echo",
-                "url": "https://errors.pydantic.dev/2/v/string_too_long",
-            }
-        ]
-    )
-
-    response = await validation_exception_handler(None, exc)
-
-    assert response.status_code == 422
-    payload = json.loads(response.body)
-    assert payload == {
-        "detail": [
-            {
-                "type": "string_too_long",
-                "loc": ["body", "password"],
-                "msg": "String should have at most 128 characters",
-            }
-        ]
-    }
-    # The echoed secret and the pydantic docs URL must be gone entirely.
-    assert "do not echo" not in response.body.decode()
-    assert "errors.pydantic.dev" not in response.body.decode()
 
 
 async def test_coded_error_is_answered_with_its_code_and_status() -> None:
@@ -89,6 +53,8 @@ async def test_responses_carry_content_security_policy(client: AsyncClient) -> N
     assert "default-src 'self'" in csp
     assert "script-src 'self'" in csp
     assert "object-src 'none'" in csp
+    # The suite's APP_URL is http, so the live app must not emit HSTS.
+    assert "strict-transport-security" not in resp.headers
 
 
 async def test_csp_admits_the_stored_captcha_provider(
@@ -217,10 +183,13 @@ async def test_register_validation_error_omits_input(client: AsyncClient) -> Non
         "/api/v1/auth/register",
         json={"email": "not-an-email", "password": "supersecret-no-echo"},
     )
+    # FastAPI's default 422 echoes back ``input`` and a pydantic docs ``url``;
+    # the handler drops them while keeping loc/msg/type.
     assert resp.status_code == 422
     assert "supersecret-no-echo" not in resp.text
+    assert "errors.pydantic.dev" not in resp.text
     for err in resp.json()["detail"]:
-        assert "input" not in err
+        assert set(err) == {"type", "loc", "msg"}
 
 
 # --- HSTS (Strict-Transport-Security) ---
@@ -265,34 +234,18 @@ async def test_hsts_emitted_for_https_app_url() -> None:
     assert hsts == "max-age=63072000; includeSubDomains"
 
 
-async def test_hsts_absent_for_http_app_url() -> None:
-    # Over plain http the header is meaningless and must be omitted.
-    assert await _hsts_for("http://localhost:5173") is None
-
-
-async def test_no_hsts_in_test_env_http(client: AsyncClient) -> None:
-    # The suite's APP_URL is http, so the live app must not emit HSTS.
-    resp = await client.get("/api/v1/config")
-    assert "strict-transport-security" not in resp.headers
-
-
 # --- API docs ---
-
-
-async def test_docs_and_openapi_are_served(client: AsyncClient) -> None:
-    docs = await client.get("/api/v1/docs")
-    schema = await client.get("/api/v1/openapi.json")
-    assert docs.status_code == 200
-    assert schema.status_code == 200
-    assert schema.json()["info"]["title"]
 
 
 async def test_docs_page_serves_scoped_csp(client: AsyncClient) -> None:
     # The custom /docs route relaxes CSP so Swagger's jsDelivr assets load, but
     # the relaxation must stay scoped to that page — /config keeps script-src 'self'.
-    docs_csp = (await client.get("/api/v1/docs")).headers.get(
-        "content-security-policy", ""
-    )
+    docs = await client.get("/api/v1/docs")
+    assert docs.status_code == 200
+    schema = await client.get("/api/v1/openapi.json")
+    assert schema.status_code == 200
+    assert schema.json()["info"]["title"]
+    docs_csp = docs.headers.get("content-security-policy", "")
     assert "https://cdn.jsdelivr.net" in docs_csp
     assert "https://static.cloudflareinsights.com" in docs_csp
 

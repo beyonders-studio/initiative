@@ -6,9 +6,6 @@ revisions that reshape what it writes are taken off around it."""
 
 from __future__ import annotations
 
-import importlib.util
-from pathlib import Path
-from types import ModuleType
 from typing import Any
 
 from alembic.migration import MigrationContext
@@ -18,22 +15,7 @@ from sqlalchemy import text
 from alembic import op
 from app.core.tools import Tool
 from app.testing import create_guild, create_initiative, create_user
-from app.testing.later_revisions import step_newest
-
-_MIGRATION = (
-    Path(__file__).resolve().parents[2]
-    / "alembic"
-    / "versions"
-    / "20261118_0613_each_tools_switch_is_a_rule.py"
-)
-
-
-def _load() -> ModuleType:
-    spec = importlib.util.spec_from_file_location(_MIGRATION.stem, _MIGRATION)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+from app.testing.later_revisions import load_revision, step_newest
 
 
 async def _rows(session, sql: str, **params: Any) -> list[tuple]:
@@ -42,7 +24,7 @@ async def _rows(session, sql: str, **params: Any) -> list[tuple]:
 
 
 def _runner(schema: str, forward: bool):
-    migration = _load()
+    migration = load_revision("20261118_0613_each_tools_switch_is_a_rule")
 
     def apply(sync_session) -> None:
         bind = sync_session.connection()

@@ -267,33 +267,22 @@ describe("InitiativeDirectory", () => {
     expect(screen.queryByText("Nebula")).not.toBeInTheDocument();
   });
 
-  it("sends a request to join, with the note the reader wrote", async () => {
+  // The note is optional, and an empty one is sent as no note rather than "".
+  it.each([
+    ["I run the Thursday session.", "I run the Thursday session."],
+    ["", null],
+  ])("sends a request to join, with the note the reader wrote: %j", async (note, message) => {
     const requests = stubJoinRequests();
 
     renderDirectory([requestEntry()]);
 
     await userEvent.click(await screen.findByRole("button", { name: "Request to join" }));
-    await userEvent.type(await screen.findByLabelText(/Message/), "I run the Thursday session.");
-    await userEvent.click(screen.getByRole("button", { name: "Send request" }));
-
-    await waitFor(() => expect(requests).toHaveLength(1));
-    expect(requests[0]).toEqual({
-      id: String(REQUEST_ID),
-      body: { message: "I run the Thursday session." },
-    });
-    expect(toast.success).toHaveBeenCalledWith("Your request to join Vanguard was sent.");
-  });
-
-  it("sends a request with no note at all", async () => {
-    const requests = stubJoinRequests();
-
-    renderDirectory([requestEntry()]);
-
-    await userEvent.click(await screen.findByRole("button", { name: "Request to join" }));
+    if (note) await userEvent.type(await screen.findByLabelText(/Message/), note);
     await userEvent.click(await screen.findByRole("button", { name: "Send request" }));
 
-    // The note is optional, and an empty one is sent as no note rather than "".
-    await waitFor(() => expect(requests.map((sent) => sent.body)).toEqual([{ message: null }]));
+    await waitFor(() => expect(requests).toHaveLength(1));
+    expect(requests[0]).toEqual({ id: String(REQUEST_ID), body: { message } });
+    expect(toast.success).toHaveBeenCalledWith("Your request to join Vanguard was sent.");
   });
 
   it("shows a knock already waiting as a state, not a button", async () => {

@@ -9,8 +9,6 @@ that holds nothing.
 
 from __future__ import annotations
 
-import importlib.util
-from pathlib import Path
 from types import ModuleType
 
 from alembic.migration import MigrationContext
@@ -31,21 +29,7 @@ from app.testing import (
     create_user,
     make_operations_community,
 )
-
-_MIGRATION = (
-    Path(__file__).resolve().parents[2]
-    / "alembic"
-    / "versions"
-    / "20261105_0579_operations_tables_live_in_one_community.py"
-)
-
-
-def _load() -> ModuleType:
-    spec = importlib.util.spec_from_file_location(_MIGRATION.stem, _MIGRATION)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+from app.testing.later_revisions import load_revision
 
 
 def _upgrade(migration: ModuleType):
@@ -58,7 +42,9 @@ def _upgrade(migration: ModuleType):
 
 #: The operations tables there were when the revision ran; later ones are not
 #: its to keep or take.
-_TABLES = set(_load().TABLES)
+_TABLES = set(
+    load_revision("20261105_0579_operations_tables_live_in_one_community").TABLES
+)
 
 
 async def _tables(session, guild_id: int) -> set[str]:
@@ -100,7 +86,11 @@ async def test_only_a_community_with_operations_rows_keeps_their_tables(
     await set_rls_context(session, Unattributed())
 
     try:
-        await session.run_sync(_upgrade(_load()))
+        await session.run_sync(
+            _upgrade(
+                load_revision("20261105_0579_operations_tables_live_in_one_community")
+            )
+        )
         assert await _tables(session, operations.id) == _TABLES
         assert await _tables(session, former.id) == _TABLES
         assert await _tables(session, empty.id) == set()

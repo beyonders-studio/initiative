@@ -10303,7 +10303,8 @@ export type PluginToolReadInstanceName = { [key: string]: string };
 
 /**
  * A tool plug-in's tool as it declares it: its names, its own rows'
- * fields, its items and its actions. Its layouts are the app's to draw.
+ * fields, its items and its actions, and the formats its rows export in.
+ * Its layouts are the app's to draw.
  */
 export interface PluginToolRead {
   kind: string;
@@ -10314,6 +10315,7 @@ export interface PluginToolRead {
   fields: PluginToolFieldRead[];
   items: PluginToolItemRead[];
   actions: PluginToolActionRead[];
+  export_formats: string[];
 }
 
 export type PluginToolRowCreateFields = {

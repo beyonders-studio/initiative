@@ -177,7 +177,8 @@ async def test_create_spreadsheet_canonicalizes_cell_keys(
     """Non-canonical numeric keys ("01:2", "0001:0002") round-trip as
     canonical "r:c" — JS emits ``String(number)`` form when the snapshot
     is hydrated into a Y.Map, so any leading-zero form stored verbatim
-    would silently disappear after a collaboration round-trip."""
+    would silently disappear after a collaboration round-trip. The formatting
+    maps' index and cell keys collapse the same way."""
     content = await _stored_content(
         client,
         author,
@@ -187,7 +188,9 @@ async def test_create_spreadsheet_canonicalizes_cell_keys(
                 "3:04": "padded col",
                 "0005:0006": "padded both",
                 "7:8": "canonical",
-            }
+            },
+            columns={"007": {"width": 90}},
+            cellStyles={"01:02": {"style": {"italic": True}}},
         ),
     )
 
@@ -197,6 +200,8 @@ async def test_create_spreadsheet_canonicalizes_cell_keys(
         "5:6": "padded both",
         "7:8": "canonical",
     }
+    assert _sheet(content)["columns"] == {"7": {"width": 90}}
+    assert _sheet(content)["cellStyles"] == {"1:2": {"style": {"italic": True}}}
 
 
 @pytest.mark.parametrize(
@@ -325,24 +330,6 @@ async def test_drops_malformed_formatting(client: AsyncClient, author: Actor):
     # Only the valid ``bold`` survived; the column entry is kept.
     assert _sheet(content)["columns"] == {"0": {"style": {"bold": True}}}
     assert _sheet(content)["cellStyles"] == {}
-
-
-async def test_canonicalizes_formatting_keys(client: AsyncClient, author: Actor):
-    """Leading-zero index/cell keys collapse to canonical form so they
-    survive the JS Y.Map round-trip, exactly like the cell map."""
-    content = await _stored_content(
-        client,
-        author,
-        _workbook(
-            cells={},
-            columns={"007": {"width": 90}},
-            cellStyles={"01:02": {"style": {"italic": True}}},
-        ),
-        name="Canon",
-    )
-
-    assert _sheet(content)["columns"] == {"7": {"width": 90}}
-    assert _sheet(content)["cellStyles"] == {"1:2": {"style": {"italic": True}}}
 
 
 async def test_border_round_trips_and_drops_bad_edges(

@@ -345,31 +345,6 @@ async def test_links_open_nothing_outside_demo_mode(client):
     assert response.status_code == 404
 
 
-async def test_making_a_pitch_imports_and_publishes(pitch, session):
-    """A pitch made from a bundle: another pitch's published export."""
-    _link, bea, source = pitch
-    editor = await create_user(session, username="rev", discriminator=1000)
-    await session.commit()
-    newest = await pitches.newest_export(source)
-    assert newest is not None
-    async with import_engine.open_payload(source, newest[0]) as bundle:
-        assert bundle is not None
-        pitch_id = await pitches.make_pitch(
-            bundle=bundle, name="Rosie's", editors=["rev#1000"]
-        )
-    await export_worker.jobs.process()
-
-    made = await session.get(Guild, pitch_id)
-    assert made is not None and made.name == "Rosie's"
-    roster = await _roster(session, pitch_id)
-    assert roster[(await accounts.demo_host(session)).id] is CommunityRole.superadmin
-    assert roster[editor.id] is CommunityRole.admin
-    assert bea in roster
-    assert await pitches.newest_export(pitch_id) is not None
-    await route_session_to_guild(session, pitch_id)
-    assert (await session.exec(select(Task.title))).all() == ["Proof the dough"]
-
-
 async def test_a_pitch_seats_each_named_account_where_it_says(pitch, session):
     _link, _bea, source = pitch
     named = {
@@ -579,6 +554,9 @@ async def test_a_copys_other_guests_keep_their_accounts(pitch, client, session):
         guest_until=datetime.now(UTC) + timedelta(hours=1),
     )
     invited_id = invited.id
+    # An invited guest has no copy of its own.
+    copy = await client.get("/api/v1/demo/copy", headers=get_auth_headers(invited))
+    assert copy.status_code == 404
 
     await copies.expire_copies(
         datetime.now(UTC) + timedelta(days=pitches.COPY_DAYS, minutes=1)
@@ -760,11 +738,11 @@ async def test_personas_are_ensured_once_and_never_over_a_real_account(
 async def test_a_listed_pitch_from_the_api_and_its_deletion(
     pitch, client, session, acting_user, role_session
 ):
-    _link, _bea, source = pitch
+    _link, bea, source = pitch
     installed = await _sales_install(session, acting_user, role_session)
     ops = installed.guild.id
     headers = install_headers(installed, [ADMIN])
-    await create_user(session, username="rev", discriminator=1000)
+    editor = await create_user(session, username="rev", discriminator=1000)
 
     newest = await pitches.newest_export(source)
     assert newest is not None
@@ -792,11 +770,17 @@ async def test_a_listed_pitch_from_the_api_and_its_deletion(
     assert listed.listed and listed.categories == ["education"]
     assert listed.has_adult_content is False
     assert (await rules.platform_values(session))["community_directory_enabled"]
+    roster = await _roster(session, pitch_id)
+    assert roster[(await accounts.demo_host(session)).id] is CommunityRole.superadmin
+    assert roster[editor.id] is CommunityRole.admin
+    assert bea in roster
     await route_session_to_guild(session, pitch_id)
     assert set((await session.exec(select(Initiative.join_policy))).all()) == {
         "request"
     }
+    assert (await session.exec(select(Task.title))).all() == ["Proof the dough"]
     await export_worker.jobs.process()
+    assert await pitches.newest_export(pitch_id) is not None
     linked = await client.post(
         _api(ops, "links"),
         json={"pitch_ref": pitch_ref},
@@ -959,26 +943,6 @@ def test_a_used_up_link_says_so_though_it_ended_then():
     assert pitches.link_state(link, now) is LinkState.used_up
     link.max_uses = None
     assert pitches.link_state(link, now) is LinkState.expired
-
-
-async def test_a_guest_invited_into_a_copy_has_no_copy_of_its_own(
-    pitch, client, session
-):
-    link, _bea, _source = pitch
-    copy_id = await copies.build_copy()
-    await _open(client, await link())
-    invited = await create_user(session)
-    await create_guild_membership(
-        session,
-        user=invited,
-        guild=await session.get(Guild, copy_id),
-        role=CommunityRole.guest,
-        guest_until=datetime.now(UTC) + timedelta(hours=1),
-    )
-
-    copy = await client.get("/api/v1/demo/copy", headers=get_auth_headers(invited))
-
-    assert copy.status_code == 404
 
 
 async def test_a_copy_whose_import_failed_says_so(pitch, client, session):

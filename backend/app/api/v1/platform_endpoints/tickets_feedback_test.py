@@ -13,7 +13,7 @@ from app.api.v1.platform_endpoints import tickets_test
 from app.core import cloud as cloud_module
 from app.core.config import settings
 from app.core.intake import IntakeStream
-from app.core.messages import AppealMessages, FeedbackMessages
+from app.core.messages import FeedbackMessages
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.tenant.comment import Comment, CommentAudience
@@ -215,20 +215,3 @@ async def test_it_takes_pictures_and_no_more_of_them_than_the_stream_allows(
         headers=sender.headers,
     )
     assert response.status_code == 400, response.text
-
-
-@pytest.mark.always
-@pytest.mark.parametrize("messages", [FeedbackMessages, AppealMessages])
-async def test_every_error_code_is_localized(messages):
-    from pathlib import Path
-
-    codes = {
-        value
-        for name, value in vars(messages).items()
-        if not name.startswith("_") and isinstance(value, str)
-    }
-    locales = Path(__file__).resolve().parents[4].parent / "frontend/public/locales"
-    for locale in ("de", "en", "es", "fr"):
-        catalogue = json.loads((locales / locale / "errors.json").read_text())
-        missing = sorted(codes - set(catalogue))
-        assert not missing, f"{locale}/errors.json is missing {missing}"

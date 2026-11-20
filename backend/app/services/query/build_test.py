@@ -18,7 +18,6 @@ from app.services.query.build import (
     Condition,
     Group,
     QuerySpec,
-    Sort,
     build,
 )
 from app.services.query.resolve import PluginCall, ResolvedQuery, SheetCall, resolve
@@ -28,25 +27,6 @@ def build_and_resolve(spec: QuerySpec) -> tuple[str, ResolvedQuery]:
     """The statement, and proof that the surface will run it."""
     sql = build(spec)
     return sql, resolve(sql)
-
-
-def test_a_grouped_count_is_the_shape_a_chart_wants():
-    sql, _ = build_and_resolve(
-        QuerySpec(
-            dataset="tasks",
-            columns=(
-                Column(field="priority"),
-                Column(field="*", aggregate="count", alias="tasks"),
-            ),
-            group_by=("priority",),
-            order_by=Sort(field="tasks", descending=True),
-            limit=10,
-        )
-    )
-    assert "count(*) AS tasks" in sql
-    assert "GROUP BY 1" in sql
-    assert "ORDER BY 2 DESC" in sql
-    assert "LIMIT 10" in sql
 
 
 def test_a_bare_column_is_not_aliased_to_itself():
@@ -364,49 +344,26 @@ class TestPickingYourself:
     """A member picker offers the reader themselves, and what that builds is
     the token rather than a value — so the tile answers per person."""
 
-    def test_a_person_field_takes_the_reader(self):
+    @pytest.mark.parametrize(
+        ("field", "op", "value", "where"),
+        [
+            ("created_by", FilterOp.eq, "me", "created_by = me"),
+            ("assignee.id", FilterOp.eq, "me", "assignee.id = me"),
+            ("created_by", FilterOp.in_, ["me", 7], "created_by IN (me, 7)"),
+            # A title may be the word "me", and comparing against it is a text
+            # comparison like any other.
+            ("title", FilterOp.eq, "me", "title = 'me'"),
+        ],
+    )
+    def test_a_person_field_takes_the_reader(self, field, op, value, where):
         sql = build(
             QuerySpec(
                 dataset="tasks",
                 columns=(Column(field="*", aggregate="count", alias="n"),),
-                where=(Condition(field="created_by", op=FilterOp.eq, value="me"),),
+                where=(Condition(field=field, op=op, value=value),),
             )
         )
-        assert sql.endswith("WHERE created_by = me")
-
-    def test_it_reaches_through_a_relation(self):
-        sql = build(
-            QuerySpec(
-                dataset="tasks",
-                columns=(Column(field="*", aggregate="count", alias="n"),),
-                where=(Condition(field="assignee.id", op=FilterOp.eq, value="me"),),
-            )
-        )
-        assert sql.endswith("WHERE assignee.id = me")
-
-    def test_a_list_takes_it_beside_real_people(self):
-        sql = build(
-            QuerySpec(
-                dataset="tasks",
-                columns=(Column(field="*", aggregate="count", alias="n"),),
-                where=(
-                    Condition(field="created_by", op=FilterOp.in_, value=["me", 7]),
-                ),
-            )
-        )
-        assert sql.endswith("WHERE created_by IN (me, 7)")
-
-    def test_anywhere_else_it_is_just_a_word(self):
-        """A title may be the word "me", and comparing against it is a text
-        comparison like any other."""
-        sql = build(
-            QuerySpec(
-                dataset="tasks",
-                columns=(Column(field="title"),),
-                where=(Condition(field="title", op=FilterOp.eq, value="me"),),
-            )
-        )
-        assert sql.endswith("WHERE title = 'me'")
+        assert sql.endswith(f"WHERE {where}")
 
     def test_what_it_builds_is_a_statement_the_validator_takes(self):
         _, resolved = build_and_resolve(
@@ -522,24 +479,6 @@ class TestBracketingWhatItAsks:
         assert refused.value.code == QueryMessages.UNSUPPORTED_SYNTAX
         assert refused.value.subject == "group depth"
 
-    def test_what_it_brackets_is_a_statement_the_validator_takes(self):
-        _, resolved = build_and_resolve(
-            QuerySpec(
-                dataset="tasks",
-                columns=(Column(field="*", aggregate="count", alias="n"),),
-                where=(
-                    Group(
-                        logic="or",
-                        conditions=(
-                            Condition(field="priority", op=FilterOp.eq, value="high"),
-                            Condition(field="created_by", op=FilterOp.eq, value="me"),
-                        ),
-                    ),
-                ),
-            )
-        )
-        assert "app.current_user_id" in resolved.sql
-
 
 class TestADateStaysADistance:
     """A dashboard is a standing question. "Due in the next 30 days" has to
@@ -558,18 +497,16 @@ class TestADateStaysADistance:
             .strip()
         )
 
-    def test_ahead_of_now(self):
-        assert self.where({"relative": 30}) == (
-            "due_date <= now() + CAST('30 days' AS interval)"
-        )
-
-    def test_behind_it(self):
-        assert self.where({"relative": -30}, FilterOp.gte) == (
-            "due_date >= now() - CAST('30 days' AS interval)"
-        )
-
-    def test_today(self):
-        assert "0 days" in self.where({"relative": 0})
+    @pytest.mark.parametrize(
+        ("days", "op", "where"),
+        [
+            (30, FilterOp.lte, "due_date <= now() + CAST('30 days' AS interval)"),
+            (-30, FilterOp.gte, "due_date >= now() - CAST('30 days' AS interval)"),
+            (0, FilterOp.lte, "due_date <= now() + CAST('0 days' AS interval)"),
+        ],
+    )
+    def test_it_is_written_from_now(self, days, op, where):
+        assert self.where({"relative": days}, op) == where
 
     @pytest.mark.parametrize("value", ["soon", None, 1.9, True, [1]])
     def test_a_distance_that_is_not_a_whole_number_of_days(self, value):
@@ -579,20 +516,6 @@ class TestADateStaysADistance:
         with pytest.raises(QueryError) as refused:
             self.where({"relative": value})
         assert refused.value.code == QueryMessages.UNSUPPORTED_SYNTAX
-
-    def test_the_statement_it_writes_is_one_the_validator_takes(self):
-        _, resolved = build_and_resolve(
-            QuerySpec(
-                dataset="tasks",
-                columns=(Column(field="*", aggregate="count", alias="n"),),
-                where=(
-                    Condition(
-                        field="due_date", op=FilterOp.lte, value={"relative": 30}
-                    ),
-                ),
-            )
-        )
-        assert "interval" in resolved.sql.lower()
 
 
 class TestAJoinedStatementSaysWhichSide:

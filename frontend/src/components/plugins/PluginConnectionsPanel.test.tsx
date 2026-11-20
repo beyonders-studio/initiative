@@ -75,23 +75,18 @@ beforeEach(() => {
 });
 
 describe("a community credential granted at the vendor", () => {
-  it("offers a button rather than a form", async () => {
-    render(vendorFlow);
-
-    expect(await screen.findByRole("button", { name: "Connect" })).toBeInTheDocument();
-    // Every field is filled when the flow finishes, so there is nothing to type
-    // and nothing to save.
-    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
-  });
-
-  it("sends the admin to the address the server built", async () => {
+  it("offers a button rather than a form, sending the admin to the address the server built", async () => {
     connect.mockImplementation((_id, options) =>
       options.onSuccess({ connect_url: "https://github-app.test/install/github?x=1" })
     );
     render(vendorFlow);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Connect" }));
+    // A button rather than a form: every field is filled when the flow
+    // finishes, so there is nothing to type and nothing to save.
+    const button = await screen.findByRole("button", { name: "Connect" });
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+    fireEvent.click(button);
 
     await waitFor(() => expect(connect).toHaveBeenCalledWith("workspace", expect.anything()));
     // A new tab, and one that cannot reach back into this page.

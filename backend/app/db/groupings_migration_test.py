@@ -13,8 +13,8 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import text
 
-from app.db.tool_layouts_migration_test import _load
 from app.testing import create_guild, create_initiative, create_project, create_user
+from app.testing.later_revisions import load_revision
 
 _OLD_LAYOUT = {
     "groupings": [
@@ -65,7 +65,7 @@ async def test_groupings_name_their_fields_and_come_back(session) -> None:
     schema = f"guild_{guild.id}"
     initiative = await create_initiative(session, guild, user)
     project = await create_project(session, initiative, user)
-    migration = _load("20261020_0529_groupings_name_fields")
+    migration = load_revision("20261020_0529_groupings_name_fields")
     scope = f"view:{guild.id}:project:{project.id}"
 
     async def sql(statement: str, **params):
@@ -129,7 +129,7 @@ async def test_groupings_name_their_fields_and_come_back(session) -> None:
 
 
 def test_the_downgrade_leaves_out_what_the_old_ids_cannot_name() -> None:
-    migration = _load("20261020_0529_groupings_name_fields")
+    migration = load_revision("20261020_0529_groupings_name_fields")
     definition = {
         "groupings": [
             {"field": "due_date", "bucket": "week"},

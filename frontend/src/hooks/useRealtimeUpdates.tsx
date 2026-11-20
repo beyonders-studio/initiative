@@ -9,6 +9,7 @@ import { syncComments } from "@/hooks/useComments";
 import { canvasIsStale, dashboardDataKey } from "@/hooks/useSqlQuery";
 import { openLiveSocket } from "@/lib/liveSocket";
 import { queryClient } from "@/lib/queryClient";
+import { isToolPluginKind } from "@/lib/toolPlugins";
 import { singularOf, TOOLS, toolPlural } from "@/lib/tools";
 import { buildCommunityWsUrl } from "@/lib/wsUrl";
 
@@ -148,6 +149,14 @@ const FACET_SPECS: Record<string, Spec> = {
   types: compose(q.allTasks(), q.allReferences("task")),
 };
 
+/**
+ * What a change to a tool plug-in's row, or inside one, makes stale: every
+ * read of its kind, its lists and each row. A row over it previews it, and is
+ * named as its parent. Its kinds are its own, so none of them is above.
+ */
+const pluginRows = (ref: ResourceRef): Spec[] =>
+  isToolPluginKind(ref.type) ? [q.pluginToolRows(ref.type)] : [];
+
 const isRef = (value: unknown): value is ResourceRef => {
   const ref = value as ResourceRef | undefined;
   return typeof ref?.type === "string" && Number.isFinite(ref?.id);
@@ -201,12 +210,12 @@ export const applyChanges = (changes: readonly RealtimeChange[], communityId: nu
   }
 
   for (const [ref, recount] of resources.values()) {
-    specs.push(...(RESOURCE_SPECS[ref.type]?.(ref.id, recount) ?? []));
+    specs.push(...(RESOURCE_SPECS[ref.type]?.(ref.id, recount) ?? pluginRows(ref)));
     // What a chip, link or embed says about it — its name, its status, its body.
     specs.push(q.references(singularOf(ref.type), ref.id));
   }
   for (const [ref, direct] of containers.values()) {
-    specs.push(...(CONTAINER_SPECS[ref.type]?.(ref.id, direct) ?? []));
+    specs.push(...(CONTAINER_SPECS[ref.type]?.(ref.id, direct) ?? pluginRows(ref)));
     // A reading about the thing a change sits directly in: a project's
     // progress moves with its tasks.
     if (direct) specs.push(q.references(singularOf(ref.type), ref.id));

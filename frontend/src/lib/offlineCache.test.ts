@@ -20,80 +20,68 @@ beforeEach(() => {
 });
 
 describe("communityIdOfPath", () => {
-  it("reads the community out of a community-addressed path", () => {
+  it("reads the community out of a community-addressed path, and only there", () => {
     expect(communityIdOfPath("/api/v1/c/42/tasks/7")).toBe(42);
-  });
-
-  it("is null for a platform path", () => {
     expect(communityIdOfPath("/api/v1/me")).toBeNull();
-  });
-
-  it("does not match a community-looking segment further along the path", () => {
     expect(communityIdOfPath("/api/v1/me/tasks?g=3")).toBeNull();
   });
 });
 
 describe("isPersistablePath", () => {
-  it("keeps community content somebody was reading", () => {
-    expect(isPersistablePath("/api/v1/c/3/tasks/2866")).toBe(true);
-    expect(isPersistablePath("/api/v1/c/3/files")).toBe(true);
-    expect(isPersistablePath("/api/v1/c/12/projects/1/tasks")).toBe(true);
-    expect(isPersistablePath("/api/v1/c/3/collections/4")).toBe(true);
-    expect(isPersistablePath("/api/v1/c/3/wiki-pages/5")).toBe(true);
+  // Community content somebody was reading, and the cross-community reads the
+  // home screens are built from.
+  it.each([
+    "/api/v1/c/3/tasks/2866",
+    "/api/v1/c/3/files",
+    "/api/v1/c/12/projects/1/tasks",
+    "/api/v1/c/3/collections/4",
+    "/api/v1/c/3/wiki-pages/5",
+    "/api/v1/me/tasks",
+    "/api/v1/me",
+    "/api/v1/communities",
+  ])("keeps %s", (path) => {
+    expect(isPersistablePath(path)).toBe(true);
   });
 
-  it("keeps the cross-community reads the home screens are built from", () => {
-    expect(isPersistablePath("/api/v1/me/tasks")).toBe(true);
-    expect(isPersistablePath("/api/v1/me")).toBe(true);
-    expect(isPersistablePath("/api/v1/communities")).toBe(true);
-  });
-
-  it("denies by default — an unlisted path is never persisted", () => {
-    expect(isPersistablePath("/api/v1/c/3/uploads/9")).toBe(false);
-    expect(isPersistablePath("/api/v1/c/3/imports")).toBe(false);
-    expect(isPersistablePath("/api/v1/something-new")).toBe(false);
-    expect(isPersistablePath("/other/path")).toBe(false);
-  });
-
-  it("never persists configuration, operator or access-grant surfaces", () => {
-    for (const path of [
-      "/api/v1/auth/providers",
-      "/api/v1/config",
-      "/api/v1/settings/branding",
-      "/api/v1/c/3/settings",
-      "/api/v1/c/3/settings/ai",
-      "/api/v1/c/3/members",
-      "/api/v1/c/3/webhooks/subscriptions",
-      "/api/v1/c/3/plugins",
-      "/api/v1/operator/users",
-      "/api/v1/access-grants/",
-      "/api/v1/ai-settings",
-      "/api/v1/webhooks",
-    ]) {
-      expect(isPersistablePath(path)).toBe(false);
-    }
-  });
-
-  it("never persists message surfaces, whose plaintext has its own erase contract", () => {
-    expect(isPersistablePath("/api/v1/me/dm-settings")).toBe(false);
-    expect(isPersistablePath("/api/v1/me/connections")).toBe(false);
-    expect(isPersistablePath("/api/v1/me/dm-permissions")).toBe(false);
-    expect(isPersistablePath("/api/v1/me/people")).toBe(false);
-    expect(isPersistablePath("/api/v1/me/ignored")).toBe(false);
-    expect(isPersistablePath("/api/v1/users/8/dm/devices")).toBe(false);
-  });
-
-  it("never persists the account's settings, keys or addresses", () => {
-    expect(isPersistablePath("/api/v1/me/api-keys")).toBe(false);
-    expect(isPersistablePath("/api/v1/me/emails")).toBe(false);
-    expect(isPersistablePath("/api/v1/me/notification-preferences")).toBe(false);
-    expect(isPersistablePath("/api/v1/me/reports")).toBe(false);
-  });
-
-  it("never persists search or trash", () => {
-    expect(isPersistablePath("/api/v1/c/3/search")).toBe(false);
-    expect(isPersistablePath("/api/v1/c/3/trash")).toBe(false);
-    expect(isPersistablePath("/api/v1/me/trash")).toBe(false);
+  it.each([
+    // Denied by default: an unlisted path is never persisted.
+    "/api/v1/c/3/uploads/9",
+    "/api/v1/c/3/imports",
+    "/api/v1/something-new",
+    "/other/path",
+    // A prefix match does not spill into a longer sibling name.
+    "/api/v1/c/3/tasks-export",
+    // Configuration, operator and access-grant surfaces.
+    "/api/v1/auth/providers",
+    "/api/v1/config",
+    "/api/v1/settings/branding",
+    "/api/v1/c/3/settings",
+    "/api/v1/c/3/settings/ai",
+    "/api/v1/c/3/members",
+    "/api/v1/c/3/webhooks/subscriptions",
+    "/api/v1/c/3/plugins",
+    "/api/v1/operator/users",
+    "/api/v1/access-grants/",
+    "/api/v1/ai-settings",
+    "/api/v1/webhooks",
+    // Message surfaces, whose plaintext has its own erase contract.
+    "/api/v1/me/dm-settings",
+    "/api/v1/me/connections",
+    "/api/v1/me/dm-permissions",
+    "/api/v1/me/people",
+    "/api/v1/me/ignored",
+    "/api/v1/users/8/dm/devices",
+    // The account's settings, keys and addresses.
+    "/api/v1/me/api-keys",
+    "/api/v1/me/emails",
+    "/api/v1/me/notification-preferences",
+    "/api/v1/me/reports",
+    // Search and trash.
+    "/api/v1/c/3/search",
+    "/api/v1/c/3/trash",
+    "/api/v1/me/trash",
+  ])("never persists %s", (path) => {
+    expect(isPersistablePath(path)).toBe(false);
   });
 
   it("excludes a community reached only by a time-bound PAM grant", () => {
@@ -102,10 +90,6 @@ describe("isPersistablePath", () => {
     expect(isPersistablePath("/api/v1/c/9/tasks")).toBe(false);
     // Other communities are unaffected.
     expect(isPersistablePath("/api/v1/c/10/tasks")).toBe(true);
-  });
-
-  it("does not let a prefix match spill into a longer sibling name", () => {
-    expect(isPersistablePath("/api/v1/c/3/tasks-export")).toBe(false);
   });
 
   it("widens the grant exclusion without narrowing it, for an unread grant list", () => {
@@ -126,19 +110,23 @@ const query = (key: readonly unknown[], status: "success" | "error" | "pending")
   ({ queryKey: key, state: { status } }) as unknown as Query;
 
 describe("shouldPersistQuery", () => {
-  it("keeps a successful read of an allowlisted path", () => {
+  it("keeps only a successful read of an allowlisted path, never a hand-written key", () => {
     expect(shouldPersistQuery(query(["/api/v1/c/3/tasks", { page: 1 }], "success"))).toBe(true);
-  });
-
-  it("drops anything that is not a success", () => {
     expect(shouldPersistQuery(query(["/api/v1/c/3/tasks"], "error"))).toBe(false);
     expect(shouldPersistQuery(query(["/api/v1/c/3/tasks"], "pending"))).toBe(false);
-  });
-
-  it("drops hand-written keys, which are not request paths", () => {
     expect(shouldPersistQuery(query(["dm", "unread"], "success"))).toBe(false);
     expect(shouldPersistQuery(query(["people", "community", 3, ""], "success"))).toBe(false);
     expect(shouldPersistQuery(query([{ scope: "community-plugin" }], "success"))).toBe(false);
+  });
+});
+
+describe("shardOfQueryKey", () => {
+  it("files a community's content under that community, everything else under the platform", () => {
+    expect(shardOfQueryKey(["/api/v1/c/3/tasks/2866"])).toBe("g3");
+    expect(shardOfQueryKey(["/api/v1/c/12/files"])).toBe("g12");
+    expect(shardOfQueryKey(["/api/v1/me"])).toBe("platform");
+    expect(shardOfQueryKey(["/api/v1/me/tasks", { page: 1 }])).toBe("platform");
+    expect(shardOfQueryKey([{ scope: "community-plugin" }])).toBe("platform");
   });
 });
 
@@ -164,22 +152,13 @@ describe("offlineCacheBuster", () => {
 });
 
 describe("restoredIdentityMismatch", () => {
-  it("is false when nothing was restored", () => {
+  it("fires once when somebody other than the restored user signs in", () => {
+    // Nothing restored.
     expect(restoredIdentityMismatch(7)).toBe(false);
-  });
-
-  it("is false when the confirmed user is the one we restored for", () => {
     noteRestoredIdentity(7);
     expect(restoredIdentityMismatch(7)).toBe(false);
-  });
-
-  it("is true when sign-out never ran and somebody else signed in", () => {
-    noteRestoredIdentity(7);
-    expect(restoredIdentityMismatch(8)).toBe(true);
-  });
-
-  it("adopts the confirmed identity, so it only fires once per handover", () => {
-    noteRestoredIdentity(7);
+    // Sign-out never ran and somebody else signed in; the confirmed identity is
+    // adopted, so it fires only once per handover.
     expect(restoredIdentityMismatch(8)).toBe(true);
     expect(restoredIdentityMismatch(8)).toBe(false);
   });

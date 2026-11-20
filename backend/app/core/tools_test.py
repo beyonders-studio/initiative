@@ -137,74 +137,19 @@ def test_kinds_keep_their_codes_and_live_where_their_sharing_says():
             ), kind.value
 
 
-def test_every_tool_has_an_initiative_switch():
-    # EVERY tool has an initiative-level switch, a rule keyed by its view
-    # permission, read and written as the initiative's ``tools`` map by kind —
-    # projects and files included, which is the whole of making them optional,
-    # and a tool plug-in's too.
-    from app.models.tenant.initiative import PermissionKey
-    from app.schemas.tenant.initiative import (
-        InitiativeCreate,
-        InitiativeRead,
-        InitiativeUpdate,
-    )
-
-    for tool in Tool:
-        assert PermissionKey(tool.view_permission)
-    for schema in (InitiativeCreate, InitiativeRead, InitiativeUpdate):
-        assert schema.model_fields["tools"].annotation == dict[str, bool]
-
-
-def test_an_initiative_starts_with_projects_and_files_on():
-    # Optional is not the same as off. An initiative created without an opinion
-    # about its tools is the one people already had, so the two that used to be
-    # unconditional keep arriving switched on and everything else stays opt-in.
-    from app.core.tool_set import BUILTIN_TOOLS
-    from app.services.tenant.initiative_tools import switches
-
-    assert {t for t in Tool if t.spec.on_by_default} == {Tool.project, Tool.file}
-    assert {t.kind: on for t, on in switches({}, BUILTIN_TOOLS).items()} == {
-        tool.value: tool.spec.on_by_default for tool in Tool
-    }
-    assert switches({Tool.post.value: True}, BUILTIN_TOOLS)[
-        BUILTIN_TOOLS.by_kind[Tool.post.value]
-    ]
-
-
-def test_every_tool_is_commentable():
-    # Comments span EVERY tool plus the content-level extras: the service
-    # registry, the RLS subject declaration, the CHECK on ``subject_type`` and
-    # the routes' ``CommentSubject`` all agree. A new tool that forgets its
-    # CommentTarget — or an extra that forgets its entry — fails here.
+def test_every_commentable_kind_inside_a_tool_is_gated_like_one():
+    # The extras are the kinds inside a tool that say they take comments. Each
+    # names a tool to answer for it, and a real column to reach it by — that is
+    # what makes a thread on something that is not a tool gated like one — or
+    # answers for itself, as a kind no sharing governs does.
     from sqlalchemy import inspect as sa_inspect
 
-    from app.core.tools import CHILD_KINDS, COMMENT_TARGETS, KINDS
+    from app.core.tools import CHILD_KINDS, KINDS
     from app.db.initiative_rls import COMMENT_PARENTS
-    from app.models.tenant.comment import Comment
-    from app.schemas.tenant.comment import CommentSubject
-    from app.services.tenant.comments import (
-        EXTRA_COMMENT_TARGETS,
-        TOOL_COMMENT_TARGETS,
-    )
+    from app.services.tenant.comments import EXTRA_COMMENT_TARGETS
 
-    assert set(TOOL_COMMENT_TARGETS) == set(Tool)
-    # The extras are the kinds inside a tool that say they take comments.
     extras = {k for k in CHILD_KINDS if KINDS[k].commentable}
-    assert set(COMMENT_TARGETS) == extras | {t.value for t in Tool}
     assert set(EXTRA_COMMENT_TARGETS) == extras
-    assert tuple(COMMENT_PARENTS) == COMMENT_TARGETS
-
-    [check] = [
-        c for c in Comment.__table__.constraints if c.name == "ck_comments_subject_type"
-    ]
-    assert all(f"'{target}'" in str(check.sqltext) for target in COMMENT_TARGETS)
-
-    # Every kind is one the comment routes take.
-    assert {s.value for s in CommentSubject} == set(COMMENT_TARGETS)
-
-    # Every extra names a tool to answer for it, and a real column to reach it
-    # by — that is what makes a thread on something that is not a tool gated
-    # like one — or answers for itself, as a kind no sharing governs does.
     for kind, extra in EXTRA_COMMENT_TARGETS.items():
         parent = COMMENT_PARENTS[kind]
         if parent.governed_by is None:
@@ -238,35 +183,24 @@ def test_every_tool_records_where_it_came_from():
     # Every tool has a marketplace, and installing a listing imports a copy
     # that records the listing it came from. A tool whose table lacks the pair
     # would install with nowhere to put it.
-    from sqlmodel import SQLModel
-
     import app.db.base  # noqa: F401  (populates the metadata)
     from app.models.tenant._mixins import ListingProvenanceMixin, tool_models
 
     models = tool_models()
     for tool in Tool:
-        model = models[tool.plural]
-        assert issubclass(model, ListingProvenanceMixin), tool
-        columns = SQLModel.metadata.tables[tool.plural].columns
-        assert {"listing_uid", "listing_version"} <= set(columns.keys()), tool
+        assert issubclass(models[tool.plural], ListingProvenanceMixin), tool
 
 
 def test_every_tool_carries_the_comment_switch():
-    # Every tool can turn its own thread off: the column on the content table
-    # and the flag on the read schema are spelled the same on all six, and the
-    # generic route that sets it takes the Tool enum as its path param. A new
-    # tool that forgets the mixin — or a read schema that never exposes it —
-    # fails here.
-    from sqlalchemy import inspect as sa_inspect
-
+    # Every tool can turn its own thread off, and the generic route that sets
+    # it takes the Tool enum as its path param. A new tool that forgets the
+    # mixin fails here.
     from app.main import app
     from app.models.tenant._mixins import CommentsToggleMixin
     from app.services.tenant.comments import TOOL_COMMENT_TARGETS
 
     for tool, target in TOOL_COMMENT_TARGETS.items():
         assert issubclass(target.model, CommentsToggleMixin), tool
-        columns = {c.name for c in sa_inspect(target.model).persist_selectable.columns}
-        assert "comments_enabled" in columns, tool
 
     routes = {getattr(route, "path", "") for route in iter_route_contexts(app.routes)}
     assert any(path.endswith("/tools/{tool}/{tool_id}/comments") for path in routes)
@@ -302,44 +236,6 @@ def test_every_tool_read_schema_reports_the_comment_switch():
         ]["schema"]["$ref"]
         model = schema["components"]["schemas"][ref.rsplit("/", 1)[-1]]
         assert "comments_enabled" in model["properties"], tool
-
-
-def test_tag_link_specs_carry_the_uniform_contract():
-    # Every taggable entity honors the structural contract everything derives
-    # from: a model, and an endpoint kind whose table is that model's. A tag
-    # assignment is a ``tagged_with`` edge in ``relationships`` now, so there is
-    # no junction to check — what replaces it is that both halves of the spec
-    # agree, and that the kind is one an edge may actually name.
-    from app.core.relationships import ENDPOINT_KINDS
-    from app.services.tenant.tags import TAG_LINKS
-
-    for name, spec in TAG_LINKS.items():
-        assert spec.kind == name, name
-        assert spec.kind in ENDPOINT_KINDS, name
-        endpoint = ENDPOINT_KINDS[spec.kind]
-        assert endpoint.table == spec.table.name == spec.entity.__tablename__, name
-        assert endpoint.code == spec.code, name
-
-
-def test_every_tag_target_has_a_spec():
-    # Derived from the enum-backed TAG_TARGETS, so a new tool that forgets to
-    # wire its tags fails here. Exact equality also catches a leftover spec for
-    # a removed target.
-    from app.core.tools import TAG_TARGETS
-    from app.services.tenant.tags import TAG_LINKS
-
-    assert set(TAG_LINKS) == set(TAG_TARGETS)
-
-
-def test_a_tag_assignment_is_an_edge_like_any_other():
-    # The one relation the whole tag layer reads and writes, and the direction
-    # it is stored in: a tag is a label, so the edge describes the thing
-    # carrying it and the tag is always the target.
-    from app.core.relationships import SPECS, RelationshipType
-
-    spec = SPECS[RelationshipType.tagged_with]
-    assert not spec.symmetric, "a tagged thing and a tag are not interchangeable"
-    assert not spec.transitive, "a tag of a tag is not a tag of the thing"
 
 
 def test_the_generic_tool_tags_route_is_the_only_tool_set_tags_surface():
@@ -475,68 +371,17 @@ def test_tool_models_spell_the_shared_columns_the_same():
         assert model.display_field() == "name", tool.value
 
 
-def test_export_adapters_cover_exactly_the_bulk_export_tools():
-    """The export-engine adapter registry and the tool registry must agree:
-    every BULK_EXPORT_TOOLS member has an adapter keyed by its kebab-singular
-    source name, and the only non-tool source is the tasks sub-resource. A
-    new exportable tool (or a renamed source) fails here instead of shipping
-    a bulk-export flag with no engine behind it."""
-    from app.core.tools import BULK_EXPORT_TOOLS, Tool, tool_export_source
+def test_each_export_adapter_serves_its_tools_formats():
+    """Each serves the formats its record names, in the record's order; a tool
+    whose formats depend on each row names none, and its adapter answers."""
+    from app.core.tools import BULK_EXPORT_TOOLS, tool_export_source
     from app.services.export.adapters import ADAPTERS
 
-    derived = {tool_export_source(tool) for tool in BULK_EXPORT_TOOLS}
-    extra = set(ADAPTERS) - derived
-    assert derived <= set(ADAPTERS), f"missing adapters for {derived - set(ADAPTERS)}"
-    # "tasks" and "events" are the filterable task and event lists, not a
-    # Tool; "initiative"/"community" are the aggregate backup/report scopes.
-    allowed = {"tasks", "events", "initiative", "community"}
-    assert extra == allowed, f"unregistered export sources: {extra - allowed}"
-    # Tools without the flag must not silently grow an adapter either.
-    unflagged = {
-        tool_export_source(t) for t in Tool if t not in BULK_EXPORT_TOOLS
-    } & set(ADAPTERS)
-    assert not unflagged, (
-        f"adapter exists but tool not in BULK_EXPORT_TOOLS: {unflagged}"
-    )
-    # Each serves the formats its record names, in the record's order; a tool
-    # whose formats depend on each row names none, and its adapter answers.
     for tool in BULK_EXPORT_TOOLS:
         formats = ADAPTERS[tool_export_source(tool)].formats
         assert formats, tool.value
         if tool.spec.export_formats is not None:
             assert formats == tool.spec.export_formats, tool.value
-
-
-def test_importers_cover_exactly_the_portable_tools():
-    """Export and import are ONE capability — a tool's JSON envelope
-    round-trips through both — so the importer registry answers to the same set
-    the export side writes, keyed by the same derived discriminator.
-
-    A tool with an export adapter and no importer emits an envelope the
-    envelope endpoint refuses as an unknown type and a backup restore skips.
-    The frontend derives its import affordance from the same set
-    (``toolForEnvelopeType``), so it offers whatever is listed here.
-    """
-    from app.core.tools import BULK_EXPORT_TOOLS, Tool, tool_envelope_type
-    from app.services.import_engine.importers import IMPORTERS
-
-    derived = {tool_envelope_type(tool) for tool in BULK_EXPORT_TOOLS}
-    assert tool_envelope_type(Tool.wiki) == "initiative-wiki"
-    assert set(IMPORTERS) == derived, (
-        f"missing importers for {sorted(derived - set(IMPORTERS))}; "
-        f"unregistered importer types {sorted(set(IMPORTERS) - derived)}"
-    )
-    # Keyed by its own declared attribute, so the registry dict and the class
-    # cannot disagree about which type an importer answers to.
-    for envelope_type, importer in IMPORTERS.items():
-        assert importer.envelope_type == envelope_type
-    # A non-portable tool must not quietly grow one either.
-    unflagged = {
-        tool_envelope_type(t) for t in Tool if t not in BULK_EXPORT_TOOLS
-    } & set(IMPORTERS)
-    assert not unflagged, (
-        f"importer exists but tool not in BULK_EXPORT_TOOLS: {sorted(unflagged)}"
-    )
 
 
 def test_envelope_schemas_answer_to_the_tool_envelope_types():

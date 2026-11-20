@@ -65,10 +65,15 @@ beforeEach(() => {
 });
 
 describe("the home sidebar", () => {
-  it("offers My Tickets only to somebody who has filed one", async () => {
+  it("shows the navigation away from My Messages, marking only it as beta, with no My Tickets unfiled", async () => {
     setup("/");
     expect(await screen.findByText("Home")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /back to navigation/i })).toBeNull();
     expect(screen.queryByText("My Tickets")).toBeNull();
+
+    const badges = screen.getAllByText("Beta");
+    expect(badges).toHaveLength(1);
+    expect(badges[0].closest("a")).toHaveTextContent("My Messages");
   });
 
   it("leads to the tickets somebody filed", async () => {
@@ -76,21 +81,6 @@ describe("the home sidebar", () => {
     setup("/");
     const item = await screen.findByRole("link", { name: "My Tickets" });
     expect(item).toHaveAttribute("href", "/my-tickets");
-  });
-
-  it("shows the navigation away from My Messages", async () => {
-    setup("/");
-
-    expect(await screen.findByText("Home")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /back to navigation/i })).toBeNull();
-  });
-
-  it("marks My Messages as beta, and nothing else", async () => {
-    setup("/");
-
-    const badges = await screen.findAllByText("Beta");
-    expect(badges).toHaveLength(1);
-    expect(badges[0].closest("a")).toHaveTextContent("My Messages");
   });
 
   it("drills into the conversations on My Messages", async () => {

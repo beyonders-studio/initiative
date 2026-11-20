@@ -28,6 +28,8 @@ from app.services.ai_settings import (
         (AIProvider.ollama, "community"),
         (AIProvider.custom, "community"),
         (AIProvider.openai, "platform"),
+        (AIProvider.anthropic, "platform"),
+        (AIProvider.openrouter, "platform"),
     ],
 )
 async def test_a_private_base_url_is_refused(provider, scope):

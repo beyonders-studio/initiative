@@ -4,8 +4,7 @@ The table records; this module is where the shape is read. It refuses exactly
 two things — an edge from a thing to itself, and a type nothing knows — and
 otherwise stores what it is given, from whatever provenance. A loop between two
 people's tasks is a fact about their work; a task somebody wants in two epics is
-an ambiguity worth recording. Neither is this layer's business to prevent, and
-both are a picker's business to warn about (see :func:`walk`).
+an ambiguity worth recording. Neither is this layer's business to prevent.
 
 Who may write an edge is the table's to decide: RLS gates both endpoints on
 every statement. A link a person makes also answers to the rules of the surface
@@ -25,7 +24,7 @@ from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import HTTPException, status
-from sqlalchemy import text, union_all
+from sqlalchemy import union_all
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlmodel import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -42,7 +41,6 @@ from app.core.relationships import (
     Related,
     RelationshipType,
     is_symmetric,
-    is_transitive,
     node_of,
 )
 from app.core.search import SearchEntityType
@@ -52,11 +50,6 @@ from app.db.session import install_context, require_actor_context, routed_tools
 from app.models.tenant._mixins import ActorKind
 from app.models.tenant.relationship import EntityRelationship
 from app.services.tenant import named_people
-
-#: How deep a walk may go, whatever it is asked for. A graph that permits cycles
-#: needs this even with the CYCLE clause below, because a mixed-type path can
-#: revisit a node the clause is not tracking.
-MAX_WALK_DEPTH = 10
 
 #: Which way an edge runs relative to the thing being asked about. ``inbound``
 #: is the "what links here" question a backlinks panel asks.
@@ -115,10 +108,6 @@ def _ordered(
 
 class SelfLoop(ValueError):
     """An edge from a thing to itself. No relation here means anything by it."""
-
-
-class NotTransitive(ValueError):
-    """A multi-hop walk was asked for along a relation that does not chain."""
 
 
 async def create(
@@ -809,95 +798,6 @@ async def set_related(
         )
 
 
-def _walk_sql(frm: str, to: str) -> str:
-    """The recursive walk, one direction of it.
-
-    Written out per direction rather than interpolated: the request path builds
-    no SQL text, and a walk has exactly two directions, so there is nothing a
-    format string would save.
-
-    A person is reached and not walked on from: what links to somebody is read
-    from each item's side, never gathered from theirs.
-    """
-    return f"""
-        WITH RECURSIVE reachable(node, depth) AS (
-            SELECT CAST(:start AS bigint), 0
-          UNION ALL
-            SELECT r.{to}_node, w.depth + 1
-            FROM reachable w
-            JOIN relationships r
-              ON r.{frm}_node = w.node
-             AND r.relationship_type = :rtype
-             AND r.removed_at IS NULL
-             AND r.{frm}_type <> '{PERSON.value}'
-            WHERE w.depth < :depth
-        ) CYCLE node SET is_cycle USING path
-        SELECT node, depth, is_cycle FROM reachable WHERE depth > 0
-    """
-
-
-#: The two walks, rendered once at import. ``CYCLE … SET … USING path`` is the
-#: SQL-standard clause (PG14+), so a cyclic graph terminates on its own.
-_WALK_OUTBOUND = _walk_sql("source", "target")
-_WALK_INBOUND = _walk_sql("target", "source")
-
-
-async def walk(
-    session: AsyncSession,
-    start: Endpoint,
-    *,
-    relationship_type: RelationshipType,
-    outbound: bool = True,
-    depth: int = MAX_WALK_DEPTH,
-) -> list[tuple[int, int, bool]]:
-    """Follow one relation, returning ``(node, depth, closes_a_cycle)``.
-
-    Uses the SQL-standard ``CYCLE`` clause, so a cyclic graph terminates on its
-    own: the row that revisits a node is flagged and not expanded, while every
-    other branch carries on. That is the whole of what this design needs from
-    cycles — they are recorded, and found when read — and it is why the table
-    needs no rule against them.
-
-    A multi-hop walk along a relation that does not chain is refused rather than
-    answered: *A related to B* and *B related to C* says nothing about A and C,
-    so walking it would return something that reads like a result and is not.
-    """
-    if depth > 1 and not is_transitive(relationship_type):
-        raise NotTransitive(
-            f"{relationship_type.value} is not transitive, so a walk deeper "
-            "than one hop has no meaning"
-        )
-    bounded = max(1, min(depth, MAX_WALK_DEPTH))
-
-    rows = await session.exec(
-        text(_WALK_OUTBOUND if outbound else _WALK_INBOUND).bindparams(
-            start=start.node, rtype=relationship_type.value, depth=bounded
-        )
-    )
-    return [(row[0], row[1], row[2]) for row in rows.all()]
-
-
-async def would_close_a_cycle(
-    session: AsyncSession,
-    *,
-    source: Endpoint,
-    relationship_type: RelationshipType,
-    target: Endpoint,
-) -> bool:
-    """Whether adding this edge would make a loop — a warning, never a refusal.
-
-    A picker asks before it offers a candidate. The answer is shown to the
-    person, who may mean it: two tasks that each wait on the other usually means
-    they are one piece of work, which is worth surfacing and worth recording.
-    """
-    if not is_transitive(relationship_type):
-        return source.node == target.node
-    reachable = await walk(
-        session, target, relationship_type=relationship_type, outbound=True
-    )
-    return any(node == source.node for node, _, _ in reachable)
-
-
 #: How far out a neighbourhood goes. About as much as a picture can say.
 MAX_NEIGHBOURHOOD_HOPS = 3
 
@@ -995,7 +895,7 @@ async def neighbourhood(
 
     Labels are left out of the walk unless asked for. A tag is shared by
     everything carrying it, so walking through one reaches the whole community
-    in a hop. A person is reached and never walked on from, as in :func:`walk`.
+    in a hop. A person is reached and never walked on from.
     """
     bounded = max(1, min(hops, MAX_NEIGHBOURHOOD_HOPS))
     depths: dict[Endpoint, int] = {start: 0}
@@ -1080,12 +980,10 @@ __all__ = [
     "ENDPOINT_KINDS",
     "HOP_BUDGET",
     "MAX_NEIGHBOURHOOD_HOPS",
-    "MAX_WALK_DEPTH",
     "SPECS",
     "Direction",
     "Endpoint",
     "Neighbourhood",
-    "NotTransitive",
     "Related",
     "SelfLoop",
     "counts_for_many",
@@ -1100,8 +998,6 @@ __all__ = [
     "related_ids",
     "remove",
     "set_related",
-    "walk",
-    "would_close_a_cycle",
 ]
 
 

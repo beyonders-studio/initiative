@@ -55,19 +55,13 @@ describe("ToolViewFilter", () => {
     expect(options()).toEqual(["All", "Active", "Archived"]);
   });
 
-  it("reports the view the reader picked", async () => {
-    const onChange = vi.fn();
-    render(<ToolViewFilter tool={Tool.project} value="active" onChange={onChange} />);
-
-    await userEvent.click(screen.getByRole("radio", { name: "Archived" }));
-    expect(onChange).toHaveBeenCalledWith("archived");
-  });
-
-  it("keeps the current view when it is clicked again", async () => {
+  it("reports the view the reader picked, and keeps the current one when it is clicked again", async () => {
     const onChange = vi.fn();
     render(<ToolViewFilter tool={Tool.project} value="active" onChange={onChange} />);
 
     await userEvent.click(screen.getByRole("radio", { name: "Active" }));
     expect(onChange).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("radio", { name: "Archived" }));
+    expect(onChange).toHaveBeenCalledWith("archived");
   });
 });

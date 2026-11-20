@@ -197,21 +197,19 @@ describe("EnvelopeImportDialog", () => {
     expect(confirmed).toEqual({});
   });
 
-  it("rejects a file whose type belongs to a different tool", async () => {
+  it.each([
+    [
+      { type: "initiative-file", name: "Notes", schema_version: 1 },
+      /import it from that tool's page/i,
+    ],
+    [{ hello: "world" }, /isn't a recognized Initiative export/i],
+  ])("rejects a file that is not this tool's export: %j", async (envelope, refusal) => {
     renderWithProviders(
       <EnvelopeImportDialog tool={Tool.dashboard} open onOpenChange={() => {}} />
     );
-    selectFile({ type: "initiative-file", name: "Notes", schema_version: 1 });
-    expect(await screen.findByText(/import it from that tool's page/i)).toBeInTheDocument();
+    selectFile(envelope);
+    expect(await screen.findByText(refusal)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^import$/i })).toBeDisabled();
-  });
-
-  it("rejects a file that isn't an Initiative export", async () => {
-    renderWithProviders(
-      <EnvelopeImportDialog tool={Tool.dashboard} open onOpenChange={() => {}} />
-    );
-    selectFile({ hello: "world" });
-    expect(await screen.findByText(/isn't a recognized Initiative export/i)).toBeInTheDocument();
   });
 
   it("ignores a slow read of an earlier file when a newer one is picked", async () => {

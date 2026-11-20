@@ -130,8 +130,8 @@ def declaration(located: Located) -> PluginToolRead:
     """The tool ``located`` is or sits in, as its plug-in declares it: its
     names, the fields of its rows and its items', which item sits under
     which, and its actions with the fields they ask for, each table named by
-    its kind. Not its layouts, which are the app's to draw, nor what an
-    action writes."""
+    its kind, and the formats its rows export in. Not its layouts, which are
+    the app's to draw, nor what an action writes."""
     block = located.tool.declaration
 
     def kind(key: str) -> str:
@@ -164,6 +164,7 @@ def declaration(located: Located) -> PluginToolRead:
             )
             for action in block.get("actions", [])
         ],
+        export_formats=list(located.tool.spec.export_formats or ()),
     )
 
 

@@ -425,6 +425,42 @@ describe("realtime resource frames", () => {
     expect(other(), "another community's install").toBe(false);
   });
 
+  it("refreshes a tool plug-in's row, its own kind's reads and the rows over it", () => {
+    const counter = "counter.tsjvtcm0s7gv2x";
+    const group = "counter_group.tsjvtcm0s7gv2x";
+    const row = seed([`/api/v1/c/${COMMUNITY}/plugin-tools/${counter}/${ENTITY_ID}`]);
+    const items = seed([`/api/v1/c/${COMMUNITY}/plugin-tools/${counter}/`, { parent_id: 7 }]);
+    const groups = seed([`/api/v1/c/${COMMUNITY}/plugin-tools/${group}/`, { initiative_id: 1 }]);
+    const another = seed([`/api/v1/c/${COMMUNITY}/plugin-tools/board.abc/`, { initiative_id: 1 }]);
+
+    applyChanges(
+      [
+        {
+          resource: { type: counter, id: ENTITY_ID },
+          parents: [{ type: group, id: 7 }],
+          action: "updated",
+        },
+      ],
+      COMMUNITY
+    );
+
+    expect(row(), "the row").toBe(true);
+    expect(items(), "its siblings").toBe(true);
+    expect(groups(), "the rows previewing it").toBe(true);
+    expect(another(), "another tool's rows").toBe(false);
+  });
+
+  it("leaves another community's install reads alone", () => {
+    const other = seed([`/api/v1/c/${COMMUNITY + 1}/plugins/${ENTITY_ID}`]);
+
+    applyChanges(
+      [{ resource: { type: "plugins", id: ENTITY_ID }, parents: [], action: "created" }],
+      COMMUNITY
+    );
+
+    expect(other()).toBe(false);
+  });
+
   it("ignores an unknown resource or a malformed frame, still refreshing the parents named", () => {
     const untouched = seed([`/api/v1/c/${COMMUNITY}/tasks/${ENTITY_ID}`]);
     const project = seed([`/api/v1/c/${COMMUNITY}/projects/7`]);

@@ -10,90 +10,60 @@ const sheet = (obj: Record<string, CellValue>) => createEvaluator(new Map(Object
 const evalA1 = (formula: string, rest: Record<string, CellValue> = {}) =>
   sheet({ "0:0": formula, ...rest }).evaluate(0, 0);
 
-describe("arithmetic & precedence", () => {
-  it("respects operator precedence", () => {
-    expect(evalA1("=1+2*3").value).toBe(7);
-    expect(evalA1("=(1+2)*3").value).toBe(9);
+const workbook = (
+  sheets: { id: string; name: string; cells: Record<string, CellValue> }[],
+  activeSheetId = sheets[0].id
+) =>
+  createEvaluator({
+    sheets: sheets.map((s) => ({ ...s, cells: new Map(Object.entries(s.cells)) })),
+    activeSheetId,
   });
 
-  it("handles exponentiation and unary minus", () => {
-    expect(evalA1("=2^3").value).toBe(8);
-    expect(evalA1("=-5+2").value).toBe(-3);
+describe("evaluating one cell", () => {
+  // B1 is "0:1", A2..A4 are "1:0".."3:0".
+  it.each<[string, Record<string, CellValue>, CellValue]>([
+    ["=1+2*3", {}, 7],
+    ["=(1+2)*3", {}, 9],
+    ["=2^3", {}, 8],
+    ["=-5+2", {}, -3],
+    // A decimal written without its leading zero.
+    ["=.5*2", {}, 1],
+    ["=SUM(-.25,1.5)", {}, 1.25],
+    ['=".5"&.5', {}, ".50.5"],
+    ["=50%", {}, 0.5],
+    ['="a"&"b"', {}, "ab"],
+    ["=1<2", {}, true],
+    ["=2<=1", {}, false],
+    ["=B1+C1", { "0:1": 2, "0:2": 3 }, 5],
+    ["=SUM(A2:A4)", { "1:0": 10, "2:0": 20, "3:0": 30 }, 60],
+    ["=AVERAGE(A2:A3)", { "1:0": 4, "2:0": 8 }, 6],
+    ["=MIN(A2:A3)", { "1:0": 4, "2:0": 8 }, 4],
+    ["=MAX(A2:A3)", { "1:0": 4, "2:0": 8 }, 8],
+    // COUNT skips text; COUNTA counts anything non-empty.
+    ["=COUNT(A2:A4)", { "1:0": 4, "2:0": 8, "3:0": "x" }, 2],
+    ["=COUNTA(A2:A4)", { "1:0": 4, "2:0": 8, "3:0": "x" }, 3],
+    // An empty referenced cell is zero in arithmetic.
+    ["=A2+1", {}, 1],
+    ['=IF(A2>10,"hi","lo")', { "1:0": 20 }, "hi"],
+    ['=IF(A2>10,"hi","lo")', { "1:0": 5 }, "lo"],
+    ["=ROUND(3.14159,2)", {}, 3.14],
+    ["=ABS(-5)", {}, 5],
+  ])("%s is %j", (formula, rest, expected) => {
+    expect(evalA1(formula, rest).value).toBe(expected);
   });
 
-  it("reads a decimal written without its leading zero", () => {
-    expect(evalA1("=.5*2").value).toBe(1);
-    expect(evalA1("=SUM(-.25,1.5)").value).toBe(1.25);
-    expect(evalA1('=".5"&.5').value).toBe(".50.5");
-  });
-
-  it("treats percent as divide-by-100", () => {
-    expect(evalA1("=50%").value).toBe(0.5);
-  });
-
-  it("concatenates with & and compares", () => {
-    expect(evalA1('="a"&"b"').value).toBe("ab");
-    expect(evalA1("=1<2").value).toBe(true);
-    expect(evalA1("=2<=1").value).toBe(false);
-  });
-});
-
-describe("references & ranges", () => {
-  it("resolves cell references", () => {
-    // A1 = formula, B1 (0:1) = 2, C1 (0:2) = 3.
-    expect(evalA1("=B1+C1", { "0:1": 2, "0:2": 3 }).value).toBe(5);
-  });
-
-  it("aggregates over a range", () => {
-    const cells = { "0:0": "=SUM(A2:A4)", "1:0": 10, "2:0": 20, "3:0": 30 };
-    expect(createEvaluator(new Map(Object.entries(cells))).evaluate(0, 0).value).toBe(60);
-  });
-
-  it("AVERAGE / MIN / MAX / COUNT / COUNTA over a range", () => {
-    const data = { "1:0": 4, "2:0": 8, "3:0": "x" }; // A2..A4
-    expect(evalA1("=AVERAGE(A2:A3)", data).value).toBe(6);
-    expect(evalA1("=MIN(A2:A3)", data).value).toBe(4);
-    expect(evalA1("=MAX(A2:A3)", data).value).toBe(8);
-    expect(evalA1("=COUNT(A2:A4)", data).value).toBe(2); // text not counted
-    expect(evalA1("=COUNTA(A2:A4)", data).value).toBe(3); // non-empty counted
-  });
-
-  it("treats an empty referenced cell as zero in arithmetic", () => {
-    expect(evalA1("=A2+1").value).toBe(1);
-  });
-});
-
-describe("functions", () => {
-  it("IF picks the branch", () => {
-    expect(evalA1('=IF(A2>10,"hi","lo")', { "1:0": 20 }).value).toBe("hi");
-    expect(evalA1('=IF(A2>10,"hi","lo")', { "1:0": 5 }).value).toBe("lo");
-  });
-
-  it("ROUND and ABS", () => {
-    expect(evalA1("=ROUND(3.14159,2)").value).toBe(3.14);
-    expect(evalA1("=ABS(-5)").value).toBe(5);
-  });
-
-  it("returns #NAME? for an unknown function", () => {
-    expect(evalA1("=FOO(1)").error).toBe("#NAME?");
-  });
-});
-
-describe("errors", () => {
-  it("divide by zero", () => {
-    expect(evalA1("=1/0").error).toBe("#DIV/0!");
-  });
-
-  it("non-numeric text in arithmetic", () => {
-    expect(evalA1('="abc"+1').error).toBe("#VALUE!");
-  });
-
-  it("propagates the first error", () => {
-    expect(evalA1("=1/0+1").error).toBe("#DIV/0!");
-  });
-
-  it("propagates an error through a reference", () => {
-    expect(evalA1("=A2+1", { "1:0": "=1/0" }).error).toBe("#DIV/0!");
+  it.each<[string, Record<string, CellValue>, string]>([
+    ["=FOO(1)", {}, "#NAME?"],
+    // Nothing that would reach outside the workbook is a known name.
+    ['=WEBSERVICE("https://example.com")', {}, "#NAME?"],
+    ['=FILTERXML("<a/>","//a")', {}, "#NAME?"],
+    ["=1/0", {}, "#DIV/0!"],
+    ['="abc"+1', {}, "#VALUE!"],
+    // The first error propagates, through a reference too.
+    ["=1/0+1", {}, "#DIV/0!"],
+    ["=A2+1", { "1:0": "=1/0" }, "#DIV/0!"],
+  ])("%s fails with %s", (formula, rest, expected) => {
+    expect(evalA1(formula, rest).error).toBe(expected);
   });
 });
 
@@ -119,15 +89,6 @@ describe("chained formulas", () => {
 });
 
 describe("cross-sheet references", () => {
-  const workbook = (
-    sheets: { id: string; name: string; cells: Record<string, CellValue> }[],
-    activeSheetId = sheets[0].id
-  ) =>
-    createEvaluator({
-      sheets: sheets.map((s) => ({ ...s, cells: new Map(Object.entries(s.cells)) })),
-      activeSheetId,
-    });
-
   it("resolves a qualified cell reference", () => {
     const e = workbook([
       { id: "s1", name: "Summary", cells: { "0:0": "=Data!A1" } },
@@ -195,15 +156,6 @@ describe("cross-sheet references", () => {
 });
 
 describe("formulas that read other formula cells", () => {
-  const workbook = (
-    sheets: { id: string; name: string; cells: Record<string, CellValue> }[],
-    activeSheetId = sheets[0].id
-  ) =>
-    createEvaluator({
-      sheets: sheets.map((s) => ({ ...s, cells: new Map(Object.entries(s.cells)) })),
-      activeSheetId,
-    });
-
   it("passes a formula cell as a function argument", () => {
     expect(evalA1("=IF(B2<0,0,B2)", { "1:1": "=1+1" }).value).toBe(2);
   });
@@ -253,15 +205,6 @@ describe("formulas that read other formula cells", () => {
 describe("functions the library leaves unimplemented", () => {
   // A2..A6 = 4, 8, 1, 9, 6 — a set with a clear median and no ties.
   const data = { "1:0": 4, "2:0": 8, "3:0": 1, "4:0": 9, "5:0": 6 };
-
-  const workbook = (
-    sheets: { id: string; name: string; cells: Record<string, CellValue> }[],
-    activeSheetId = sheets[0].id
-  ) =>
-    createEvaluator({
-      sheets: sheets.map((s) => ({ ...s, cells: new Map(Object.entries(s.cells)) })),
-      activeSheetId,
-    });
 
   it("MEDIAN of an odd and an even count", () => {
     expect(evalA1("=MEDIAN(A2:A6)", data).value).toBe(6);
@@ -394,21 +337,5 @@ describe("functions the library leaves unimplemented", () => {
     // The shape that used to fail: the inner INT() re-enters the parser
     // while the outer subtraction is mid-parse.
     expect(evalA1("=(c10-INT(c10))", { "9:2": "=1.5*2.5" }).value).toBeCloseTo(0.75, 10);
-  });
-
-  it("keeps the aggregates that were already registered", () => {
-    expect(evalA1("=MIN(A2:A6)", data).value).toBe(1);
-    expect(evalA1("=MAX(A2:A6)", data).value).toBe(9);
-    expect(evalA1("=COUNTA(A2:A6)", data).value).toBe(5);
-  });
-});
-
-describe("functions that would reach outside the workbook", () => {
-  it("answers WEBSERVICE as an unknown name", () => {
-    expect(evalA1('=WEBSERVICE("https://example.com")').error).toBe("#NAME?");
-  });
-
-  it("answers FILTERXML as an unknown name", () => {
-    expect(evalA1('=FILTERXML("<a/>","//a")').error).toBe("#NAME?");
   });
 });

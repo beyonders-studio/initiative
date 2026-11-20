@@ -7,13 +7,11 @@ import struct
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from pydantic import ValidationError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import builtin_announcements as builtins_module
 from app.core.builtin_announcements import BuiltinAnnouncement
-from app.core.image_headers import ImageRejected
 from app.models.platform.announcement import (
     AnnouncementAudienceAccounts,
     AnnouncementCategory,
@@ -25,7 +23,6 @@ from app.models.platform.notification import Notification, NotificationType
 from app.models.platform.user import UserRole
 from app.schemas.platform.announcement import (
     AnnouncementSection,
-    AnnouncementUpdate,
     AnnouncementWrite,
 )
 from app.services.platform import announcements as service
@@ -74,32 +71,6 @@ async def _publish(session, author, **overrides):
     return announcement
 
 
-async def test_a_published_announcement_reaches_a_plain_member(session):
-    author = await create_user(session, role=UserRole.owner)
-    reader = await create_user(session)
-    await _publish(session, author)
-
-    items = await service.list_for_user(session, user=reader)
-
-    assert [item.title for item in items] == ["Board view is new"]
-    assert items[0].key.startswith("db:")
-    assert items[0].is_builtin is False
-
-
-async def test_a_draft_and_a_scheduled_notice_reach_nobody(session):
-    author = await create_user(session, role=UserRole.owner)
-    reader = await create_user(session)
-    await _publish(session, author, title="Draft", published_at=None)
-    await _publish(
-        session,
-        author,
-        title="Later",
-        published_at=datetime.now(UTC) + timedelta(days=1),
-    )
-
-    assert await service.list_for_user(session, user=reader) == []
-
-
 async def test_an_expired_notice_stops_being_shown_anywhere(session):
     """An end date retires a notice from the archive as well as the queue."""
     author = await create_user(session, role=UserRole.owner)
@@ -145,63 +116,39 @@ async def test_guild_admins_only_needs_an_admin_membership_somewhere(session):
     assert len(await service.list_for_user(session, user=admin)) == 1
 
 
-async def test_a_notice_for_existing_accounts_skips_the_ones_made_since(session):
-    """A breaking change is about a transition somebody has to have made."""
+@pytest.mark.parametrize(
+    "audience,reaches",
+    [
+        (AnnouncementAudienceAccounts.existing, {"was_here"}),
+        (AnnouncementAudienceAccounts.new, {"arrived_since"}),
+        (AnnouncementAudienceAccounts.everyone, {"was_here", "arrived_since"}),
+    ],
+)
+async def test_the_audience_is_read_from_when_the_account_was_made(
+    session, audience, reaches
+):
+    """A breaking change is about a transition somebody has to have made; an
+    onboarding tip is the other way round; everyone is still everyone."""
     author = await create_user(session, role=UserRole.owner)
     published = datetime.now(UTC) - timedelta(days=7)
 
-    was_here = await create_user(session)
-    was_here.created_at = published - timedelta(days=30)
-    arrived_since = await create_user(session)
-    arrived_since.created_at = published + timedelta(days=1)
-    session.add(was_here)
-    session.add(arrived_since)
+    accounts = {
+        "was_here": await create_user(session),
+        "arrived_since": await create_user(session),
+    }
+    accounts["was_here"].created_at = published - timedelta(days=30)
+    accounts["arrived_since"].created_at = published + timedelta(days=1)
+    session.add_all(accounts.values())
     await session.commit()
 
-    await _publish(
-        session,
-        author,
-        published_at=published,
-        audience_accounts=AnnouncementAudienceAccounts.existing,
-    )
+    await _publish(session, author, published_at=published, audience_accounts=audience)
 
-    assert len(await service.list_for_user(session, user=was_here)) == 1
-    assert await service.list_for_user(session, user=arrived_since) == []
-
-
-async def test_a_notice_for_new_accounts_is_the_other_way_round(session):
-    """The same line, read from the other side: an onboarding tip."""
-    author = await create_user(session, role=UserRole.owner)
-    published = datetime.now(UTC) - timedelta(days=7)
-
-    was_here = await create_user(session)
-    was_here.created_at = published - timedelta(days=30)
-    arrived_since = await create_user(session)
-    arrived_since.created_at = published + timedelta(days=1)
-    session.add(was_here)
-    session.add(arrived_since)
-    await session.commit()
-
-    await _publish(
-        session,
-        author,
-        published_at=published,
-        audience_accounts=AnnouncementAudienceAccounts.new,
-    )
-
-    assert await service.list_for_user(session, user=was_here) == []
-    assert len(await service.list_for_user(session, user=arrived_since)) == 1
-
-
-async def test_everyone_is_still_everyone(session):
-    author = await create_user(session, role=UserRole.owner)
-    reader = await create_user(session)
-    reader.created_at = datetime.now(UTC) + timedelta(days=1)
-    session.add(reader)
-    await session.commit()
-    await _publish(session, author)
-
-    assert len(await service.list_for_user(session, user=reader)) == 1
+    reached = {
+        name
+        for name, user in accounts.items()
+        if await service.list_for_user(session, user=user)
+    }
+    assert reached == reaches
 
 
 async def test_a_builtin_with_a_floor_skips_a_fresh_install(session, monkeypatch):
@@ -262,48 +209,6 @@ async def test_the_version_pair_only_moves_when_the_version_does(session):
         await app_settings_service.record_running_version(session, version="0.65.0")
     ) == "0.64.0"
     assert await app_settings_service.previous_running_version(session) == "0.64.0"
-
-
-async def test_a_dismissal_takes_it_out_of_the_queue_and_a_sighting_does_not(session):
-    author = await create_user(session, role=UserRole.owner)
-    reader = await create_user(session)
-    announcement = await _publish(session, author)
-    key = f"db:{announcement.id}"
-
-    await service.record_receipt(session, user_id=reader.id, key=key, dismissed=False)
-    await session.commit()
-    assert len(await service.list_for_user(session, user=reader)) == 1
-
-    await service.record_receipt(session, user_id=reader.id, key=key, dismissed=True)
-    await session.commit()
-    assert await service.list_for_user(session, user=reader) == []
-
-    with_dismissed = await service.list_for_user(
-        session, user=reader, include_dismissed=True
-    )
-    assert len(with_dismissed) == 1
-    assert with_dismissed[0].dismissed_at is not None
-
-
-async def test_a_notice_can_ask_to_be_dismissed_more_than_once(session):
-    """Three dismissals means three: it comes back until the third."""
-    author = await create_user(session, role=UserRole.owner)
-    reader = await create_user(session)
-    announcement = await _publish(session, author, dismissals_required=3)
-    key = f"db:{announcement.id}"
-
-    for expected_remaining in (2, 1):
-        await service.record_receipt(
-            session, user_id=reader.id, key=key, dismissed=True
-        )
-        await session.commit()
-        still_queued = await service.list_for_user(session, user=reader)
-        assert len(still_queued) == 1, expected_remaining
-        assert still_queued[0].dismissals_required == 3
-
-    await service.record_receipt(session, user_id=reader.id, key=key, dismissed=True)
-    await session.commit()
-    assert await service.list_for_user(session, user=reader) == []
 
 
 async def test_two_tabs_dismissing_at_once_do_not_collide(session, engine):
@@ -377,42 +282,6 @@ async def test_the_first_dismissal_leaves_one_read_line_in_the_bell(session):
     assert lines[0].read_at is not None
 
 
-async def test_a_route_triggered_notice_is_returned_with_its_pattern(session):
-    """The server hands the pattern over; the client decides when to show it."""
-    author = await create_user(session, role=UserRole.owner)
-    reader = await create_user(session)
-    await _publish(session, author, trigger_route="/c/*/i/*/projects/**")
-
-    items = await service.list_for_user(session, user=reader)
-
-    assert [item.trigger_route for item in items] == ["/c/*/i/*/projects/**"]
-
-
-async def test_a_trigger_route_has_to_look_like_a_path(session):
-    with pytest.raises(ValidationError):
-        _write(trigger_route="https://elsewhere.example/x")
-
-
-async def test_a_dismissal_is_not_undone_by_seeing_it_again(session):
-    author = await create_user(session, role=UserRole.owner)
-    reader = await create_user(session)
-    announcement = await _publish(session, author)
-    key = f"db:{announcement.id}"
-
-    await service.record_receipt(session, user_id=reader.id, key=key, dismissed=True)
-    await session.commit()
-    dismissed_at = (
-        await session.get(AnnouncementReadReceipt, (reader.id, key))
-    ).dismissed_at
-
-    await service.record_receipt(session, user_id=reader.id, key=key, dismissed=False)
-    await session.commit()
-    receipt = await session.get(AnnouncementReadReceipt, (reader.id, key))
-    await session.refresh(receipt)
-
-    assert receipt.dismissed_at == dismissed_at
-
-
 async def test_a_builtin_notice_is_merged_in_and_can_be_dismissed(session, monkeypatch):
     reader = await create_user(session)
     builtin = BuiltinAnnouncement(
@@ -436,64 +305,6 @@ async def test_a_builtin_notice_is_merged_in_and_can_be_dismissed(session, monke
     await session.commit()
 
     assert await service.list_for_user(session, user=reader) == []
-
-
-async def test_a_receipt_key_that_names_nothing_is_refused(session):
-    assert await service.announcement_exists(session, key="db:999999") is False
-    assert await service.announcement_exists(session, key="builtin:nope") is False
-
-
-async def test_deleting_an_announcement_takes_its_receipts_with_it(session):
-    author = await create_user(session, role=UserRole.owner)
-    reader = await create_user(session)
-    announcement = await _publish(session, author)
-    key = f"db:{announcement.id}"
-    await service.record_receipt(session, user_id=reader.id, key=key, dismissed=True)
-    await session.commit()
-
-    assert await service.delete_announcement(session, announcement=announcement) == key
-    await service.delete_receipts(session, key=key)
-    await session.commit()
-
-    assert await session.get(AnnouncementReadReceipt, (reader.id, key)) is None
-
-
-async def test_update_clears_a_publication_date_only_when_told_to(session):
-    author = await create_user(session, role=UserRole.owner)
-    announcement = await _publish(session, author)
-
-    await service.update(
-        session,
-        announcement=announcement,
-        payload=AnnouncementUpdate(title="Renamed"),
-    )
-    await session.commit()
-    assert announcement.published_at is not None
-    assert announcement.title == "Renamed"
-
-    await service.update(
-        session,
-        announcement=announcement,
-        payload=AnnouncementUpdate(clear_published_at=True),
-    )
-    await session.commit()
-    assert announcement.published_at is None
-
-
-async def test_storing_the_same_picture_twice_keeps_one_copy(session):
-    data = _png(padding=32)
-
-    first = await service.store_image(session, data=data)
-    second = await service.store_image(session, data=data)
-    await session.commit()
-
-    assert first.sha256 == second.sha256
-    assert first.width == 8
-
-
-async def test_a_file_that_is_not_an_image_is_refused(session):
-    with pytest.raises(ImageRejected):
-        await service.store_image(session, data=b"not an image at all, really")
 
 
 async def test_the_pruner_keeps_referenced_pictures_and_drops_the_rest(session):

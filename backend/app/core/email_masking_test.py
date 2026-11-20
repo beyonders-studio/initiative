@@ -18,19 +18,13 @@ from app.core.email_masking import mask_email
         ("a@b", "a***@b***"),
         # Two characters: first and last are both real and both kept.
         ("ab@cd.e", "a***b@c***e"),
+        # Display-only: case is kept, surrounding whitespace is not.
+        ("Jordan@Example.COM", "J***n@E***M"),
+        ("  user1@example.com  ", "u***1@e***m"),
     ],
 )
 def test_masks_both_halves(raw: str, masked: str) -> None:
     assert mask_email(raw) == masked
-
-
-def test_preserves_case_rather_than_normalising() -> None:
-    """Masking is display-only; it is not the place addresses get folded."""
-    assert mask_email("Jordan@Example.COM") == "J***n@E***M"
-
-
-def test_ignores_surrounding_whitespace() -> None:
-    assert mask_email("  user1@example.com  ") == "u***1@e***m"
 
 
 @pytest.mark.parametrize("empty", [None, ""])

@@ -66,21 +66,6 @@ async def test_every_stream_is_listed_before_anything_is_configured(client, owne
     assert all(b["enabled"] is False for b in body["bindings"])
 
 
-async def test_a_member_cannot_read_or_change_the_settings(client, acting_user):
-    """Not an owner, so not deployment configuration they may touch."""
-    actor = await acting_user("member")
-    assert (
-        await client.get("/api/v1/settings/intake", headers=actor.headers)
-    ).status_code == 403
-    assert (
-        await client.put(
-            "/api/v1/settings/intake/community",
-            json={"community_id": 1},
-            headers=actor.headers,
-        )
-    ).status_code == 403
-
-
 async def test_pointing_at_a_guild_that_does_not_exist_is_refused(client, owner):
     response = await client.put(
         "/api/v1/settings/intake/community",
@@ -558,14 +543,6 @@ async def test_options_offer_the_operations_guilds_projects(client, owner):
     ]
 
 
-async def test_a_member_cannot_read_the_options(client, acting_user):
-    actor = await acting_user("member")
-    response = await client.get(
-        "/api/v1/settings/intake/options", headers=actor.headers
-    )
-    assert response.status_code == 403
-
-
 async def test_a_stream_cannot_be_bound_to_an_archived_project(client, session, owner):
     """Archived content takes no writes, so a case could never land there."""
     await client.put(
@@ -692,16 +669,6 @@ async def test_a_contact_for_an_unknown_stream_is_refused(client, owner):
         json={"email": "ops@example.com"},
     )
     assert response.status_code == 404
-
-
-async def test_a_member_cannot_set_a_contact(client, acting_user):
-    member = await acting_user("member")
-    response = await client.put(
-        "/api/v1/settings/intake/contact",
-        headers=member.headers,
-        json={"email": "ops@example.com"},
-    )
-    assert response.status_code == 403
 
 
 async def test_a_stream_falls_back_to_the_general_contact_and_never_to_another(

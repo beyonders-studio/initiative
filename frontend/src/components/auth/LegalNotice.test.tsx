@@ -32,13 +32,13 @@ const hosted = (requiredDocuments: Doc[], documents: Doc[] = requiredDocuments) 
 };
 
 describe("LegalNotice", () => {
-  it("says nothing on a deployment with no terms of its own", () => {
-    useLegalIndex.mockReturnValue({
-      enabled: false,
-      documents: [],
-      requiredDocuments: [],
-      isLoading: false,
-    });
+  // A deployment with no terms of its own, or one whose terms sit in its own
+  // contract (an enterprise, or an employment one): signup asks for nothing.
+  it.each([
+    [{ enabled: false, documents: [], requiredDocuments: [] }],
+    [{ enabled: true, documents: [PRIVACY], requiredDocuments: [] }],
+  ])("says nothing where the deployment requires nothing", (index) => {
+    useLegalIndex.mockReturnValue({ ...index, isLoading: false });
 
     const { container } = renderWithProviders(<LegalNotice />);
 
@@ -69,16 +69,6 @@ describe("LegalNotice", () => {
     expect(screen.getByRole("link", { name: "Terms of Service" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Privacy Policy" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Service Levels" })).not.toBeInTheDocument();
-  });
-
-  it("says nothing where the deployment requires nothing", () => {
-    // An enterprise whose terms sit in its own contract, or in an employment
-    // one: signup asks for nothing.
-    hosted([], [PRIVACY]);
-
-    const { container } = renderWithProviders(<LegalNotice />);
-
-    expect(container).toBeEmptyDOMElement();
   });
 
   it("links a document kept elsewhere where it is kept", () => {

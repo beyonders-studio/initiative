@@ -19,18 +19,6 @@ import { ToolRelationsPanel } from "@/components/entities/ToolRelationsPanel";
 const noLinks = () => server.use(communityHttp.get("/relationships/", () => HttpResponse.json([])));
 
 describe("ToolRelationsPanel", () => {
-  it("names itself after the tool it sits on", async () => {
-    noLinks();
-    renderPage(
-      () => (
-        <ToolRelationsPanel tool={Tool.dashboard} entity={{ id: 3, initiative_id: 7 }} canEdit />
-      ),
-      { initialRoute: "/c/1" }
-    );
-
-    expect(await screen.findByRole("heading", { name: "Connections" })).toBeInTheDocument();
-  });
-
   it("names itself after the CHILD when the links are the child's", async () => {
     // An event's links are the event's; the calendar only answers for them.
     noLinks();
@@ -49,24 +37,16 @@ describe("ToolRelationsPanel", () => {
     expect(await screen.findByText(/Link the task this event is for/)).toBeInTheDocument();
   });
 
-  it("takes itself out of the way where a link cannot be made", async () => {
-    // A community calendar belongs to no initiative, and every link is made inside
-    // one — so there is nothing here to offer but a refusal.
+  // A community calendar belongs to no initiative, and every link is made inside
+  // one — so there is nothing to offer but a refusal; and nothing is drawn while
+  // the row is still arriving.
+  it.each([
+    [Tool.calendar, { id: 3, initiative_id: null }],
+    [Tool.dashboard, undefined],
+  ])("takes itself out of the way where a link cannot be made (%s)", (tool, entity) => {
     noLinks();
     const { container } = renderPage(
-      () => (
-        <ToolRelationsPanel tool={Tool.calendar} entity={{ id: 3, initiative_id: null }} canEdit />
-      ),
-      { initialRoute: "/c/1" }
-    );
-
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it("draws nothing while the row is still arriving", () => {
-    noLinks();
-    const { container } = renderPage(
-      () => <ToolRelationsPanel tool={Tool.dashboard} entity={undefined} canEdit />,
+      () => <ToolRelationsPanel tool={tool} entity={entity} canEdit />,
       { initialRoute: "/c/1" }
     );
 

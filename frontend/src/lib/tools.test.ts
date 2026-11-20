@@ -25,7 +25,6 @@ import { TOOL_HAS_DETAIL } from "./toolRows";
 import {
   entityRefRoute,
   eventRoute,
-  INITIATIVES_ROUTE,
   initiativeRoute,
   NO_RELATIONS_PANEL,
   SHARED_LAYOUT_TOOLS,
@@ -272,9 +271,6 @@ describe("tool routes", () => {
     expect(singularOf("calendar_entries")).toBe("calendar_entry");
     expect(singularOf("calendar_events")).toBe("calendar_event");
     expect(singularOf("tasks")).toBe("task");
-  });
-
-  it("derives the route param name from the enum", () => {
     expect(toolCamelSingular(Tool.calendar)).toBe("calendar");
     expect(toolCamelSingular("calendar_event" as Tool)).toBe("calendarEvent");
   });
@@ -314,14 +310,8 @@ describe("tool route builders", () => {
     expect(taskRoute(1, 2, 5)).toBe("/i/1/projects/2/tasks/5");
     expect(eventRoute(1, 2, 9)).toBe("/i/1/calendars/2/events/9");
     expect(eventRoute(null, 2, 9)).toBe("/calendars/2/events/9");
-  });
-
-  it("names the initiative tree", () => {
-    expect(INITIATIVES_ROUTE).toBe("/i");
     expect(initiativeRoute(4)).toBe("/i/4");
-  });
-
-  it("routes a bare id through the resolver", () => {
+    // A bare id goes through the resolver.
     expect(entityRefRoute("file", 42)).toBe("/go/file/42");
   });
 });
@@ -351,10 +341,6 @@ describe("tool relations", () => {
     const wired = toolsWithRelationsPanel();
     const missing = TOOLS.filter((tool) => !NO_RELATIONS_PANEL.has(tool) && !wired.has(tool));
     expect(missing, `no ToolRelationsPanel wired for ${missing.join(", ")}`).toEqual([]);
-  });
-
-  it("does not wire a panel for a tool that opted out", () => {
-    const wired = toolsWithRelationsPanel();
     for (const tool of NO_RELATIONS_PANEL) {
       expect(wired.has(tool), `${tool} opted out of relations but renders a panel`).toBe(false);
     }
@@ -493,12 +479,9 @@ describe("tool imports", () => {
 });
 
 describe("toolInPath", () => {
-  it("reads the tool and id a path is inside", () => {
+  it("reads the outermost tool and id a path is inside, so what it holds and its settings name it", () => {
     expect(toolInPath("/c/1/i/2/wikis/3")).toEqual({ tool: Tool.wiki, id: 3 });
     expect(toolInPath("/c/1/calendars/5")).toEqual({ tool: Tool.calendar, id: 5 });
-  });
-
-  it("reads the outermost tool, so what it holds and its settings name it", () => {
     expect(toolInPath("/c/1/i/2/projects/3/tasks/5")).toEqual({ tool: Tool.project, id: 3 });
     expect(toolInPath("/c/1/i/2/wikis/4/files/8")).toEqual({ tool: Tool.wiki, id: 4 });
     expect(toolInPath("/c/1/i/2/dashboards/6/settings/access")).toEqual({
