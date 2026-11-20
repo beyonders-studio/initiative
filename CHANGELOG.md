@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Counter fields can show as a progress bar or a segmented clock, and open full screen.** Pick the look in the field's settings; a list draws it that way unless its layout says otherwise. On an item, the full-screen button beside a counter field opens it the way the Counters tool does, with big buttons to step it.
 - **Copy a page's link from the desktop app.** The share button beside Reload in the title bar copies the address of the page you're on, ready to open in a browser or send to someone.
 - **Connect a plug-in's account once for every community.** On a plug-in's page under Platform settings › Integrations, **Connect for every community** connects one account, such as a GitHub organization, that every community with the plug-in then uses. Communities see it as connected and can't change or disconnect it; **Disconnect** gives each community its own again.
+- **Tools that plug-ins add work like the built-in ones.** The menu on anything in one archives it or puts it in the trash, and on the tool's own page opens its **Access settings**. Everything in them takes tags, and the trash lists them and puts them back.
 - **Quit the desktop app from its taskbar button on Windows.** Right-click it and choose **Quit Initiative**. Closing the window only tucks the app into the tray.
 
 ### Changed
@@ -47,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A notice no longer shows twice. Going offline in a live document now shows one warning, which says your edits will sync, and it goes away when you're back online.
 - **A refused connection says why it may have been.** When connecting a plug-in's account is refused, the page says the account may not be one you control (for an organization, you need to be one of its owners), not only that the other service didn't finish.
 - **Events that run past midnight.** On the month calendar, an evening event that ends after midnight is shown with its start time on the day it starts, not as a bar across two days. The list says when it stops on the second day ("Until 12:30am") instead of calling that day "All day". An event that ends at midnight no longer shows on the next day.
+- **An item's menu is always on its page.** A task, event or plug-in tool's row whose page layout leaves out its menu shows the menu at the top of the page, so archiving, deleting and its other actions are still there.
 - **Reload in the desktop app no longer leaves a blank window.** The page reloads where you were.
 - **A whiteboard opens straight away.** Opening one could leave it loading until somebody else in it saved or you switched windows, and with nobody else in it, for good.
 - **Shapes and arrows keep the size you draw them on a shared whiteboard.** With the same whiteboard open somewhere else, such as the desktop app and a browser, a shape or arrow no longer shrinks to a fraction of its size when you let go.

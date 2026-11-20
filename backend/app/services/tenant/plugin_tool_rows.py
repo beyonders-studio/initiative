@@ -48,6 +48,7 @@ from app.core.tools import kind_refusal
 from app.db.guild_standing import ActorContext, InstallContext
 from app.db.plugin_tools import NUMBER, NUMBER_LIMIT
 from app.db.query import apply_pagination
+from app.db.session import routed_tools
 from app.db.tool_rows import Located, ToolRow, load_row, locate, row_of, select_rows
 from app.models.platform.guild import GuildMembership
 from app.models.platform.user import User
@@ -62,6 +63,7 @@ from app.schemas.tenant.plugin_tool import (
     PluginToolRowRead,
     PluginToolValues,
 )
+from app.schemas.tenant.tag import tag_summaries
 from app.services.marketplace.declarative import action_change
 from app.services.marketplace.tool_plugins import (
     NEVER_EMPTY,
@@ -79,6 +81,7 @@ from app.services.permissions import (
     serialize_grants,
 )
 from app.services.tenant import descriptions
+from app.services.tenant import tags as tags_service
 from app.services.tenant.descriptions import newly_mentioned
 from app.services.tenant.initiative_tools import tool_on
 
@@ -509,13 +512,13 @@ async def serialize(
     located: Located,
     rows: Sequence[ToolRow],
 ) -> list[PluginToolRowRead]:
-    """``rows`` of ``located``'s table as a read returns them: a tool's row
-    with who it is shared with."""
+    """``rows`` of ``located``'s table as a read returns them, with their
+    tags, and a tool's row with who it is shared with."""
     parent = parent_column(located)
-    grants = (
-        await grants_of(session, located.kind, [row.id for row in rows])
-        if parent is None
-        else {}
+    ids = [row.id for row in rows]
+    grants = await grants_of(session, located.kind, ids) if parent is None else {}
+    tags = await tags_service.tags_for(
+        session, tags_service.tag_links(routed_tools(session))[located.kind], ids
     )
     declared = declared_fields(located)
     read: list[PluginToolRowRead] = []
@@ -544,6 +547,7 @@ async def serialize(
                 grants=serialize_grants(
                     SimpleNamespace(grants=grants.get(row.id, [])), context=context
                 ),
+                tags=tag_summaries(tags.get(row.id, [])),
                 created_by=row.created_by,
                 created_by_kind=row.created_by_kind,
                 archived_at=row.archived_at,

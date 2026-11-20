@@ -294,7 +294,7 @@ async def _load_trash_entity(
         entity = None
     elif located is not None:
         entity = await load_row(
-            session, located, tools, entity_id, for_update=for_update
+            session, located, tools, entity_id, for_update=for_update, trashed=True
         )
     else:
         model = MODELS_BY_TABLE[entry[0].name]

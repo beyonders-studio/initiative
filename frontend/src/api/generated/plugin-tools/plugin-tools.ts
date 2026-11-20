@@ -334,8 +334,8 @@ export function useListPluginToolRows<
 /**
  * Add a row: of the tool, in an initiative where its switch is on and the
  * caller's role may create it, shared as ``grants`` says; or of an item,
- * under a row of the tool the caller may change. Fields left out start at
- * their defaults.
+ * under a row of the tool the caller may change, tagged with ``tag_ids``.
+ * Fields left out start at their defaults.
  * @summary Create Plugin Tool Row
  */
 export const createPluginToolRow = (
@@ -571,8 +571,8 @@ export function useReadPluginToolRow<
 }
 
 /**
- * Change a row: its name, its place and the fields sent. A counter is
- * held to its bounds.
+ * Change a row: its name, its place, its tags and the fields sent. A
+ * counter is held to its bounds.
  * @summary Update Plugin Tool Row
  */
 export const updatePluginToolRow = (
@@ -666,6 +666,96 @@ export const useUpdatePluginToolRow = <TError = ErrorType<HTTPValidationError>, 
   TContext
 > => {
   return useMutation(getUpdatePluginToolRowMutationOptions(options), queryClient);
+};
+/**
+ * Move a row to the trash with the items under it, as a built-in tool's
+ * delete does. A tool's row asks the delete right on it, and an item what
+ * changing one asks of its tool, as a task asks of its project.
+ * @summary Delete Plugin Tool Row
+ */
+export const deletePluginToolRow = (
+  communityId: number,
+  kind: string,
+  rowId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    { url: `/api/v1/c/${communityId}/plugin-tools/${kind}/${rowId}`, method: "DELETE", signal },
+    options
+  );
+};
+
+export const getDeletePluginToolRowMutationKey = () => ["deletePluginToolRow"] as const;
+
+export const getDeletePluginToolRowMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deletePluginToolRow>>,
+    TError,
+    DeletePluginToolRowMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deletePluginToolRow>>,
+  TError,
+  DeletePluginToolRowMutationVariables,
+  TContext
+> => {
+  const mutationKey = getDeletePluginToolRowMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deletePluginToolRow>>,
+    DeletePluginToolRowMutationVariables
+  > = (props) => {
+    const { communityId, kind, rowId } = props ?? {};
+
+    return deletePluginToolRow(communityId, kind, rowId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeletePluginToolRowMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deletePluginToolRow>>
+>;
+
+export type DeletePluginToolRowMutationError = ErrorType<HTTPValidationError>;
+export type DeletePluginToolRowMutationVariables = {
+  communityId: number;
+  kind: string;
+  rowId: number;
+};
+
+/**
+ * @summary Delete Plugin Tool Row
+ */
+export const useDeletePluginToolRow = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof deletePluginToolRow>>,
+      TError,
+      DeletePluginToolRowMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof deletePluginToolRow>>,
+  TError,
+  DeletePluginToolRowMutationVariables,
+  TContext
+> => {
+  return useMutation(getDeletePluginToolRowMutationOptions(options), queryClient);
 };
 /**
  * Copy a row with every item under it, as a built-in tool's duplicate

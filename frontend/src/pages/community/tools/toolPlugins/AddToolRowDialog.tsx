@@ -39,6 +39,7 @@ export const blankRow = (table: ToolTable, initiativeId: number): ToolRow => {
     can: { edit: true, contribute: true, delete: true, share: true, export: true, unarchive: true },
     comments_enabled: true,
     grants: [],
+    tags: [],
     created_at: "",
     updated_at: "",
   });
@@ -101,6 +102,7 @@ export const AddToolRowDialog = ({
           await create.mutateAsync({
             name: item.name.trim(),
             ...setOn(table, blank, item),
+            ...(item.tags.length > 0 ? { tag_ids: item.tags.map((tag) => tag.id) } : {}),
             ...(parentId === undefined ? { initiative_id: initiativeId } : { parent_id: parentId }),
           })
         )

@@ -388,6 +388,7 @@
         "masonry": "Cada uno como una tarjeta, cada una tan alta como es.",
         "table": "Cada uno como una fila, con sus campos en columnas."
       }
-    }
+    },
+    "accessSettings": "Configuración de acceso"
   }
 }

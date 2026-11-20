@@ -388,6 +388,7 @@
         "masonry": "Chacun en carte, chacune aussi haute qu'elle l'est.",
         "table": "Chacun en ligne, ses champs en colonnes."
       }
-    }
+    },
+    "accessSettings": "Paramètres d'accès"
   }
 }

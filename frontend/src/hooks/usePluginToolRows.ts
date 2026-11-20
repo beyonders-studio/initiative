@@ -14,6 +14,7 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import {
   createPluginToolRow,
+  deletePluginToolRow,
   getListPluginToolRowsQueryKey,
   getReadPluginToolRowQueryKey,
   listPluginToolRows,
@@ -21,13 +22,16 @@ import {
   updatePluginToolRow,
   useReadPluginToolRow,
 } from "@/api/generated/plugin-tools/plugin-tools";
-import { invalidate, type Spec } from "@/api/query-keys";
+import { bulkSetResourceGrants } from "@/api/generated/resource-grants/resource-grants";
+import { invalidate, q } from "@/api/query-keys";
+import type { GrantsChange } from "@/hooks/toolHooks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
 import type { FieldSaveKind } from "@/hooks/useFieldSave";
 import { fetchAllPages } from "@/lib/fetchAllPages";
 import { type InstalledTool, installedTools, type ToolRow } from "@/lib/toolPlugins";
+import type { MutationOpts } from "@/types/mutation";
 
 /** The tools the community's tool plug-ins declare, as far as they are known:
  *  still being read, unread for a failure, or read. */
@@ -46,17 +50,12 @@ export const useInstalledTools = (): InstalledTools => {
   return isLoading ? { status: "loading" } : { status: "ready", tools };
 };
 
-/** Every read of one kind's rows: its lists and each row. */
-const rowsOf = (kind: string): Spec => ({
-  communityPrefix: [`/api/v1/plugin-tools/${kind}/`],
-});
-
 /** Every row of `kind` in one place, the tool's own in an initiative or an
- *  item table's under one row: `page_size: 0` walks the server's windows, so
- *  a preset sorts all of them. */
+ *  item table's under one row, live or archived: `page_size: 0` walks the
+ *  server's windows, so a preset sorts all of them. */
 export const usePluginToolRows = (
   kind: string,
-  where: { initiative_id: number } | { parent_id: number }
+  where: ({ initiative_id: number } | { parent_id: number }) & { archived?: true }
 ) => {
   const communityId = useActiveCommunityId();
   const params = { ...where, page_size: 0 };
@@ -74,7 +73,7 @@ export const usePluginToolRow = (kind: string, rowId: number | null) =>
 export const useCreatePluginToolRow = (kind: string) =>
   useCommunityMutation<PluginToolRowRead, PluginToolRowCreate>({
     mutationFn: (communityId, data) => createPluginToolRow(communityId, kind, data),
-    invalidate: () => invalidate(rowsOf(kind)),
+    invalidate: () => invalidate(q.pluginToolRows(kind)),
     errorKey: "plugins:error",
   });
 
@@ -87,8 +86,36 @@ export const useRunPluginToolAction = (kind: string, itemKinds: readonly string[
   >({
     mutationFn: (communityId, { rowId, actionId, ...run }) =>
       runPluginToolAction(communityId, kind, rowId, actionId, run),
-    invalidate: () => invalidate(rowsOf(kind), ...itemKinds.map(rowsOf)),
+    invalidate: () => invalidate(q.pluginToolRows(kind), ...itemKinds.map(q.pluginToolRows)),
     errorKey: "plugins:error",
+  });
+
+/** Puts a row in the trash, with the items under it. The rows over it list
+ *  it no more, so every tool plug-in row is read again. */
+export const useDeletePluginToolRow = (kind: string, options?: MutationOpts<void, number>) =>
+  useCommunityMutation<void, number>(
+    {
+      mutationFn: (communityId, rowId) => deletePluginToolRow(communityId, kind, rowId),
+      invalidate: () => invalidate(q.pluginToolRows()),
+      errorKey: "plugins:error",
+    },
+    options
+  );
+
+/** Replaces who a tool's row is shared with, as the sharing panel answers
+ *  it. Its items answer to its sharing, so each is read again too. */
+export const useSetPluginToolRowGrants = (kind: string, rowId: number) =>
+  useCommunityMutation<void, GrantsChange>({
+    mutationFn: async (communityId, { grants, note }) => {
+      const { results } = await bulkSetResourceGrants(communityId, {
+        items: [{ resource_type: kind, resource_id: rowId, grants }],
+        note,
+      });
+      // One row, so a row it skipped is this change refused.
+      if (results[0]?.status !== "ok") throw new Error(results[0]?.detail ?? "");
+    },
+    invalidate: () => invalidate(q.pluginToolRows()),
+    errorKey: "access:bulkAccess.updateError",
   });
 
 /** How a row of `kind` is saved field by field. Its rows hold none of the
@@ -97,6 +124,6 @@ export const pluginToolRowSaves = (kind: string): FieldSaveKind<ToolRow, PluginT
   name: `plugin-tool-${kind}`,
   readKey: (communityId, id) => getReadPluginToolRowQueryKey(communityId, kind, id),
   patch: (communityId, id, patch) => updatePluginToolRow(communityId, kind, id, patch),
-  lists: () => rowsOf(kind),
-  itself: () => rowsOf(kind),
+  lists: () => q.pluginToolRows(kind),
+  itself: () => q.pluginToolRows(kind),
 });

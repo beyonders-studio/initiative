@@ -388,6 +388,7 @@
         "masonry": "Each one as a card, each as tall as it is.",
         "table": "Each one as a row, its fields in columns."
       }
-    }
+    },
+    "accessSettings": "Access settings"
   }
 }

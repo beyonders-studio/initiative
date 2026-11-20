@@ -6,7 +6,6 @@ import type {
   ChecklistProgress,
   DetailLayoutDefinitionInput,
   PropertyDefinitionRead,
-  TagSummary,
   TaskAssigneeSummary,
   TaskListRead,
   TaskParentSummary,
@@ -14,8 +13,7 @@ import type {
   TaskTypeRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { UnreadDot } from "@/components/notifications/UnreadDot";
-import { TagBadge } from "@/components/tags";
-import { TagBadgeList } from "@/components/tags/TagBadge";
+import { TagsFieldBadges } from "@/components/tags/TagBadge";
 import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
 import { TaskTypeMark, TaskTypeOption } from "@/components/tasks/TaskTypeOption";
 import { priorityVariant } from "@/components/tools/projects/projectTasksConfig";
@@ -230,19 +228,6 @@ const PriorityField = memo(function PriorityField({ value, field, env }: FieldRe
   );
 });
 
-const TagsField = memo(function TagsField({ value, item, variant, env }: FieldRendererProps) {
-  const tags = value as TagSummary[];
-  const tagHref = (tag: TagSummary) => env.communityPath(`/tags/${tag.id}`, item);
-  if (variant === "cell") {
-    return tags.length > 0 ? (
-      <TagBadgeList tags={tags} tagHref={tagHref} />
-    ) : (
-      <span className="text-muted-foreground text-sm">&mdash;</span>
-    );
-  }
-  return tags.map((tag) => <TagBadge key={tag.id} tag={tag} size="sm" to={tagHref(tag)} />);
-});
-
 // A card shows a type by its icon alone, beside the title and named on hover;
 // a cell names it.
 const TaskTypeField = memo(function TaskTypeField({ value, variant }: FieldRendererProps) {
@@ -364,7 +349,12 @@ export const taskFields = (
       phrase: "relations:blockers.label",
       value: (task) => task.blocked_by_open_count || null,
     }),
-    builtin({ id: "tags", render: TagsField, requireable: true, value: (task) => task.tags }),
+    builtin({
+      id: "tags",
+      render: TagsFieldBadges,
+      requireable: true,
+      value: (task) => task.tags,
+    }),
     ...propertyFields<TaskListRead>(definitions, (task, definition) =>
       listedValue(task.properties, definition)
     ),

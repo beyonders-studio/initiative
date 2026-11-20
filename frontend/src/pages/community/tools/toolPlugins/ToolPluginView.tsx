@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { useRegisterPrimaryCreateAction } from "@/components/navigation/CreateActionContext";
 import { ToolListToolbar } from "@/components/tools/ToolListToolbar";
 import { ToolPresetSelect } from "@/components/tools/ToolPresetSelect";
+import { ToolViewFilter } from "@/components/tools/ToolViewFilter";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCreateFromSearchParam } from "@/hooks/useCreateFromSearchParam";
 import { layoutViewSpec, useListView, viewKey } from "@/hooks/useListView";
@@ -21,6 +22,7 @@ import {
   toolRow,
   toolText,
 } from "@/lib/toolPlugins";
+import { type ToolView, toolViewParams } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
@@ -39,7 +41,8 @@ import { ToolRows } from "./ToolRows";
  * The rows of one of a tool plug-in's tables in one place, in the list this
  * person picked of those it declares and sorted by the preset they picked, as
  * a built-in tool's list is, and adding one: the tool's own in its initiative tab, or an item
- * table's on the page of the row they sit under.
+ * table's on the page of the row they sit under. Its archived rows are a view
+ * of their own, as every tool's are.
  */
 export const ToolTableRows = ({
   table,
@@ -59,14 +62,17 @@ export const ToolTableRows = ({
   /** What its control row is headed with: an item table's name. */
   heading?: ReactNode;
 }) => {
-  const { t, i18n } = useTranslation(["plugins", "layouts", "projects"]);
+  const { t, i18n } = useTranslation(["plugins", "layouts", "projects", "common"]);
   const gp = useCommunityPath();
   const communityId = useActiveCommunityId();
   const navigate = useNavigate();
-  const rows = usePluginToolRows(
-    table.kind,
-    parentId === undefined ? { initiative_id: initiativeId } : { parent_id: parentId }
-  );
+  const [view, setView] = useState<ToolView>("active");
+  const rows = usePluginToolRows(table.kind, {
+    ...(parentId === undefined ? { initiative_id: initiativeId } : { parent_id: parentId }),
+    ...toolViewParams(table.kind, view),
+  });
+  // Nothing is made into the archive.
+  const canAdd = canCreate && view !== "archived";
   // The page's own rows open their dialog from the URL; an item table's opens
   // its own.
   const fromSearch = useCreateFromSearchParam();
@@ -75,7 +81,7 @@ export const ToolTableRows = ({
   const setOpen = primary ? fromSearch.setOpen : setAdding;
   const onOpenChange = primary ? fromSearch.onOpenChange : setAdding;
   const label = t("tool.create", { name: toolText(table.name, i18n.language) });
-  useRegisterPrimaryCreateAction(primary && canCreate ? { run: () => setOpen(true), label } : null);
+  useRegisterPrimaryCreateAction(primary && canAdd ? { run: () => setOpen(true), label } : null);
 
   // The lists it declares, each as this place laid it out or as shipped, and
   // the one this person was last in here, or the one it opens on.
@@ -115,7 +121,7 @@ export const ToolTableRows = ({
     presets.find((preset) => JSON.stringify(preset.sorting) === JSON.stringify(listView.sorting)) ??
     null;
 
-  const add = canCreate ? (
+  const add = canAdd ? (
     <Button size="sm" onClick={() => setOpen(true)}>
       <Plus className="h-4 w-4" />
       {label}
@@ -127,21 +133,24 @@ export const ToolTableRows = ({
       <ToolListToolbar
         heading={heading}
         leading={
-          presets.length > 0 ? (
-            <ToolPresetSelect
-              presets={presets.map((preset) => ({
-                slug: preset.slug,
-                name: presetName(preset, t as TranslateFn, i18n.language),
-              }))}
-              activeSlug={activePreset?.slug ?? null}
-              onSelect={(slug) => {
-                const picked = presets.find((preset) => preset.slug === slug);
-                if (picked) listView.setSorting(picked.sorting);
-              }}
-              label={t("projects:presets.label")}
-              placeholder={t("projects:presets.placeholder")}
-            />
-          ) : undefined
+          <div className="flex items-center gap-2">
+            <ToolViewFilter tool={table.kind} value={view} onChange={setView} />
+            {presets.length > 0 ? (
+              <ToolPresetSelect
+                presets={presets.map((preset) => ({
+                  slug: preset.slug,
+                  name: presetName(preset, t as TranslateFn, i18n.language),
+                }))}
+                activeSlug={activePreset?.slug ?? null}
+                onSelect={(slug) => {
+                  const picked = presets.find((preset) => preset.slug === slug);
+                  if (picked) listView.setSorting(picked.sorting);
+                }}
+                label={t("projects:presets.label")}
+                placeholder={t("projects:presets.placeholder")}
+              />
+            ) : null}
+          </div>
         }
         view={
           lists.length > 1 && list
@@ -176,7 +185,7 @@ export const ToolTableRows = ({
         <StatusMessage title={t("tool.loadError")} onRetry={() => void rows.refetch()} />
       ) : rows.data.items.length === 0 ? (
         <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground text-sm">
-          {t("tool.empty")}
+          {view === "archived" ? t("common:toolIndex.emptyArchivedBody") : t("tool.empty")}
         </p>
       ) : (
         list && (

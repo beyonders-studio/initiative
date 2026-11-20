@@ -36,7 +36,7 @@
  */
 import { ContentKind, type PostRead, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { queryClient } from "@/lib/queryClient";
-import { PARENT_TOOL, TOOLS, toolApiPath, toolRouteSegment } from "@/lib/tools";
+import { isBuiltInTool, PARENT_TOOL, TOOLS, toolApiPath, toolRouteSegment } from "@/lib/tools";
 
 // The active community is per-tab React state in `CommunityProvider`, mirrored here (a
 // module var is per-JS-context, so it stays per-tab — unlike shared storage) so
@@ -598,8 +598,16 @@ const toolSubtree = (which: Tool, id: number): Spec => ({
   communityPrefix: [`${toolApiPath(which)}/${id}/`],
 });
 
-/** One entity and every list it sits in — what a generic per-tool write makes stale. */
-const tool = (which: Tool, id: number): Spec => compose(toolEntity(which, id), toolList(which));
+/** Every read of a tool plug-in's rows, or of one kind's: its lists and each
+ *  row. */
+const pluginToolRows = (kind = ""): Spec => ({
+  communityPrefix: [kind ? `/api/v1/plugin-tools/${kind}/` : "/api/v1/plugin-tools/"],
+});
+
+/** One entity and every list it sits in — what a generic per-tool write makes
+ *  stale. A tool plug-in's row, every read of its kind. */
+const tool = (which: string, id: number): Spec =>
+  isBuiltInTool(which) ? compose(toolEntity(which, id), toolList(which)) : pluginToolRows(which);
 
 // The same two, by name, for the call sites that already know their tool.
 const allProjects = (): Spec => toolList(Tool.project);
@@ -645,6 +653,7 @@ const communityContent = (): Spec =>
   compose(
     allInitiatives(),
     ...TOOLS.map(toolList),
+    pluginToolRows(),
     allCollections(),
     allTasks(),
     allComments(),
@@ -676,6 +685,7 @@ export const q = {
   announcements,
   appConfig,
   pluginServices,
+  pluginToolRows,
   plugins,
   references,
   authProviders,
