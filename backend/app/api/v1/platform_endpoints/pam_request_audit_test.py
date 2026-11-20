@@ -39,6 +39,9 @@ async def _break_glass(client: AsyncClient, actor: Actor, guild: Guild) -> None:
 async def test_each_request_through_a_grant_is_written_down(
     client: AsyncClient, acting_user, outsider, capfd
 ):
+    """One line per request, naming the grant that served it: which grant, at
+    what level, and whether somebody let themselves in. A grantee reaching past
+    what the grant allows is recorded with what it was refused."""
     a, guild = await outsider()
     await acting_user(guild_role=CommunityRole.admin, guild=guild, initiative=True)
     await _break_glass(client, a, guild)
@@ -60,20 +63,6 @@ async def test_each_request_through_a_grant_is_written_down(
         "status": 200,
         "reached": {"community_id": guild.id},
     }
-
-
-async def test_the_line_names_the_grant_that_served_it(
-    client: AsyncClient, acting_user, outsider, capfd
-):
-    """Which grant, at what level, and whether somebody let themselves in."""
-    a, guild = await outsider()
-    await acting_user(guild_role=CommunityRole.admin, guild=guild, initiative=True)
-    await _break_glass(client, a, guild)
-    capfd.readouterr()
-
-    await client.get(f"/api/v1/c/{guild.id}/initiatives/", headers=a.headers)
-
-    (line,) = emitted(capfd, PAM)
     context = line["context"]
     assert context["grant_id"] is not None
     assert context["access_level"] == "read_write"
@@ -81,6 +70,16 @@ async def test_the_line_names_the_grant_that_served_it(
     assert context["settings_level"] == "superadmin"
     assert context["break_glass"] is True
     assert context["request_id"]
+
+    refused = await client.post(
+        f"/api/v1/c/{guild.id}/initiatives/",
+        json={"name": "Not mine to make"},
+        headers=a.headers,
+    )
+    assert refused.status_code >= 400
+    (line,) = emitted(capfd, PAM)
+    assert line["detail"]["method"] == "POST"
+    assert line["detail"]["status"] == refused.status_code
 
 
 async def test_a_member_reaching_their_own_community_is_not_recorded(
@@ -97,28 +96,6 @@ async def test_a_member_reaching_their_own_community_is_not_recorded(
     assert reached.status_code == 200
 
     assert emitted(capfd, PAM) == []
-
-
-async def test_a_refused_request_is_recorded_with_what_it_was_refused(
-    client: AsyncClient, acting_user, outsider, capfd
-):
-    """A grantee reaching past what the grant allows is exactly what somebody
-    reviewing the window wants to see."""
-    a, guild = await outsider()
-    await acting_user(guild_role=CommunityRole.admin, guild=guild, initiative=True)
-    await _break_glass(client, a, guild)
-    capfd.readouterr()
-
-    refused = await client.post(
-        f"/api/v1/c/{guild.id}/initiatives/",
-        json={"name": "Not mine to make"},
-        headers=a.headers,
-    )
-    assert refused.status_code >= 400
-
-    (line,) = emitted(capfd, PAM)
-    assert line["detail"]["method"] == "POST"
-    assert line["detail"]["status"] == refused.status_code
 
 
 async def test_reaching_nothing_still_records_the_attempt(

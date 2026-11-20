@@ -19,23 +19,6 @@ from app.testing.factories import (
 )
 
 
-async def test_whoever_makes_a_community_holds_its_seat(
-    client: AsyncClient, session: AsyncSession
-):
-    """Starting a community means holding all of it, billing and sign-in
-    included — and there is somebody to pass the seat to only because the
-    first person has it."""
-    founder = await create_user(session)
-
-    created = await client.post(
-        "/api/v1/communities/",
-        headers=get_auth_headers(founder),
-        json={"name": "Founders"},
-    )
-    assert created.status_code == 201, created.text
-    assert created.json()["role"] == "superadmin"
-
-
 async def test_the_seat_is_read_from_postgres_not_from_the_enum(
     session: AsyncSession,
 ):

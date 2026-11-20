@@ -17,26 +17,23 @@ from app.core.messages import NativeMessages
 from app.core.version import __version__
 
 
-async def test_manifest_404_when_bundle_absent(client: AsyncClient):
-    """No OTA artifacts present (the default outside a built image) → 404, not a 500."""
-    response = await client.get("/api/v1/native/bundle/manifest")
-    assert response.status_code == 404
-    assert response.json()["detail"] == NativeMessages.OTA_BUNDLE_NOT_AVAILABLE
-
-
-async def test_download_404_when_bundle_absent(client: AsyncClient):
-    response = await client.get("/api/v1/native/bundle/download")
-    assert response.status_code == 404
-    assert response.json()["detail"] == NativeMessages.OTA_BUNDLE_NOT_AVAILABLE
+async def test_no_bundle_is_a_404_not_a_500(client: AsyncClient):
+    """No OTA artifacts present (the default outside a built image)."""
+    for path in ("manifest", "download"):
+        response = await client.get(f"/api/v1/native/bundle/{path}")
+        assert response.status_code == 404
+        assert response.json()["detail"] == NativeMessages.OTA_BUNDLE_NOT_AVAILABLE
 
 
 async def test_manifest_names_the_bundle_and_its_statement(
     client: AsyncClient, tmp_path, monkeypatch
 ):
     """The manifest names the bundle, and carries the signed statement the updater
-    verifies the zip against when the image has one."""
+    verifies the zip against when the image has one. The download serves the
+    zip, cached for good."""
     bundle = tmp_path / "bundle.zip"
-    bundle.write_bytes(b"PK\x03\x04 fake zip payload")
+    payload = b"PK\x03\x04 fake zip payload"
+    bundle.write_bytes(payload)
     digest = hashlib.sha256(bundle.read_bytes()).hexdigest()
 
     statement = tmp_path / "statement.json"
@@ -58,14 +55,6 @@ async def test_manifest_names_the_bundle_and_its_statement(
     body = (await client.get("/api/v1/native/bundle/manifest")).json()
     assert body["statement"] == f'{{"v":1,"sha256":"{digest}"}}'
     assert body["signature"] == "c2lnbmVk"
-
-
-async def test_download_serves_zip(client: AsyncClient, tmp_path, monkeypatch):
-    bundle = tmp_path / "bundle.zip"
-    payload = b"PK\x03\x04 fake zip payload"
-    bundle.write_bytes(payload)
-
-    monkeypatch.setattr(native, "_BUNDLE_PATH", bundle)
 
     response = await client.get("/api/v1/native/bundle/download")
     assert response.status_code == 200

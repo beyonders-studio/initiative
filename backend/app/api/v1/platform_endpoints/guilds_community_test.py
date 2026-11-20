@@ -1150,49 +1150,32 @@ async def test_the_age_a_birthdate_states_is_what_the_answer_turns_on(
         assert a.user.age_confirmed_at is None
 
 
-@pytest.mark.parametrize(
-    "prior_answer,expected_detail",
-    [
-        pytest.param(
-            "never asked", "COMMUNITY_AGE_CONFIRMATION_REQUIRED", id="never answered"
-        ),
-        pytest.param(
-            "answered under age", "COMMUNITY_AGE_BELOW_MINIMUM", id="answered under age"
-        ),
-    ],
-)
-async def test_join_refuses_an_account_that_has_not_confirmed_its_age(
-    client: AsyncClient,
-    session: AsyncSession,
-    acting_user,
-    prior_answer: str,
-    expected_detail: str,
+async def test_join_refuses_an_account_that_answered_under_age(
+    client: AsyncClient, session: AsyncSession, acting_user
 ):
-    """Both are refused, and the two are told apart.
-
-    One of them can be fixed by answering and the other cannot, and the reply
-    is the only thing that knows which — so an account whose answer stands is
-    not sent back to a form that has nothing for it.
+    """Told apart from an account that never answered: one can be fixed by
+    answering and the other cannot, and the reply is the only thing that knows
+    which — so an account whose answer stands is not sent back to a form that
+    has nothing for it.
 
     The under-age answer is fifteen from the US: old enough for an account
     there, so the account survives to be refused by the directory.
     """
     a = await acting_user("member", age_confirmed_at=None)
     guild = await _a_listed_guild(session, name="Open Table")
-    if prior_answer == "answered under age":
-        answered = await client.post(
-            "/api/v1/me/age-confirmation",
-            json={"birthdate": _birthdate_for_age(15)},
-            headers={**a.headers, "CF-IPCountry": "US"},
-        )
-        assert answered.status_code == 422, answered.text
+    answered = await client.post(
+        "/api/v1/me/age-confirmation",
+        json={"birthdate": _birthdate_for_age(15)},
+        headers={**a.headers, "CF-IPCountry": "US"},
+    )
+    assert answered.status_code == 422, answered.text
 
     response = await client.post(
         f"/api/v1/communities/directory/{guild.id}/join", headers=a.headers
     )
 
     assert response.status_code == 403
-    assert response.json()["detail"] == expected_detail
+    assert response.json()["detail"] == "COMMUNITY_AGE_BELOW_MINIMUM"
     assert await _membership_of(session, guild=guild, user_id=a.user.id) is None
 
 
@@ -1207,6 +1190,8 @@ async def test_confirming_age_lets_the_same_account_join(
         f"/api/v1/communities/directory/{guild.id}/join", headers=a.headers
     )
     assert refused.status_code == 403
+    assert refused.json()["detail"] == "COMMUNITY_AGE_CONFIRMATION_REQUIRED"
+    assert await _membership_of(session, guild=guild, user_id=a.user.id) is None
 
     confirmed = await client.post(
         "/api/v1/me/age-confirmation",
