@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import re
 
+from alembic.runtime.migration import MigrationContext
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
@@ -138,7 +139,11 @@ def guild_schema_names(connection: Connection) -> list[str]:
 
 
 def run_for_each_guild_schema(
-    connection: Connection, fn, *, operations: bool = False
+    connection: Connection,
+    fn,
+    *,
+    operations: bool = False,
+    commit_each: MigrationContext | None = None,
 ) -> None:
     """Run a migration-op callback once per guild schema (``guild_template`` +
     every ``guild_<id>``), with ``search_path`` routed so unqualified names
@@ -151,6 +156,16 @@ def run_for_each_guild_schema(
     the generated ``op.*`` calls execute against unqualified table names, so
     routing the search_path per schema applies them everywhere. Same
     transaction-local mechanics as the string variant below.
+
+    ``commit_each``, the revision's context (``op.get_context()``), commits
+    each schema's work, and whatever the revision did before it, before the
+    next schema begins. A revision that touches many tables in each schema
+    passes it, so its locks are held one schema at a time rather than for
+    every community at once. Alembic stamps the revision only once it
+    returns, so a run that stops part way runs the whole revision again:
+    ``fn`` must then leave a schema it already did as it is, by what the
+    schema holds, and what the revision does outside the loop must bear
+    running twice.
     """
     from app.db.operations_schema import OPERATIONS_MARKER
 
@@ -169,6 +184,10 @@ def run_for_each_guild_schema(
             {"sp": f"{schema}, public"},
         )
         fn()
+        if commit_each is not None:
+            # Commits the revision's transaction and begins the next one.
+            with commit_each.autocommit_block():
+                pass
     connection.execute(text("SELECT set_config('search_path', 'public', true)"))
 
 

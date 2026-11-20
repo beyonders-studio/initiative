@@ -6,9 +6,14 @@ with real data; dropped in teardown. Runs against the test DB as the owning role
 """
 
 import pytest
+from alembic.runtime.migration import MigrationContext
 from sqlalchemy import text
 
-from app.db.guild_migrations import apply_to_all_guild_schemas, guild_schema_names
+from app.db.guild_migrations import (
+    apply_to_all_guild_schemas,
+    guild_schema_names,
+    run_for_each_guild_schema,
+)
 from app.db.schema_provisioning import (
     drop_guild_schema,
     guild_schema_name,
@@ -22,6 +27,8 @@ _GID_A = 990_201
 _GID_B = 990_202
 _GID_C = 990_203
 _GID_D = 990_204
+_GID_E = 990_205
+_GID_F = 990_206
 _COLUMN = "_mig_helper_test"
 
 
@@ -130,6 +137,52 @@ async def test_apply_to_all_guild_schemas_targets_template(engine):
                 )  # remove from guild_template + every guild schema
             )
             await drop_guild_schema(conn, _GID_C)
+
+
+async def test_a_revision_committing_each_schema_finishes_when_run_again(engine):
+    """With ``commit_each``, the schemas done before a failure stay done, the
+    failing one is rolled back, and running the revision again finishes."""
+    first, second = guild_schema_name(_GID_E), guild_schema_name(_GID_F)
+
+    def revision(connection, fail_in: str | None) -> None:
+        context = MigrationContext.configure(
+            connection, opts={"transaction_per_migration": True}
+        )
+
+        def step() -> None:
+            connection.execute(
+                text(f"ALTER TABLE tags ADD COLUMN IF NOT EXISTS {_COLUMN} boolean")
+            )
+            if connection.execute(text("SELECT current_schema()")).scalar() == fail_in:
+                raise RuntimeError("stopped")
+
+        with context.begin_transaction(_per_migration=True):
+            run_for_each_guild_schema(connection, step, commit_each=context)
+
+    try:
+        async with engine.begin() as conn:
+            await provision_guild_schema(conn, _GID_E)
+            await provision_guild_schema(conn, _GID_F)
+        async with engine.connect() as conn:
+            with pytest.raises(RuntimeError):
+                await conn.run_sync(revision, second)
+        async with engine.connect() as conn:
+            assert await _tags_has_column(conn, first)
+            assert not await _tags_has_column(conn, second)
+        async with engine.connect() as conn:
+            await conn.run_sync(revision, None)
+        async with engine.connect() as conn:
+            assert await _tags_has_column(conn, second)
+            assert await _tags_has_column(conn, "guild_template")
+    finally:
+        async with engine.begin() as conn:
+            await conn.run_sync(
+                lambda c: apply_to_all_guild_schemas(
+                    c, f"ALTER TABLE tags DROP COLUMN IF EXISTS {_COLUMN}"
+                )
+            )
+            await drop_guild_schema(conn, _GID_E)
+            await drop_guild_schema(conn, _GID_F)
 
 
 async def test_apply_to_all_guild_schemas_failure_propagates_and_reverts(engine):

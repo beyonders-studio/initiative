@@ -312,20 +312,25 @@ def upgrade() -> None:
     # any more, and no tool plug-in's listing takes its shape: it is retired.
     with _held("public.marketplace_listings"):
         _run("DELETE FROM public.marketplace_listings WHERE kind = 'counter_group'")
+    # Each community is converted and committed on its own, with its rows in
+    # ``public``; one already converted is left as it is.
+    run_for_each_guild_schema(_bind(), _convert, commit_each=op.get_context())
+    _run("DROP TYPE IF EXISTS public.counter_view_mode")
+
+
+def _convert() -> None:
+    """The upgrade of the schema the search path leads with, and of its rows
+    in ``public``."""
     converted: list[int] = []
-    run_for_each_guild_schema(_bind(), lambda: _upgrade_schema(converted))
+    _upgrade_schema(converted)
     if converted:
         _rewrite_public(converted, {old: new for old, (new, _) in KINDS.items()})
-    _run("DROP TYPE IF EXISTS public.counter_view_mode")
 
 
 def _apply_upgrade() -> None:
     """The upgrade of the schema the search path leads with alone, and of its
     rows in ``public``."""
-    converted: list[int] = []
-    _upgrade_schema(converted)
-    if converted:
-        _rewrite_public(converted, {old: new for old, (new, _) in KINDS.items()})
+    _convert()
     _run("DROP TYPE IF EXISTS public.counter_view_mode")
 
 
@@ -741,15 +746,9 @@ def _builtin_rules(table: str, *, tool: bool) -> list[str]:
 
 
 def downgrade() -> None:
-    _run(
-        "CREATE TYPE public.counter_view_mode AS ENUM"
-        " ('number', 'progress_bar', 'segmented_clock')"
-    )
+    _create_view_mode()
     _add_kind_code_arms({old: code for old, (_, code) in KINDS.items()})
-    converted: list[int] = []
-    run_for_each_guild_schema(_bind(), lambda: _downgrade_schema(converted))
-    if converted:
-        _rewrite_public(converted, {new: old for old, (new, _) in KINDS.items()})
+    run_for_each_guild_schema(_bind(), _revert, commit_each=op.get_context())
     with _held("public.plugin_kind_codes"):
         _run(
             "DELETE FROM public.plugin_kind_codes"
@@ -765,12 +764,25 @@ def _apply_downgrade() -> None:
     """The downgrade of the schema the search path leads with alone, and of
     its rows in ``public``; the rest of ``public`` stays as the upgrade left
     it."""
+    _create_view_mode()
+    _add_kind_code_arms({old: code for old, (_, code) in KINDS.items()})
+    _revert()
+
+
+def _create_view_mode() -> None:
     _run(
         "DO $$ BEGIN CREATE TYPE public.counter_view_mode AS ENUM"
         " ('number', 'progress_bar', 'segmented_clock');"
         " EXCEPTION WHEN duplicate_object THEN NULL; END $$"
     )
-    _add_kind_code_arms({old: code for old, (_, code) in KINDS.items()})
+
+
+def _revert() -> None:
+    """The downgrade of the schema the search path leads with, and of its rows
+    in ``public``; a schema that has its built-in tables already is left as it
+    is."""
+    if _exists("counter_groups"):
+        return
     converted: list[int] = []
     _downgrade_schema(converted)
     if converted:
