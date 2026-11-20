@@ -35,10 +35,10 @@ Counters is switched on in an initiative:
   render too.
 * Every row naming a counter kind takes the plug-in's: each ``<x>_type``
   column with an ``<x>_id`` beside it, each ``tool`` column, in the schema and
-  in the ``public`` tables that name a community. A saved layout of a counter
-  group is deleted, as the plug-in's are drawn as declared. A dashboard's
+  in the ``public`` tables that name a community. A dashboard's
   query that reads ``counters`` or ``counter_groups`` reads the plug-in's
-  tables.
+  tables. A counter's page someone laid out is kept as the plug-in's
+  counter's.
 
 Elsewhere, and in ``guild_template``, the rules and rows naming a counter kind
 are deleted and the two tables dropped.
@@ -50,8 +50,8 @@ the kinds are dropped first; a start renders them for the community's tools.
 The downgrade turns an install of the plug-in back into the built-in tool in
 each community, and gives every other community the empty built-in tables.
 
-Revision ID: 20261119_0618
-Revises: 20261118_0617
+Revision ID: 20261119_0619
+Revises: 20261119_0618
 Create Date: 2026-11-19
 """
 
@@ -68,8 +68,8 @@ from alembic import op
 
 from app.db.guild_migrations import run_for_each_guild_schema, split_sql_statements
 
-revision = "20261119_0618"
-down_revision = "20261118_0617"
+revision = "20261119_0619"
+down_revision = "20261119_0618"
 branch_labels = None
 depends_on = None
 
@@ -322,12 +322,15 @@ def _upgrade_schema(converted: list[int]) -> None:
         "dashboards",
         *kind_tables,
     ):
-        # A counter group's saved layouts go: the plug-in's are drawn as declared.
-        _run(
-            "DELETE FROM tool_layouts WHERE tool = 'counter_group' OR kind = 'counter'"
-        )
         if in_use:
             _keep_rules()
+            # A counter's page someone laid out is the plug-in's counter's;
+            # its target, the group, follows with the kind columns below.
+            _run(
+                "ALTER TABLE tool_layouts DROP CONSTRAINT IF EXISTS ck_tool_layouts_kind",
+                f"UPDATE tool_layouts SET kind = {_literal(KINDS['counter'][0])}"
+                " WHERE tool = 'counter_group' AND kind = 'counter'",
+            )
             for table, column in kind_columns:
                 mapping = {old: new for old, (new, _) in KINDS.items()}
                 _run(
@@ -759,6 +762,11 @@ def _downgrade_schema(converted: list[int]) -> None:
         _run(
             f"UPDATE initiative_rules SET key = {_case('key', back_keys)}"
             f" WHERE install_id IS NULL AND key IN ({_listed(back_keys)})"
+        )
+        _run(
+            "ALTER TABLE tool_layouts DROP CONSTRAINT IF EXISTS ck_tool_layouts_kind",
+            f"UPDATE tool_layouts SET kind = 'counter'"
+            f" WHERE kind = {_literal(KINDS['counter'][0])}",
         )
         for table, column in kind_columns:
             _run(

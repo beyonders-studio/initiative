@@ -1,4 +1,4 @@
-"""Revision 20261119_0618 turns the built-in Counters into its tool plug-in in
+"""Revision 20261119_0619 turns the built-in Counters into its tool plug-in in
 each community that uses it, and drops the tables elsewhere.
 
 Each test builds a community as this release has it, turns it back into the
@@ -150,6 +150,22 @@ async def test_a_community_using_counters_keeps_them_as_the_plug_in(
         ),
         {"k": GROUP, "g": group, "i": initiative_a, "u": admin.user.id},
     )
+    # Someone laid out the group's counter page.
+    await (await session.connection()).execute(
+        sa.text(
+            f"INSERT INTO {s}.tool_layouts (initiative_id, tool, tool_id, kind,"
+            " definition, created_by, created_by_kind, created_at, updated_at)"
+            " VALUES (:i, :t, :g, :k, CAST(:d AS jsonb), :u, 'member', now(), now())"
+        ),
+        {
+            "i": initiative_a,
+            "t": GROUP,
+            "g": group,
+            "k": COUNTER,
+            "d": json.dumps({"header": [], "main": [], "side": []}),
+            "u": admin.user.id,
+        },
+    )
     # Counters is switched off in B today, and A is where it is used.
     await (await session.connection()).execute(
         sa.text(
@@ -180,6 +196,7 @@ async def test_a_community_using_counters_keeps_them_as_the_plug_in(
                 f"SELECT initiative_id, initiative_role_id, key, enabled"
                 f" FROM {s}.initiative_rules WHERE key LIKE '{GROUP}%'"
             ),
+            "layouts": f"SELECT tool, tool_id, kind, definition FROM {s}.tool_layouts",
             "search": (
                 f"SELECT entity_type, entity_id, dac_tool FROM {s}.search_entries"
                 f" WHERE entity_type IN ('{GROUP}', '{COUNTER}')"
@@ -207,6 +224,9 @@ async def test_a_community_using_counters_keeps_them_as_the_plug_in(
             f"SELECT count(*) FROM {s}.guild_plugins WHERE listing_uid = :u",
             u=COUNTERS_UID,
         ) == [(0,)]
+        assert await _rows(session, f"SELECT tool, kind FROM {s}.tool_layouts") == [
+            ("counter_group", "counter")
+        ]
         keys = {
             key
             for (key,) in await _rows(

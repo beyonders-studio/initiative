@@ -300,7 +300,7 @@ async def add_counter(
 
 
 #: The revision that turns the built-in Counters into its plug-in.
-_CONVERSION = "20261119_0618_counters_become_a_plug_in.py"
+_CONVERSION = "20261119_0619_counters_become_a_plug_in.py"
 
 
 def counters_conversion() -> Any:

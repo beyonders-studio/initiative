@@ -860,7 +860,7 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
     await session.commit()
     if converted:
         # Counters turned back into the built-in tool and converted again, as
-        # 20261119_0618 does in a community that uses it: every check below
+        # 20261119_0619 does in a community that uses it: every check below
         # then holds for the converted tables.
         install = {**install, "id": await convert_counters(session, guild.id)}
         await route_session_to_guild(session, guild.id)

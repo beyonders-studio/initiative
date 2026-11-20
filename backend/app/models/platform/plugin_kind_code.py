@@ -30,7 +30,7 @@ FIRST_PLUGIN_KIND_CODE = 1024
 
 #: The kinds of a tool that moved out of Initiative into a plug-in, each with
 #: the code its built-in kind had, so a node id stored before the move still
-#: names the same row (the Counters plug-in's, from 20261119_0618).
+#: names the same row (the Counters plug-in's, from 20261119_0619).
 ADOPTED_KIND_CODES: dict[str, int] = {
     "counter_group.tsjvtcm0s7gv2x": 4,
     "counter.tsjvtcm0s7gv2x": 3,
