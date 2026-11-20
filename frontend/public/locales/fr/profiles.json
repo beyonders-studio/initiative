@@ -274,12 +274,39 @@
     "empty": "Dites ce que vous faites",
     "edit": "Votre statut",
     "set": "Définir le statut",
-    "help": "Un emoji, une ligne, ou les deux. Toute personne qui ouvre votre profil le voit.",
+    "help": "Un emoji, une ligne, ou les deux. Les autres le voient à côté de votre nom.",
     "placeholder": "Vous faites quoi ?",
     "emojiPlaceholder": "Emoji",
-    "save": "Définir le statut",
-    "clear": "Effacer",
-    "failed": "Ce statut n'a pas pu être enregistré."
+    "save": "Enregistrer",
+    "clear": "Effacer le statut",
+    "failed": "Ce statut n'a pas pu être enregistré.",
+    "erase": "Effacer",
+    "until": "Jusqu'à {{time}}",
+    "suggestions": "Suggestions",
+    "suggestion": {
+      "meeting": "En réunion",
+      "commuting": "En trajet",
+      "sick": "Malade",
+      "vacation": "En vacances",
+      "remote": "En télétravail"
+    },
+    "clearAfter": {
+      "label": "Effacer après",
+      "never": "Ne pas effacer",
+      "30m": "30 minutes",
+      "1h": "1 heure",
+      "4h": "4 heures",
+      "today": "Aujourd'hui",
+      "week": "Cette semaine",
+      "custom": "Choisir une date et une heure"
+    },
+    "pause": {
+      "label": "Suspendre les notifications",
+      "help": "Jusqu'à la fin de votre statut. La cloche continue de collecter, et vous recevez un résumé à la fin.",
+      "running": "Suspendues jusqu'à {{time}}.",
+      "needsEnd": "Choisissez quand votre statut se termine pour suspendre jusque-là.",
+      "failed": "Les notifications n'ont pas pu être suspendues."
+    }
   },
   "communities": {
     "title": "Communautés"

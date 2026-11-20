@@ -473,7 +473,7 @@
       "respectPresenceHelp": "Si ya estás aquí, la campana te lo ha dicho. El correo espera unos minutos y el móvil se queda callado.",
       "pause": {
         "title": "Pausar notificaciones",
-        "description": "El correo, el móvil y el escritorio se detienen los días que elijas. La campana sigue recogiendo, y al volver recibes un resumen de todo.",
+        "description": "El correo, el móvil y el escritorio se detienen los días que elijas. También puedes pausar hasta que termine tu estado, al ponerlo. La campana sigue recogiendo, y recibes un resumen de todo cuando vuelvas.",
         "active": "En pausa hasta el {{until}}",
         "scheduled": "Pausa del {{from}} al {{until}}",
         "resume": "Reanudar",

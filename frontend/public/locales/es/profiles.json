@@ -274,12 +274,39 @@
     "empty": "Cuenta en qué andas",
     "edit": "Tu estado",
     "set": "Poner estado",
-    "help": "Un emoji, una línea o ambos. Lo ve cualquiera que abra tu perfil.",
+    "help": "Un emoji, una línea o ambos. Los demás lo ven junto a tu nombre.",
     "placeholder": "¿En qué andas?",
     "emojiPlaceholder": "Emoji",
-    "save": "Poner estado",
-    "clear": "Quitar",
-    "failed": "No se pudo guardar ese estado."
+    "save": "Guardar",
+    "clear": "Borrar estado",
+    "failed": "No se pudo guardar ese estado.",
+    "erase": "Borrar",
+    "until": "Hasta {{time}}",
+    "suggestions": "Sugerencias",
+    "suggestion": {
+      "meeting": "En una reunión",
+      "commuting": "De camino",
+      "sick": "De baja por enfermedad",
+      "vacation": "De vacaciones",
+      "remote": "Trabajando en remoto"
+    },
+    "clearAfter": {
+      "label": "Borrar después de",
+      "never": "No borrar",
+      "30m": "30 minutos",
+      "1h": "1 hora",
+      "4h": "4 horas",
+      "today": "Hoy",
+      "week": "Esta semana",
+      "custom": "Elegir fecha y hora"
+    },
+    "pause": {
+      "label": "Pausar notificaciones",
+      "help": "Hasta que termine tu estado. La campana sigue recogiendo, y recibes un resumen cuando termine.",
+      "running": "En pausa hasta {{time}}.",
+      "needsEnd": "Elige cuándo termina tu estado para pausar hasta entonces.",
+      "failed": "No se pudieron pausar las notificaciones."
+    }
   },
   "communities": {
     "title": "Comunidades"
