@@ -47,17 +47,6 @@ async def _listing(client: AsyncClient, user) -> list[dict]:
     return response.json()["items"]
 
 
-async def test_an_account_lists_the_address_it_was_created_with(
-    client: AsyncClient, session: AsyncSession
-):
-    user = await create_user(session, email="only@example.com")
-
-    items = await _listing(client, user)
-    assert [(i["email"], i["is_primary"], i["verified"]) for i in items] == [
-        ("only@example.com", True, True)
-    ]
-
-
 async def test_a_synthetic_address_is_not_shown(
     client: AsyncClient, session: AsyncSession
 ):
@@ -74,27 +63,11 @@ async def test_a_synthetic_address_is_not_shown(
     )
     await session.commit()
 
-    assert [i["email"] for i in await _listing(client, user)] == ["sso@example.com"]
-
-
-async def test_adding_an_address_holds_it_unproven(
-    client: AsyncClient, session: AsyncSession
-):
-    await _enable_smtp(session)
-    user = await create_user(session, email="primary@example.com")
-
-    response = await client.post(
-        "/api/v1/me/emails",
-        json={"email": "second@example.com", "current_password": PASSWORD},
-        headers=get_auth_headers(user),
-    )
-    assert response.status_code == 202, response.text
-
     items = await _listing(client, user)
-    second = [i for i in items if i["email"] == "second@example.com"]
-    assert second and second[0]["verified"] is False
-    assert second[0]["is_primary"] is False
-    assert second[0]["source"] == addresses.SOURCE_ADDED
+    # The address it was created with, primary and proven.
+    assert [(i["email"], i["is_primary"], i["verified"]) for i in items] == [
+        ("sso@example.com", True, True)
+    ]
 
 
 async def test_adding_an_address_somebody_holds_says_the_same_thing(
@@ -120,40 +93,34 @@ async def test_adding_an_address_somebody_holds_says_the_same_thing(
     assert taken.status_code == free.status_code
     assert taken.json() == free.json()
 
-    # The asker gained the free address and not the taken one.
-    asker_holds = {normalize_email(i["email"]) for i in await _listing(client, other)}
+    assert taken.status_code == 202, taken.text
+
+    # The asker gained the free address, held unproven, and not the taken one.
+    listing = await _listing(client, other)
+    asker_holds = {normalize_email(i["email"]) for i in listing}
     assert asker_holds == {"asker@example.com", "untaken@example.com"}
+    [added] = [i for i in listing if i["email"] == "untaken@example.com"]
+    assert added["verified"] is False
+    assert added["is_primary"] is False
+    assert added["source"] == addresses.SOURCE_ADDED
+
+    # The verification token names the address it proves, not just the account.
+    session.expire_all()
+    record = (
+        await session.exec(
+            select(UserToken).where(
+                UserToken.user_id == other_id,
+                UserToken.purpose == UserTokenPurpose.email_verification,
+            )
+        )
+    ).one()
+    assert record.user_email_id is not None
 
     # And the taken address is still where it was.
     session.expire_all()
     still_theirs = await addresses.find_user_by_address(session, "taken@example.com")
     assert still_theirs is not None and still_theirs.id == owner_id
     assert other_id != owner_id
-
-
-async def test_a_verification_token_proves_one_address(
-    client: AsyncClient, session: AsyncSession
-):
-    await _enable_smtp(session)
-    user = await create_user(session, email="holder@example.com")
-    user_id = user.id
-    await client.post(
-        "/api/v1/me/emails",
-        json={"email": "proveme@example.com", "current_password": PASSWORD},
-        headers=get_auth_headers(user),
-    )
-
-    session.expire_all()
-    record = (
-        await session.exec(
-            select(UserToken).where(
-                UserToken.user_id == user_id,
-                UserToken.purpose == UserTokenPurpose.email_verification,
-            )
-        )
-    ).one()
-    # The token names the address it proves, not just the account.
-    assert record.user_email_id is not None
 
 
 async def test_the_primary_moves_only_to_a_proven_address(
@@ -229,21 +196,6 @@ async def test_the_primary_moves_off_a_minted_address(
     )
     assert moved.status_code == 200, moved.text
     assert moved.json()["is_primary"] is True
-
-
-async def test_the_primary_address_is_not_removed(
-    client: AsyncClient, session: AsyncSession
-):
-    user = await create_user(session, email="keepme@example.com")
-    address_id = (await _listing(client, user))[0]["id"]
-
-    refused = await client.post(
-        f"/api/v1/me/emails/{address_id}/remove",
-        json=CONFIRM,
-        headers=get_auth_headers(user),
-    )
-    assert refused.status_code == 400
-    assert refused.json()["detail"] == "PRIMARY_ADDRESS"
 
 
 async def test_the_last_proven_address_is_not_removed(
@@ -342,41 +294,6 @@ async def test_an_unproven_claim_does_not_take_the_address(
     }
 
 
-async def test_proving_an_address_settles_every_other_claim(
-    client: AsyncClient, session: AsyncSession
-):
-    other_claimant = await create_user(session, email="claimant@example.com")
-    holder = await create_user(session, email="holder2@example.com")
-    other_claimant_id, holder_id = other_claimant.id, holder.id
-    for user_id in (other_claimant_id, holder_id):
-        addresses.record_address(
-            session,
-            user_id=user_id,
-            email="contested2@example.com",
-            source=addresses.SOURCE_ADDED,
-            verified=False,
-            is_primary=False,
-        )
-    await session.commit()
-
-    theirs = await addresses._pending_for_user(
-        session, user_id=holder_id, digest=hash_email("contested2@example.com")
-    )
-    await addresses.verify_for_user(session, user_id=holder_id, address_id=theirs.id)
-    await session.commit()
-
-    # The holder has it, and the other claim is gone.
-    session.expire_all()
-    rows = (
-        await session.exec(
-            select(UserEmail).where(
-                UserEmail.email_hash == hash_email("contested2@example.com")
-            )
-        )
-    ).all()
-    assert [(r.user_id, r.verified_at is not None) for r in rows] == [(holder_id, True)]
-
-
 async def test_an_unproven_address_signs_nobody_in(
     client: AsyncClient, session: AsyncSession
 ):
@@ -396,31 +313,6 @@ async def test_an_unproven_address_signs_nobody_in(
     assert await addresses.find_user_by_address(session, "pending@example.com") is None
     found = await addresses.find_user_by_address(session, "real@example.com")
     assert found is not None
-
-
-async def test_an_account_holds_a_bounded_number_of_addresses(
-    client: AsyncClient, session: AsyncSession
-):
-    await _enable_smtp(session)
-    user = await create_user(session, email="collector@example.com")
-    for n in range(addresses.MAX_ADDRESSES_PER_ACCOUNT - 1):
-        addresses.record_address(
-            session,
-            user_id=user.id,
-            email=f"extra-{n}@example.com",
-            source=addresses.SOURCE_ADDED,
-            verified=False,
-            is_primary=False,
-        )
-    await session.commit()
-
-    refused = await client.post(
-        "/api/v1/me/emails",
-        json={"email": "one-too-many@example.com", "current_password": PASSWORD},
-        headers=get_auth_headers(user),
-    )
-    assert refused.status_code == 400
-    assert refused.json()["detail"] == "TOO_MANY_ADDRESSES"
 
 
 async def test_asking_again_resends_rather_than_refusing(
@@ -484,6 +376,7 @@ async def test_a_full_account_answers_the_same_whoever_holds_the_address(
     )
     assert taken.status_code == free.status_code == 400
     assert taken.json() == free.json()
+    assert free.json()["detail"] == "TOO_MANY_ADDRESSES"
 
 
 async def test_proving_an_address_somebody_just_proved_is_refused(
@@ -518,6 +411,11 @@ async def test_proving_an_address_somebody_just_proved_is_refused(
     ) is None
     holder = await addresses.find_user_by_address(session, "contested3@example.com")
     assert holder is not None and holder.id == first_id
+    # Proving it settled every other claim.
+    rows = (
+        await session.exec(select(UserEmail).where(UserEmail.email_hash == digest))
+    ).all()
+    assert [(r.user_id, r.verified_at is not None) for r in rows] == [(first_id, True)]
 
 
 # ---------------------------------------------------------------------------

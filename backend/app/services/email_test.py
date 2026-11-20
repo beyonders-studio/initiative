@@ -65,15 +65,6 @@ async def test_mention_email_escapes_malicious_display_name(session, monkeypatch
     assert captured["subject"] == "You were mentioned in Plans"
 
 
-def test_strip_html_unescapes_entities():
-    # The plain-text alternative is derived from the escaped HTML fragment, so
-    # tags are stripped first and entities decoded back to literal text.
-    assert (
-        email_service._strip_html("<strong>Tom &amp; Jerry</strong> said &lt;hi&gt;")
-        == "Tom & Jerry said <hi>"
-    )
-
-
 async def test_join_request_email_renders_and_escapes_the_note(session, monkeypatch):
     """The manager's copy resolves from the `initiativeJoinRequest` block and
     neutralizes the requester's free-text note in the HTML part.

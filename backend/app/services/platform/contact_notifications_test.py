@@ -69,7 +69,7 @@ async def _handle(session, user) -> tuple[str, str]:
 
 
 class TestConnections:
-    async def test_asking_tells_the_account_being_asked(
+    async def test_asking_and_answering_tell_the_other_account(
         self, client, session, acting_user
     ):
         ada = await acting_user()
@@ -90,18 +90,7 @@ class TestConnections:
         # The one doing the asking is not told they asked.
         assert await _lines(session, ada.user.id, "connection_requested") == []
 
-    async def test_accepting_tells_the_account_that_asked(
-        self, client, session, acting_user
-    ):
-        ada = await acting_user()
-        bo = await acting_user()
-        username, discriminator = await _handle(session, bo.user)
-        await client.post(
-            "/api/v1/me/connections",
-            json={"username": username, "discriminator": discriminator},
-            headers=ada.headers,
-        )
-
+        # Accepting tells the account that asked.
         accepted = await client.post(
             f"/api/v1/me/connections/{ada.user.id}/accept", headers=bo.headers
         )
@@ -134,7 +123,7 @@ class TestConnections:
 
 
 class TestMessageRequests:
-    async def test_asking_tells_the_account_being_asked(
+    async def test_asking_and_answering_tell_the_other_account(
         self, client, session, acting_user
     ):
         ada = await acting_user()
@@ -153,18 +142,7 @@ class TestMessageRequests:
         assert lines[0]["actor_id"] == ada.user.id
         assert lines[0]["target_path"] == "/messages"
 
-    async def test_accepting_tells_the_account_that_asked(
-        self, client, session, acting_user
-    ):
-        ada = await acting_user()
-        bo = await acting_user()
-        await _reachable(session, ada.user, bo.user)
-        await client.post(
-            "/api/v1/me/message-requests",
-            json={"user_id": bo.user.id},
-            headers=ada.headers,
-        )
-
+        # Accepting tells the account that asked.
         accepted = await client.post(
             f"/api/v1/me/message-requests/{ada.user.id}/accept", headers=bo.headers
         )
@@ -210,34 +188,9 @@ class TestMessageRequests:
 class TestPush:
     """The channel that works when the app is closed, which is the whole point."""
 
-    async def test_a_request_pushes(self, client, session, acting_user):
-        ada = await acting_user()
-        bo = await acting_user()
-        await _reachable(session, ada.user, bo.user)
-        await client.post(
-            "/api/v1/push/register",
-            json={"push_token": "fcm-bo", "platform": "android"},
-            headers=await signed_in_headers(session, bo.user),
-        )
-
-        with patch(
-            "app.services.platform.push_notifications.send_push_notification",
-            new_callable=AsyncMock,
-            return_value=(True, False),
-        ) as send:
-            await client.post(
-                "/api/v1/me/message-requests",
-                json={"user_id": bo.user.id},
-                headers=ada.headers,
-            )
-            await drain_notices()
-
-        assert send.await_count == 1
-        kwargs = send.await_args.kwargs
-        assert kwargs["push_token"] == "fcm-bo"
-        assert kwargs["data"]["target_path"] == "/messages"
-
-    async def test_every_installation_hears_it(self, client, session, acting_user):
+    async def test_a_request_pushes_every_installation(
+        self, client, session, acting_user
+    ):
         """Unlike a message, nothing here needs decrypting, so there is no reason
         to hold it back from an installation that has no key store."""
         ada = await acting_user()
@@ -264,6 +217,14 @@ class TestPush:
             await drain_notices()
 
         assert send.await_count == 2
+        assert {call.kwargs["push_token"] for call in send.await_args_list} == {
+            "fcm-phone",
+            "fcm-tablet",
+        }
+        assert all(
+            call.kwargs["data"]["target_path"] == "/messages"
+            for call in send.await_args_list
+        )
 
     async def test_turning_the_preference_off_stops_it(
         self, client, session, acting_user

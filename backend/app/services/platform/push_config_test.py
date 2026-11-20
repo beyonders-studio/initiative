@@ -74,10 +74,9 @@ async def test_refresh_loads_db_over_env(
     assert cfg.sender_id == "123456"
 
 
-async def test_full_service_account_survives_the_round_trip(
-    session: AsyncSession,
-) -> None:
-    """A realistic service account comes back byte-identical, and parses.
+async def test_credential_is_kept_when_not_sent(session: AsyncSession) -> None:
+    """Toggling the switch without re-pasting the JSON keeps the JSON, and a
+    realistic service account comes back byte-identical, and parses.
 
     Stored truncated it would encrypt and save without complaint and then fail at
     ``json.loads`` on the next push — a long way from the settings page that
@@ -85,27 +84,6 @@ async def test_full_service_account_survives_the_round_trip(
     """
     account = _service_account()
     assert len(account) > 2000, "the fixture must exercise the wide column"
-
-    await app_settings_service.update_push_settings(
-        session,
-        system_session=session,
-        enabled=True,
-        project_id="demo-project",
-        application_id=None,
-        api_key=None,
-        sender_id=None,
-        service_account_json=account,
-        secret_provided=True,
-    )
-
-    stored = (await push_config.ensure_push_config_fresh()).service_account_json
-    assert stored == account
-    assert json.loads(stored or "{}")["project_id"] == "demo-project"
-
-
-async def test_credential_is_kept_when_not_sent(session: AsyncSession) -> None:
-    """Toggling the switch without re-pasting the JSON keeps the JSON."""
-    account = _service_account()
     await app_settings_service.update_push_settings(
         session,
         system_session=session,
@@ -132,3 +110,4 @@ async def test_credential_is_kept_when_not_sent(session: AsyncSession) -> None:
     cfg = await push_config.ensure_push_config_fresh()
     assert cfg.enabled is False
     assert cfg.service_account_json == account
+    assert json.loads(cfg.service_account_json or "{}")["project_id"] == "demo-project"

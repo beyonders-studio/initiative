@@ -64,19 +64,9 @@ async def test_exporting_a_roster_is_recorded_with_its_count(
     assert rows[0]["detail"] == {"count": 2}
     assert rows[0]["is_write"] is False
 
-
-async def test_an_export_that_matched_nobody_records_nothing(
-    client: AsyncClient, session: AsyncSession, capfd
-):
-    guild = await create_guild(session)
-    admin = await create_user(session)
-    await create_guild_membership(
-        session, user=admin, guild=guild, role=CommunityRole.admin
-    )
-    capfd.readouterr()
-
+    # An export that matched nobody records nothing.
     response = await client.get(
-        f"/api/v1/c/{guild.id}/users/export.csv?user_id=9999999",
+        f"/api/v1/c/{guild_id}/users/export.csv?user_id=9999999",
         headers=get_auth_headers(admin),
     )
     assert response.status_code == 404
@@ -111,20 +101,9 @@ async def test_removing_a_member_is_recorded_against_the_admin_who_did_it(
     ]
     assert rows[0]["detail"] == {"role": "member", "via": "admin"}
 
-
-async def test_removing_someone_who_is_not_a_member_records_nothing(
-    client: AsyncClient, session: AsyncSession, capfd
-):
-    guild = await create_guild(session)
-    admin = await create_user(session)
-    outsider = await create_user(session)
-    await create_guild_membership(
-        session, user=admin, guild=guild, role=CommunityRole.admin
-    )
-    capfd.readouterr()
-
+    # Removing someone who is no longer a member records nothing.
     response = await client.delete(
-        f"/api/v1/c/{guild.id}/users/{outsider.id}", headers=get_auth_headers(admin)
+        f"/api/v1/c/{guild_id}/users/{member_id}", headers=get_auth_headers(admin)
     )
     assert response.status_code == 404
     assert emitted(capfd, AuditEventType.GUILD_MEMBER_REMOVED) == []
@@ -162,6 +141,16 @@ async def test_a_transfer_records_one_move_counted_by_tool(
     assert detail["to_user_id"] == admin.user.id
     assert detail["counts"][Tool.project.value] == 1
 
+    # A transfer that moved nothing records nothing.
+    response = await client.post(
+        admin.g(f"/users/{member.user.id}/transfer-ownership"),
+        headers=admin.headers,
+        json={"new_owner_id": admin.user.id},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["total"] == 0
+    assert emitted(capfd, AuditEventType.CONTENT_OWNERSHIP_TRANSFERRED) == []
+
 
 async def test_a_claim_records_the_move_with_no_previous_owner(
     client: AsyncClient, session: AsyncSession, acting_user, capfd
@@ -191,25 +180,3 @@ async def test_a_claim_records_the_move_with_no_previous_owner(
     assert detail["from_user_id"] is None
     assert detail["to_user_id"] == admin.user.id
     assert detail["counts"][Tool.project.value] == 1
-
-
-async def test_a_transfer_that_moved_nothing_records_nothing(
-    client: AsyncClient, acting_user, capfd
-):
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    member = await acting_user(
-        guild_role=CommunityRole.member,
-        guild=admin.guild,
-        initiative=admin.initiative,
-        initiative_role="member",
-    )
-    capfd.readouterr()
-
-    response = await client.post(
-        admin.g(f"/users/{member.user.id}/transfer-ownership"),
-        headers=admin.headers,
-        json={"new_owner_id": admin.user.id},
-    )
-    assert response.status_code == 200, response.text
-    assert response.json()["total"] == 0
-    assert emitted(capfd, AuditEventType.CONTENT_OWNERSHIP_TRANSFERRED) == []

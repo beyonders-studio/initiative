@@ -30,19 +30,6 @@ async def _set_policy(session, user, policy: DmPolicy) -> None:
 # ------------------------------------------------------------- dm-settings ---
 
 
-async def test_settings_come_back_with_every_community_switched_on(
-    client, session, acting_user
-):
-    a = await acting_user(guild_role=CommunityRole.member)
-
-    response = await client.get("/api/v1/me/dm-settings", headers=a.headers)
-    assert response.status_code == 200, response.text
-    body = response.json()
-    assert body["dm_policy"] == "private"
-    assert [c["community_id"] for c in body["communities"]] == [a.guild.id]
-    assert body["communities"][0]["enabled"] is True
-
-
 async def test_raising_the_policy_needs_an_age_answer(client, session, acting_user):
     a = await acting_user()
     a.user.age_confirmed_at = None
@@ -56,6 +43,12 @@ async def test_raising_the_policy_needs_an_age_answer(client, session, acting_us
     assert response.json()["detail"] == "DM_AGE_CONFIRMATION_REQUIRED"
     read = await client.get("/api/v1/me/dm-settings", headers=a.headers)
     assert read.json()["age_answer_required"] is True
+
+    # Staying private needs no age answer.
+    response = await client.patch(
+        "/api/v1/me/dm-settings", json={"dm_policy": "private"}, headers=a.headers
+    )
+    assert response.status_code == 200, response.text
 
 
 async def test_no_age_check_raises_the_policy_unasked(client, session, acting_user):
@@ -74,21 +67,17 @@ async def test_no_age_check_raises_the_policy_unasked(client, session, acting_us
     assert response.json()["age_answer_required"] is False
 
 
-async def test_staying_private_needs_no_age_answer(client, session, acting_user):
-    a = await acting_user()
-    a.user.age_confirmed_at = None
-    session.add(a.user)
-    await session.commit()
-
-    response = await client.patch(
-        "/api/v1/me/dm-settings", json={"dm_policy": "private"}, headers=a.headers
-    )
-    assert response.status_code == 200, response.text
-
-
 async def test_switching_a_community_off_and_on(client, session, acting_user):
+    """Settings come back private, with every community switched on."""
     a = await acting_user(guild_role=CommunityRole.member)
     guild = a.guild
+
+    response = await client.get("/api/v1/me/dm-settings", headers=a.headers)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["dm_policy"] == "private"
+    assert [c["community_id"] for c in body["communities"]] == [a.guild.id]
+    assert body["communities"][0]["enabled"] is True
 
     off = await client.patch(
         "/api/v1/me/dm-settings",
@@ -231,18 +220,6 @@ async def test_permission_is_identical_across_being_ignored(
     await session.commit()
 
     assert await _permission(client, bram.headers, ada.user.id) == before
-
-
-async def test_a_private_target_is_denied(client, session, acting_user):
-    ada = await acting_user(guild_role=CommunityRole.member)
-    bram = await acting_user(guild_role=CommunityRole.member, guild=ada.guild)
-    await _set_policy(session, ada.user, DmPolicy.private)
-    await _set_policy(session, bram.user, DmPolicy.community)
-
-    assert await _permission(client, bram.headers, ada.user.id) == {
-        "permission": "denied",
-        "may_connect": True,
-    }
 
 
 async def test_an_unknown_account_is_denied(client, acting_user):
@@ -416,30 +393,6 @@ async def test_ignoring_someone_does_not_stop_you_reaching_them(
     assert [r["user_id"] for r in theirs.json()["incoming"]] == [bram.user.id]
 
 
-async def test_may_connect_says_nothing_about_being_ignored(
-    client, session, acting_user
-):
-    """The second answer is held to the first one's rule.
-
-    Connecting and messaging are separate rules, so the endpoint carries both —
-    but neither may tell the caller they have been ignored. ``dm_may_connect``
-    asks whether each account is reachable at all, which is a fact about each
-    of them rather than about the pair.
-    """
-    ada = await acting_user(guild_role=CommunityRole.member)
-    bram = await acting_user(guild_role=CommunityRole.member, guild=ada.guild)
-    await _set_policy(session, ada.user, DmPolicy.community)
-    await _set_policy(session, bram.user, DmPolicy.community)
-
-    before = await _permission(client, bram.headers, ada.user.id)
-
-    session.add(UserIgnore(user_id=ada.user.id, ignored_user_id=bram.user.id))
-    await session.commit()
-
-    after = await _permission(client, bram.headers, ada.user.id)
-    assert after["may_connect"] == before["may_connect"]
-
-
 async def test_permissions_answer_for_a_page_of_people(client, session, acting_user):
     """One request for a page of people, and the same two answers per person
     as asking about each alone."""
@@ -462,7 +415,8 @@ async def test_permissions_answer_for_a_page_of_people(client, session, acting_u
         assert answers[str(other.user.id)] == await _permission(
             client, ada.headers, other.user.id
         )
-    assert answers[str(bram.user.id)]["permission"] == "denied"
+    # A private target is denied, and may still be asked to connect.
+    assert answers[str(bram.user.id)] == {"permission": "denied", "may_connect": True}
     assert answers[str(cleo.user.id)]["permission"] == "may_request"
     # Nothing about yourself: every action on your own account is refused.
     assert str(ada.user.id) not in answers

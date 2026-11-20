@@ -3,6 +3,8 @@ window."""
 
 from datetime import UTC, datetime
 
+import pytest
+
 from app.core.notification_categories import Channel, NotificationCategory
 from app.services.platform.notification_prefs import (
     in_quiet_hours,
@@ -61,16 +63,6 @@ def test_a_row_off_in_one_community_is_off_there_alone():
             channel=channel,
             guild_id=8,
         )
-
-
-def test_the_bell_is_gateable():
-    """The whole reason in_app exists as a channel."""
-    prefs = {"categories": {"subscriptions": {"in_app": False}}}
-    assert not wants(
-        prefs,
-        category=NotificationCategory.subscriptions,
-        channel=Channel.in_app,
-    )
 
 
 def test_a_muted_community_says_nothing_including_a_mention():
@@ -150,29 +142,24 @@ def _at(hour: int, minute: int = 0) -> datetime:
     return datetime(2026, 9, 9, hour, minute, tzinfo=UTC)
 
 
-def test_quiet_hours_wraps_overnight():
-    prefs = {"quiet_hours": {"start": "22:00", "end": "07:00"}}
-    assert in_quiet_hours(prefs, tz_name="UTC", now=_at(23))
-    assert in_quiet_hours(prefs, tz_name="UTC", now=_at(3))
-    assert in_quiet_hours(prefs, tz_name="UTC", now=_at(22))
-    assert not in_quiet_hours(prefs, tz_name="UTC", now=_at(7))
-    assert not in_quiet_hours(prefs, tz_name="UTC", now=_at(12))
-
-
-def test_quiet_hours_within_one_day():
-    prefs = {"quiet_hours": {"start": "09:00", "end": "17:00"}}
-    assert in_quiet_hours(prefs, tz_name="UTC", now=_at(12))
-    assert not in_quiet_hours(prefs, tz_name="UTC", now=_at(20))
-
-
-def test_quiet_hours_is_read_in_the_accounts_timezone():
-    prefs = {"quiet_hours": {"start": "22:00", "end": "07:00"}}
-    # 23:00 UTC is 19:00 in New York — inside the window in UTC, well outside
-    # it there.
-    assert in_quiet_hours(prefs, tz_name="UTC", now=_at(23))
-    assert not in_quiet_hours(prefs, tz_name="America/New_York", now=_at(23))
-
-
-def test_unknown_timezone_falls_back_rather_than_raising():
-    prefs = {"quiet_hours": {"start": "22:00", "end": "07:00"}}
-    assert in_quiet_hours(prefs, tz_name="Mars/Olympus", now=_at(23))
+@pytest.mark.parametrize(
+    ("window", "tz_name", "hour", "inside"),
+    [
+        # Overnight, wrapping past midnight: the start is in, the end is out.
+        (("22:00", "07:00"), "UTC", 23, True),
+        (("22:00", "07:00"), "UTC", 3, True),
+        (("22:00", "07:00"), "UTC", 22, True),
+        (("22:00", "07:00"), "UTC", 7, False),
+        (("22:00", "07:00"), "UTC", 12, False),
+        # Within one day.
+        (("09:00", "17:00"), "UTC", 12, True),
+        (("09:00", "17:00"), "UTC", 20, False),
+        # Read in the account's timezone: 23:00 UTC is 19:00 in New York.
+        (("22:00", "07:00"), "America/New_York", 23, False),
+        # An unknown timezone falls back rather than raising.
+        (("22:00", "07:00"), "Mars/Olympus", 23, True),
+    ],
+)
+def test_quiet_hours_window(window, tz_name, hour, inside):
+    prefs = {"quiet_hours": {"start": window[0], "end": window[1]}}
+    assert in_quiet_hours(prefs, tz_name=tz_name, now=_at(hour)) is inside

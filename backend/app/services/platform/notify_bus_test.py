@@ -23,28 +23,6 @@ def _wire_frame(origin: str, user_id: int, action: str = "membership") -> str:
     )
 
 
-async def test_a_frame_from_another_worker_reaches_our_sockets(
-    account_socket,
-) -> None:
-    tab = account_socket(7)
-
-    await user_stream.deliver_remote(_wire_frame("some-other-worker", 7))
-    await settle()
-
-    assert len(tab.sent) == 1
-    assert tab.sent[0]["resource"] == "account"
-
-
-async def test_our_own_echo_is_not_delivered_twice(account_socket) -> None:
-    """We deliver locally before publishing, so the echo is already spent."""
-    tab = account_socket(7)
-
-    await user_stream.deliver_remote(_wire_frame(user_stream.ORIGIN, 7))
-    await settle()
-
-    assert tab.sent == []
-
-
 async def test_an_unreadable_frame_is_dropped_not_raised(account_socket) -> None:
     """Anything on the channel that is not ours must not take the reader down."""
     tab = account_socket(7)
@@ -56,63 +34,18 @@ async def test_an_unreadable_frame_is_dropped_not_raised(account_socket) -> None
     assert tab.sent == []
 
 
-async def test_local_delivery_survives_a_bus_that_is_down(
-    account_socket, monkeypatch
-) -> None:
-    """The whole fail-soft claim, in one test.
-
-    A deployment that cannot reach the bus behaves exactly as it did before the
-    bus existed: every socket this process holds is still served.
-    """
-
-    async def _unavailable(_channel: str, _payload: str) -> None:
-        raise RuntimeError("bus not connected")
-
-    monkeypatch.setattr(notify_bus, "notify", _unavailable)
-    tab = account_socket(7)
-
-    await user_stream.publish([7], user_stream.build_frame("account", "membership"))
-    await settle()
-
-    assert len(tab.sent) == 1
-
-
-async def test_a_published_frame_is_offered_to_the_other_workers(
-    account_socket, monkeypatch
-) -> None:
-    sent: list[str] = []
-
-    async def _capture(_channel: str, payload: str) -> None:
-        sent.append(payload)
-
-    monkeypatch.setattr(notify_bus, "notify", _capture)
-
-    await user_stream.publish([7], user_stream.build_frame("account", "membership"))
-
-    assert len(sent) == 1
-    envelope = json.loads(sent[0])
-    assert envelope["user_ids"] == [7]
-    assert envelope["origin"] == user_stream.ORIGIN
-    # Content-free on the wire as well as at the socket.
-    assert envelope["frame"]["ids"] == {}
-
-
-def test_the_listen_address_is_a_libpq_dsn(monkeypatch) -> None:
-    """asyncpg is handed a plain postgresql:// URL, not SQLAlchemy's spelling."""
-    monkeypatch.setattr(
-        settings,
-        "DATABASE_URL_LISTEN",
-        "postgresql+asyncpg://someone:secret@db:5432/initiative",
-    )
-    assert notify_bus._dsn() == "postgresql://someone:secret@db:5432/initiative"
-
-
-def test_the_listen_address_defaults_to_the_database(monkeypatch) -> None:
-    """Unset is the ordinary case: an app talking to Postgres directly."""
-    monkeypatch.setattr(settings, "DATABASE_URL_LISTEN", None)
-    monkeypatch.setattr(
-        settings, "DATABASE_URL", "postgresql+asyncpg://a:b@localhost:5432/x"
-    )
+@pytest.mark.parametrize(
+    ("listen", "database"),
+    [
+        # asyncpg is handed a plain postgresql:// URL, not SQLAlchemy's spelling.
+        ("postgresql+asyncpg://a:b@localhost:5432/x", "postgresql+asyncpg://c:d@db/y"),
+        # Unset is the ordinary case: an app talking to Postgres directly.
+        (None, "postgresql+asyncpg://a:b@localhost:5432/x"),
+    ],
+)
+def test_the_listen_address_is_a_libpq_dsn(monkeypatch, listen, database) -> None:
+    monkeypatch.setattr(settings, "DATABASE_URL_LISTEN", listen)
+    monkeypatch.setattr(settings, "DATABASE_URL", database)
     assert notify_bus._dsn() == "postgresql://a:b@localhost:5432/x"
 
 

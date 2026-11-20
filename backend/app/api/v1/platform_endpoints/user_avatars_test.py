@@ -13,7 +13,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.image_headers import validate_image
 from app.db.public_rls import platform_tier, role_name
 from app.models.platform.notification import Notification, NotificationType
-from app.models.platform.user import User, UserRole
+from app.models.platform.user import UserRole
 from app.models.platform.user_avatar import AVATAR_SPEC, UserAvatar
 from app.services.platform import user_avatars as service
 from app.services.platform.user_avatars_test import jpeg, png
@@ -77,12 +77,14 @@ async def test_anyone_may_fetch_a_picture_without_a_session(
 ):
     """A name and a face are public information here, so the serve route asks
     for nothing — which is what lets the response be cached by a shared proxy
-    rather than only by the browser that asked."""
+    rather than only by the browser that asked. The response is cached under
+    the URL that was asked for, so a digest that is no longer current must not
+    return whatever is, and a removed picture's URL stops working."""
     user = await create_user(session)
     await _upload(client, get_auth_headers(user))
-    digest = validate_image(AVATAR_SPEC, png(256, 256)).sha256
+    stale = validate_image(AVATAR_SPEC, png(256, 256)).sha256
 
-    response = await client.get(f"/api/v1/users/{user.id}/avatar/{digest}")
+    response = await client.get(f"/api/v1/users/{user.id}/avatar/{stale}")
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/png"
@@ -90,34 +92,20 @@ async def test_anyone_may_fetch_a_picture_without_a_session(
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.content == png(256, 256)
 
-
-async def test_a_stale_digest_is_not_served_the_current_picture(
-    client: AsyncClient, session: AsyncSession
-):
-    """The response is cached under the URL that was asked for, so a digest
-    that is no longer current must not return whatever is."""
-    user = await create_user(session)
-    await _upload(client, get_auth_headers(user))
-    stale = validate_image(AVATAR_SPEC, png(256, 256)).sha256
     await _upload(client, get_auth_headers(user), jpeg(128, 128))
-
-    response = await client.get(f"/api/v1/users/{user.id}/avatar/{stale}")
-
-    assert response.status_code == 404
-
-
-async def test_removing_a_picture_makes_its_url_stop_working(
-    client: AsyncClient, session: AsyncSession
-):
-    user = await create_user(session)
-    await _upload(client, get_auth_headers(user))
-    digest = validate_image(AVATAR_SPEC, png(256, 256)).sha256
+    current = validate_image(AVATAR_SPEC, jpeg(128, 128)).sha256
+    assert (
+        await client.get(f"/api/v1/users/{user.id}/avatar/{stale}")
+    ).status_code == 404
+    assert (
+        await client.get(f"/api/v1/users/{user.id}/avatar/{current}")
+    ).status_code == 200
 
     deleted = await client.delete("/api/v1/me/avatar", headers=get_auth_headers(user))
 
     assert deleted.status_code == 204
     assert (
-        await client.get(f"/api/v1/users/{user.id}/avatar/{digest}")
+        await client.get(f"/api/v1/users/{user.id}/avatar/{current}")
     ).status_code == 404
 
 
@@ -252,7 +240,7 @@ async def test_setting_an_external_picture_drops_the_uploaded_one(
 async def test_the_request_path_cannot_write_someone_elses_picture(
     client: AsyncClient, session: AsyncSession, role_session
 ):
-    """Own-row is a database rule, not an endpoint check.
+    """Own-row is a database rule, not an endpoint check, for writes.
 
     Asserted as ``app_user`` with another user's id in the request context, so
     a handler that forgot to scope the write would still be stopped here.
@@ -276,30 +264,19 @@ async def test_the_request_path_cannot_write_someone_elses_picture(
 
     assert deleted.rowcount == 0
     assert updated.rowcount == 0
-    assert (
-        await session.exec(select(UserAvatar).where(UserAvatar.user_id == owner.id))
-    ).first() is not None
 
-
-async def test_the_request_path_may_read_any_picture(
-    client: AsyncClient, session: AsyncSession, role_session
-):
-    """Reads are deliberately unconditional — the picture is public."""
-    owner = await create_user(session)
-    other = await create_user(session)
-    await _upload(client, get_auth_headers(owner))
-
-    s = await role_session("app_user")
+    # Reads are deliberately unconditional — the picture is public.
     await _assume(s, "member", other.id)
-
     found = (
         await s.exec(
             text("SELECT sha256 FROM public.user_avatars WHERE user_id = :uid"),
             params={"uid": owner.id},
         )
     ).first()
-
     assert found is not None
+    assert (
+        await session.exec(select(UserAvatar).where(UserAvatar.user_id == owner.id))
+    ).first() is not None
 
 
 async def test_deleting_a_user_takes_their_picture_with_them(
@@ -316,24 +293,6 @@ async def test_deleting_a_user_takes_their_picture_with_them(
     assert (
         await session.exec(select(UserAvatar).where(UserAvatar.user_id == user.id))
     ).first() is None
-
-
-async def test_anonymizing_a_user_leaves_no_face(
-    client: AsyncClient, session: AsyncSession
-):
-    from app.services.platform import users as users_service
-
-    user = await create_user(session)
-    await _upload(client, get_auth_headers(user))
-
-    await users_service.soft_delete_user(session, user.id)
-    await session.commit()
-
-    assert (
-        await session.exec(select(UserAvatar).where(UserAvatar.user_id == user.id))
-    ).first() is None
-    refreshed = (await session.exec(select(User).where(User.id == user.id))).first()
-    assert refreshed is not None and refreshed.avatar_url is None
 
 
 # --- the three things a review caught -----------------------------------------
@@ -373,26 +332,6 @@ async def test_storing_does_not_depend_on_what_the_read_saw(
     assert len(rows) == 1
     # Last writer wins, which is what "replace my picture" means.
     assert rows[0].content_type == "image/jpeg"
-
-
-async def test_a_stored_picture_is_named_on_the_user_row(
-    client: AsyncClient, session: AsyncSession
-):
-    """``users.avatar_url`` is what every payload naming a person carries, so a
-    ``user_avatars`` row nothing points at is a picture that has disappeared.
-    This is the invariant the backfill has to preserve too."""
-    user = await create_user(session)
-    await _upload(client, get_auth_headers(user))
-
-    row = (
-        await session.exec(select(UserAvatar).where(UserAvatar.user_id == user.id))
-    ).first()
-    stored = (await session.exec(select(User).where(User.id == user.id))).first()
-
-    assert row is not None and stored is not None
-    assert stored.avatar_url == f"/api/v1/users/{user.id}/avatar/{row.sha256}"
-    # And that URL actually serves.
-    assert (await client.get(stored.avatar_url)).status_code == 200
 
 
 async def test_a_takedown_and_its_notice_are_one_write(

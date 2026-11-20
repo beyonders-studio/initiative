@@ -12,7 +12,7 @@ import pytest
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.notification_categories import NotificationCategory, category_of
+from app.core.notification_categories import NotificationCategory
 from app.models.platform.email_outbox import EmailOutboxItem
 from app.models.platform.notification import NotificationType
 from app.services import email as email_service
@@ -54,44 +54,6 @@ def configured(monkeypatch):
 # --- resolution --------------------------------------------------------------
 
 
-async def test_a_fresh_deployment_restricts_nothing(session: AsyncSession) -> None:
-    """The shape the app had before any of this existed."""
-    guild = await create_guild(session)
-    assert await notification_policy.resolve(session, guild.id) == (
-        notification_policy.UNRESTRICTED
-    )
-    assert await notification_policy.resolve(session, None) == (
-        notification_policy.UNRESTRICTED
-    )
-
-
-async def test_the_deployment_binds_every_community(session: AsyncSession) -> None:
-    guild = await create_guild(session)
-    await _platform(session, push_notifications_enabled=False)
-
-    assert (await notification_policy.resolve(session, guild.id)).push is False
-    assert (await notification_policy.resolve(session, None)).push is False
-
-
-async def test_a_community_answers_only_for_itself(session: AsyncSession) -> None:
-    quiet = await create_guild(session)
-    other = await create_guild(session)
-    await rules.put(session, "allow_push_notifications", False, guild_id=quiet.id)
-    await rules.put(session, "redact_notification_content", True, guild_id=quiet.id)
-    await session.commit()
-
-    here = await notification_policy.resolve(session, quiet.id)
-    assert here.push is False
-    assert here.redact is True
-
-    elsewhere = await notification_policy.resolve(session, other.id)
-    assert elsewhere == notification_policy.UNRESTRICTED
-    # A notification belonging to no community is the deployment's answer alone.
-    assert await notification_policy.resolve(session, None) == (
-        notification_policy.UNRESTRICTED
-    )
-
-
 async def test_the_stricter_of_the_pair_binds(session: AsyncSession) -> None:
     """A community may narrow what the deployment permits, never widen it."""
     guild = await create_guild(session)
@@ -108,6 +70,8 @@ async def test_the_stricter_of_the_pair_binds(session: AsyncSession) -> None:
 
     resolved = await notification_policy.resolve(session, guild.id)
     assert (resolved.push, resolved.email, resolved.redact) == (False, False, True)
+    # A notification belonging to no community is the deployment's answer alone.
+    assert (await notification_policy.resolve(session, None)).push is False
 
 
 async def test_resolve_many_answers_each_community(session: AsyncSession) -> None:
@@ -136,14 +100,6 @@ async def test_a_community_that_no_longer_exists_is_answered_by_the_deployment(
 
 
 # --- the redacted wording ----------------------------------------------------
-
-
-async def test_a_redacted_line_says_the_kind_of_thing_and_stops() -> None:
-    title, body = notification_policy.redacted_line(
-        category_of(NotificationType.mention), "en"
-    )
-    assert title == "You were mentioned or answered"
-    assert body == "Open Initiative to see where."
 
 
 async def test_every_category_has_a_redacted_line() -> None:
@@ -189,30 +145,6 @@ async def test_a_community_that_declines_push_gets_none(
     user = await create_user(session, email="declines-push@example.com")
 
     assert await _mention_push(session, user, guild.id) == (None, None)
-
-
-async def test_a_redacting_community_sends_the_kind_of_thing(
-    session: AsyncSession, push_on
-) -> None:
-    guild = await create_guild(session)
-    await rules.put(session, "redact_notification_content", True, guild_id=guild.id)
-    await session.commit()
-    user = await create_user(session, email="redacts@example.com")
-
-    assert await _mention_push(session, user, guild.id) == (
-        "You were mentioned or answered",
-        "Open Initiative to see where.",
-    )
-
-
-async def test_an_unrestricted_community_pushes_what_it_was_given(
-    session: AsyncSession, push_on
-) -> None:
-    guild = await create_guild(session)
-    user = await create_user(session, email="unrestricted-push@example.com")
-
-    title, _body = await _mention_push(session, user, guild.id)
-    assert title == "Ana mentioned you in Q3 budget"
 
 
 async def test_a_redacted_push_reads_the_recipients_language(

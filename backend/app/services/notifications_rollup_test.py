@@ -42,25 +42,6 @@ async def _lines(session: AsyncSession, user_id: int) -> list[Notification]:
     return [row[0] if isinstance(row, tuple) else row for row in rows]
 
 
-def test_a_second_comment_extends_the_line():
-    first = _rolled_up_comment(None, commenter_name="ana", commenter_id=1)
-    assert first["comment_count"] == 1
-    assert [c["name"] for c in first["commenters"]] == ["ana"]
-
-    second = _rolled_up_comment(first, commenter_name="bo", commenter_id=2)
-    assert second["comment_count"] == 2
-    assert [c["name"] for c in second["commenters"]] == ["ana", "bo"]
-    assert second["commenter_count"] == 2
-
-
-def test_the_same_person_twice_is_one_commenter_and_two_comments():
-    first = _rolled_up_comment(None, commenter_name="ana", commenter_id=1)
-    again = _rolled_up_comment(first, commenter_name="ana", commenter_id=1)
-    assert again["comment_count"] == 2
-    assert again["commenter_count"] == 1
-    assert [c["name"] for c in again["commenters"]] == ["ana"]
-
-
 def test_the_roster_is_bounded_but_the_count_is_not():
     rolled = _rolled_up_comment(None, commenter_name="p0", commenter_id=0)
     for i in range(1, MAX_ROLLED_UP_COMMENTERS + 5):
@@ -73,8 +54,10 @@ async def test_many_comments_on_one_task_are_one_line(session: AsyncSession):
     owner = await create_user(session, email="rollup-owner@example.com")
     talkers = [
         await create_user(session, email=f"rollup-talker-{i}@example.com")
-        for i in range(3)
+        for i in range(2)
     ]
+    # The same person twice is one commenter and two comments.
+    talkers.append(talkers[0])
 
     with patch(
         "app.services.platform.email_outbox.enqueue", new_callable=AsyncMock
@@ -87,7 +70,9 @@ async def test_many_comments_on_one_task_are_one_line(session: AsyncSession):
     lines = await _lines(session, owner.id)
     assert len(lines) == 1
     assert lines[0].data["comment_count"] == 3
-    assert lines[0].data["commenter_count"] == 3
+    assert lines[0].data["commenter_count"] == 2
+    names = [c["name"].split("#")[0] for c in lines[0].data["commenters"]]
+    assert sorted(names) == sorted(talker.username for talker in talkers[:2])
     # One interruption, not three: the flurry opens the window once.
     assert email.await_count == 1
 

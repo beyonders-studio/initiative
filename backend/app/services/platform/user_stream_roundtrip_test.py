@@ -80,14 +80,15 @@ async def test_a_frame_crosses_between_two_connections(
 async def test_our_own_publish_does_not_come_back_around(
     account_socket, monkeypatch
 ) -> None:
-    """The dedupe, end to end: publish delivers locally exactly once.
+    """The dedupe, end to end: publish delivers locally exactly once, to each
+    reader one notice names.
 
     Our own listener sees the echo and must drop it — otherwise every frame on
     a single-worker install would arrive twice.
     """
     monkeypatch.setattr(settings, "DATABASE_URL_LISTEN", TEST_DATABASE_URL)
 
-    tab = account_socket(7)
+    tabs = {user_id: account_socket(user_id) for user_id in range(1, 16)}
 
     bus = notify_bus.NotifyBus()
     monkeypatch.setattr(notify_bus, "bus", bus)
@@ -97,11 +98,13 @@ async def test_our_own_publish_does_not_come_back_around(
         if not await _wait_for(lambda: bus.running, timeout=10.0):
             pytest.skip("this address cannot hold a LISTEN (a transaction pooler)")
 
-        await user_stream.publish([7], user_stream.build_frame("account", "membership"))
+        await user_stream.publish(
+            list(tabs), user_stream.build_frame("account", "community")
+        )
 
         # Give the echo every chance to arrive before claiming it did not.
         await asyncio.sleep(0.5)
-        assert len(tab.sent) == 1
+        assert all(len(tab.sent) == 1 for tab in tabs.values())
     finally:
         await bus.stop()
 
@@ -137,34 +140,5 @@ async def test_a_burst_of_frames_all_reach_the_bus(monkeypatch) -> None:
 
         failures = [r for r in results if isinstance(r, Exception)]
         assert failures == [], f"{len(failures)} of 25 frames never reached the bus"
-    finally:
-        await bus.stop()
-
-
-async def test_a_community_listing_reaches_every_member_on_another_worker(
-    account_socket, monkeypatch
-) -> None:
-    """The fan-out, end to end: each member's socket gets exactly one frame."""
-    monkeypatch.setattr(settings, "DATABASE_URL_LISTEN", TEST_DATABASE_URL)
-
-    tabs = {user_id: account_socket(user_id) for user_id in range(1, 16)}
-
-    bus = notify_bus.NotifyBus()
-    monkeypatch.setattr(notify_bus, "bus", bus)
-    bus.register(user_stream.CHANNEL, user_stream.deliver_remote)
-    await bus.start()
-    try:
-        if not await _wait_for(lambda: bus.running, timeout=10.0):
-            pytest.skip("this address cannot hold a LISTEN (a transaction pooler)")
-
-        # Published as the after-commit hook does it: one notice naming every
-        # member.
-        await user_stream.publish(
-            list(tabs), user_stream.build_frame("account", "community")
-        )
-
-        assert await _wait_for(
-            lambda: all(len(tab.sent) == 1 for tab in tabs.values())
-        ), {user_id: len(tab.sent) for user_id, tab in tabs.items()}
     finally:
         await bus.stop()

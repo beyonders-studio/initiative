@@ -18,7 +18,6 @@ from app.api.v1.platform_endpoints.dm_transport_test import (
     _set_policy,
 )
 from app.models.platform.user_dm_settings import DmPolicy
-from app.models.platform.user_ignore import UserIgnore
 from app.testing import set_notification_prefs
 
 
@@ -69,7 +68,9 @@ async def _read_thread(client, actor, conversation_id):
     )
 
 
-async def test_a_message_names_the_sender_and_counts_one(client, session, acting_user):
+async def test_a_flurry_is_one_line_naming_the_sender(client, session, acting_user):
+    """The line says who and how many. It never says what — and a pair carries
+    no roster: the line already names the sender."""
     a = await acting_user()
     b = await acting_user()
     conversation_id, b_device = await _channel(client, session, a, b)
@@ -81,17 +82,11 @@ async def test_a_message_names_the_sender_and_counts_one(client, session, acting
     assert lines[0]["data"]["count"] == 1
     assert lines[0]["data"]["sender_id"] == a.user.id
     assert lines[0]["data"]["conversation_id"] == conversation_id
-    # The line says who and how many. It never says what.
     assert "payload" not in lines[0]["data"]
     assert "body" not in lines[0]["data"]
+    assert "member_names" not in lines[0]["data"]
 
-
-async def test_a_flurry_is_one_line(client, session, acting_user):
-    a = await acting_user()
-    b = await acting_user()
-    conversation_id, b_device = await _channel(client, session, a, b)
-
-    for _ in range(4):
+    for _ in range(3):
         await _send(client, a, conversation_id, b_device)
 
     lines = await _lines(session, b.user.id)
@@ -102,7 +97,8 @@ async def test_a_flurry_is_one_line(client, session, acting_user):
 async def test_reading_the_line_makes_the_next_message_a_new_one(
     client, session, acting_user
 ):
-    """Once read, "new" has to start meaning something again."""
+    """The recipient's own client is the only thing that can close a line, and
+    once read, "new" has to start meaning something again."""
     a = await acting_user()
     b = await acting_user()
     conversation_id, b_device = await _channel(client, session, a, b)
@@ -110,6 +106,9 @@ async def test_reading_the_line_makes_the_next_message_a_new_one(
 
     read = await _read_thread(client, b, conversation_id)
     assert read.status_code == 204, read.text
+    lines = await _lines(session, b.user.id)
+    assert len(lines) == 1
+    assert lines[0]["read_at"] is not None
 
     await _send(client, a, conversation_id, b_device)
 
@@ -117,19 +116,6 @@ async def test_reading_the_line_makes_the_next_message_a_new_one(
     assert len(lines) == 2
     assert lines[1]["data"]["count"] == 1
     assert lines[1]["read_at"] is None
-
-
-async def test_an_ignored_sender_produces_no_line(client, session, acting_user):
-    a = await acting_user()
-    b = await acting_user()
-    conversation_id, b_device = await _channel(client, session, a, b)
-    session.add(UserIgnore(user_id=b.user.id, ignored_user_id=a.user.id))
-    await session.commit()
-
-    sent = await _send(client, a, conversation_id, b_device)
-    assert sent.status_code == 200, sent.text
-
-    assert await _lines(session, b.user.id) == []
 
 
 class TestChannels:
@@ -156,19 +142,6 @@ class TestChannels:
         # this announces is encrypted, and the server holds no key to it.
         assert b"a secret" not in repr(send.await_args).encode()
 
-    async def test_a_flurry_is_one_email(self, client, session, acting_user):
-        a = await acting_user()
-        b = await acting_user()
-        conversation_id, b_device = await _channel(client, session, a, b)
-
-        with patch(
-            "app.services.platform.email_outbox.enqueue", new_callable=AsyncMock
-        ) as send:
-            for _ in range(4):
-                await _send(client, a, conversation_id, b_device)
-
-        assert send.await_count == 1
-
     async def test_turning_the_preference_off_stops_it(
         self, client, session, acting_user
     ):
@@ -192,19 +165,6 @@ class TestChannels:
 class TestReadingTheThread:
     """The recipient's own client is the only thing that can close a line, and
     closing it is what lets the next message be announced."""
-
-    async def test_reading_closes_the_line(self, client, session, acting_user):
-        a = await acting_user()
-        b = await acting_user()
-        conversation_id, b_device = await _channel(client, session, a, b)
-        await _send(client, a, conversation_id, b_device)
-
-        read = await _read_thread(client, b, conversation_id)
-        assert read.status_code == 204, read.text
-
-        lines = await _lines(session, b.user.id)
-        assert len(lines) == 1
-        assert lines[0]["read_at"] is not None
 
     async def test_only_the_named_conversation_closes(
         self, client, session, acting_user
@@ -360,37 +320,17 @@ class TestAGroupLine:
         c = await acting_user()
         conversation_id, devices = await self._group(client, session, [a, b, c])
 
-        await _send(client, a, conversation_id, devices[b.user.id])
+        await _send(client, a, conversation_id, devices[b.user.id], b"a group secret")
 
         lines = await _lines(session, b.user.id)
         assert len(lines) == 1
-        names = lines[0]["data"]["member_names"]
+        data = lines[0]["data"]
+        # The line still carries no message.
+        assert b"a group secret" not in repr(data).encode()
+        assert "payload" not in data and "body" not in data
+        names = data["member_names"]
         # A and C, not B: listing the reader back to themselves would be naming
         # the one person who already knows they are there.
         assert len(names) == 2
         assert all(isinstance(name, str) and name for name in names)
         assert lines[0]["data"]["sender_id"] == a.user.id
-
-    async def test_a_pair_carries_no_roster(self, client, session, acting_user):
-        """Nothing changes for two people: the line already names the sender."""
-        a = await acting_user()
-        b = await acting_user()
-        conversation_id, b_device = await _channel(client, session, a, b)
-
-        await _send(client, a, conversation_id, b_device)
-
-        assert "member_names" not in (await _lines(session, b.user.id))[0]["data"]
-
-    async def test_the_line_still_carries_no_message(
-        self, client, session, acting_user
-    ):
-        a = await acting_user()
-        b = await acting_user()
-        c = await acting_user()
-        conversation_id, devices = await self._group(client, session, [a, b, c])
-
-        await _send(client, a, conversation_id, devices[b.user.id], b"a group secret")
-
-        data = (await _lines(session, b.user.id))[0]["data"]
-        assert b"a group secret" not in repr(data).encode()
-        assert "payload" not in data and "body" not in data

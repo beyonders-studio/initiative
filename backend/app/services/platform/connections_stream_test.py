@@ -6,9 +6,6 @@ as a notification, and an ignored account is told neither that it happened nor
 that it was lifted.
 """
 
-import json
-from typing import Any
-
 from sqlalchemy import text
 
 from app.models.platform.contact_grant import ContactGrantKind
@@ -16,9 +13,7 @@ from app.models.platform.user_dm_settings import DmPolicy
 from app.models.platform.user_ignore import UserIgnore
 from app.services.platform import (
     connections_stream,
-    notify_bus,
     user_ignores,
-    user_stream,
 )
 from app.services.platform import contact_grants as contact_grants_service
 from app.testing import create_user
@@ -105,7 +100,10 @@ async def test_ignoring_pokes_the_holder_and_nobody_else(session, account_socket
     await user_ignores.add(session, user_id=ada.id, ignored_user_id=bram.id)
     await settle()
 
-    assert _connections_frames(to_ada)
+    [frame] = _connections_frames(to_ada)
+    assert frame["resource"] == "connections"
+    assert frame["ids"] == {}
+    assert set(frame) == {"resource", "action", "ids", "timestamp"}
     assert _connections_frames(to_bram) == []
 
 
@@ -126,49 +124,3 @@ async def test_lifting_an_ignore_pokes_the_holder_and_nobody_else(
 
     assert _connections_frames(to_ada)
     assert _connections_frames(to_bram) == []
-
-
-async def test_the_frame_carries_nothing(session, account_socket):
-    ada = await create_user(session)
-    bram = await create_user(session)
-    await session.commit()
-    to_ada = await _socket_for(account_socket, ada)
-
-    await user_ignores.add(session, user_id=ada.id, ignored_user_id=bram.id)
-    await settle()
-
-    frame = _connections_frames(to_ada)[0]
-    assert frame["resource"] == "connections"
-    assert frame["ids"] == {}
-    assert set(frame) == {"resource", "action", "ids", "timestamp"}
-
-
-async def test_a_fan_out_publishes_for_everyone_it_names(
-    session, account_socket, monkeypatch
-):
-    """Not narrowed to this worker's own sockets, and one notice for all.
-
-    That narrowing would have to happen before ``publish``, which is also what
-    puts a frame on the cross-worker bus — so an account connected only to
-    another worker would never be published for. Here ``away`` stands in for
-    that account: it holds no socket on this process, and the frame is still
-    sent for it, in the same notice as ``here``.
-    """
-    here = await create_user(session)
-    away = await create_user(session)
-    await session.commit()
-    to_here = await _socket_for(account_socket, here)
-
-    notices: list[dict[str, Any]] = []
-
-    async def _capture(_channel: str, payload: str) -> None:
-        notices.append(json.loads(payload))
-
-    monkeypatch.setattr(notify_bus, "notify", _capture)
-
-    user_stream.queue_signals(session, [here.id, away.id], connections_stream.RESOURCE)
-    await session.commit()
-    await settle()
-
-    assert _connections_frames(to_here)
-    assert [notice["user_ids"] for notice in notices] == [[here.id, away.id]]

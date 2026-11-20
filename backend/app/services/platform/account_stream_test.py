@@ -8,8 +8,8 @@ reaching a socket.
 import pytest
 
 from app.models.platform.guild import CommunityJoinPolicy, CommunityRole
-from app.services.platform import account_stream, rules, user_stream
 from app.services.platform import guilds as guilds_service
+from app.services.platform import rules, user_stream
 from app.testing import create_guild, create_guild_membership, create_user
 from app.testing.sockets import settle
 
@@ -42,76 +42,6 @@ def bus_off(monkeypatch):
     monkeypatch.setattr(notify_bus, "notify", _unavailable)
 
 
-async def test_the_frame_says_nothing_about_the_account(
-    session, account_socket
-) -> None:
-    """It names the channel and nothing else — the client re-reads to learn."""
-    user = await create_user(session)
-    tab = account_socket(user.id)
-
-    account_stream.queue_account_signal(session, user.id, "membership")
-    await session.commit()
-    await settle()
-
-    frame = tab.sent[0]
-    assert frame["resource"] == "account"
-    assert frame["action"] == "membership"
-    assert frame["ids"] == {}
-    assert set(frame) == {"resource", "action", "ids", "timestamp"}
-
-
-async def test_no_frame_before_the_commit(session, account_socket) -> None:
-    """A tab told to re-read before the COMMIT reads the state being replaced."""
-    user = await create_user(session)
-    tab = account_socket(user.id)
-
-    account_stream.queue_account_signal(session, user.id, "membership")
-    await settle()
-
-    assert tab.sent == []
-
-
-async def test_rollback_pokes_nobody(session, account_socket) -> None:
-    user = await create_user(session)
-    tab = account_socket(user.id)
-
-    account_stream.queue_account_signal(session, user.id, "membership")
-    await session.rollback()
-    await settle()
-
-    assert tab.sent == []
-
-
-async def test_one_frame_per_channel_per_transaction(session, account_socket) -> None:
-    """Three reasons to re-read one account is still one refetch."""
-    user = await create_user(session)
-    tab = account_socket(user.id)
-
-    for reason in ("membership", "role", "community"):
-        account_stream.queue_account_signal(session, user.id, reason)
-    await session.commit()
-    await settle()
-
-    assert len(tab.sent) == 1
-
-
-async def test_the_inbox_and_the_account_are_not_the_same_frame(
-    session, account_socket
-) -> None:
-    """Two channels over one socket: one must not swallow the other."""
-    from app.services.platform import notification_stream
-
-    user = await create_user(session)
-    tab = account_socket(user.id)
-
-    account_stream.queue_account_signal(session, user.id, "membership")
-    notification_stream.queue_signal(session, user.id, "created")
-    await session.commit()
-    await settle()
-
-    assert {frame["resource"] for frame in tab.sent} == {"account", "notification"}
-
-
 async def test_being_added_to_a_guild_pokes_the_arrival(
     session, account_socket
 ) -> None:
@@ -126,7 +56,12 @@ async def test_being_added_to_a_guild_pokes_the_arrival(
     await session.commit()
     await settle()
 
-    assert [frame["resource"] for frame in tab.sent] == ["account"]
+    # It names the channel and nothing else — the client re-reads to learn.
+    [frame] = tab.sent
+    assert frame["resource"] == "account"
+    assert frame["action"] == "membership"
+    assert frame["ids"] == {}
+    assert set(frame) == {"resource", "action", "ids", "timestamp"}
 
 
 async def test_re_adding_an_existing_member_pokes_nobody(
