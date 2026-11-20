@@ -51,23 +51,31 @@ const book = `book.${uid}`;
 
 const field = (key: string) => ({ type: "field", props: { field: key } });
 
-/** The shelf, its rows' pages placing their actions and tags, and a book's
- *  card its tags. */
-const definition = () => {
+/** The shelf, its rows' pages placing their actions (a book's, unless its
+ *  layout leaves them out as shipped) and tags, and a book's card its tags. */
+const definition = (placeBookActions: boolean) => {
   const made = shelfDefinition();
   made.tool.layouts.detail.main.push(field("tags"));
   const [books] = made.tool.items;
-  Object.assign(books.layouts.detail, { header: [field("name"), { type: "actions" }] });
+  if (placeBookActions) {
+    Object.assign(books.layouts.detail, { header: [field("name"), { type: "actions" }] });
+  }
   books.layouts.lists[0].card.children.push(field("tags"));
   return made;
 };
 
 /** The page of one row: the shelf's 5, or book 8 on it. */
-const show = (kind: string, overrides: Partial<PluginToolRowRead> = {}) => {
+const show = (
+  kind: string,
+  overrides: Partial<PluginToolRowRead> = {},
+  placeBookActions = true
+) => {
   const rowId = kind === shelf ? 5 : 8;
   server.use(
     communityHttp.get("/plugins/", () =>
-      HttpResponse.json({ items: [buildToolPlugin({ definition: definition() } as never)] })
+      HttpResponse.json({
+        items: [buildToolPlugin({ definition: definition(placeBookActions) } as never)],
+      })
     ),
     communityHttp.get(`/plugin-tools/${kind}/${rowId}`, () =>
       HttpResponse.json(
@@ -268,6 +276,12 @@ describe("a tool plug-in's row", () => {
 describe("an item of a tool plug-in", () => {
   it("is shared as its tool is, so it offers no access settings of its own", async () => {
     show(book, { can: ownerCan() });
+
+    expect(await offered()).toEqual(["Archive", "Delete"]);
+  });
+
+  it("offers its actions where its page's layout does not place them", async () => {
+    show(book, { can: ownerCan() }, false);
 
     expect(await offered()).toEqual(["Archive", "Delete"]);
   });

@@ -29,6 +29,7 @@ import {
   type DetailLayoutSpec,
   isRequired,
   PlacedProperties,
+  pageParts,
   placedProperties,
   requiredKey,
   requiredKeys,
@@ -412,6 +413,10 @@ const ItemDetail = <I extends DetailItem, C, P>({
     return upFront ? addingTree(laidOut, [...upFront, ...requiredKeys(layout)]) : laidOut;
   }, [spec, layout, more, upFront]);
   const placed = useMemo(() => placedProperties(tree), [tree]);
+  // What can be done with the item is always on its page: where its layout
+  // does not place it, it heads the detail.
+  const placesActions = useMemo(() => pageParts(tree).includes("actions"), [tree]);
+  const unplacedActions = !adding && Boolean(home.actions) && !placesActions;
   const view = useMemo<LayoutContext<I>>(
     () => ({
       fields: detail.fields([], added),
@@ -429,6 +434,11 @@ const ItemDetail = <I extends DetailItem, C, P>({
   const drawn = { detail, context, home, extension } as unknown as Drawn;
   const body = (
     <PlacedProperties.Provider value={placed}>
+      {unplacedActions ? (
+        <div className="flex">
+          <ItemActions />
+        </div>
+      ) : null}
       {renderNode(tree, item, view, parts)}
     </PlacedProperties.Provider>
   );
