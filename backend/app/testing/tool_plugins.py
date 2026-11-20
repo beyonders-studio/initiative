@@ -1,9 +1,11 @@
-"""Counters, declared as a tool plug-in: the SDK's own example
-(``test/support/counters.ts`` in initiative-plugin-sdk), as a manifest a
-test registers."""
+"""Counters, the tool plug-in this build's catalogue ships, as a manifest a
+test registers, and the helpers that install it."""
 
 from __future__ import annotations
 
+import copy
+import json
+from functools import cache
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -27,205 +29,25 @@ __all__ = [
     "run_as_a_revision",
 ]
 
-#: The uid the SDK's example names Counters by.
+#: The uid the catalogue ships Counters under.
 COUNTERS_UID = "TSJVTCM0S7GV2X"
 
 
-def _field(key: str) -> dict[str, Any]:
-    """A layout's part drawing one field."""
-    return {"type": "field", "props": {"field": key}}
+@cache
+def _catalogued() -> dict[str, Any]:
+    from app.services.marketplace.builtin import CATALOG_DIR
 
-
-def _header() -> list[dict[str, Any]]:
-    """An item page's name and its menu, across the top."""
-    return [
-        {
-            "type": "stack",
-            "props": {"direction": "row", "gap": "sm", "align": "start"},
-            "children": [_field("name"), {"type": "actions"}],
-        }
-    ]
+    with (CATALOG_DIR / "core.counters.json").open(encoding="utf-8") as handle:
+        return json.load(handle)["definition"]
 
 
 def counters_tool_manifest() -> dict[str, Any]:
-    """A fresh copy of the Counters tool plug-in's manifest."""
-    return {
-        "plugin_kind": "tool",
-        "features": ["tool"],
-        "default_name": "Counters",
-        "tool": {
-            "key": "counter_group",
-            "name": {"en": "Counters"},
-            "instance_name": {"en": "Counter group"},
-            "icon": "gauge",
-            "fields": [
-                {"key": "description", "name": {"en": "Description"}, "kind": "text"}
-            ],
-            "layouts": {
-                "lists": [
-                    {
-                        "kind": "grid",
-                        "card": {
-                            "type": "card",
-                            "children": [
-                                {
-                                    "type": "items",
-                                    "props": {
-                                        "item": "counter",
-                                        "fields": ["name", "count"],
-                                        "limit": 4,
-                                        "tint": "color",
-                                    },
-                                },
-                                _field("name"),
-                                {
-                                    "type": "stack",
-                                    "props": {"tone": "muted"},
-                                    "children": [_field("description")],
-                                },
-                            ],
-                        },
-                    },
-                    {"kind": "table", "columns": ["name", "description", "updated_at"]},
-                ],
-                "detail": {
-                    "header": _header(),
-                    "main": [_field("description"), {"type": "relations"}],
-                    "side": [
-                        {"type": "section", "children": [{"type": "properties"}]},
-                        {"type": "byline"},
-                    ],
-                },
-            },
-            "items": [
-                {
-                    "key": "counter",
-                    "name": {"en": "Counter"},
-                    "fields": [
-                        {
-                            "key": "count",
-                            "name": {"en": "Count"},
-                            "kind": "counter",
-                            "counter": {
-                                "min": "min",
-                                "max": "max",
-                                "step": "step",
-                                "initial": "initial_count",
-                            },
-                        },
-                        {"key": "min", "name": {"en": "Minimum"}, "kind": "number"},
-                        {"key": "max", "name": {"en": "Maximum"}, "kind": "number"},
-                        {
-                            "key": "step",
-                            "name": {"en": "Step"},
-                            "kind": "number",
-                            "default": 1,
-                            "required": True,
-                        },
-                        {
-                            "key": "initial_count",
-                            "name": {"en": "Starting count"},
-                            "kind": "number",
-                            "default": 0,
-                            "required": True,
-                        },
-                        {
-                            "key": "color",
-                            "name": {"en": "Colour"},
-                            "kind": "color",
-                            "default": "random",
-                        },
-                        {
-                            "key": "view_mode",
-                            "name": {"en": "Look"},
-                            "kind": "select",
-                            "default": "number",
-                            "required": True,
-                            "options": [
-                                {"value": "number", "label": {"en": "Number"}},
-                                {"value": "bar", "label": {"en": "Progress bar"}},
-                                {"value": "clock", "label": {"en": "Segmented clock"}},
-                            ],
-                        },
-                    ],
-                    "checks": [
-                        {"field": "min", "at_most": {"field": "max"}},
-                        {"field": "step", "above": 0},
-                    ],
-                    "layouts": {
-                        "lists": [
-                            {
-                                "kind": "grid",
-                                "card": {
-                                    "type": "card",
-                                    "props": {"tint": "color"},
-                                    "children": [_field("name"), _field("count")],
-                                },
-                                "displays": {"count": {"from": "view_mode"}},
-                                "presets": [
-                                    {
-                                        "slug": "by-name",
-                                        "name": {"en": "By name"},
-                                        "sort": [{"field": "name"}],
-                                    },
-                                    {
-                                        "slug": "by-count",
-                                        "name": {"en": "By count"},
-                                        "sort": [
-                                            {"field": "count", "dir": "desc"},
-                                            {"field": "name"},
-                                        ],
-                                    },
-                                ],
-                            },
-                            {
-                                "kind": "table",
-                                "columns": ["name", "count", "min", "max"],
-                                "displays": {"count": {"from": "view_mode"}},
-                            },
-                        ],
-                        "detail": {
-                            "header": _header(),
-                            "main": [_field("count"), {"type": "relations"}],
-                            "side": [
-                                {
-                                    "type": "section",
-                                    "children": [
-                                        _field(key)
-                                        for key in (
-                                            "color",
-                                            "min",
-                                            "max",
-                                            "step",
-                                            "initial_count",
-                                            "view_mode",
-                                        )
-                                    ],
-                                },
-                                {
-                                    "type": "section",
-                                    "children": [{"type": "properties"}],
-                                },
-                            ],
-                        },
-                    },
-                    "open_while": {"field": "count", "below": {"field": "max"}},
-                }
-            ],
-            "actions": [
-                {
-                    "id": "reset_all",
-                    "name": {"en": "Reset all"},
-                    "on": "counter_group",
-                    "confirm": {
-                        "en": "Put every counter in this group back to its starting count?"
-                    },
-                    "write": '{"items": {"counter": [items.counter.{"id": id, '
-                    '"set": {"count": initial_count}}]}}',
-                }
-            ],
-        },
-    }
+    """A fresh copy of the Counters tool plug-in's definition, as this build's
+    catalogue ships it (``core.counters``), less the plug-in API it needs: a
+    test lists it as a version of its own, for the API this build serves."""
+    definition = copy.deepcopy(_catalogued())
+    definition.pop("min_plugin_api", None)
+    return definition
 
 
 async def install_tool_plugin(
@@ -320,23 +142,19 @@ async def add_counter(
     community where it is not. Committed."""
     from app.db.plugin_tools import provisioned_tools
     from app.db.session import routed_guild_id
-    from app.db.tool_rows import locate
     from app.services.tenant.plugin_tool_rows import insert
     from app.testing.schema_harness import route_session_to_guild
 
     tools = await provisioned_tools(guild_id)
     (tool,) = tools.installed
-    (item,) = tool.children
     if routed_guild_id(session) is None:
         await route_session_to_guild(session, guild_id)
     group = await insert(
-        session,
-        locate(tools, tool.kind),
-        {"initiative_id": initiative_id, "name": "Scores"},
+        session, tool.table, {"initiative_id": initiative_id, "name": "Scores"}
     )
     row = await insert(
         session,
-        locate(tools, item.value),
+        tool.items[0],
         {"counter_group_id": group, "name": "Laps", **counter},
     )
     await session.commit()

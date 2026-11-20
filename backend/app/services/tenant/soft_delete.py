@@ -295,7 +295,7 @@ async def _purge_references(
     """
     from app.core.reactions import ReactionTarget
     from app.core.tools import KINDS, LAYOUT_INSTANCE_TABLES
-    from app.db.initiative_rls import comment_parents, content_kind_tables
+    from app.db.initiative_rls import comment_parents
     from app.services.tenant import (
         engagement_levels,
         metadata,
@@ -305,7 +305,7 @@ async def _purge_references(
         tool_layouts,
     )
 
-    content_kinds_by_kind = content_kind_tables(tools)
+    content_kinds_by_kind = tools.kind_tables
     content_kinds = {table: kind for kind, table in content_kinds_by_kind.items()}
     installed = {table.name for table in tools.installed_tables}
     # What an edge may name that has a row: everything in a tool, and a tag.

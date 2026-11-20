@@ -673,7 +673,7 @@ async def _place_tool_plugins(
         and SURFACE_PLUGINS not in seat.closed_surfaces
     )
     if may_place:
-        uids = {tool.kind.partition(".")[2].upper() for tool in held.values()}
+        uids = {tool.listing_uid for tool in held.values()}
         plugins = await session.exec(
             select(GuildPlugin).where(col(GuildPlugin.listing_uid).in_(uids))
         )

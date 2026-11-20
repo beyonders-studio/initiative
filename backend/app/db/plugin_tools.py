@@ -46,7 +46,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
 import string
 from collections import OrderedDict
 from collections.abc import Iterable, Mapping, Sequence
@@ -62,8 +61,14 @@ from sqlmodel import SQLModel
 from sqlmodel.main import get_column_from_field
 
 from app.core.palette import COLOR_PALETTE
-from app.core.tool_set import BUILTIN_TOOLS, KEPT_TOOL_SETS, ToolRecord, ToolSet
-from app.core.tools import Kind, ToolSpec
+from app.core.tool_set import (
+    BUILTIN_TOOLS,
+    DECLARED,
+    KEPT_TOOL_SETS,
+    ToolRecord,
+    ToolSet,
+)
+from app.core.tools import Kind, ToolSpec, plugin_kind
 from app.db.base import MODELS_BY_TABLE
 from app.db.names import object_name
 from app.models.tenant import _mixins
@@ -72,13 +77,17 @@ from app.services.marketplace.tool_plugins import (
     COMPARISONS,
     MAX_TOOL_CHECKS,
     MAX_TOOL_KEY_LENGTH,
+    NUMBER_KINDS,
     RANDOM_COLOR,
     TOOL_COLUMNS,
     TOOL_FIELD_KINDS,
+    TOOL_KEY_CHARS,
+    TOOL_KEY_START,
     effective_defaults,
 )
 
 __all__ = [
+    "CHECKED_FIELD",
     "DECLARED",
     "TABULAR_FORMATS",
     "InstalledTool",
@@ -96,10 +105,6 @@ __all__ = [
     "tool_table_name",
     "tools_digest",
 ]
-
-#: The ``info`` key of a tool plug-in's table holding its declaration: the
-#: tool's block, or the item's.
-DECLARED = "declared"
 
 #: The prefix of every table a tool plug-in has.
 TABLE_PREFIX = "p_"
@@ -137,8 +142,6 @@ _ITEM_MIXINS = (
     _mixins.ArchiveMixin,
 )
 
-_KEY_START = frozenset("abcdefghijklmnopqrstuvwxyz")
-_KEY_CHARS = _KEY_START | frozenset("0123456789_")
 _UID_CHARS = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 _UID_LENGTH = 14
 #: What a select option's value is written with, as registration holds it.
@@ -159,8 +162,9 @@ _OPTIONS = "options"
 #: The ``info`` key marking a declared check's CHECK, which a later version
 #: may add, change or take away.
 _DECLARED = "declared"
-#: The kinds of field a check compares.
-_NUMBERS = frozenset({"number", "counter"})
+#: The ``info`` key of a select's or a declared check's CHECK naming the
+#: field it holds: what a row it refuses is refused as.
+CHECKED_FIELD = "field"
 
 
 class PluginToolError(ValueError):
@@ -194,7 +198,7 @@ def _key(raw: Any, what: str) -> str:
     """A declared key, checked one character at a time."""
     if not isinstance(raw, str) or not raw or len(raw) > MAX_TOOL_KEY_LENGTH:
         raise PluginToolError(f"{what} {raw!r} is not a tool key")
-    if raw[0] not in _KEY_START or any(c not in _KEY_CHARS for c in raw):
+    if raw[0] not in TOOL_KEY_START or any(c not in TOOL_KEY_CHARS for c in raw):
         raise PluginToolError(f"{what} {raw!r} is not a tool key")
     return raw
 
@@ -232,10 +236,6 @@ def _field_key(raw: Any) -> str:
 def tool_table_name(listing_uid: str, key: str) -> str:
     """The table a tool plug-in's tool or item ``key`` is kept in."""
     return f"{TABLE_PREFIX}{_uid(listing_uid)}_{_key(key, 'key')}"
-
-
-def _kind(listing_uid: str, key: str) -> str:
-    return f"{_key(key, 'key')}.{_uid(listing_uid)}"
 
 
 def is_plugin_kind(value: Any) -> bool:
@@ -296,20 +296,11 @@ def _literal(value: Any, kind: str) -> Any:
     if kind == "color" and value == RANDOM_COLOR:
         return _RANDOM_COLOR
     if kind == "multi_select":
-        array = sa.literal(list(value), postgresql.ARRAY(sa.Text))
-        return sa.text(
-            str(array.compile(dialect=_DIALECT, compile_kwargs={"literal_binds": True}))
-        )
+        return _compiled(sa.literal(list(value), postgresql.ARRAY(sa.Text)))
     if isinstance(value, bool):
         return sa.true() if value else sa.false()
     if isinstance(value, int | float):
-        return sa.text(
-            str(
-                sa.literal(value).compile(
-                    dialect=_DIALECT, compile_kwargs={"literal_binds": True}
-                )
-            )
-        )
+        return _compiled(sa.literal(value))
     return str(value)
 
 
@@ -343,33 +334,24 @@ def _field_column(field: Mapping[str, Any], start: Any) -> sa.Column:
         if start is None
         else _literal(start, "number" if kind == "counter" else kind)
     )
-    required = field.get("required") is True
-    if required and default is None:
-        raise PluginToolError(f"field {key!r} is required and has no default")
     return sa.Column(
         key,
         _FIELD_TYPES[kind](),
         server_default=default,
-        nullable=not required,
+        nullable=field.get("required") is not True,
         info={"field": kind},
     )
 
 
 def _operand(raw: Any, numbers: frozenset[str]) -> Any:
-    """What a check compares its field with, checked again: a finite number,
-    or ``{"field": key}``, a number or counter field of the same table."""
+    """What a check compares its field with: a number, or ``{"field": key}``,
+    a number or counter field of the same table."""
     if isinstance(raw, Mapping):
         key = raw.get("field")
         if set(raw) != {"field"} or key not in numbers:
             raise PluginToolError(f"{raw!r} is not a number field of its table")
         return sa.column(_field_key(key))
     if isinstance(raw, bool) or not isinstance(raw, int | float):
-        raise PluginToolError(f"{raw!r} is not a number")
-    try:
-        finite = math.isfinite(raw)
-    except OverflowError:
-        finite = False
-    if not finite:
         raise PluginToolError(f"{raw!r} is not a number")
     return sa.literal(raw)
 
@@ -382,10 +364,8 @@ def _declared_checks(
     """A CHECK per declared check, each one comparison of a number or counter
     field with a number or another such field. An empty side passes, as a
     CHECK that reads NULL does."""
-    if len(checks) > MAX_TOOL_CHECKS:
-        raise PluginToolError(f"{table}: more than {MAX_TOOL_CHECKS} checks")
     numbers = frozenset(
-        field.get("key") for field in fields if field.get("kind") in _NUMBERS
+        field.get("key") for field in fields if field.get("kind") in NUMBER_KINDS
     )
     built: list[sa.Constraint] = []
     for index, check in enumerate(checks):
@@ -402,7 +382,7 @@ def _declared_checks(
                     _operand(check[terms[0]], numbers),
                 ),
                 name=object_name("ck", table, f"check_{index}"),
-                info={_DECLARED: True},
+                info={_DECLARED: True, CHECKED_FIELD: check["field"]},
             )
         )
     return built
@@ -427,13 +407,11 @@ def _checks(
         if field.get("kind") != "select":
             continue
         options = [_option(option.get("value")) for option in field.get("options", [])]
-        if not options:
-            raise PluginToolError(f"select field {field.get('key')!r} has no options")
         checks.append(
             sa.CheckConstraint(
                 sa.column(field["key"]).in_(options),
                 name=object_name("ck", table, f"{field['key']}_option"),
-                info={_OPTIONS: True},
+                info={_OPTIONS: True, CHECKED_FIELD: field["key"]},
             )
         )
     return checks + _declared_checks(table, fields, declared)
@@ -466,11 +444,6 @@ def _table(
         )
     starts = effective_defaults(fields)
     columns = [_field_column(field, starts.get(field.get("key"))) for field in fields]
-    seen = {"id", anchor.name, "name", "position", "created_at", "updated_at"}
-    for column in columns:
-        if column.name in seen:
-            raise PluginToolError(f"{name}: two columns named {column.name!r}")
-        seen.add(column.name)
     universal = _mixin_columns(_TOOL_MIXINS if parent is None else _ITEM_MIXINS)
     table = sa.Table(
         name,
@@ -527,7 +500,7 @@ def build_tool(
         raise PluginToolError("not a tool plug-in's definition")
     uid = tool.listing_uid
     key = _key(block.get("key"), "tool key")
-    kind = _kind(uid, key)
+    kind = plugin_kind(key, _uid(uid))
     if kind not in codes:
         raise PluginToolError(f"{kind} has no kind code")
     own = _table(
@@ -551,7 +524,7 @@ def build_tool(
             parent=(f"{_key(parent_key, 'parent key')}_id", tables[parent_key]),
             declared=item,
         )
-        item_kind = _kind(uid, item_key)
+        item_kind = plugin_kind(item_key, uid)
         if item_kind not in codes:
             raise PluginToolError(f"{item_kind} has no kind code")
         # Every item holds a conversation and is put away when finished
@@ -590,7 +563,6 @@ def build_tool(
         view_permission=f"{kind}:enabled",
         create_permission=f"{kind}:create",
         scope=kind,
-        declaration=block,
     )
 
 

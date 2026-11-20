@@ -32,9 +32,6 @@ publisher's own check is never taken on trust:
   fields, its previews of items an item table directly under it, its presets
   sorts by fields that sort, and its size the kit's.
 
-:func:`tool_row_problems` holds a row to its table's declaration: its
-required fields and its checks, as the table's constraints do.
-
 Beside the tool, a tool plug-in carries only the listing terms every plug-in
 has (:func:`~app.services.marketplace.service_plugins.listing_terms`); a term
 that serves or calls is refused rather than dropped.
@@ -47,12 +44,12 @@ import operator
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
-from decimal import Decimal
 from typing import Any
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ValidationError
 
+from app.core.tools import plugin_kind
 from app.schemas.tenant.tool_layout import (
     MAX_PRESETS,
     TOOL_FIELDS,
@@ -77,6 +74,7 @@ from app.services.marketplace.manifest_values import (
 )
 from app.services.marketplace.service_plugins import (
     _CURRENCIES,
+    LISTING_TERMS,
     MAX_SELECT_OPTIONS,
     MAX_SERVICE_DEFINITION_BYTES,
     _choice,
@@ -105,27 +103,16 @@ __all__ = [
     "table_fields",
     "tool_changes",
     "tool_kinds",
-    "tool_row_problems",
     "value_fits",
 ]
 
 #: The plug-in kind, and the one feature, of a plug-in that declares a tool.
 TOOL = "tool"
 
-#: What a tool plug-in carries beside its tool. Every other term the contract
-#: declares serves or calls something, and a tool plug-in runs no code.
-TOOL_PLUGIN_TERMS: frozenset[str] = frozenset(
-    {
-        "plugin_kind",
-        "tool",
-        "features",
-        "default_name",
-        "min_plugin_api",
-        "minimum_age",
-        "availability",
-        "help",
-    }
-)
+#: What a tool plug-in carries: its tool, and the listing terms every plug-in
+#: has. Every other term the contract declares serves or calls something, and
+#: a tool plug-in runs no code.
+TOOL_PLUGIN_TERMS: frozenset[str] = LISTING_TERMS | {"plugin_kind", "tool", "features"}
 
 TOOL_FIELD_KINDS: frozenset[str] = contract.enum("toolFieldKind")
 TOOL_ICONS: frozenset[str] = contract.enum("toolIcon")
@@ -168,8 +155,10 @@ MAX_TOOL_ITEMS = contract.cap("toolItems")
 MAX_TOOL_ACTIONS = contract.cap("toolActions")
 MAX_TOOL_CHECKS = contract.cap("toolChecks")
 MAX_PRESET_SORTS = contract.cap("presetSorts")
-_KEY_CHARS = contract.charset("toolKey")
-_KEY_START = frozenset("abcdefghijklmnopqrstuvwxyz")
+#: What a key a tool declares is written with, and what it starts with: a
+#: letter of those.
+TOOL_KEY_CHARS = contract.charset("toolKey")
+TOOL_KEY_START = frozenset(c for c in TOOL_KEY_CHARS if c.isalpha())
 
 #: The comparisons an open condition or a check makes between a number or
 #: counter field and an operand, each with whether it holds of two numbers.
@@ -182,7 +171,8 @@ COMPARISONS: dict[str, Callable[[Any, Any], bool]] = {
     "not_equals": operator.ne,
 }
 _COMPARISONS = tuple(COMPARISONS)
-_NUMBER_KINDS = frozenset({"number", "counter"})
+#: The kinds of field a comparison reads.
+NUMBER_KINDS = frozenset({"number", "counter"})
 _CONDITIONS = frozenset({*_COMPARISONS, "is", "in", "not_passed"})
 _COUNTER_BOUNDS = ("min", "max", "step", "initial")
 
@@ -194,13 +184,10 @@ def is_tool_plugin(definition: Any) -> bool:
 
 def tool_kinds(definition: dict[str, Any], *, listing_uid: str) -> list[str]:
     """The kinds a tool plug-in's definition declares: its tool's and each
-    item's, as ``<key>.<uid in lower case>``. A built-in kind never holds a
-    ``.``, so the two never meet, and two plug-ins declaring the same key
-    differ by their uids."""
+    item's (``plugin_kind``)."""
     tool = definition["tool"]
-    suffix = listing_uid.lower()
     keys = [tool["key"], *(item["key"] for item in tool.get("items", []))]
-    return [f"{key}.{suffix}" for key in keys]
+    return [plugin_kind(key, listing_uid) for key in keys]
 
 
 # --- one version against another ----------------------------------------------
@@ -318,10 +305,10 @@ def _key(raw: Any, *, what: str) -> str:
         fail(f"{what} is required")
     if len(raw) > MAX_TOOL_KEY_LENGTH:
         fail(f"{what} is longer than {MAX_TOOL_KEY_LENGTH} characters")
-    if raw[0] not in _KEY_START:
+    if raw[0] not in TOOL_KEY_START:
         fail(f"{what} starts with a lower-case letter")
     for character in raw:
-        if character not in _KEY_CHARS:
+        if character not in TOOL_KEY_CHARS:
             fail(f"{what} holds lower-case letters, digits and '_', not {character!r}")
     return raw
 
@@ -559,8 +546,8 @@ def _open_while(
             fail(f"{what}: {term!r} reads {kind_names}, and {key!r} is a {kind} field")
 
     if term in _COMPARISONS:
-        reads(_NUMBER_KINDS, "a number or counter field")
-        numbers = {k for k, f in by_key.items() if f["kind"] in _NUMBER_KINDS}
+        reads(NUMBER_KINDS, "a number or counter field")
+        numbers = {k for k, f in by_key.items() if f["kind"] in NUMBER_KINDS}
         value = _operand(value, numbers=numbers, what=f"{what} {term}", noun=noun)
     elif term == "is":
         reads(frozenset({"checkbox"}), "a checkbox field")
@@ -643,33 +630,6 @@ def effective_defaults(
             )
         counters[field["key"]] = 0 if start is None else start
     return {**starts, **counters}
-
-
-def tool_row_problems(
-    table: Mapping[str, Any], row: Mapping[str, Any]
-) -> list[tuple[str, str]]:
-    """What is wrong with ``row``, a row of the declared ``table`` (the tool
-    block or one of its items) as it would be stored, by its fields' keys:
-    each required field it empties, as ``(key, "required")``, and each check
-    it breaks, as ``(key, <comparison>)``. A field ``row`` leaves out takes
-    its column's default, which a required field always has; a check whose
-    either side is empty holds, as the table's CHECK does."""
-    problems = [
-        (field["key"], "required")
-        for field in table.get("fields", ())
-        if field.get("required") and field["key"] in row and row[field["key"]] is None
-    ]
-    for check in table.get("checks", ()):
-        ((term, operand),) = ((t, v) for t, v in check.items() if t != "field")
-        left = row.get(check["field"])
-        right = row.get(operand["field"]) if isinstance(operand, dict) else operand
-        if (
-            left is not None
-            and right is not None
-            and not COMPARISONS[term](Decimal(str(left)), Decimal(str(right)))
-        ):
-            problems.append((check["field"], term))
-    return problems
 
 
 def _validated[M: BaseModel](

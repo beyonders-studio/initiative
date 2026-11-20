@@ -15,7 +15,7 @@ model metadata.
 from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import cached_property
 from typing import Any
 
@@ -25,6 +25,10 @@ from sqlmodel import SQLModel
 import app.db.base  # noqa: F401  # every model on the metadata
 from app.core.relationships import ENDPOINT_CODES
 from app.core.tools import KINDS, Kind, Tool, ToolRefusals, ToolSpec
+
+#: The ``info`` key of a tool plug-in's table holding its declaration: the
+#: tool's block, or the item's.
+DECLARED = "declared"
 
 
 @dataclass(frozen=True, eq=False)
@@ -50,14 +54,25 @@ class ToolRecord(ToolRefusals):
     create_permission: str
     #: The resource its plug-in scopes name.
     scope: str
-    #: A tool plug-in's ``tool`` block, as its definition declares it: its
-    #: fields, items and actions. Empty for a built-in tool.
-    declaration: Mapping[str, Any] = field(default_factory=dict)
 
     @property
     def value(self) -> str:
         """Its kind, as a refusal names it."""
         return self.kind
+
+    @property
+    def declaration(self) -> Mapping[str, Any]:
+        """A tool plug-in's ``tool`` block, as its definition declares it: its
+        fields, items and actions. Empty for a built-in tool."""
+        return self.table.info.get(DECLARED, {})
+
+    @property
+    def kind_tables(self) -> dict[str, str]:
+        """Its kind and each kind inside it, with the table its ids point
+        at."""
+        return {self.kind: self.table.name} | {
+            child.value: child.table for child in self.children
+        }
 
     @property
     def listing_uid(self) -> str:
@@ -137,10 +152,8 @@ class ToolSet:
         """Each installed tool's item kind, and the kind of the table its rows
         sit under: the tool's own, or another item's."""
         parents: dict[str, str] = {}
+        kinds = self.table_kinds
         for record in self.installed:
-            kinds = {record.table.name: record.kind} | {
-                child.table: child.value for child in record.children
-            }
             for item in record.items:
                 (parent,) = (
                     kinds[fk.column.table.name]
@@ -163,11 +176,29 @@ class ToolSet:
         )
 
     @cached_property
+    def kind_tables(self) -> dict[str, str]:
+        """Every tool and everything inside one, keyed by its wire name, with
+        the table its ids point at: what the tables that name a piece of
+        content by ``(entity_type, entity_id)`` take."""
+        return {
+            **{record.kind: record.table.name for record in self.records},
+            **{kind.value: kind.table for kind in self.child_kinds},
+        }
+
+    @cached_property
+    def table_kinds(self) -> dict[str, str]:
+        """The kind each table of :attr:`kind_tables` keeps, by its name."""
+        return {table: kind for kind, table in self.kind_tables.items()}
+
+    @cached_property
+    def tool_of(self) -> dict[str, ToolRecord]:
+        """The tool each kind of :attr:`kind_tables` is or lives in."""
+        return {kind: record for record in self.records for kind in record.kind_tables}
+
+    @cached_property
     def content_kinds(self) -> tuple[str, ...]:
         """Every tool, then everything that lives inside one."""
-        return tuple(r.kind for r in self.records) + tuple(
-            kind.value for kind in self.child_kinds
-        )
+        return tuple(self.kind_tables)
 
     @cached_property
     def kind_codes(self) -> dict[str, int]:

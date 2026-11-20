@@ -90,9 +90,8 @@ def trash_kinds(tools: ToolSet) -> dict[str, Table]:
     """What the trash calls the rows of each table with the trash, in a
     community with ``tools``: the kind it keeps, or what else the trash holds
     (a comment, an initiative)."""
-    from app.db.initiative_rls import content_kind_tables
 
-    named = content_kind_tables(tools) | {e: plural_of(e) for e in TRASHABLE_EXTRAS}
+    named = tools.kind_tables | {e: plural_of(e) for e in TRASHABLE_EXTRAS}
     return {
         kind: tools.tables[name]
         for kind, name in named.items()

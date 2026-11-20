@@ -53,7 +53,6 @@ from app.core.search import SearchEntityType
 from app.core.tool_set import BUILTIN_TOOLS, KEPT_TOOL_SETS, ToolSet
 from app.core.tools import TAGGABLE_EXTRAS, Tool
 from app.db.base import MODELS_BY_TABLE
-from app.db.initiative_rls import content_kind_tables
 from app.models.tenant.relationship import EntityRelationship
 from app.models.tenant.tag import Tag
 from app.schemas.tenant.tag import tag_summaries
@@ -115,7 +114,7 @@ def tag_links(tools: ToolSet) -> dict[str, TagLinkSpec]:
     bulk endpoint's ``target_type`` takes: every tool, the content-level
     extras (sub-resources of a built-in tool that also carry tags), and every
     kind inside a tool plug-in's tool."""
-    tables = content_kind_tables(tools)
+    tables = tools.kind_tables
     kinds = (
         *(tool.kind for tool in tools),
         *TAGGABLE_EXTRAS,

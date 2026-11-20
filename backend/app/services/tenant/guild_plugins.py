@@ -979,13 +979,12 @@ async def tool_placed(
 ) -> bool:
     """Whether the install bringing the tool plug-in's ``tool`` is placed in
     the initiative: where its tool can be used."""
-    uid = tool.kind.partition(".")[2].upper()
     return (
         await session.exec(
             select(PluginPlacement.initiative_id)
             .join(GuildPlugin, col(GuildPlugin.id) == PluginPlacement.install_id)
             .where(
-                GuildPlugin.listing_uid == uid,
+                GuildPlugin.listing_uid == tool.listing_uid,
                 PluginPlacement.initiative_id == initiative_id,
             )
         )

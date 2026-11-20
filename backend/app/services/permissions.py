@@ -158,9 +158,29 @@ def _grant_level(level: Any) -> str:
 SHARING_READ = "sharing:read"
 
 
-def serialize_grants(row: Any, *, context: ActorContext | None) -> list:
-    """Serialize a resource's eager-loaded ``grants`` into the unified grant list
-    — one ``ResourceGrantSchema`` per ``resource_grants`` row (user, role,
+async def grants_of(
+    session: Any, kind: str, ids: Iterable[int]
+) -> dict[int, list[ResourceGrant]]:
+    """Who each of a tool's rows ``ids`` is shared with, by id."""
+    grants: dict[int, list[ResourceGrant]] = {}
+    ids = list(ids)
+    if not ids:
+        return grants
+    for grant in (
+        await session.exec(
+            select(ResourceGrant).where(
+                ResourceGrant.resource_type == kind,
+                ResourceGrant.resource_id.in_(ids),  # type: ignore[attr-defined]
+            )
+        )
+    ).all():
+        grants.setdefault(grant.resource_id, []).append(grant)
+    return grants
+
+
+def serialize_grants(grants: Iterable[Any], *, context: ActorContext | None) -> list:
+    """Serialize a resource's ``grants`` into the unified grant list — one
+    ``ResourceGrantSchema`` per ``resource_grants`` row (user, role,
     all-initiative-members, or an installed plug-in), owner included.
 
     An installed plug-in sees the list only with ``sharing:read``; without it the
@@ -177,7 +197,7 @@ def serialize_grants(row: Any, *, context: ActorContext | None) -> list:
             all_initiative_members=bool(getattr(g, "all_initiative_members", False)),
             plugin_install_id=getattr(g, "plugin_install_id", None),
         )
-        for g in getattr(row, "grants", None) or []
+        for g in grants
     ]
 
 

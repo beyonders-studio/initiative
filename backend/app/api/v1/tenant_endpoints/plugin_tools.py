@@ -25,12 +25,11 @@ Every write tells the tool's room that it changed, and nothing else.
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, status
+from fastapi import APIRouter, Depends, Query, WebSocket, status
 
-from app.api import resource_access
+from app.api import resource_access, tool_copy
 from app.api.actor_route import ActorRoute
 from app.api.content_socket import serve_tool_stream
 from app.api.deps import (
@@ -44,11 +43,10 @@ from app.api.deps import (
     plugin_tool_scope,
 )
 from app.core.plugin_scopes import PluginScopeAccess
-from app.db.query import build_paginated_response
+from app.db.query import build_paginated_response, paginated_query
 from app.db.session import routed_guild_id, routed_tools
-from app.db.tool_rows import Located, ToolRow, load_row
+from app.db.tool_rows import Located, ToolRow, load_row, row_of
 from app.models.platform.user import User
-from app.schemas.base import RESERVED_SIGIL_CODE, RESERVED_SIGILS
 from app.schemas.tenant.plugin_tool import (
     PluginToolActionRun,
     PluginToolRead,
@@ -63,16 +61,12 @@ from app.services.content_sockets import sockets
 from app.services.permissions import Action
 from app.services.tenant import plugin_tool_rows as rows_service
 from app.services.tenant import tags as tags_service
-from app.services.tenant.names import copy_name
 from app.services.tenant.soft_delete import trash
 
 router = APIRouter(route_class=ActorRoute)
 
 ToolRead = Annotated[ActorContext, Depends(plugin_tool_scope(PluginScopeAccess.read))]
 ToolWrite = Annotated[ActorContext, Depends(plugin_tool_scope(PluginScopeAccess.write))]
-
-#: The longest name a row holds.
-_NAME_LENGTH = 255
 
 
 async def _read(
@@ -164,28 +158,22 @@ async def list_plugin_tool_rows(
     previews of its items where ``include_preview`` asks."""
     tools = routed_tools(session)
     located = rows_service.located_kind(tools, kind)
+    under = rows_service.placed(located, initiative_id, parent_id)
+    if under is None:
+        raise rows_service.refuse_placement()
     if rows_service.parent_column(located) is None:
-        if initiative_id is None or parent_id is not None:
-            raise rows_service.refuse_placement()
-        await rows_service.require_on(session, located, initiative_id)
-        under = initiative_id
+        await rows_service.require_on(session, located, under)
     else:
-        if parent_id is None or initiative_id is not None:
-            raise rows_service.refuse_placement()
         await rows_service.load_authorized(
-            session, context, rows_service.parent_of(located, tools), tools, parent_id
+            session, context, rows_service.parent_of(located, tools), tools, under
         )
-        under = parent_id
-    rows = await rows_service.rows_under(
+    found, total, page = await paginated_query(
         session,
-        located,
-        tools,
-        under,
-        archived=archived,
-        page_number=page,
-        page_size=page_size,
+        *rows_service.listed(located, tools, under, archived=archived),
+        page,
+        page_size,
     )
-    total = await rows_service.count_under(session, located, under, archived=archived)
+    rows = [row_of(located.table, row) for row in found]
     previews = (
         await rows_service.previews(session, context, located, tools, rows)
         if include_preview
@@ -216,24 +204,23 @@ async def create_plugin_tool_row(
     Fields left out start at their defaults."""
     tools = routed_tools(session)
     located = rows_service.located_kind(tools, kind)
+    under = rows_service.placed(located, body.initiative_id, body.parent_id)
+    if under is None:
+        raise rows_service.refuse_placement()
     parent = rows_service.parent_column(located)
     if parent is None:
-        if body.initiative_id is None or body.parent_id is not None:
-            raise rows_service.refuse_placement()
         resource_access.refuse_plugin_sharing(context, body, "grants")
         initiative = await resource_access.prepare_create(
-            session, located.tool, body.initiative_id, current_user, context
+            session, located.tool, under, current_user, context
         )
         placed = {"initiative_id": initiative.id}
     else:
-        if body.parent_id is None or body.initiative_id is not None:
-            raise rows_service.refuse_placement()
         above = await rows_service.load_authorized(
             session,
             context,
             rows_service.parent_of(located, tools),
             tools,
-            body.parent_id,
+            under,
             action=rows_service.writing(located),
         )
         placed = {parent: above.id}
@@ -245,7 +232,7 @@ async def create_plugin_tool_row(
         "name": body.name,
         **({} if body.position is None else {"position": body.position}),
     }
-    row_id = await rows_service.insert(session, located, columns)
+    row_id = await rows_service.insert(session, located.table, columns)
     if parent is None:
         await resource_access.grant_initial_sharing(
             session,
@@ -387,61 +374,27 @@ async def duplicate_plugin_tool_row(
     body = body or ToolDuplicateRequest()
     tools = routed_tools(session)
     located = rows_service.located_kind(tools, kind)
-    parent = rows_service.parent_column(located)
     source = await rows_service.load_authorized(
         session, context, located, tools, row_id, action=rows_service.writing(located)
     )
-    initiative_id = body.target_initiative_id or int(source.tool["initiative_id"])
-    beside = initiative_id == source.tool["initiative_id"]
-    if parent is not None and not beside:
-        raise rows_service.refuse_placement()
-    name = (body.name or "").strip() or (
-        copy_name(source.name, _NAME_LENGTH) if beside else source.name
-    )
-    if RESERVED_SIGILS.intersection(name):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=RESERVED_SIGIL_CODE,
-        )
-    columns = {"name": name, **rows_service.copy_columns(located, source)}
-    if parent is not None:
-        copy_id = await rows_service.insert(
-            session, located, {**columns, parent: source.values[parent]}
-        )
-    else:
-        await resource_access.require_stays_in(
-            session, source.initiative_id, initiative_id
-        )
-        await resource_access.prepare_create(
-            session, located.tool, initiative_id, current_user, context
-        )
-        copy_id = await rows_service.insert(
-            session, located, {**columns, "initiative_id": initiative_id}
-        )
-        held = await rows_service.grants_of(session, located.kind, [source.id])
-        await resource_access.grant_initial_sharing(
+    if rows_service.parent_column(located) is None:
+        copy = await tool_copy.duplicate(
             session,
-            context,
             located.tool,
+            source,
+            initiative_id=body.target_initiative_id,
+            name=body.name,
             user=current_user,
-            resource_id=copy_id,
-            initiative_id=initiative_id,
+            actor=context,
             payload=body,
-            grants=resource_access.duplicate_sharing(
-                SimpleNamespace(
-                    grants=held.get(source.id, []),
-                    initiative_id=source.initiative_id,
-                ),
-                initiative_id=initiative_id,
-            ),
         )
-        await session.flush()
-    await rows_service.carried(session, located, tools, source, copy_id)
-    if parent is None:
         await session.commit()
-        return await _read(session, context, located, copy_id)
+        return await _read(session, context, located, copy.id)
+    if body.target_initiative_id not in (None, source.tool["initiative_id"]):
+        raise rows_service.refuse_placement()
+    copy = await tool_copy.duplicate_item(session, located, source, name=body.name)
     return await _committed(
-        session, context, located, copy_id, _tool_id(source), "item_added"
+        session, context, located, copy.id, _tool_id(source), "item_added"
     )
 
 

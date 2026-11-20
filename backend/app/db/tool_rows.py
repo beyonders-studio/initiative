@@ -18,7 +18,7 @@ import sqlalchemy as sa
 from sqlalchemy import Integer, String, Table
 from sqlalchemy.dialects.postgresql import ARRAY
 
-from app.core.tool_set import ToolRecord, ToolSet
+from app.core.tool_set import DECLARED, ToolRecord, ToolSet
 from app.db import gucs
 from app.db.authorization import standing_arg
 from app.db.initiative_rls import governing_walk, paths_for
@@ -65,20 +65,22 @@ class Located:
     #: none for the tool's own table.
     hops: tuple[tuple[str, str], ...]
 
+    @property
+    def declared(self) -> Mapping[str, Any]:
+        """What the declaration says of its table: the tool's block, or its
+        item's."""
+        return self.table.info[DECLARED]
+
 
 def locate(tools: ToolSet, kind: str) -> Located | None:
     """The table ``kind`` keeps its rows in, where an installed tool of
     ``tools`` has it: the tool's own, or one of its items'."""
-    for tool in tools.installed:
-        tables = {tool.kind: tool.table.name} | {
-            child.value: child.table for child in tool.children
-        }
-        if kind in tables:
-            walk = governing_walk(tables[kind], paths_for(tools))
-            return Located(
-                kind, tool, tools.tables[tables[kind]], walk[1] if walk else ()
-            )
-    return None
+    tool = tools.tool_of.get(kind)
+    if tool is None or not tool.installed:
+        return None
+    name = tools.kind_tables[kind]
+    walk = governing_walk(name, paths_for(tools))
+    return Located(kind, tool, tools.tables[name], walk[1] if walk else ())
 
 
 def _actions(kind: str, tool: sa.FromClause) -> sa.ColumnElement[Any]:

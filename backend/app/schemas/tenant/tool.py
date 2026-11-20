@@ -102,7 +102,9 @@ def serialize_tool[Summary: "ToolSummaryBase"](
             "can": client_access(row, user_id, context=context),
             "tags": annotated_tags(row),
             "properties": annotated_properties(row),
-            "grants": serialize_grants(row, context=context),
+            "grants": serialize_grants(
+                getattr(row, "grants", None) or [], context=context
+            ),
             **schema.derived_fields(row, context=context, user_id=user_id),
             **fields,
         },

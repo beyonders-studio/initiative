@@ -18,15 +18,16 @@ them, its source the tool's kind, in the formats its record offers
   row's items: their name and declared fields, each cell written as its kind
   reads.
 
-Every row is loaded and refused as the universal routes load it
-(``resource_access.load_kind``), and exported on the export action, or read
-from an initiative or community backup.
+It is a ``ToolExportAdapter`` keyed on the tool's kind: every row is loaded
+and refused as the universal routes load it (``resource_access.load_kind``),
+exported on the export action or read from an initiative or community backup,
+and its people and references are written as every tool's are.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from datetime import date, datetime
 from types import SimpleNamespace
 from typing import Any
@@ -37,52 +38,39 @@ from sqlalchemy import Table
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.messages import ExportMessages, KindMessages
-from app.core.relationships import node_of
+from app.core.identity_boundary import STORED_MENTION
+from app.core.messages import ExportMessages
 from app.core.tool_set import ToolRecord
-from app.core.tools import kind_refusal
 from app.core.user_display import display_name, handle_of
-from app.core.user_input_validators import resolve_zone
 from app.db.plugin_tools import DECLARED, TABULAR_FORMATS
 from app.db.session import require_guild_context, routed_tools
 from app.db.tool_rows import ToolRow
 from app.models.platform.user import User
 from app.models.platform.user_profile_view import MemberProfile
-from app.models.tenant.initiative import Initiative
-from app.models.tenant.relationship import EntityRelationship
 from app.models.tenant.tool_layout import ToolLayout
 from app.schemas.tenant.import_envelopes import CURRENT_SCHEMA_VERSION
 from app.services.export import values
 from app.services.export.adapters._common import (
     BuildContext,
+    ToolExportAdapter,
     export_stem,
-    selection_ids,
 )
-from app.services.export.contract import RenderItem, RenderRequest
+from app.services.export.contract import RenderItem
 from app.services.export.engine import ExportError
-from app.services.export.i18n import export_locale
+from app.services.export.i18n import et, export_locale
 from app.services.export.property_values import exported_properties
 from app.services.import_engine.mentions import (
     detach_markdown_mentions,
     load_mention_handles,
     markdown_mention_ids,
+    mention_namer,
 )
-from app.services.import_engine.references import (
-    detach_envelope_references,
-    detach_markdown_references,
-)
+from app.services.import_engine.references import detach_markdown_references
 from app.services.marketplace.widget_meta import in_language
-from app.services.permissions import (
-    EXPORT_ACCESS,
-    DacResource,
-    require_export_access,
-)
 from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant.archive import archive_filter_clause
-from app.services.tenant.initiative_tools import tool_on_sql
-from app.services.tenant.project_export import EXPORTED_LINK_TYPES
-from app.services.tenant.tool_listing import initiative_switch_clause
+from app.services.tenant.project_export import load_links
 
 #: What every installed tool's export may be narrowed by: whether it is
 #: archived, as every tool's list is. Unset, it carries both.
@@ -96,12 +84,13 @@ InstalledFilters = create_model(
 @dataclass(frozen=True)
 class Prepared:
     """What a batch of one installed tool's rows is written from: the tool,
-    each row's live items by item table (and theirs under them), the people
-    they name and the handles of those their text mentions, by id, and what
-    each row and item carries beside its fields, by kind and id
-    (:func:`_carried`)."""
+    the kind of each of its tables by name, each row's live items by item
+    table (and theirs under them), the people they name and the handles of
+    those their text mentions, by id, and what each row and item carries
+    beside its fields, by kind and id (:func:`_carried`)."""
 
     tool: ToolRecord
+    kinds: Mapping[str, str]
     items: Mapping[int, Mapping[str, list[Mapping[str, Any]]]]
     people: Mapping[int, Any]
     handles: Mapping[int, str]
@@ -109,20 +98,15 @@ class Prepared:
     #: The layouts each item table keeps under a row, by the table's kind
     #: and the row's id.
     layouts: Mapping[tuple[str, int], list[dict[str, Any]]]
+    #: A text with each mention in it named as the person reads now
+    #: (``mention_namer``), for a table's cells.
+    named: Callable[[Any], Any]
 
 
 def envelope_type(tool: ToolRecord) -> str:
     """The ``type`` an installed tool's envelope carries, as a built-in
     tool's is ``initiative-<tool>``."""
     return f"initiative-{tool.kind}"
-
-
-def table_kinds(tool: ToolRecord) -> dict[str, str]:
-    """The kind of each of ``tool``'s tables, by table name: the tool's own
-    and each item's."""
-    return {tool.table.name: tool.kind} | {
-        child.table: child.value for child in tool.children
-    }
 
 
 def _fields(table: Table) -> list[Any]:
@@ -160,115 +144,43 @@ async def _carried(
     """What each row of each kind in ``ids`` carries beside its fields: its
     tags by name, its property values (``exported_properties``), and the
     links it makes, each far end by its ref, as a task's are
-    (``project_export.EXPORTED_LINK_TYPES``)."""
-    tools = routed_tools(session)
-    taggable = tags_service.tag_links(tools)
+    (``project_export.load_links``)."""
+    taggable = tags_service.tag_links(routed_tools(session))
     carried: dict[tuple[str, int], dict[str, Any]] = {}
-    nodes: dict[int, tuple[str, int]] = {}
     for kind, entity_ids in ids.items():
         tags = await tags_service.tags_for(session, taggable[kind], entity_ids)
         summaries = await metadata_service.summaries_by_id(session, kind, entity_ids)
+        links = await load_links(session, kind, entity_ids)
         for entity_id in entity_ids:
             carried[(kind, entity_id)] = {
                 "tags": sorted(tag.name for tag in tags.get(entity_id, [])),
                 "properties": exported_properties(
                     SimpleNamespace(properties=summaries.get(entity_id, []))
                 ),
-                "links": [],
+                "links": [
+                    link.model_dump(mode="json") for link in links.get(entity_id, [])
+                ],
             }
-            nodes[node_of(tools.kind_codes[kind], entity_id)] = (kind, entity_id)
-    if nodes:
-        edges = await session.exec(
-            select(EntityRelationship)
-            .where(
-                EntityRelationship.source_node.in_(list(nodes)),
-                EntityRelationship.relationship_type.in_(
-                    [link.value for link in EXPORTED_LINK_TYPES]
-                ),
-                EntityRelationship.removed_at.is_(None),
-            )
-            .order_by(EntityRelationship.id)
-        )
-        for edge in edges:
-            carried[nodes[edge.source_node]]["links"].append(
-                {
-                    "type": edge.relationship_type,
-                    "target_external_ref": f"{edge.target_type}:{edge.target_id}",
-                }
-            )
     return carried
 
 
-class InstalledToolAdapter:
+class InstalledToolAdapter(ToolExportAdapter):
     """The export source of one installed tool, named by its kind."""
 
-    template_id = "data-table"
     #: The most any installed tool exports; which of them one does is its
     #: record's, asked once the community's tools are known.
     formats = ("json", *TABULAR_FORMATS)
-    prepares = True
 
     def __init__(self, kind: str) -> None:
-        self.source = kind
+        self.kind = self.source = kind
 
-    # -- the tool --------------------------------------------------------------
-
-    def tool(self, session: AsyncSession) -> ToolRecord:
-        """The community's installed tool of this kind, or not found."""
-        found = routed_tools(session).by_kind.get(self.source)
-        if found is None or not found.installed:
-            raise kind_refusal(self.source, KindMessages.NOT_FOUND, 404)
-        return found
-
-    # -- the rows --------------------------------------------------------------
-
-    async def fetch(
-        self,
-        session: AsyncSession,
-        user: User,
-        guild_id: int,
-        entity_id: int,
-        /,
-        *,
-        access: str = EXPORT_ACCESS,
-    ) -> ToolRow:
-        """One of the tool's live rows, loaded as the universal routes load
-        it, on its tool's switch, and held to ``access``."""
+    async def get_row(self, session: AsyncSession, entity_id: int, /) -> ToolRow:
+        """One of the tool's live rows, loaded and refused as the universal
+        routes load it, on its tool's switch."""
         from app.api.resource_access import load_kind
 
-        tool = self.tool(session)
         context = require_guild_context(session)
-        row = await load_kind(session, self.source, entity_id, user, context)
-        if row.deleted_at is not None:
-            raise tool.not_found()
-        switched_on = await session.scalar(
-            select(Initiative.id).where(
-                Initiative.id == row.initiative_id, tool_on_sql(tool)
-            )
-        )
-        if switched_on is None:
-            raise tool.disabled()
-        require_export_access(DacResource(tool), row, context=context, access=access)
-        return row
-
-    async def initiative_ids(
-        self, session: AsyncSession, initiative_id: int, /
-    ) -> list[int]:
-        """The tool's live rows in one initiative, where it has the tool
-        switched on, in id order."""
-        tool = self.tool(session)
-        table = tool.table
-        return list(
-            await session.exec(
-                select(table.c.id)
-                .where(
-                    table.c.initiative_id == initiative_id,
-                    table.c.deleted_at.is_(None),
-                    initiative_switch_clause(tool, table.c),
-                )
-                .order_by(table.c.id.asc())
-            )
-        )
+        return await load_kind(session, self.kind, entity_id, None, context)
 
     def filters_of(self, raw: Any) -> BaseModel | None:
         """The tool's export filters from a job's params, or ``None``."""
@@ -292,7 +204,7 @@ class InstalledToolAdapter:
         archived = getattr(filters, "archived", None)
         if archived is None or not ids:
             return ids
-        table = self.tool(session).table
+        table = self.record(session).table
         kept = set(
             await session.exec(
                 select(table.c.id).where(
@@ -302,8 +214,21 @@ class InstalledToolAdapter:
         )
         return [entity_id for entity_id in ids if entity_id in kept]
 
-    def title(self, row: ToolRow, /) -> str:
-        return row.name
+    async def count(
+        self,
+        session: AsyncSession,
+        *,
+        user: User,
+        guild_id: int,
+        params: dict,
+        format: str,
+    ) -> int:
+        """One for each row, and one for each item under it."""
+        rows = await self.load(session, user, guild_id, params, format)
+        items = await self._items(session, self.record(session), rows)
+        return len(rows) + sum(
+            len(found) for held in items.values() for found in held.values()
+        )
 
     async def _items(
         self, session: AsyncSession, tool: ToolRecord, rows: list[ToolRow]
@@ -345,7 +270,7 @@ class InstalledToolAdapter:
     ) -> Prepared:
         """The rows' items, the people they and their items name, and what
         each carries beside its fields."""
-        tool = self.tool(session)
+        tool = self.record(session)
         items = await self._items(session, tool, rows)
         by_name = {item.name: item for item in tool.items}
         cells = [(tool.table, row.values) for row in rows] + [
@@ -368,14 +293,16 @@ class InstalledToolAdapter:
             if people
             else ()
         )
-        mentioned = {
-            user_id
+        texts = [
+            row[column.name]
             for table, row in cells
             for column in _fields(table)
             if column.info["field"] == "text"
-            for user_id in markdown_mention_ids(row[column.name])
+        ]
+        mentioned = {
+            user_id for text in texts for user_id in markdown_mention_ids(text)
         }
-        kinds = table_kinds(tool)
+        kinds = routed_tools(session).table_kinds
         ids: dict[str, list[int]] = {}
         for table, row in cells:
             ids.setdefault(kinds[table.name], []).append(row["id"])
@@ -395,17 +322,18 @@ class InstalledToolAdapter:
                 )
         return Prepared(
             tool,
+            kinds,
             items,
             {profile.id: profile for profile in profiles},
             await load_mention_handles(session, mentioned),
             await _carried(session, ids),
             layouts,
+            await mention_namer(
+                session,
+                texts if ctx.format != "json" else [],
+                missing=et("fallback.formerMember", export_locale(ctx.user)),
+            ),
         )
-
-    async def prepared_reach(
-        self, session: AsyncSession, ctx: BuildContext, /
-    ) -> set[int]:
-        return set()
 
     # -- writing ---------------------------------------------------------------
 
@@ -418,7 +346,7 @@ class InstalledToolAdapter:
     ) -> dict[str, Any]:
         """A row, or an item, and the items under it, as the envelope holds
         them."""
-        kinds = table_kinds(prepared.tool)
+        kinds = prepared.kinds
         kind = kinds[table.name]
         under = _under(prepared.tool, table)
         laid = {
@@ -488,6 +416,9 @@ class InstalledToolAdapter:
             return _option_label(field, value, locale)
         if kind == "multi_select":
             return ", ".join(_option_label(field, each, locale) for each in value)
+        if kind == "text":
+            # A mention reads as ``@Name``, as a task's description does.
+            return STORED_MENTION.sub(lambda m: f"@{m.group(1)}", prepared.named(value))
         return values.text(value)
 
     def item(self, row: ToolRow, ctx: BuildContext, /) -> RenderItem:
@@ -495,15 +426,13 @@ class InstalledToolAdapter:
         tool = prepared.tool
         items = prepared.items.get(row.id, {})
         if ctx.format == "json":
-            data = {
-                "type": envelope_type(tool),
-                "schema_version": CURRENT_SCHEMA_VERSION,
-                **self._json(tool.table, row.values, items, prepared),
-            }
-            detach_envelope_references(data, guild_id=ctx.guild_id)
             return RenderItem(
                 key=f"{export_stem(row.name, ctx.date)}.{envelope_type(tool)}",
-                data=data,
+                data={
+                    "type": envelope_type(tool),
+                    "schema_version": CURRENT_SCHEMA_VERSION,
+                    **self._json(tool.table, row.values, items, prepared),
+                },
             )
         # A table of the row's items, the one item table a tabular tool has.
         (table,) = tool.items
@@ -536,78 +465,4 @@ class InstalledToolAdapter:
                 "columns": values.head(columns),
                 "rows": [values.cells(columns, r) for r in items.get(table.name, [])],
             },
-        )
-
-    def batch(
-        self, rows: list[ToolRow], ctx: BuildContext, /
-    ) -> tuple[RenderItem, ...]:
-        return tuple(self.item(row, ctx) for row in rows)
-
-    # -- the source ------------------------------------------------------------
-
-    async def load(
-        self,
-        session: AsyncSession,
-        user: User,
-        guild_id: int,
-        params: dict,
-        format: str,
-    ) -> list[ToolRow]:
-        """Every selected row, fetched and authorized one by one, then
-        narrowed to those the filters leave. A selection is refused whole if
-        any of it is."""
-        if format not in (self.tool(session).spec.export_formats or ()):
-            raise ExportError(ExportMessages.EXPORT_INVALID_FORMAT)
-        ids = selection_ids(
-            params, single_key=f"{self.source}_id", multi_key=f"{self.source}_ids"
-        )
-        rows = [
-            await self.fetch(session, user, guild_id, entity_id) for entity_id in ids
-        ]
-        kept = set(
-            await self.narrow(
-                session, user, self.filters_of(params.get("filters")), ids
-            )
-        )
-        return [row for row in rows if row.id in kept]
-
-    async def count(
-        self,
-        session: AsyncSession,
-        *,
-        user: User,
-        guild_id: int,
-        params: dict,
-        format: str,
-    ) -> int:
-        """One for each row, and one for each item under it."""
-        rows = await self.load(session, user, guild_id, params, format)
-        items = await self._items(session, self.tool(session), rows)
-        return len(rows) + sum(
-            len(found) for held in items.values() for found in held.values()
-        )
-
-    async def build(
-        self,
-        session: AsyncSession,
-        *,
-        user: User,
-        guild_id: int,
-        params: dict,
-        format: str,
-    ) -> RenderRequest:
-        rows = await self.load(session, user, guild_id, params, format)
-        ctx = BuildContext(
-            format=format,
-            user=user,
-            guild_id=guild_id,
-            now=datetime.now(resolve_zone(params.get("tz"))),
-        )
-        ctx = replace(ctx, prepared=await self.prepare(session, rows, ctx))
-        return RenderRequest(
-            guild_id=guild_id,
-            template_id=self.template_id,
-            format=format,
-            batch=self.batch(rows, ctx),
-            initiative_ids=frozenset(row.initiative_id for row in rows),
         )

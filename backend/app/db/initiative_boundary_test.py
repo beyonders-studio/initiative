@@ -1237,11 +1237,108 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
     assert not failures, "\n".join(failures)
 
 
-async def test_the_universal_routes_keep_a_tool_plugins_rows_in_their_initiative(
+@dataclass(frozen=True)
+class _PluginInA:
+    """A community with initiatives A and B and the test Counters installed by
+    its seat: A's admin and a moderator of each, a member of no initiative,
+    and, where seeded, a counter group and a counter in A, made by A's
+    moderator and shared by name with B's moderator and the outsider."""
+
+    admin: Actor
+    initiative_b: Any
+    moderator_a: Actor
+    moderator_b: Actor
+    outsider: Actor
+    seat: Actor
+    install: dict[str, Any]
+    tools: ToolSet
+    #: The item row as the seeder made it, and the tool's row and the item by
+    #: kind; empty where not seeded.
+    item_row: dict[str, Any]
+    rows: dict[str, int]
+
+    @property
+    def guild(self) -> Any:
+        return self.admin.guild
+
+    @property
+    def tool(self) -> Any:
+        return self.tools.installed[0]
+
+    @property
+    def item_kind(self) -> str:
+        (kind,) = (child.value for child in self.tool.children)
+        return kind
+
+
+@pytest.fixture
+def plugin_in_a(
     session: AsyncSession,
     acting_user: Callable[..., Awaitable[Actor]],
+    client: AsyncClient,
+) -> Callable[..., Awaitable[_PluginInA]]:
+    """Sets up :class:`_PluginInA`: seeded unless ``seeded`` is false, the
+    rows shared with A's moderator too where ``shared_with_a``. Committed."""
+
+    async def make(*, seeded: bool = True, shared_with_a: bool = False) -> _PluginInA:
+        admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+        guild = admin.guild
+        initiative_b = await create_initiative(session, guild, admin.user)
+        moderator_a = await acting_user(
+            guild=guild, initiative=admin.initiative, initiative_role="moderator"
+        )
+        moderator_b = await acting_user(
+            guild=guild, initiative=initiative_b, initiative_role="moderator"
+        )
+        outsider = await acting_user(guild=guild)
+        await session.commit()
+        seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
+        install = await install_tool_plugin(client, session, seat)
+        tools = await provisioned_tools(guild.id)
+        tool = tools.installed[0]
+        item_row: dict[str, Any] = {}
+        rows: dict[str, int] = {}
+        if seeded:
+            await route_session_to_guild(session, guild.id)
+            seeder = _Seeder(
+                session,
+                await _Catalog.read(session),
+                admin.initiative.id,
+                grantor=moderator_a.user.id,
+                grantees=(
+                    *((moderator_a.user.id,) if shared_with_a else ()),
+                    moderator_b.user.id,
+                    outsider.user.id,
+                ),
+                tools=tools,
+            )
+            item_row = await seeder.make(tool.items[0].name, moderator_a.user.id)
+            (item_kind,) = (child.value for child in tool.children)
+            rows = {
+                tool.kind: item_row[f"{tool.kind.split('.')[0]}_id"],
+                item_kind: item_row["id"],
+            }
+            await session.commit()
+        return _PluginInA(
+            admin,
+            initiative_b,
+            moderator_a,
+            moderator_b,
+            outsider,
+            seat,
+            install,
+            tools,
+            item_row,
+            rows,
+        )
+
+    return make
+
+
+async def test_the_universal_routes_keep_a_tool_plugins_rows_in_their_initiative(
     reading_as: Callable[[int, int], Awaitable[AsyncSession]],
     client: AsyncClient,
+    plugin_in_a: Callable[..., Awaitable[_PluginInA]],
 ) -> None:
     """A tool plug-in's row and its item, in initiative A and shared by name
     with a moderator of B and a member of no initiative, are archived,
@@ -1249,40 +1346,10 @@ async def test_the_universal_routes_keep_a_tool_plugins_rows_in_their_initiative
     routes by A's moderator, and by neither of the others."""
     from app.services.tenant.soft_delete import trash
 
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    guild = admin.guild
-    initiative_b = await create_initiative(session, guild, admin.user)
-    moderator_a = await acting_user(
-        guild=guild, initiative=admin.initiative, initiative_role="moderator"
-    )
-    moderator_b = await acting_user(
-        guild=guild, initiative=initiative_b, initiative_role="moderator"
-    )
-    outsider = await acting_user(guild=guild)
-    await session.commit()
-    seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
-    await install_tool_plugin(client, session, seat)
-    tools = await provisioned_tools(guild.id)
-    tool = tools.installed[0]
-    (item_kind,) = (child.value for child in tool.children)
-    await route_session_to_guild(session, guild.id)
-    seeder = _Seeder(
-        session,
-        await _Catalog.read(session),
-        admin.initiative.id,
-        grantor=moderator_a.user.id,
-        grantees=(moderator_b.user.id, outsider.user.id),
-        tools=tools,
-    )
-    item_row = await seeder.make(tool.items[0].name, moderator_a.user.id)
-    rows = {
-        tool.kind: item_row[f"{tool.kind.split('.')[0]}_id"],
-        item_kind: item_row["id"],
-    }
-    await session.commit()
+    a = await plugin_in_a()
 
-    for actor in (moderator_b, outsider):
-        for kind, row_id in rows.items():
+    for actor in (a.moderator_b, a.outsider):
+        for kind, row_id in a.rows.items():
             for route in ("archive", "unarchive"):
                 response = await client.post(
                     actor.g(f"/{route}/{kind}/{row_id}"), headers=actor.headers
@@ -1310,61 +1377,62 @@ async def test_the_universal_routes_keep_a_tool_plugins_rows_in_their_initiative
 
     # A kind the community has not installed is not found.
     response = await client.post(
-        moderator_a.g(f"/archive/stranger.{'x' * 14}/1"), headers=moderator_a.headers
+        a.moderator_a.g(f"/archive/stranger.{'x' * 14}/1"),
+        headers=a.moderator_a.headers,
     )
     assert response.status_code == 404, response.text
 
-    for kind, row_id in rows.items():
+    for kind, row_id in a.rows.items():
         for route in ("archive", "unarchive"):
             response = await client.post(
-                moderator_a.g(f"/{route}/{kind}/{row_id}"), headers=moderator_a.headers
+                a.moderator_a.g(f"/{route}/{kind}/{row_id}"),
+                headers=a.moderator_a.headers,
             )
             assert response.status_code == 200, (route, kind, response.text)
             assert response.json()["entity_type"] == kind
         response = await client.post(
-            moderator_a.g("/comments/"),
-            headers=moderator_a.headers,
+            a.moderator_a.g("/comments/"),
+            headers=a.moderator_a.headers,
             json={"subject_type": kind, "subject_id": row_id, "content": "hi"},
         )
         assert response.status_code == 201, (kind, response.text)
         response = await client.get(
-            moderator_a.g("/search/"),
-            headers=moderator_a.headers,
+            a.moderator_a.g("/search/"),
+            headers=a.moderator_a.headers,
             params={"search": "boundary", "types": [kind]},
         )
         assert [hit["entity_id"] for hit in response.json()["items"]] == [row_id]
 
     # Trashed by A's moderator, the item is theirs to take back out, and the
     # others do not find it in the bin.
-    located = locate(tools, item_kind)
+    located = locate(a.tools, a.item_kind)
     assert located is not None
-    mine = await reading_as(moderator_a.user.id, guild.id)
-    row = await load_row(mine, located, tools, rows[item_kind])
+    mine = await reading_as(a.moderator_a.user.id, a.guild.id)
+    row = await load_row(mine, located, a.tools, a.rows[a.item_kind])
     assert row is not None
-    await trash(mine, row, deleted_by_user_id=moderator_a.user.id)
+    await trash(mine, row, deleted_by_user_id=a.moderator_a.user.id)
     await mine.commit()
-    for actor in (moderator_b, outsider):
+    for actor in (a.moderator_b, a.outsider):
         response = await client.post(
-            actor.g(f"/trash/{item_kind}/{rows[item_kind]}/restore"),
+            actor.g(f"/trash/{a.item_kind}/{a.rows[a.item_kind]}/restore"),
             headers=actor.headers,
         )
         assert response.status_code == 404, response.text
-    response = await client.get(admin.g("/trash/"), headers=admin.headers)
-    assert (item_kind, rows[item_kind]) in {
+    response = await client.get(a.admin.g("/trash/"), headers=a.admin.headers)
+    assert (a.item_kind, a.rows[a.item_kind]) in {
         (item["entity_type"], item["entity_id"]) for item in response.json()["items"]
     }, response.text
     response = await client.post(
-        moderator_a.g(f"/trash/{item_kind}/{rows[item_kind]}/restore"),
-        headers=moderator_a.headers,
+        a.moderator_a.g(f"/trash/{a.item_kind}/{a.rows[a.item_kind]}/restore"),
+        headers=a.moderator_a.headers,
     )
     assert response.status_code == 200, response.text
 
 
 async def test_the_tool_plugin_routes_keep_its_rows_in_their_initiative(
-    session: AsyncSession,
-    acting_user: Callable[..., Awaitable[Actor]],
     reading_as: Callable[[int, int], Awaitable[AsyncSession]],
     client: AsyncClient,
+    plugin_in_a: Callable[..., Awaitable[_PluginInA]],
 ) -> None:
     """A tool plug-in's row and its item, in initiative A and shared by name
     with a moderator of B and a member of no initiative, are read, listed,
@@ -1374,35 +1442,8 @@ async def test_the_tool_plugin_routes_keep_its_rows_in_their_initiative(
     them, is answered 404."""
     from app.api.content_socket import tool_authorizer
 
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    guild = admin.guild
-    initiative_b = await create_initiative(session, guild, admin.user)
-    moderator_a = await acting_user(
-        guild=guild, initiative=admin.initiative, initiative_role="moderator"
-    )
-    moderator_b = await acting_user(
-        guild=guild, initiative=initiative_b, initiative_role="moderator"
-    )
-    outsider = await acting_user(guild=guild)
-    await session.commit()
-    seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
-    await install_tool_plugin(client, session, seat)
-    tools = await provisioned_tools(guild.id)
-    tool = tools.installed[0]
-    (item_kind,) = (child.value for child in tool.children)
-    await route_session_to_guild(session, guild.id)
-    seeder = _Seeder(
-        session,
-        await _Catalog.read(session),
-        admin.initiative.id,
-        grantor=moderator_a.user.id,
-        grantees=(moderator_b.user.id, outsider.user.id),
-        tools=tools,
-    )
-    item_row = await seeder.make(tool.items[0].name, moderator_a.user.id)
-    tool_id = item_row[f"{tool.kind.split('.')[0]}_id"]
-    rows = {tool.kind: tool_id, item_kind: item_row["id"]}
-    await session.commit()
+    a = await plugin_in_a()
+    tool_id = a.rows[a.tool.kind]
 
     def addressed(kind: str, row_id: int) -> list[tuple[str, str, Any]]:
         """Every route that names one of A's rows, and its body."""
@@ -1416,14 +1457,18 @@ async def test_the_tool_plugin_routes_keep_its_rows_in_their_initiative(
         ]
 
     under = [
-        ("GET", f"/plugin-tools/{item_kind}/?parent_id={tool_id}", None),
-        ("POST", f"/plugin-tools/{item_kind}/", {"parent_id": tool_id, "name": "X"}),
+        ("GET", f"/plugin-tools/{a.item_kind}/?parent_id={tool_id}", None),
+        (
+            "POST",
+            f"/plugin-tools/{a.item_kind}/",
+            {"parent_id": tool_id, "name": "X"},
+        ),
     ]
-    in_a = f"/plugin-tools/{tool.kind}/?initiative_id={admin.initiative.id}"
-    new_in_a = {"initiative_id": admin.initiative.id, "name": "Mine"}
+    in_a = f"/plugin-tools/{a.tool.kind}/?initiative_id={a.admin.initiative.id}"
+    new_in_a = {"initiative_id": a.admin.initiative.id, "name": "Mine"}
 
-    for actor in (moderator_b, outsider):
-        for kind, row_id in rows.items():
+    for actor in (a.moderator_b, a.outsider):
+        for kind, row_id in a.rows.items():
             for method, path, body in addressed(kind, row_id):
                 response = await client.request(
                     method, actor.g(path), headers=actor.headers, json=body
@@ -1437,88 +1482,68 @@ async def test_the_tool_plugin_routes_keep_its_rows_in_their_initiative(
         response = await client.get(actor.g(in_a), headers=actor.headers)
         assert response.status_code == 404, response.text
         response = await client.post(
-            actor.g(f"/plugin-tools/{tool.kind}/"), headers=actor.headers, json=new_in_a
+            actor.g(f"/plugin-tools/{a.tool.kind}/"),
+            headers=actor.headers,
+            json=new_in_a,
         )
         assert response.status_code == 404, response.text
-        watching = await reading_as(actor.user.id, guild.id)
+        watching = await reading_as(actor.user.id, a.guild.id)
         assert (
-            await tool_authorizer(guild.id, tool.kind, tool_id)(watching, None) is None
+            await tool_authorizer(a.guild.id, a.tool.kind, tool_id)(watching, None)
+            is None
         )
         await watching.rollback()
 
     for method, path, body in under:
         response = await client.request(
-            method, moderator_a.g(path), headers=moderator_a.headers, json=body
+            method,
+            a.moderator_a.g(path),
+            headers=a.moderator_a.headers,
+            json=body,
         )
         assert response.status_code in (200, 201), (method, path, response.text)
-    for kind, row_id in rows.items():
+    for kind, row_id in a.rows.items():
         for method, path, body in addressed(kind, row_id):
-            if path.endswith("reset_all") and kind == item_kind:
+            if path.endswith("reset_all") and kind == a.item_kind:
                 continue
-            if path.endswith("step") and kind == tool.kind:
+            if path.endswith("step") and kind == a.tool.kind:
                 continue
             response = await client.request(
-                method, moderator_a.g(path), headers=moderator_a.headers, json=body
+                method,
+                a.moderator_a.g(path),
+                headers=a.moderator_a.headers,
+                json=body,
             )
             assert response.status_code in (200, 201), (method, path, response.text)
-    response = await client.get(moderator_a.g(in_a), headers=moderator_a.headers)
+    response = await client.get(a.moderator_a.g(in_a), headers=a.moderator_a.headers)
     assert tool_id in {row["id"] for row in response.json()["items"]}, response.text
     response = await client.post(
-        moderator_a.g(f"/plugin-tools/{tool.kind}/"),
-        headers=moderator_a.headers,
+        a.moderator_a.g(f"/plugin-tools/{a.tool.kind}/"),
+        headers=a.moderator_a.headers,
         json=new_in_a,
     )
     assert response.status_code == 201, response.text
-    watching = await reading_as(moderator_a.user.id, guild.id)
-    assert await tool_authorizer(guild.id, tool.kind, tool_id)(watching, None)
+    watching = await reading_as(a.moderator_a.user.id, a.guild.id)
+    assert await tool_authorizer(a.guild.id, a.tool.kind, tool_id)(watching, None)
     await watching.rollback()
 
 
 async def test_tags_and_links_keep_a_tool_plugins_rows_in_their_initiative(
     session: AsyncSession,
-    acting_user: Callable[..., Awaitable[Actor]],
     client: AsyncClient,
+    plugin_in_a: Callable[..., Awaitable[_PluginInA]],
 ) -> None:
     """A tool plug-in's row and its item, in initiative A and shared by name
     with a moderator of B and a member of no initiative, are tagged, linked
     and have their tags and links listed by A's moderator, and by neither of
     the others. A kind the community does not have is not found."""
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    guild = admin.guild
-    initiative_b = await create_initiative(session, guild, admin.user)
-    moderator_a = await acting_user(
-        guild=guild, initiative=admin.initiative, initiative_role="moderator"
-    )
-    moderator_b = await acting_user(
-        guild=guild, initiative=initiative_b, initiative_role="moderator"
-    )
-    outsider = await acting_user(guild=guild)
-    await session.commit()
-    seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
-    await install_tool_plugin(client, session, seat)
-    tools = await provisioned_tools(guild.id)
-    tool = tools.installed[0]
-    (item_kind,) = (child.value for child in tool.children)
-    await route_session_to_guild(session, guild.id)
-    seeder = _Seeder(
-        session,
-        await _Catalog.read(session),
-        admin.initiative.id,
-        grantor=moderator_a.user.id,
-        grantees=(moderator_b.user.id, outsider.user.id),
-        tools=tools,
-    )
-    item_row = await seeder.make(tool.items[0].name, moderator_a.user.id)
-    rows = {
-        tool.kind: item_row[f"{tool.kind.split('.')[0]}_id"],
-        item_kind: item_row["id"],
-    }
-    tag = await create_tag(session, guild)
+    a = await plugin_in_a()
+    tag = await create_tag(session, a.guild)
     await session.commit()
     link = {
-        "source": {"type": item_kind, "id": rows[item_kind]},
+        "source": {"type": a.item_kind, "id": a.rows[a.item_kind]},
         "relationship_type": "related_to",
-        "target": {"type": tool.kind, "id": rows[tool.kind]},
+        "target": {"type": a.tool.kind, "id": a.rows[a.tool.kind]},
     }
 
     async def tag_and_link(actor: Actor) -> list[int]:
@@ -1526,14 +1551,14 @@ async def test_tags_and_links_keep_a_tool_plugins_rows_in_their_initiative(
         statuses = [
             (
                 await client.put(
-                    actor.g(f"/tools/{tool.kind}/{rows[tool.kind]}/tags"),
+                    actor.g(f"/tools/{a.tool.kind}/{a.rows[a.tool.kind]}/tags"),
                     headers=actor.headers,
                     json={"tag_ids": [tag.id]},
                 )
             ).status_code,
             (
                 await client.put(
-                    actor.g(f"/tools/{tool.kind}/{rows[tool.kind]}/comments"),
+                    actor.g(f"/tools/{a.tool.kind}/{a.rows[a.tool.kind]}/comments"),
                     headers=actor.headers,
                     json={"comments_enabled": True},
                 )
@@ -1544,7 +1569,7 @@ async def test_tags_and_links_keep_a_tool_plugins_rows_in_their_initiative(
                 )
             ).status_code,
         ]
-        for kind, row_id in rows.items():
+        for kind, row_id in a.rows.items():
             response = await client.post(
                 actor.g("/tags/bulk"),
                 headers=actor.headers,
@@ -1557,12 +1582,12 @@ async def test_tags_and_links_keep_a_tool_plugins_rows_in_their_initiative(
             statuses.append(response.status_code)
         return statuses
 
-    for actor in (moderator_b, outsider):
+    for actor in (a.moderator_b, a.outsider):
         assert await tag_and_link(actor) == [404] * 5, actor
-    assert await tag_and_link(moderator_a) == [200, 200, 201, 200, 200]
+    assert await tag_and_link(a.moderator_a) == [200, 200, 201, 200, 200]
 
-    for actor in (moderator_b, outsider):
-        for kind, row_id in rows.items():
+    for actor in (a.moderator_b, a.outsider):
+        for kind, row_id in a.rows.items():
             for path in ("/relationships/", "/relationships/neighbourhood"):
                 response = await client.get(
                     actor.g(path),
@@ -1576,7 +1601,7 @@ async def test_tags_and_links_keep_a_tool_plugins_rows_in_their_initiative(
                 params={
                     "entity": f"{kind}:{row_id}",
                     "relationship_type": "related_to",
-                    "other_type": tool.kind,
+                    "other_type": a.tool.kind,
                 },
                 json=[],
             )
@@ -1592,18 +1617,18 @@ async def test_tags_and_links_keep_a_tool_plugins_rows_in_their_initiative(
         )
         assert response.json()["counts"] == {}, response.text
 
-    for kind, row_id in rows.items():
+    for kind, row_id in a.rows.items():
         response = await client.get(
-            moderator_a.g("/relationships/"),
-            headers=moderator_a.headers,
+            a.moderator_a.g("/relationships/"),
+            headers=a.moderator_a.headers,
             params={"entity": f"{kind}:{row_id}", "relationship_type": "related_to"},
         )
         assert [e["other"]["type"] for e in response.json()] == [
-            next(other for other in rows if other != kind)
+            next(other for other in a.rows if other != kind)
         ], response.text
         response = await client.get(
-            moderator_a.g(f"/tags/{tag.id}/entities"),
-            headers=moderator_a.headers,
+            a.moderator_a.g(f"/tags/{tag.id}/entities"),
+            headers=a.moderator_a.headers,
             params={"kind": kind},
         )
         assert [i["entity_id"] for i in response.json()["items"]] == [row_id]
@@ -1612,28 +1637,28 @@ async def test_tags_and_links_keep_a_tool_plugins_rows_in_their_initiative(
     stranger = f"stranger.{'x' * 14}"
     for response in (
         await client.put(
-            moderator_a.g(f"/tools/{stranger}/1/tags"),
-            headers=moderator_a.headers,
+            a.moderator_a.g(f"/tools/{stranger}/1/tags"),
+            headers=a.moderator_a.headers,
             json={"tag_ids": [tag.id]},
         ),
         await client.post(
-            moderator_a.g("/tags/bulk"),
-            headers=moderator_a.headers,
+            a.moderator_a.g("/tags/bulk"),
+            headers=a.moderator_a.headers,
             json={"target_type": stranger, "target_ids": [1], "add_tag_ids": [tag.id]},
         ),
         await client.get(
-            moderator_a.g(f"/tags/{tag.id}/entities"),
-            headers=moderator_a.headers,
+            a.moderator_a.g(f"/tags/{tag.id}/entities"),
+            headers=a.moderator_a.headers,
             params={"kind": stranger},
         ),
         await client.get(
-            moderator_a.g("/relationships/"),
-            headers=moderator_a.headers,
+            a.moderator_a.g("/relationships/"),
+            headers=a.moderator_a.headers,
             params={"entity": f"{stranger}:1"},
         ),
         await client.post(
-            moderator_a.g("/relationships/"),
-            headers=moderator_a.headers,
+            a.moderator_a.g("/relationships/"),
+            headers=a.moderator_a.headers,
             json={**link, "target": {"type": stranger, "id": 1}},
         ),
     ):
@@ -1642,8 +1667,8 @@ async def test_tags_and_links_keep_a_tool_plugins_rows_in_their_initiative(
 
 async def test_references_keep_a_tool_plugins_rows_in_their_initiative(
     session: AsyncSession,
-    acting_user: Callable[..., Awaitable[Actor]],
     client: AsyncClient,
+    plugin_in_a: Callable[..., Awaitable[_PluginInA]],
 ) -> None:
     """A reference to a tool plug-in's row or its item in initiative A, shared
     by name with a moderator of B and a member of no initiative, resolves to
@@ -1653,45 +1678,16 @@ async def test_references_keep_a_tool_plugins_rows_in_their_initiative(
     from app.models.tenant.relationship import EntityRelationship
     from app.services.tenant.relationships import Endpoint
 
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    guild = admin.guild
-    initiative_b = await create_initiative(session, guild, admin.user)
-    moderator_a = await acting_user(
-        guild=guild, initiative=admin.initiative, initiative_role="moderator"
-    )
-    moderator_b = await acting_user(
-        guild=guild, initiative=initiative_b, initiative_role="moderator"
-    )
-    outsider = await acting_user(guild=guild)
-    await session.commit()
-    seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
-    await install_tool_plugin(client, session, seat)
-    tools = await provisioned_tools(guild.id)
-    tool = tools.installed[0]
-    (item_kind,) = (child.value for child in tool.children)
-    await route_session_to_guild(session, guild.id)
-    seeder = _Seeder(
-        session,
-        await _Catalog.read(session),
-        admin.initiative.id,
-        grantor=moderator_a.user.id,
-        grantees=(moderator_b.user.id, outsider.user.id),
-        tools=tools,
-    )
-    item_row = await seeder.make(tool.items[0].name, moderator_a.user.id)
-    rows = {
-        tool.kind: item_row[f"{tool.kind.split('.')[0]}_id"],
-        item_kind: item_row["id"],
-    }
-    refs = [f"{kind}:{row_id}" for kind, row_id in rows.items()]
+    a = await plugin_in_a()
+    refs = [f"{kind}:{row_id}" for kind, row_id in a.rows.items()]
     written = " ".join(
-        f"#{kind.replace('_', '-')}[It]({row_id})" for kind, row_id in rows.items()
+        f"#{kind.replace('_', '-')}[It]({row_id})" for kind, row_id in a.rows.items()
     )
     task_a, task_b = [
         await create_task(
-            session, await create_project(session, initiative, admin.user)
+            session, await create_project(session, initiative, a.admin.user)
         )
-        for initiative in (admin.initiative, initiative_b)
+        for initiative in (a.admin.initiative, a.initiative_b)
     ]
     await session.commit()
 
@@ -1719,11 +1715,11 @@ async def test_references_keep_a_tool_plugins_rows_in_their_initiative(
         )
         return set(edges.all())
 
-    for actor in (moderator_b, outsider):
+    for actor in (a.moderator_b, a.outsider):
         assert await resolved(actor) == (set(), set()), actor
-    assert await resolved(moderator_a) == (set(refs), set(refs))
+    assert await resolved(a.moderator_a) == (set(refs), set(refs))
 
-    for actor, task in ((moderator_a, task_a), (moderator_b, task_b)):
+    for actor, task in ((a.moderator_a, task_a), (a.moderator_b, task_b)):
         response = await client.post(
             actor.g("/comments/"),
             headers=actor.headers,
@@ -1731,13 +1727,12 @@ async def test_references_keep_a_tool_plugins_rows_in_their_initiative(
         )
         assert response.status_code == 201, response.text
     assert await recorded(task_b.id) == set()
-    assert await recorded(task_a.id) == set(rows.items())
+    assert await recorded(task_a.id) == set(a.rows.items())
 
 
 async def test_exports_and_counts_keep_a_tool_plugins_rows_in_their_initiative(
-    session: AsyncSession,
-    acting_user: Callable[..., Awaitable[Actor]],
     client: AsyncClient,
+    plugin_in_a: Callable[..., Awaitable[_PluginInA]],
 ) -> None:
     """A tool plug-in's row and its item in initiative A, shared by name with
     its moderator, a moderator of B and a member of no initiative, are
@@ -1746,41 +1741,17 @@ async def test_exports_and_counts_keep_a_tool_plugins_rows_in_their_initiative(
     backups and statements hold none of it. Its export is imported into A by
     A's moderator once the tool is placed there, and into an initiative the
     importer is not in by nobody."""
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    guild = admin.guild
-    initiative_b = await create_initiative(session, guild, admin.user)
-    moderator_a = await acting_user(
-        guild=guild, initiative=admin.initiative, initiative_role="moderator"
-    )
-    moderator_b = await acting_user(
-        guild=guild, initiative=initiative_b, initiative_role="moderator"
-    )
-    outsider = await acting_user(guild=guild)
-    await session.commit()
-    seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
-    install = await install_tool_plugin(client, session, seat)
-    tools = await provisioned_tools(guild.id)
-    tool = tools.installed[0]
-    await route_session_to_guild(session, guild.id)
-    seeder = _Seeder(
-        session,
-        await _Catalog.read(session),
-        admin.initiative.id,
-        grantor=moderator_a.user.id,
-        # A's moderator too, as a count counts what is shared with its reader.
-        grantees=(moderator_a.user.id, moderator_b.user.id, outsider.user.id),
-        tools=tools,
-    )
-    item_row = await seeder.make(tool.items[0].name, moderator_a.user.id)
-    tool_id = item_row[f"{tool.kind.split('.')[0]}_id"]
-    await session.commit()
-    a, b = admin.initiative.id, initiative_b.id
+    # Shared with A's moderator too, as a count counts what is shared with
+    # its reader.
+    a = await plugin_in_a(shared_with_a=True)
+    item_row, tool_id = a.item_row, a.rows[a.tool.kind]
+    in_a, in_b = a.admin.initiative.id, a.initiative_b.id
     # The dashboard dataset of the tool's items, named by its table.
-    counted = f"SELECT count(*) FROM {tool.items[0].name}"
+    counted = f"SELECT count(*) FROM {a.tool.items[0].name}"
 
-    for actor in (moderator_b, outsider):
+    for actor in (a.moderator_b, a.outsider):
         response = await client.get(
-            actor.g(f"/exports/{tool.kind}"),
+            actor.g(f"/exports/{a.tool.kind}"),
             headers=actor.headers,
             params={"ids": [tool_id], "format": "json"},
         )
@@ -1788,83 +1759,90 @@ async def test_exports_and_counts_keep_a_tool_plugins_rows_in_their_initiative(
         response = await client.get(
             actor.g("/tools/counts/by-initiative"), headers=actor.headers
         )
-        assert response.json()["counts"][tool.kind] == {}, response.text
+        assert response.json()["counts"][a.tool.kind] == {}, response.text
         response = await client.get(
-            actor.g(f"/tools/{tool.kind}/counts"),
+            actor.g(f"/tools/{a.tool.kind}/counts"),
             headers=actor.headers,
-            params={"initiative_id": a},
+            params={"initiative_id": in_a},
         )
         assert response.json()["views"] == {"active": 0, "archived": 0}
         response = await client.get("/api/v1/me/tools/counts", headers=actor.headers)
-        assert response.json()["counts"][tool.kind] == 0, response.text
+        assert response.json()["counts"][a.tool.kind] == 0, response.text
         response = await client.post(
             actor.g("/query"), headers=actor.headers, json={"sql": counted}
         )
         assert response.json()["rows"] == [[0]], response.text
     response = await client.get(
-        moderator_b.g("/exports/estimate"),
-        headers=moderator_b.headers,
-        params={"scope": "initiative", "initiative_id": b},
+        a.moderator_b.g("/exports/estimate"),
+        headers=a.moderator_b.headers,
+        params={"scope": "initiative", "initiative_id": in_b},
     )
-    assert response.json()["tools"][tool.kind]["count"] == 0, response.text
+    assert response.json()["tools"][a.tool.kind]["count"] == 0, response.text
     response = await client.get(
-        moderator_b.g("/exports/estimate"),
-        headers=moderator_b.headers,
-        params={"scope": "initiative", "initiative_id": a},
+        a.moderator_b.g("/exports/estimate"),
+        headers=a.moderator_b.headers,
+        params={"scope": "initiative", "initiative_id": in_a},
     )
     assert response.status_code == 404, response.text
 
     # A kind the community has not installed is not found.
     for path in (f"/exports/stranger.{'x' * 14}", f"/tools/stranger.{'x' * 14}/counts"):
         response = await client.get(
-            moderator_a.g(path), headers=moderator_a.headers, params={"ids": [1]}
+            a.moderator_a.g(path),
+            headers=a.moderator_a.headers,
+            params={"ids": [1]},
         )
         assert response.status_code == 404, (path, response.text)
 
     response = await client.get(
-        moderator_a.g(f"/exports/{tool.kind}"),
-        headers=moderator_a.headers,
+        a.moderator_a.g(f"/exports/{a.tool.kind}"),
+        headers=a.moderator_a.headers,
         params={"ids": [tool_id], "format": "json"},
     )
     assert response.status_code == 200, response.text
     exported = response.json()
-    assert exported["type"] == f"initiative-{tool.kind}"
+    assert exported["type"] == f"initiative-{a.tool.kind}"
     assert [counter["name"] for counter in exported["items"]["counter"]] == [
         item_row["name"]
     ]
     response = await client.get(
-        moderator_a.g(f"/exports/{tool.kind}"),
-        headers=moderator_a.headers,
+        a.moderator_a.g(f"/exports/{a.tool.kind}"),
+        headers=a.moderator_a.headers,
         params={"ids": [tool_id], "format": "csv"},
     )
     assert response.status_code == 200, response.text
     assert item_row["name"] in response.text
     response = await client.get(
-        moderator_a.g("/tools/counts/by-initiative"), headers=moderator_a.headers
+        a.moderator_a.g("/tools/counts/by-initiative"),
+        headers=a.moderator_a.headers,
     )
-    assert response.json()["counts"][tool.kind] == {str(a): 1}, response.text
+    assert response.json()["counts"][a.tool.kind] == {str(in_a): 1}, response.text
     response = await client.get(
-        moderator_a.g(f"/tools/{tool.kind}/counts"),
-        headers=moderator_a.headers,
-        params={"initiative_id": a, "include_tags": True},
+        a.moderator_a.g(f"/tools/{a.tool.kind}/counts"),
+        headers=a.moderator_a.headers,
+        params={"initiative_id": in_a, "include_tags": True},
     )
     assert response.json() == {
         "views": {"active": 1, "archived": 0},
         "tag_counts": {},
         "untagged_count": 1,
     }, response.text
-    response = await client.get("/api/v1/me/tools/counts", headers=moderator_a.headers)
-    assert response.json()["counts"][tool.kind] == 1, response.text
+    response = await client.get(
+        "/api/v1/me/tools/counts", headers=a.moderator_a.headers
+    )
+    assert response.json()["counts"][a.tool.kind] == 1, response.text
     response = await client.post(
-        moderator_a.g("/query"), headers=moderator_a.headers, json={"sql": counted}
+        a.moderator_a.g("/query"),
+        headers=a.moderator_a.headers,
+        json={"sql": counted},
     )
     assert response.json()["rows"] == [[1]], response.text
     response = await client.get(
-        moderator_a.g("/exports/estimate"),
-        headers=moderator_a.headers,
-        params={"scope": "initiative", "initiative_id": a},
+        a.moderator_a.g("/exports/estimate"),
+        headers=a.moderator_a.headers,
+        params={"scope": "initiative", "initiative_id": in_a},
     )
-    assert response.json()["tools"][tool.kind]["count"] == 1, response.text
+    assert response.json()["tools"][a.tool.kind]["count"] == 1, response.text
 
     async def restore(actor: Actor, initiative_id: int) -> tuple[int, str | None]:
         response = await client.post(
@@ -1875,26 +1853,26 @@ async def test_exports_and_counts_keep_a_tool_plugins_rows_in_their_initiative(
         return response.status_code, response.json().get("detail")
 
     refused = (404, ImportEngineMessages.IMPORT_INVALID_PARAMS)
-    for actor in (moderator_b, outsider):
-        assert await restore(actor, a) == refused, actor
-    assert await restore(moderator_a, b) == refused
+    for actor in (a.moderator_b, a.outsider):
+        assert await restore(actor, in_a) == refused, actor
+    assert await restore(a.moderator_a, in_b) == refused
     response = await client.patch(
-        seat.g(f"/plugins/{install['id']}"),
-        headers=seat.headers,
-        json={"placed_initiative_ids": [a, b]},
+        a.seat.g(f"/plugins/{a.install['id']}"),
+        headers=a.seat.headers,
+        json={"placed_initiative_ids": [in_a, in_b]},
     )
     assert response.status_code == 200, response.text
-    for actor in (moderator_b, outsider):
-        assert await restore(actor, a) == refused, actor
-    assert await restore(moderator_a, b) == refused
-    assert (await restore(moderator_a, a))[0] == 201
+    for actor in (a.moderator_b, a.outsider):
+        assert await restore(actor, in_a) == refused, actor
+    assert await restore(a.moderator_a, in_b) == refused
+    assert (await restore(a.moderator_a, in_a))[0] == 201
 
 
 async def test_sharing_holds_and_responses_keep_a_tool_plugins_rows_in_their_initiative(
     session: AsyncSession,
-    acting_user: Callable[..., Awaitable[Actor]],
     reading_as: Callable[[int, int], Awaitable[AsyncSession]],
     client: AsyncClient,
+    plugin_in_a: Callable[..., Awaitable[_PluginInA]],
 ) -> None:
     """A tool plug-in's row in initiative A, shared by name with a moderator
     of B and a member of no initiative, is shared, held and taken out of the
@@ -1903,65 +1881,50 @@ async def test_sharing_holds_and_responses_keep_a_tool_plugins_rows_in_their_ini
     and links nothing more on them."""
     from app.services.tenant.soft_delete import trash
 
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    guild = admin.guild
-    initiative_b = await create_initiative(session, guild, admin.user)
-    moderator_a = await acting_user(
-        guild=guild, initiative=admin.initiative, initiative_role="moderator"
-    )
-    moderator_b = await acting_user(
-        guild=guild, initiative=initiative_b, initiative_role="moderator"
-    )
-    outsider = await acting_user(guild=guild)
-    await session.commit()
-    seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
-    install = await install_tool_plugin(client, session, seat)
-    tools = await provisioned_tools(guild.id)
-    tool = tools.installed[0]
-    (item_kind,) = (child.value for child in tool.children)
-    mine = await reading_as(moderator_a.user.id, guild.id)
+    a = await plugin_in_a(seeded=False)
+    mine = await reading_as(a.moderator_a.user.id, a.guild.id)
     rows: dict[str, int] = dict(
         zip(
-            (tool.kind, item_kind),
-            (await add_counter(mine, guild.id, admin.initiative.id))[1:],
+            (a.tool.kind, a.item_kind),
+            (await add_counter(mine, a.guild.id, a.admin.initiative.id))[1:],
         )
     )
-    trashed, _ = (await add_counter(mine, guild.id, admin.initiative.id))[1:]
+    trashed, _ = (await add_counter(mine, a.guild.id, a.admin.initiative.id))[1:]
     mine.add_all(
         ResourceGrant(
-            resource_type=tool.kind,
+            resource_type=a.tool.kind,
             resource_id=row_id,
-            initiative_id=admin.initiative.id,
+            initiative_id=a.admin.initiative.id,
             user_id=person.user.id,
             level=ResourceAccessLevel.write,
         )
-        for row_id in (rows[tool.kind], trashed)
-        for person in (moderator_b, outsider)
+        for row_id in (rows[a.tool.kind], trashed)
+        for person in (a.moderator_b, a.outsider)
     )
     await mine.flush()
-    located = locate(tools, tool.kind)
+    located = locate(a.tools, a.tool.kind)
     assert located is not None
-    row = await load_row(mine, located, tools, trashed)
+    row = await load_row(mine, located, a.tools, trashed)
     assert row is not None
-    await trash(mine, row, deleted_by_user_id=moderator_a.user.id)
+    await trash(mine, row, deleted_by_user_id=a.moderator_a.user.id)
     await mine.commit()
 
-    def sharing(row_id: int, kind: str = tool.kind) -> dict[str, Any]:
+    def sharing(row_id: int, kind: str = a.tool.kind) -> dict[str, Any]:
         return {
             "items": [
                 {
                     "resource_type": kind,
                     "resource_id": row_id,
-                    "grants": [{"user_id": outsider.user.id, "level": "read"}],
+                    "grants": [{"user_id": a.outsider.user.id, "level": "read"}],
                 }
             ]
         }
 
-    for actor in (moderator_b, outsider):
+    for actor in (a.moderator_b, a.outsider):
         response = await client.put(
             actor.g("/resource-grants/bulk"),
             headers=actor.headers,
-            json=sharing(rows[tool.kind]),
+            json=sharing(rows[a.tool.kind]),
         )
         assert response.status_code == 200, response.text
         assert response.json()["results"][0]["status"] == "not_found"
@@ -1977,29 +1940,30 @@ async def test_sharing_holds_and_responses_keep_a_tool_plugins_rows_in_their_ini
             )
             assert response.status_code == 404, (kind, response.text)
         response = await client.post(
-            actor.g(f"/trash/{tool.kind}/{trashed}/restore"), headers=actor.headers
+            actor.g(f"/trash/{a.tool.kind}/{trashed}/restore"),
+            headers=actor.headers,
         )
         assert response.status_code == 404, response.text
 
     # A kind the community lacks is not found.
     stranger = f"stranger.{'x' * 14}"
     response = await client.put(
-        moderator_a.g("/resource-grants/bulk"),
-        headers=moderator_a.headers,
-        json=sharing(rows[tool.kind], stranger),
+        a.moderator_a.g("/resource-grants/bulk"),
+        headers=a.moderator_a.headers,
+        json=sharing(rows[a.tool.kind], stranger),
     )
     assert response.json()["results"][0]["status"] == "not_found", response.text
     response = await client.post(
-        moderator_a.g("/holds"),
-        headers=moderator_a.headers,
+        a.moderator_a.g("/holds"),
+        headers=a.moderator_a.headers,
         json={"target_type": stranger, "target_id": 1, "reason": "legal_request"},
     )
     assert response.status_code == 404, response.text
 
     response = await client.put(
-        moderator_a.g("/resource-grants/bulk"),
-        headers=moderator_a.headers,
-        json=sharing(rows[tool.kind]),
+        a.moderator_a.g("/resource-grants/bulk"),
+        headers=a.moderator_a.headers,
+        json=sharing(rows[a.tool.kind]),
     )
     assert response.json()["results"][0]["status"] == "ok", response.text
 
@@ -2008,8 +1972,8 @@ async def test_sharing_holds_and_responses_keep_a_tool_plugins_rows_in_their_ini
     comments: dict[str, int] = {}
     for kind, row_id in rows.items():
         response = await client.post(
-            moderator_a.g("/comments/"),
-            headers=moderator_a.headers,
+            a.moderator_a.g("/comments/"),
+            headers=a.moderator_a.headers,
             json={"subject_type": kind, "subject_id": row_id, "content": "hi"},
         )
         assert response.status_code == 201, (kind, response.text)
@@ -2023,20 +1987,23 @@ async def test_sharing_holds_and_responses_keep_a_tool_plugins_rows_in_their_ini
     # end and are a response to each.
     linked = ("depends_on", "related_to", "attached")
     ends = {
-        "s": tool.kind,
-        "si": rows[tool.kind],
-        "t": item_kind,
-        "ti": rows[item_kind],
+        "s": a.tool.kind,
+        "si": rows[a.tool.kind],
+        "t": a.item_kind,
+        "ti": rows[a.item_kind],
     }
     # A symmetric edge is stored with its lower node id first.
     flipped = {"s": ends["t"], "si": ends["ti"], "t": ends["s"], "ti": ends["si"]}
-    lower_first = (tools.endpoint_codes[tool.kind], rows[tool.kind]) < (
-        tools.endpoint_codes[item_kind],
-        rows[item_kind],
+    lower_first = (
+        a.tools.endpoint_codes[a.tool.kind],
+        rows[a.tool.kind],
+    ) < (
+        a.tools.endpoint_codes[a.item_kind],
+        rows[a.item_kind],
     )
     for ty in linked:
         given = ends if ty == "depends_on" or lower_first else flipped
-        linking = await reading_as(moderator_a.user.id, guild.id)
+        linking = await reading_as(a.moderator_a.user.id, a.guild.id)
         assert await _attempt(linking, link.bindparams(**given, ty=ty)) == 1, ty
         await linking.rollback()
 
@@ -2044,8 +2011,8 @@ async def test_sharing_holds_and_responses_keep_a_tool_plugins_rows_in_their_ini
     await session.exec(
         pg_insert(PluginInstall)
         .values(
-            guild_id=guild.id,
-            install_id=install["id"],
+            guild_id=a.guild.id,
+            install_id=a.install["id"],
             listing_uid=COUNTERS_UID,
             enabled=True,
             **read_only,
@@ -2057,26 +2024,26 @@ async def test_sharing_holds_and_responses_keep_a_tool_plugins_rows_in_their_ini
     await session.commit()
     for kind, row_id in rows.items():
         response = await client.get(
-            moderator_a.g("/comments/"),
-            headers=moderator_a.headers,
+            a.moderator_a.g("/comments/"),
+            headers=a.moderator_a.headers,
             params={"subject_type": kind, "subject_id": row_id},
         )
         assert response.status_code == 200, (kind, response.text)
         assert [c["id"] for c in response.json()["comments"]] == [comments[kind]]
         response = await client.post(
-            moderator_a.g("/comments/"),
-            headers=moderator_a.headers,
+            a.moderator_a.g("/comments/"),
+            headers=a.moderator_a.headers,
             json={"subject_type": kind, "subject_id": row_id, "content": "again"},
         )
         assert response.status_code == 403, (kind, response.text)
         response = await client.put(
-            moderator_a.g(f"/reactions/comment/{comments[kind]}"),
-            headers=moderator_a.headers,
+            a.moderator_a.g(f"/reactions/comment/{comments[kind]}"),
+            headers=a.moderator_a.headers,
             json={"emoji": "👍"},
         )
         assert response.status_code == 403, (kind, response.text)
     for ty in linked:
-        linking = await reading_as(moderator_a.user.id, guild.id)
+        linking = await reading_as(a.moderator_a.user.id, a.guild.id)
         assert await _attempt(linking, link.bindparams(**ends, ty=ty)) == _REFUSED, ty
         await linking.rollback()
 
@@ -2085,6 +2052,7 @@ async def test_notices_and_marks_keep_a_tool_plugins_rows_in_their_initiative(
     session: AsyncSession,
     acting_user: Callable[..., Awaitable[Actor]],
     client: AsyncClient,
+    plugin_in_a: Callable[..., Awaitable[_PluginInA]],
 ) -> None:
     """A reply, an @mention and a subscription on a tool plug-in's item in
     initiative A tell only people who can open it, and its line names it: a
@@ -2093,46 +2061,22 @@ async def test_notices_and_marks_keep_a_tool_plugins_rows_in_their_initiative(
     and its tool. Neither of them views, bookmarks or subscribes to A's rows
     or sets a property on them, which A's moderators do; a kind the community
     lacks is not found."""
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    guild = admin.guild
-    initiative_b = await create_initiative(session, guild, admin.user)
-    moderators_a = [
+    a = await plugin_in_a()
+    mentioned_a, subscriber_a = [
         await acting_user(
-            guild=guild, initiative=admin.initiative, initiative_role="moderator"
+            guild=a.guild,
+            initiative=a.admin.initiative,
+            initiative_role="moderator",
         )
-        for _ in range(3)
+        for _ in range(2)
     ]
-    moderator_a, mentioned_a, subscriber_a = moderators_a
-    moderator_b = await acting_user(
-        guild=guild, initiative=initiative_b, initiative_role="moderator"
-    )
-    outsider = await acting_user(guild=guild)
-    text = await create_property_definition(session, admin.initiative)
+    text = await create_property_definition(session, a.admin.initiative)
     person = await create_property_definition(
-        session, admin.initiative, type=MetadataType.user_reference
+        session, a.admin.initiative, type=MetadataType.user_reference
     )
-    seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
-    await install_tool_plugin(client, session, seat)
-    tools = await provisioned_tools(guild.id)
-    tool = tools.installed[0]
-    (item_kind,) = (child.value for child in tool.children)
-    await route_session_to_guild(session, guild.id)
-    seeder = _Seeder(
-        session,
-        await _Catalog.read(session),
-        admin.initiative.id,
-        grantor=moderator_a.user.id,
-        grantees=(moderator_b.user.id, outsider.user.id),
-        tools=tools,
-    )
-    item_row = await seeder.make(tool.items[0].name, moderator_a.user.id)
-    rows = {
-        tool.kind: item_row[f"{tool.kind.split('.')[0]}_id"],
-        item_kind: item_row["id"],
-    }
     # Subscribed before they were moved out of reach: kept, and not told.
-    for actor in (moderator_b, outsider):
-        for kind, row_id in rows.items():
+    for actor in (a.moderator_b, a.outsider):
+        for kind, row_id in a.rows.items():
             session.add(
                 PersonalItem(
                     user_id=actor.user.id,
@@ -2145,14 +2089,14 @@ async def test_notices_and_marks_keep_a_tool_plugins_rows_in_their_initiative(
 
     def properties(actor: Actor, kind: str, values: list[dict[str, Any]]) -> Any:
         return client.put(
-            actor.g(f"/properties/{kind}/{rows.get(kind, 1)}"),
+            actor.g(f"/properties/{kind}/{a.rows.get(kind, 1)}"),
             headers=actor.headers,
             json={"values": values},
         )
 
     written = [{"property_id": text.id, "value": "boundary"}]
-    for actor in (moderator_b, outsider):
-        for kind, row_id in rows.items():
+    for actor in (a.moderator_b, a.outsider):
+        for kind, row_id in a.rows.items():
             for mark in ("view", "subscribe"):
                 response = await client.put(
                     actor.g(f"/personal-items/{mark}/{kind}/{row_id}"),
@@ -2162,7 +2106,7 @@ async def test_notices_and_marks_keep_a_tool_plugins_rows_in_their_initiative(
             response = await properties(actor, kind, written)
             assert response.status_code == 404, (kind, response.text)
         response = await client.put(
-            actor.g(f"/personal-items/bookmark/{tool.kind}/{rows[tool.kind]}"),
+            actor.g(f"/personal-items/bookmark/{a.tool.kind}/{a.rows[a.tool.kind]}"),
             headers=actor.headers,
         )
         assert response.status_code == 404, response.text
@@ -2174,64 +2118,74 @@ async def test_notices_and_marks_keep_a_tool_plugins_rows_in_their_initiative(
         ("GET", f"/personal-items/{stranger}/1"),
         ("PUT", f"/personal-items/subscribe/{stranger}/1"),
         ("PUT", f"/personal-items/bookmark/{stranger}/1"),
-        ("PUT", f"/personal-items/bookmark/{item_kind}/{rows[item_kind]}"),
+        (
+            "PUT",
+            f"/personal-items/bookmark/{a.item_kind}/{a.rows[a.item_kind]}",
+        ),
     ):
         response = await client.request(
-            method, moderator_a.g(path), headers=moderator_a.headers
+            method, a.moderator_a.g(path), headers=a.moderator_a.headers
         )
         assert response.status_code == 404, (path, response.text)
-    response = await properties(moderator_a, stranger, written)
+    response = await properties(a.moderator_a, stranger, written)
     assert response.status_code == 404, response.text
 
     response = await client.put(
-        moderator_a.g(f"/personal-items/bookmark/{tool.kind}/{rows[tool.kind]}"),
-        headers=moderator_a.headers,
+        a.moderator_a.g(
+            f"/personal-items/bookmark/{a.tool.kind}/{a.rows[a.tool.kind]}"
+        ),
+        headers=a.moderator_a.headers,
     )
     assert response.status_code == 200, response.text
-    assert response.json()["entity_type"] == tool.kind
+    assert response.json()["entity_type"] == a.tool.kind
     response = await client.get(
-        moderator_a.g("/personal-items"),
-        headers=moderator_a.headers,
+        a.moderator_a.g("/personal-items"),
+        headers=a.moderator_a.headers,
         params={"mark": "bookmark"},
     )
     assert [
         (item["entity_type"], item["entity_id"], item["initiative_id"])
         for item in response.json()
-    ] == [(tool.kind, rows[tool.kind], admin.initiative.id)], response.text
+    ] == [(a.tool.kind, a.rows[a.tool.kind], a.admin.initiative.id)], response.text
     response = await client.put(
-        subscriber_a.g(f"/personal-items/subscribe/{item_kind}/{rows[item_kind]}"),
+        subscriber_a.g(
+            f"/personal-items/subscribe/{a.item_kind}/{a.rows[a.item_kind]}"
+        ),
         headers=subscriber_a.headers,
     )
     assert response.status_code == 200, response.text
     assert response.json()["subscribed"] is True
-    for kind in rows:
-        response = await properties(moderator_a, kind, written)
+    for kind in a.rows:
+        response = await properties(a.moderator_a, kind, written)
         assert response.status_code == 200, (kind, response.text)
         assert [value["value"] for value in response.json()] == ["boundary"]
         response = await properties(
-            moderator_a, kind, [{"property_id": person.id, "value": outsider.user.id}]
+            a.moderator_a,
+            kind,
+            [{"property_id": person.id, "value": a.outsider.user.id}],
         )
         assert response.status_code == 422, (kind, response.text)
 
     said = await client.post(
-        moderator_a.g("/comments/"),
-        headers=moderator_a.headers,
+        a.moderator_a.g("/comments/"),
+        headers=a.moderator_a.headers,
         json={
-            "subject_type": item_kind,
-            "subject_id": rows[item_kind],
+            "subject_type": a.item_kind,
+            "subject_id": a.rows[a.item_kind],
             "content": "first",
         },
     )
     assert said.status_code == 201, said.text
     mentions = " ".join(
-        f"@[someone]({actor.user.id})" for actor in (mentioned_a, moderator_b, outsider)
+        f"@[someone]({actor.user.id})"
+        for actor in (mentioned_a, a.moderator_b, a.outsider)
     )
     answered = await client.post(
-        admin.g("/comments/"),
-        headers=admin.headers,
+        a.admin.g("/comments/"),
+        headers=a.admin.headers,
         json={
-            "subject_type": item_kind,
-            "subject_id": rows[item_kind],
+            "subject_type": a.item_kind,
+            "subject_id": a.rows[a.item_kind],
             "content": f"answer {mentions}",
             "parent_comment_id": said.json()["id"],
         },
@@ -2249,20 +2203,20 @@ async def test_notices_and_marks_keep_a_tool_plugins_rows_in_their_initiative(
         if data.get("comment_id") == answered.json()["id"]
         # A tool plug-in's row opens on its own page, in its initiative.
         and data.get("target_path")
-        == f"/i/{admin.initiative.id}/t/{item_kind}/{rows[item_kind]}"
+        == f"/i/{a.admin.initiative.id}/t/{a.item_kind}/{a.rows[a.item_kind]}"
     }
     assert told == {
-        moderator_a.user.id: NotificationType.comment_reply,
+        a.moderator_a.user.id: NotificationType.comment_reply,
         mentioned_a.user.id: NotificationType.mention,
         subscriber_a.user.id: NotificationType.subscription_activity,
     }
-    response = await client.get("/api/v1/notifications/", headers=moderator_a.headers)
+    response = await client.get("/api/v1/notifications/", headers=a.moderator_a.headers)
     (line,) = (
         line
         for line in response.json()["notifications"]
         if line["data"].get("comment_id") == answered.json()["id"]
     )
-    assert line["data"]["entity_name"] == item_row["name"], line
+    assert line["data"]["entity_name"] == a.item_row["name"], line
 
 
 async def test_webhooks_tell_a_tool_plugins_changes_only_where_they_are_heard(

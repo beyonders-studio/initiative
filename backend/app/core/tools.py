@@ -37,6 +37,13 @@ def plural_of(stem: str) -> str:
     return stem + "s"
 
 
+def plugin_kind(key: str, listing_uid: str) -> str:
+    """A tool plug-in's kind: its tool's or an item's ``key``, ``.`` and its
+    listing's uid in lower case (``counter.tsjvtcm0s7gv2x``). A built-in kind
+    holds no ``.``, so the two never meet."""
+    return f"{key}.{listing_uid.lower()}"
+
+
 class ToolRefusals:
     """The refusals every tool answers alike, each naming the tool by its
     ``value``: a built-in tool's, and a tool plug-in's

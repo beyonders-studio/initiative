@@ -32,6 +32,7 @@ from typing import Any
 from sqlalchemy import ColumnElement
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tool_set import ToolRecord
 from app.core.tools import Tool
 from app.models.platform.user import User
 from app.models.tenant.post import Post, is_published_clause
@@ -62,9 +63,11 @@ class PostAdapter(ToolExportAdapter):
         await metadata_service.annotate_properties(session, [post])
         return post
 
-    def in_initiative(self, initiative_id: int, /) -> list[ColumnElement[bool]]:
+    def in_initiative(
+        self, record: ToolRecord, initiative_id: int, /
+    ) -> list[ColumnElement[bool]]:
         """Only published posts: a draft is in no export."""
-        return [*super().in_initiative(initiative_id), is_published_clause()]
+        return [*super().in_initiative(record, initiative_id), is_published_clause()]
 
     def fields(self, post: Post, ctx: BuildContext, /) -> dict[str, Any]:
         """The poll's choices, as their text in the order they are offered."""
