@@ -10,13 +10,10 @@ import {
 const withHandle = { id: 7, username: "foobar", discriminator: 12 };
 
 describe("getUserHandle", () => {
-  it("writes the number as four digits", () => {
+  it("writes the number as four digits, and nothing without a name part", () => {
     expect(getUserHandle(withHandle)).toBe("foobar#0012");
     expect(getUserHandle({ ...withHandle, discriminator: 1234 })).toBe("foobar#1234");
     expect(getUserHandle({ ...withHandle, discriminator: 0 })).toBe("foobar#0000");
-  });
-
-  it("has nothing to write without a name part", () => {
     expect(getUserHandle({ id: 7 })).toBe("");
     expect(getUserHandle(null)).toBe("");
   });
@@ -30,20 +27,14 @@ describe("formatDiscriminator", () => {
 });
 
 describe("getUserDisplayName", () => {
-  it("prefers a community name", () => {
+  it("prefers a community name, then the handle, even for an account no longer in use", () => {
     expect(getUserDisplayName({ ...withHandle, display_name: "Jordan Drako" })).toBe(
       "Jordan Drako"
     );
-  });
-
-  it("falls back to the handle", () => {
     // Most members set no community name, so this is the ordinary case
     // rather than an edge one.
     expect(getUserDisplayName(withHandle)).toBe("foobar#0012");
     expect(getUserDisplayName({ ...withHandle, display_name: "   " })).toBe("foobar#0012");
-  });
-
-  it("keeps rendering the handle for an account no longer in use", () => {
     // The handle is a pseudonym and a unique identifier at once — an old
     // thread stays legible only if it survives the account.
     expect(getUserDisplayName({ ...withHandle, status: "anonymized" })).toBe("foobar#0012");

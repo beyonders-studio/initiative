@@ -8,33 +8,22 @@ const grid = (over: Partial<Parameters<typeof sheetGrid>[0]> = {}) =>
   sheetGrid({ bounds: canvas, ...over });
 
 describe("usedRange", () => {
-  it("is null for an empty sheet", () => {
+  it("spans where the data starts and ends, for a record or a Map, ignoring malformed keys", () => {
     expect(usedRange({})).toBeNull();
     expect(usedRange(new Map())).toBeNull();
-  });
-
-  it("reports where the data starts as well as where it ends", () => {
     expect(usedRange({ "2:3": "a", "7:1": "b" })).toEqual({ r1: 2, c1: 1, r2: 7, c2: 3 });
-  });
-
-  it("reads a Map as readily as a record", () => {
     const cells = new Map<string, CellValue>([["4:4", 1]]);
     expect(usedRange(cells)).toEqual({ r1: 4, c1: 4, r2: 4, c2: 4 });
-  });
-
-  it("ignores malformed keys", () => {
     expect(usedRange({ nonsense: 1, "1:1": 2 })).toEqual({ r1: 1, c1: 1, r2: 1, c2: 1 });
   });
 });
 
 describe("clipToCeiling", () => {
-  it("keeps everything inside the ceiling", () => {
-    const { kept, dropped } = clipToCeiling({ "0:0": 1, "99:25": 2 });
-    expect(dropped).toBe(0);
-    expect(Object.keys(kept)).toHaveLength(2);
-  });
-
-  it("drops what can never be rendered, and counts it", () => {
+  it("keeps everything inside the ceiling, and counts what can never be rendered", () => {
+    expect(clipToCeiling({ "0:0": 1, "99:25": 2 })).toEqual({
+      kept: { "0:0": 1, "99:25": 2 },
+      dropped: 0,
+    });
     const { kept, dropped } = clipToCeiling({
       "0:0": "in",
       [`0:${CEILING.cols}`]: "past the columns",
@@ -46,11 +35,8 @@ describe("clipToCeiling", () => {
 });
 
 describe("sheetGrid — clamping", () => {
-  it("pulls a cell inside the canvas", () => {
+  it("pulls a cell and a range's corners inside the canvas", () => {
     expect(grid().clampCell({ row: -5, col: 900 })).toEqual({ row: 0, col: 25 });
-  });
-
-  it("pulls a range's corners inside the canvas", () => {
     expect(grid().clampRange({ r1: -1, c1: -1, r2: 500, c2: 500 })).toEqual({
       r1: 0,
       c1: 0,
@@ -59,16 +45,13 @@ describe("sheetGrid — clamping", () => {
     });
   });
 
-  it("normalizes a selection from corners in any order", () => {
+  it("normalizes a selection from corners in any order, clamped to the canvas", () => {
     expect(grid().normalizeSelection({ row: 5, col: 5 }, { row: 2, col: 8 })).toEqual({
       r1: 2,
       c1: 5,
       r2: 5,
       c2: 8,
     });
-  });
-
-  it("clamps a selection dragged past the canvas", () => {
     expect(grid().normalizeSelection({ row: 0, col: 0 }, { row: 5000, col: 5000 })).toEqual({
       r1: 0,
       c1: 0,
@@ -93,12 +76,9 @@ describe("sheetGrid — forEachCell", () => {
 });
 
 describe("sheetGrid — step", () => {
-  it("moves one cell", () => {
+  it("moves one cell, staying put at the canvas edge", () => {
     expect(grid().step({ row: 3, col: 3 }, 1, 0)).toEqual({ row: 4, col: 3 });
     expect(grid().step({ row: 3, col: 3 }, 0, -1)).toEqual({ row: 3, col: 2 });
-  });
-
-  it("stays put at the canvas edge", () => {
     expect(grid().step({ row: 0, col: 0 }, -1, -1)).toEqual({ row: 0, col: 0 });
     expect(grid().step({ row: 99, col: 25 }, 1, 1)).toEqual({ row: 99, col: 25 });
   });

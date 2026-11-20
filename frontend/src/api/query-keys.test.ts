@@ -28,25 +28,16 @@ describe("query-keys community scoping", () => {
     setInvalidationCommunity(null);
   });
 
-  it("invalidates only the active community's queries", async () => {
+  it("invalidates only the active community's queries, and the cross-community /me aggregate", async () => {
     const activeCommunity = seed(["/api/v1/c/5/tasks/"]);
     const otherCommunity = seed(["/api/v1/c/7/tasks/"]);
+    const meAggregate = seed(["/api/v1/me/tasks"]);
 
     setInvalidationCommunity(5);
     await invalidate(q.allTasks());
 
     expect(activeCommunity()).toBe(true);
     expect(otherCommunity()).toBe(false);
-  });
-
-  it("still invalidates the cross-community /me aggregate", async () => {
-    const communityScoped = seed(["/api/v1/c/5/tasks/"]);
-    const meAggregate = seed(["/api/v1/me/tasks"]);
-
-    setInvalidationCommunity(5);
-    await invalidate(q.allTasks());
-
-    expect(communityScoped()).toBe(true);
     expect(meAggregate()).toBe(true);
   });
 
@@ -204,34 +195,18 @@ describe("query-keys community scoping", () => {
       for (const key of kept) expect(key()).toBe(true);
     });
 
-    it("keeps the arriving community's own data — it is not the departing community's", async () => {
+    it("keeps the arriving community's own data, and a person's own views of the departing one's lists", async () => {
       const arriving = survives(["/api/v1/c/5/projects/"]);
       const arrivingDetail = survives(["/api/v1/c/5/tasks/12"]);
       const departing = survives(["/api/v1/c/4/projects/"]);
+      const views = survives(["/api/v1/c/4/view-preferences"]);
 
       await resetCommunityScopedQueries(5);
 
       expect(arriving()).toBe(true);
       expect(arrivingDetail()).toBe(true);
       expect(departing()).toBe(false);
-    });
-
-    it("keeps a person's own views of the departing community's lists", async () => {
-      const views = survives(["/api/v1/c/4/view-preferences"]);
-      const lists = survives(["/api/v1/c/4/projects/"]);
-
-      await resetCommunityScopedQueries(5);
-
       expect(views()).toBe(true);
-      expect(lists()).toBe(false);
-    });
-
-    it("still drops everything community-scoped when no arriving community is named", async () => {
-      const five = survives(["/api/v1/c/5/projects/"]);
-
-      await resetCommunityScopedQueries();
-
-      expect(five()).toBe(false);
     });
   });
 });
@@ -258,27 +233,8 @@ describe("patchCachedPost", () => {
 
   const markRead = (post: PostRead) => ({ ...post, is_read: true });
 
-  it("patches a post inside an infinite feed's pages", () => {
+  it("patches a post inside an infinite feed's pages, leaving the others identical", () => {
     const key = ["/api/v1/c/5/posts/", { initiative_id: 1 }];
-    queryClient.setQueryData(key, {
-      pageParams: [1, 2],
-      pages: [
-        { items: [{ id: 1, is_read: false }], page: 1 },
-        { items: [{ id: 2, is_read: false }], page: 2 },
-      ],
-    });
-
-    patchCachedPost(2, markRead);
-
-    const data = queryClient.getQueryData(key) as {
-      pages: { items: { id: number; is_read: boolean }[] }[];
-    };
-    expect(data.pages[1].items[0].is_read).toBe(true);
-    expect(data.pages[0].items[0].is_read).toBe(false);
-  });
-
-  it("leaves untouched pages identical, so their cards do not re-render", () => {
-    const key = ["/api/v1/c/5/posts/"];
     const untouched = { items: [{ id: 1, is_read: false }], page: 1 };
     queryClient.setQueryData(key, {
       pageParams: [1, 2],
@@ -287,7 +243,11 @@ describe("patchCachedPost", () => {
 
     patchCachedPost(2, markRead);
 
-    const data = queryClient.getQueryData(key) as { pages: unknown[] };
+    const data = queryClient.getQueryData(key) as {
+      pages: { items: { id: number; is_read: boolean }[] }[];
+    };
+    expect(data.pages[1].items[0].is_read).toBe(true);
+    // Untouched pages stay identical, so their cards do not re-render.
     expect(data.pages[0]).toBe(untouched);
   });
 

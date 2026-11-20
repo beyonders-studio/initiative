@@ -38,20 +38,13 @@ const appRoutes = (): Set<string> => {
 };
 
 describe("notification target paths", () => {
-  it("finds the paths it is meant to be checking", () => {
-    // Guards against the regexes silently matching nothing, which would make
-    // every assertion below vacuously true.
-    const paths = backendTargetPaths();
-    expect(paths.length).toBeGreaterThan(0);
-    expect(paths).toContain("/profile/account");
-  });
-
   it("only ever points at a page this app has", () => {
-    const routes = appRoutes();
+    const paths = backendTargetPaths();
+    // The regexes matching nothing would make the check below vacuously true.
+    expect(paths).toContain("/profile/account");
     // Community-relative targets are resolved against a community elsewhere; these
     // are the app-level ones the SPA navigates to verbatim.
-    const missing = backendTargetPaths().filter((target) => !routes.has(target));
-
-    expect(missing).toEqual([]);
+    const routes = appRoutes();
+    expect(paths.filter((target) => !routes.has(target))).toEqual([]);
   });
 });

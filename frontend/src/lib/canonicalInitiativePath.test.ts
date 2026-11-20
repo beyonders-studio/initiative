@@ -9,38 +9,22 @@ import { describe, expect, it } from "vitest";
 import { canonicalInitiativePath } from "@/lib/communityUrl";
 
 describe("canonicalInitiativePath", () => {
-  it("replaces an initiative the entity doesn't belong to", () => {
-    expect(canonicalInitiativePath("/c/1/i/9/projects/7", 5)).toBe("/c/1/i/5/projects/7");
-    expect(canonicalInitiativePath("/c/1/i/9/projects/7/tasks/22", 5)).toBe(
-      "/c/1/i/5/projects/7/tasks/22"
-    );
-  });
-
-  // A plug-in's calendar belongs to no initiative; its address says so.
-  it("drops the segment for a community-level entity", () => {
-    expect(canonicalInitiativePath("/c/1/i/9/calendars/2", null)).toBe("/c/1/calendars/2");
-    expect(canonicalInitiativePath("/c/1/i/9/calendars/2/events/8", null)).toBe(
-      "/c/1/calendars/2/events/8"
-    );
-  });
-
-  it("inserts the segment when the entity does belong to one", () => {
-    expect(canonicalInitiativePath("/c/1/calendars/2", 5)).toBe("/c/1/i/5/calendars/2");
-  });
-
-  it("leaves an already-correct path untouched", () => {
-    expect(canonicalInitiativePath("/c/1/i/5/projects/7", 5)).toBe("/c/1/i/5/projects/7");
-    expect(canonicalInitiativePath("/c/1/calendars/2", null)).toBe("/c/1/calendars/2");
-  });
-
-  // Nothing outside a community has an initiative to canonicalize.
-  it("leaves a non-community path alone", () => {
-    expect(canonicalInitiativePath("/my-tools", 5)).toBe("/my-tools");
-    expect(canonicalInitiativePath("/profile/notifications", null)).toBe("/profile/notifications");
-  });
-
-  it("handles the community root", () => {
-    expect(canonicalInitiativePath("/c/1", 5)).toBe("/c/1/i/5");
-    expect(canonicalInitiativePath("/c/1/i/5", null)).toBe("/c/1");
+  it.each([
+    // An initiative the entity doesn't belong to is replaced.
+    ["/c/1/i/9/projects/7", 5, "/c/1/i/5/projects/7"],
+    ["/c/1/i/9/projects/7/tasks/22", 5, "/c/1/i/5/projects/7/tasks/22"],
+    // A plug-in's calendar belongs to no initiative; its address says so.
+    ["/c/1/i/9/calendars/2", null, "/c/1/calendars/2"],
+    ["/c/1/i/9/calendars/2/events/8", null, "/c/1/calendars/2/events/8"],
+    ["/c/1/calendars/2", 5, "/c/1/i/5/calendars/2"],
+    ["/c/1/i/5/projects/7", 5, "/c/1/i/5/projects/7"],
+    ["/c/1/calendars/2", null, "/c/1/calendars/2"],
+    // Nothing outside a community has an initiative to canonicalize.
+    ["/my-tools", 5, "/my-tools"],
+    ["/profile/notifications", null, "/profile/notifications"],
+    ["/c/1", 5, "/c/1/i/5"],
+    ["/c/1/i/5", null, "/c/1"],
+  ])("rewrites %s for initiative %s as %s", (path, initiativeId, expected) => {
+    expect(canonicalInitiativePath(path, initiativeId)).toBe(expected);
   });
 });

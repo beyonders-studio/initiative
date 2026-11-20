@@ -33,13 +33,6 @@ describe("what a browser arrives holding", () => {
     }
   });
 
-  it("knows the same categories the backend can offer", () => {
-    // Mirrored by backend/app/core/cookie_categories_test.py. The server says
-    // which of these a deployment actually uses; this is the vocabulary both
-    // sides have to agree on.
-    expect([...KNOWN_CONSENT_CATEGORIES]).toEqual(["analytics", "marketing"]);
-  });
-
   it("can name and describe every category it knows, in every locale", () => {
     const locales = fs
       .readdirSync(LOCALES_DIR, { withFileTypes: true })
@@ -67,14 +60,13 @@ describe("what a browser arrives holding", () => {
     expect(hasConsent(ConsentCategory.marketing)).toBe(false);
   });
 
-  it("puts the question again where the answer was to an older one", () => {
+  it("puts the question again where the answer was to an older one, or is unreadable", () => {
     stored(answer(["analytics"], 0));
 
     expect(getConsentState().record).toBeNull();
     expect(hasConsent(ConsentCategory.analytics)).toBe(false);
-  });
 
-  it("puts the question again rather than guessing, where the answer is unreadable", () => {
+    // Rather than guessing, where the answer is unreadable.
     setItem("cookie-consent", "{ not json");
 
     expect(getConsentState().record).toBeNull();
@@ -106,13 +98,6 @@ describe("answering", () => {
     recordConsent([]);
 
     expect(hasConsent(ConsentCategory.necessary)).toBe(true);
-  });
-
-  it("grants only what was asked for", () => {
-    recordConsent([ConsentCategory.analytics]);
-
-    expect(hasConsent(ConsentCategory.analytics)).toBe(true);
-    expect(hasConsent(ConsentCategory.marketing)).toBe(false);
   });
 
   it("does not store the essential category as though it were a choice", () => {

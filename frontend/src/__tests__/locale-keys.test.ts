@@ -84,14 +84,10 @@ const describeLocaleParity = (
             const sourcePath = path.join(localesDir, SOURCE_LOCALE, `${namespace}.json`);
             const targetPath = path.join(localesDir, locale, `${namespace}.json`);
 
-            it("should exist", () => {
+            it("should exist with exactly the source keys", () => {
               expect(fs.existsSync(targetPath), `${locale}/${namespace}.json is missing`).toBe(
                 true
               );
-            });
-
-            it("should have exactly the source keys", () => {
-              if (!fs.existsSync(targetPath)) return;
               const sourceKeys = collectKeys(loadJson(sourcePath));
               const targetKeys = collectKeys(loadJson(targetPath));
               expect(

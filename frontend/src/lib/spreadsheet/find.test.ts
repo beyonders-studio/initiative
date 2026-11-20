@@ -8,31 +8,28 @@ const sheet = (obj: Record<string, CellValue>) => new Map(Object.entries(obj));
 const loose = { matchCase: false, wholeCell: false };
 
 describe("findInCells", () => {
-  it("finds a substring, ignoring case by default", () => {
-    const found = findInCells(sheet({ "0:0": "Total cost", "1:0": "other" }), "total", loose);
-    expect(found).toEqual([{ row: 0, col: 0 }]);
-  });
-
-  it("respects match case", () => {
-    const cells = sheet({ "0:0": "Total", "1:0": "total" });
-    expect(findInCells(cells, "total", { matchCase: true, wholeCell: false })).toEqual([
-      { row: 1, col: 0 },
-    ]);
-  });
-
-  it("matches the whole cell when asked", () => {
-    const cells = sheet({ "0:0": "cost", "1:0": "cost of goods" });
-    expect(findInCells(cells, "cost", { matchCase: false, wholeCell: true })).toEqual([
+  it("finds a literal substring, ignoring case unless asked, or the whole cell", () => {
+    expect(findInCells(sheet({ "0:0": "Total cost", "1:0": "other" }), "total", loose)).toEqual([
       { row: 0, col: 0 },
     ]);
+    const cased = sheet({ "0:0": "Total", "1:0": "total" });
+    expect(findInCells(cased, "total", { matchCase: true, wholeCell: false })).toEqual([
+      { row: 1, col: 0 },
+    ]);
+    const whole = sheet({ "0:0": "cost", "1:0": "cost of goods" });
+    expect(findInCells(whole, "cost", { matchCase: false, wholeCell: true })).toEqual([
+      { row: 0, col: 0 },
+    ]);
+    expect(findInCells(sheet({ "0:0": "a.c", "1:0": "abc" }), "a.c", loose)).toEqual([
+      { row: 0, col: 0 },
+    ]);
+    expect(findInCells(sheet({ "0:0": "anything" }), "", loose)).toEqual([]);
   });
 
-  it("searches the stored text, so a formula matches its own source", () => {
-    const cells = sheet({ "0:0": "=SUM(A2:A9)" });
-    expect(findInCells(cells, "sum(", loose)).toEqual([{ row: 0, col: 0 }]);
-  });
-
-  it("matches numbers and booleans by their text", () => {
+  it("searches the stored text: a formula's source, a number's or boolean's text", () => {
+    expect(findInCells(sheet({ "0:0": "=SUM(A2:A9)" }), "sum(", loose)).toEqual([
+      { row: 0, col: 0 },
+    ]);
     const cells = sheet({ "0:0": 1234, "1:0": true });
     expect(findInCells(cells, "23", loose)).toEqual([{ row: 0, col: 0 }]);
     expect(findInCells(cells, "true", loose)).toEqual([{ row: 1, col: 0 }]);
@@ -47,63 +44,35 @@ describe("findInCells", () => {
       { row: 2, col: 0 },
     ]);
   });
-
-  it("treats query characters literally", () => {
-    const cells = sheet({ "0:0": "a.c", "1:0": "abc" });
-    expect(findInCells(cells, "a.c", loose)).toEqual([{ row: 0, col: 0 }]);
-  });
-
-  it("finds nothing for an empty query", () => {
-    expect(findInCells(sheet({ "0:0": "anything" }), "", loose)).toEqual([]);
-  });
 });
 
 describe("replaceInValue", () => {
-  it("is null when the cell doesn't match", () => {
-    expect(replaceInValue("hello", "xyz", "!", loose)).toBeNull();
-  });
-
-  it("replaces every occurrence in the cell", () => {
-    expect(replaceInValue("a-a-a", "a", "b", loose)).toBe("b-b-b");
-  });
-
-  it("replaces case-insensitively but writes the replacement as typed", () => {
-    expect(replaceInValue("Total total", "total", "sum", loose)).toBe("sum sum");
-  });
-
-  it("replaces the whole cell when asked", () => {
-    expect(
-      replaceInValue("cost of goods", "COST OF GOODS", "x", {
-        matchCase: false,
-        wholeCell: true,
-      })
-    ).toBe("x");
-  });
-
-  it("leaves a non-matching part of the text alone", () => {
-    expect(replaceInValue("=SUM(A1:A9)", "A1", "B1", loose)).toBe("=SUM(B1:A9)");
+  it.each([
+    ["hello", "xyz", "!", loose, null],
+    ["a-a-a", "a", "b", loose, "b-b-b"],
+    // Case-insensitive, but the replacement is written as typed.
+    ["Total total", "total", "sum", loose, "sum sum"],
+    ["cost of goods", "COST OF GOODS", "x", { matchCase: false, wholeCell: true }, "x"],
+    ["=SUM(A1:A9)", "A1", "B1", loose, "=SUM(B1:A9)"],
+  ])("replaces in %j: %j for %j", (value, query, replacement, options, expected) => {
+    expect(replaceInValue(value, query, replacement, options)).toBe(expected);
   });
 });
 
 describe("replaceAllInCells", () => {
-  it("writes only the cells that changed", () => {
+  it("writes only the cells that changed, re-coerced, and nothing for an empty query", () => {
     const cells = sheet({ "0:0": "cost", "0:1": "other", "1:0": "cost centre" });
-    const writes = replaceAllInCells(cells, "cost", "price", loose, coerceScalar);
-    expect(writes).toEqual({ "0:0": "price", "1:0": "price centre" });
-  });
-
-  it("re-coerces a result that reads as a number", () => {
-    const cells = sheet({ "0:0": "12x" });
-    const writes = replaceAllInCells(cells, "x", "", loose, coerceScalar);
-    expect(writes["0:0"]).toBe(12);
-  });
-
-  it("clears a cell replaced down to nothing", () => {
-    const cells = sheet({ "0:0": "x" });
-    expect(replaceAllInCells(cells, "x", "", loose, coerceScalar)["0:0"]).toBeNull();
-  });
-
-  it("does nothing for an empty query", () => {
+    expect(replaceAllInCells(cells, "cost", "price", loose, coerceScalar)).toEqual({
+      "0:0": "price",
+      "1:0": "price centre",
+    });
+    expect(replaceAllInCells(sheet({ "0:0": "12x" }), "x", "", loose, coerceScalar)["0:0"]).toBe(
+      12
+    );
+    // Replaced down to nothing clears the cell.
+    expect(
+      replaceAllInCells(sheet({ "0:0": "x" }), "x", "", loose, coerceScalar)["0:0"]
+    ).toBeNull();
     expect(replaceAllInCells(sheet({ "0:0": "a" }), "", "b", loose, coerceScalar)).toEqual({});
   });
 });
