@@ -16,7 +16,6 @@ from app.api.v1.platform_endpoints import (
     dm,
     dm_transport,
     email_otp,
-    field_catalog,
     guild_provider_connections,
     guilds,
     health,
@@ -85,6 +84,7 @@ from app.api.v1.tenant_endpoints import (
     events,
     evidence,
     exports,
+    field_catalog,
     files,
     guild_plugins,
     holds,
@@ -138,7 +138,6 @@ api_router = APIRouter()
 # Top-level routes: unauthenticated, user-scoped, operator, and cross-guild.
 # These do NOT take a guild path segment.
 # ---------------------------------------------------------------------------
-api_router.include_router(field_catalog.router, tags=["fields"])
 api_router.include_router(recurrence.router, prefix="/recurrence", tags=["recurrence"])
 api_router.include_router(version.router, tags=["version"])
 api_router.include_router(health.router, tags=["health"])
@@ -308,6 +307,7 @@ guild_router.include_router(task_statuses.initiative_router, tags=["task-statuse
 guild_router.include_router(task_types.router, tags=["task-types"])
 guild_router.include_router(tool_layouts.router, tags=["layouts"])
 guild_router.include_router(query.router, tags=["query"])
+guild_router.include_router(field_catalog.router, tags=["fields"])
 guild_router.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
 # A community's own moderation: its reports, and settling them. No prefix —
 # the reports of an initiative lead with the initiative, and settling one leads

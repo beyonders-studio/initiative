@@ -7,23 +7,22 @@
  * an operator the server would refuse and a new field reaches the UI without a
  * second list being edited.
  *
- * The answer describes a dataset's shape rather than anybody's rows: it is the
- * same for every community and never changes within a deployment, so it is cached
- * indefinitely and every consumer of a dataset shares one request.
+ * The answer describes a dataset's shape rather than anybody's rows, and the
+ * datasets are the community's tool set's: it never changes while the tab is
+ * open, so it is cached indefinitely and every consumer of a dataset in a
+ * community shares one request.
  */
 
 import { useMemo } from "react";
 
 import { useReadFieldCatalog } from "@/api/generated/fields/fields";
 import type {
-  DatasetName,
   DefaultFilter,
   GroupingDescription,
   RelationDescription,
 } from "@/api/generated/initiativeAPI.schemas";
+import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { type FilterFieldSpec, toFilterFieldSpec } from "@/lib/widgets/conditions";
-
-export type { DatasetName };
 
 const EMPTY: FilterFieldSpec[] = [];
 const NO_RELATIONS: RelationDescription[] = [];
@@ -37,8 +36,9 @@ const NO_GROUPINGS: GroupingDescription[] = [];
  * the same shape, and two components doing it themselves is two places to keep
  * in step for no gain.
  */
-export function useFieldCatalog(dataset: DatasetName) {
-  const query = useReadFieldCatalog(dataset, {
+export function useFieldCatalog(dataset: string) {
+  const communityId = useActiveCommunityId();
+  const query = useReadFieldCatalog(communityId, dataset, {
     query: {
       staleTime: Number.POSITIVE_INFINITY,
       gcTime: Number.POSITIVE_INFINITY,

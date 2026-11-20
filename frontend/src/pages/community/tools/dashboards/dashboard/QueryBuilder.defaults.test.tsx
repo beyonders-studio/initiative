@@ -8,10 +8,11 @@
  */
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildPluginCatalogEntry } from "@/__tests__/factories";
+import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import type {
@@ -41,7 +42,7 @@ const DEFAULTS: Record<string, { field: string; op: string; value: unknown }[]> 
 
 beforeEach(() => {
   server.use(
-    http.get("/api/v1/fields/:dataset", ({ params }) => {
+    communityHttp.get("/fields/:dataset", ({ params }) => {
       const dataset = String(params.dataset);
       return HttpResponse.json({
         dataset,

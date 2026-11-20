@@ -1,6 +1,6 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildPluginCatalogEntry } from "@/__tests__/factories";
@@ -47,8 +47,8 @@ const serve = () => {
   asked.describe = 0;
   described.build = null;
   server.use(
-    http.get("/api/v1/query/vocabulary", () => HttpResponse.json(VOCABULARY)),
-    http.get("/api/v1/fields/:dataset", ({ params }) =>
+    communityHttp.get("/query/vocabulary", () => HttpResponse.json(VOCABULARY)),
+    communityHttp.get("/fields/:dataset", ({ params }) =>
       HttpResponse.json({
         dataset: params.dataset,
         fields:
@@ -199,7 +199,7 @@ describe("narrowing what a tile is about", () => {
     // nothing comparable in it, and adding a condition in either case would
     // store one naming no field at all.
     server.use(
-      http.get("/api/v1/fields/:dataset", ({ params }) =>
+      communityHttp.get("/fields/:dataset", ({ params }) =>
         HttpResponse.json({ dataset: params.dataset, fields: [] })
       )
     );
@@ -398,7 +398,7 @@ describe("what a new statement leaves out", () => {
   /** The catalog, answering with what the server derives for `tasks`. */
   const withDefaults = () =>
     server.use(
-      http.get("/api/v1/fields/:dataset", ({ params }) =>
+      communityHttp.get("/fields/:dataset", ({ params }) =>
         HttpResponse.json({
           dataset: params.dataset,
           fields: [FIELD("title", "text"), FIELD("archived_at", "date")],

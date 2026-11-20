@@ -517,6 +517,18 @@ takes.
 - PUT /api/v1/c/{community_id}/layouts/default response property `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/presets/anyOf[subschema #1]/items/name` list-of-types was widened by adding types `object` to media type `application/json` of response `200`
 - PUT /api/v1/c/{community_id}/layouts/default the `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/displays/anyOf[subschema #1]/additionalProperties/` response's property `type` changed from `string` to `any` for status `200`
 
+### The field catalogue is read in a community
+
+A dataset's fields and the query vocabulary are read inside a community, at
+`/c/{community_id}/fields/{dataset}` and `/c/{community_id}/query/vocabulary`:
+the datasets a statement may name are the community's tool set's, so a tool
+plug-in's datasets are offered where it is installed. `dataset` is a string;
+one the community does not have is 404 `QUERY_UNKNOWN_RELATION`, where a value
+outside the enum was 422.
+
+- GET /api/v1/fields/{dataset} api path removed without deprecation
+- GET /api/v1/query/vocabulary api path removed without deprecation
+
 ### A plug-in's registration has no installation-sharing switch
 
 Every community that connects the same vendor account holds its route, so a

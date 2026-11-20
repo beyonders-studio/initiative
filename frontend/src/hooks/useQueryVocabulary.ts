@@ -4,9 +4,9 @@
  * Both halves come from the server's own registry — the datasets and functions
  * from the validator's allow-lists, the fields from the field registry — so a
  * name offered while somebody types is one the validator accepts. Neither
- * describes anybody's rows: the answer is the same for every community and never
- * changes within a deployment, so both are cached for the session and every
- * consumer shares one request.
+ * describes anybody's rows, and the datasets are the community's tool set's: the
+ * answer never changes while the tab is open, so both are cached for the session
+ * and every consumer in a community shares one request.
  */
 
 import { useQueries } from "@tanstack/react-query";
@@ -15,7 +15,7 @@ import {
   getReadFieldCatalogQueryOptions,
   useReadQueryVocabulary,
 } from "@/api/generated/fields/fields";
-import type { DatasetName } from "@/api/generated/initiativeAPI.schemas";
+import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import type { DatasetFields } from "@/lib/widgets/completion";
 
 /** Neither answer changes while the tab is open, or after it. */
@@ -31,7 +31,8 @@ const NO_FIELDS: DatasetFields[] = [];
 
 /** What a statement may name and call. */
 export const useQueryVocabulary = (enabled = true) => {
-  const query = useReadQueryVocabulary({ query: { enabled, ...FOREVER } });
+  const communityId = useActiveCommunityId();
+  const query = useReadQueryVocabulary(communityId, { query: { enabled, ...FOREVER } });
   return {
     datasets: query.data?.datasets ?? NO_DATASETS,
     functions: query.data?.functions ?? NO_FUNCTIONS,
@@ -47,10 +48,11 @@ export const useQueryVocabulary = (enabled = true) => {
  * read for a filter control or the builder is not read again — the cache key is
  * the endpoint's own, so every consumer of a dataset shares the one request.
  */
-export const useFieldCatalogs = (datasets: string[], enabled = true): DatasetFields[] =>
-  useQueries({
+export const useFieldCatalogs = (datasets: string[], enabled = true): DatasetFields[] => {
+  const communityId = useActiveCommunityId();
+  return useQueries({
     queries: datasets.map((dataset) =>
-      getReadFieldCatalogQueryOptions(dataset as DatasetName, { query: { enabled, ...FOREVER } })
+      getReadFieldCatalogQueryOptions(communityId, dataset, { query: { enabled, ...FOREVER } })
     ),
     // Reduced here rather than after the hook returns, so the array is stable
     // between renders and the completion list is not rebuilt on every keystroke.
@@ -73,3 +75,4 @@ export const useFieldCatalogs = (datasets: string[], enabled = true): DatasetFie
       return answered.length ? answered : NO_FIELDS;
     },
   });
+};
