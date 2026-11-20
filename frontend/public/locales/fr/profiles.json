@@ -305,7 +305,8 @@
       "help": "Jusqu'à la fin de votre statut. La cloche continue de collecter, et vous recevez un résumé à la fin.",
       "running": "Suspendues jusqu'à {{time}}.",
       "needsEnd": "Choisissez quand votre statut se termine pour suspendre jusque-là.",
-      "failed": "Les notifications n'ont pas pu être suspendues."
+      "failed": "Les notifications n'ont pas pu être suspendues.",
+      "tooLong": "Une pause dure au plus {{count}} jours. Choisissez une fin plus proche pour suspendre jusque-là."
     }
   },
   "communities": {

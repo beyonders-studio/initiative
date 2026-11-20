@@ -305,7 +305,8 @@
       "help": "Until your status clears. The bell keeps collecting, and you get one summary when it ends.",
       "running": "Paused until {{time}}.",
       "needsEnd": "Pick when your status clears to pause until then.",
-      "failed": "Notifications could not be paused."
+      "failed": "Notifications could not be paused.",
+      "tooLong": "A pause runs at most {{count}} days. Pick an earlier end to pause until then."
     }
   },
   "communities": {

@@ -305,7 +305,8 @@
       "help": "Bis dein Status endet. Die Glocke sammelt weiter, und du bekommst am Ende eine Zusammenfassung.",
       "running": "Pausiert bis {{time}}.",
       "needsEnd": "Wähle, wann dein Status endet, um bis dahin zu pausieren.",
-      "failed": "Benachrichtigungen konnten nicht pausiert werden."
+      "failed": "Benachrichtigungen konnten nicht pausiert werden.",
+      "tooLong": "Eine Pause dauert höchstens {{count}} Tage. Wähle ein früheres Ende, um bis dahin zu pausieren."
     }
   },
   "communities": {

@@ -305,7 +305,8 @@
       "help": "Hasta que termine tu estado. La campana sigue recogiendo, y recibes un resumen cuando termine.",
       "running": "En pausa hasta {{time}}.",
       "needsEnd": "Elige cuándo termina tu estado para pausar hasta entonces.",
-      "failed": "No se pudieron pausar las notificaciones."
+      "failed": "No se pudieron pausar las notificaciones.",
+      "tooLong": "Una pausa dura como máximo {{count}} días. Elige un final anterior para pausar hasta entonces."
     }
   },
   "communities": {

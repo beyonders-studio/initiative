@@ -1,4 +1,4 @@
-import { addHours, addMinutes, endOfDay, endOfWeek } from "date-fns";
+import { addDays, addHours, addMinutes, endOfDay, endOfWeek } from "date-fns";
 import { MessageCircle, SmilePlus, X } from "lucide-react";
 import { useEffect, useReducer, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -239,9 +239,16 @@ export const StatusDialog = ({
   const clearAt = endOf(clearAfter, custom, weekStartsOn);
   const passed = (end: string | null) => end !== null && Date.parse(end) <= Date.now();
   const blank = !emoji && !text.trim();
-  const customMissing = clearAfter === "custom" && (clearAt === null || passed(clearAt));
-  // A pause always ends, so it needs a status that does.
-  const pauseNeedsEnd = !blank && pauseChoice === true && clearAt === null;
+  // Saving nothing only clears the status, so no end is asked of it.
+  const customMissing = !blank && clearAfter === "custom" && (clearAt === null || passed(clearAt));
+  // A pause always ends, so it needs a status that does, and no later than a
+  // pause may run.
+  const maxPauseDays = preferences.data?.max_pause_days;
+  const pauseTooLong =
+    clearAt !== null &&
+    maxPauseDays !== undefined &&
+    Date.parse(clearAt) > addDays(now, maxPauseDays).getTime();
+  const pauseRefused = !blank && pauseChoice === true && (clearAt === null || pauseTooLong);
 
   /** Save the status, then the pause, and close only once both stand. A
    *  status that fails leaves the pause alone; a pause that fails after the
@@ -267,9 +274,9 @@ export const StatusDialog = ({
   };
 
   const submit = () => {
+    if (blank) return commit(null, null);
     const end = endOf(clearAfter, custom, weekStartsOn);
     if (clearAfter === "custom" && (end === null || passed(end))) return;
-    if (blank) return commit(null, null);
     return commit({ emoji, text: text.trim() || null, clear_at: end }, pauseChoice);
   };
 
@@ -407,14 +414,16 @@ export const StatusDialog = ({
                         })
                       : clearAt === null
                         ? t("profiles:status.pause.needsEnd")
-                        : t("profiles:status.pause.help")}
+                        : pauseTooLong
+                          ? t("profiles:status.pause.tooLong", { count: maxPauseDays })
+                          : t("profiles:status.pause.help")}
                   </span>
                 </span>
                 <Switch
                   id="status-pause"
                   checked={paused}
                   onCheckedChange={setPauseChoice}
-                  disabled={!paused && clearAt === null}
+                  disabled={!paused && (clearAt === null || pauseTooLong)}
                 />
               </div>
             </div>
@@ -425,7 +434,7 @@ export const StatusDialog = ({
           pendingLabel={t("common:submitting")}
           onSubmit={submit}
           pending={saving}
-          disabled={customMissing || pauseNeedsEnd}
+          disabled={customMissing || pauseRefused}
         >
           {current ? (
             <Button

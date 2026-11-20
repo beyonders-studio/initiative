@@ -8865,6 +8865,7 @@ export interface NotificationPreferencesRead {
   email: EmailScheduleOutput;
   digests: Partial<Record<NotificationCategory, DigestScheduleOutput>>;
   pause: PauseRead | null;
+  max_pause_days: number;
   respect_presence: boolean;
   communities: CommunityNotificationSettings[];
 }
