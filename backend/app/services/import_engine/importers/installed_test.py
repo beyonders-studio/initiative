@@ -21,6 +21,7 @@ from app.db.plugin_tools import provisioned_tools
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.data_job import DataJobStatus
 from app.models.tenant.relationship import EntityRelationship
+from app.models.tenant.resource_grant import ResourceGrant
 from app.services.platform import rules
 from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
@@ -237,50 +238,83 @@ async def test_a_tool_plugins_envelope_is_refused_where_it_cannot_be_made(
 async def _restore(
     client: Any, seat: Any, monkeypatch: Any, role_session: Any
 ) -> dict[str, Any]:
-    """A backup holding one Counters group, restored by ``seat`` into the new
-    initiative the restore makes: the finished job."""
+    """A backup of two initiatives, restored by ``seat`` into the new
+    initiatives the restore makes: a Counters group in the first, whose
+    description names the project the second holds, which is written after
+    it. The finished job."""
     from app.api.v1.tenant_endpoints.imports_test import (
         _apply_backup,
         _make_backup_zip,
         _minimal_manifest,
+        _project_envelope_with_comment,
     )
 
-    envelope = {
+    group = {
         "type": f"initiative-{GROUP}",
         "schema_version": 1,
         "name": "Party",
+        "fields": {"description": "See #project[Imported Board](project:7)"},
         "items": {"counter": [{"name": "Gold", "fields": {"count": 12}}]},
     }
-    entry = {
-        "path": f"initiatives/1-restored/{GROUP}/1-party.json",
-        "tool": GROUP,
-        "type": envelope["type"],
-        "schema_version": 1,
-        "entity_id": 1,
-        "title": "Party",
-        "initiative_id": 1,
-    }
+    project = _project_envelope_with_comment("stranger#4321", "Alice Chen")
+    project["tasks"][0]["comments"] = []
+    entries = [
+        {
+            "path": f"initiatives/1-restored/{GROUP}/1-party.json",
+            "tool": GROUP,
+            "type": group["type"],
+            "schema_version": 1,
+            "entity_id": 1,
+            "title": "Party",
+            "initiative_id": 1,
+        },
+        {
+            "path": "initiatives/2-later/projects/7-imported-board.json",
+            "tool": "project",
+            "type": "initiative-project",
+            "schema_version": 1,
+            "entity_id": 7,
+            "title": "Imported Board",
+            "initiative_id": 2,
+        },
+    ]
+    manifest = _minimal_manifest(entries=entries)
+    manifest["initiatives"].append(
+        {**manifest["initiatives"][0], "id": 2, "name": "Later"}
+    )
     archive = _make_backup_zip(
-        _minimal_manifest(entries=[entry]),
-        {entry["path"]: json.dumps(envelope).encode()},
+        manifest,
+        {
+            entries[0]["path"]: json.dumps(group).encode(),
+            entries[1]["path"]: json.dumps(project).encode(),
+        },
     )
     job = await _apply_backup(client, seat, archive, monkeypatch, role_session)
     assert job["status"] == DataJobStatus.done.value, job.get("error")
     return job
 
 
+def _group_entry(job: dict[str, Any]) -> dict[str, Any]:
+    (entry,) = (e for e in job["result"]["entries"] if e["tool"] == GROUP)
+    return entry
+
+
 async def test_a_restore_places_a_tool_plugin_in_the_initiative_it_makes(
     client, session, acting_user, monkeypatch, role_session
 ):
+    """The Counters group is written in the initiative the restore made, its
+    install placed there, and its reference to the project restored after it
+    names that project, with the edge its text makes."""
+    from app.models.tenant.project import Project
+
     seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
     install = await install_tool_plugin(
         client, session, seat, placements=[seat.initiative.id]
     )
 
     job = await _restore(client, seat, monkeypatch, role_session)
-    (made,) = job["result"]["initiatives"]
-    (entry,) = job["result"]["entries"]
-    assert entry["status"] == "created", entry
+    made, _later = job["result"]["initiatives"]
+    assert _group_entry(job)["status"] == "created", job["result"]["entries"]
 
     response = await client.get(
         seat.g(f"/plugins/{install['id']}"), headers=seat.headers
@@ -288,7 +322,8 @@ async def test_a_restore_places_a_tool_plugin_in_the_initiative_it_makes(
     assert response.json()["placed_initiative_ids"] == sorted(
         [seat.initiative.id, made["initiative_id"]]
     )
-    (tool,) = (await provisioned_tools(seat.guild.id)).installed
+    tools = await provisioned_tools(seat.guild.id)
+    (tool,) = tools.installed
     await route_session_to_guild(session, seat.guild.id)
     (group,) = (
         await session.exec(
@@ -298,6 +333,21 @@ async def test_a_restore_places_a_tool_plugin_in_the_initiative_it_makes(
         )
     ).all()
     assert group.name == "Party"
+    project = (
+        await session.exec(sa.select(Project).where(Project.name == "Imported Board"))
+    ).scalar_one()
+    assert group.description == f"See #project[Imported Board]({project.id})"
+    edge = (
+        await session.exec(
+            sa.select(EntityRelationship).where(
+                EntityRelationship.source_node
+                == node_of(tools.kind_codes[GROUP], group.id),
+                EntityRelationship.relationship_type == "references",
+                EntityRelationship.removed_at.is_(None),
+            )
+        )
+    ).scalar_one()
+    assert edge.target_id == project.id
 
 
 async def test_a_restore_leaves_out_a_tool_plugin_it_may_not_place(
@@ -313,7 +363,7 @@ async def test_a_restore_leaves_out_a_tool_plugin_it_may_not_place(
     await session.commit()
 
     job = await _restore(client, seat, monkeypatch, role_session)
-    (entry,) = job["result"]["entries"]
+    entry = _group_entry(job)
     assert (entry["status"], entry["error"]) == (
         "skipped",
         ImportEngineMessages.IMPORT_TOOL_NOT_PLACED,
@@ -322,3 +372,62 @@ async def test_a_restore_leaves_out_a_tool_plugin_it_may_not_place(
         seat.g(f"/plugins/{install['id']}"), headers=seat.headers
     )
     assert response.json()["placed_initiative_ids"] == [seat.initiative.id]
+
+
+async def test_a_person_a_tool_plugins_property_names_is_let_in(
+    client, session, acting_user, monkeypatch, role_session
+):
+    """A person-valued property on an imported tool plug-in's row names
+    somebody the importer means to work on it: they are shared the row, as a
+    built-in tool's import shares it."""
+    from app.api.v1.tenant_endpoints.imports_test import _run_import_worker
+
+    a, _seat, _install, target = await _counters(client, session, acting_user)
+    inside = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=a.guild,
+        initiative=target,
+        initiative_role="member",
+    )
+    envelope = {
+        "type": f"initiative-{GROUP}",
+        "schema_version": 1,
+        "name": "Party",
+        "properties": [
+            {
+                "property_name": "Owner",
+                "property_type": "user_reference",
+                "value_handle": "Robin",
+            }
+        ],
+    }
+    job = (await _import(client, a, envelope, target.id)).json()
+    assert job["status"] == "staged", job
+    confirmed = await client.post(
+        a.g(f"/imports/jobs/{job['id']}/confirm"),
+        headers=a.headers,
+        json={"people_map": {"Robin": inside.user.id}},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    await _run_import_worker(monkeypatch, role_session)
+    done = (await client.get(a.g(f"/data-jobs/{job['id']}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
+    assert done["result"]["unmatched_handles"] == []
+
+    (tool,) = (await provisioned_tools(a.guild.id)).installed
+    await route_session_to_guild(session, a.guild.id)
+    group_id = (
+        await session.exec(
+            sa.select(tool.table.c.id).where(tool.table.c.initiative_id == target.id)
+        )
+    ).scalar_one()
+    levels = (
+        await session.exec(
+            sa.select(ResourceGrant.level).where(
+                ResourceGrant.resource_type == GROUP,
+                ResourceGrant.resource_id == group_id,
+                ResourceGrant.user_id == inside.user.id,
+            )
+        )
+    ).all()
+    assert len(levels) == 1, levels

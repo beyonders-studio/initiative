@@ -28,7 +28,7 @@ from app.core.errors import CodedError
 from app.core.messages import ImportEngineMessages
 from app.core.tool_set import ToolRecord, ToolSet
 from app.db.session import require_guild_context
-from app.db.tool_rows import Located, ToolRow
+from app.db.tool_rows import Located, ToolRow, text_columns
 from app.models.platform.user import User
 from app.models.tenant.initiative import Initiative
 from app.schemas.tenant.import_envelopes import InstalledToolEnvelope, InstalledToolRow
@@ -52,8 +52,8 @@ from app.services.import_engine.importers._base import (
 from app.services.import_engine.mentions import place_markdown_mentions
 from app.services.import_engine.people import PeopleMap, initiative_member_id
 from app.services.import_engine.references import (
+    has_source_references,
     place_markdown_references,
-    ref_resolver,
 )
 from app.services.tenant import plugin_tool_rows as rows
 from app.services.tenant.tags import tag_links
@@ -115,7 +115,6 @@ class InstalledToolImporter(NamesPeopleInPassing):
             session, initiative_id=target_initiative.id
         )
         people = context.people if context is not None else PeopleMap()
-        resolve = ref_resolver(context) if context is not None else lambda _ref: None
         tags = TagRestore(session)
         props = PropertyRestore(
             session,
@@ -144,15 +143,16 @@ class InstalledToolImporter(NamesPeopleInPassing):
                     if value is None:
                         unmatched.add(handle)
                 elif field["kind"] == "text" and isinstance(value, str):
-                    value = place_markdown_references(
-                        place_markdown_mentions(
-                            value,
-                            row.mention_handles,
-                            context=context,
-                            initiative_member_handles=members,
-                        ),
-                        resolve,
+                    value = place_markdown_mentions(
+                        value,
+                        row.mention_handles,
+                        context=context,
+                        initiative_member_handles=members,
                     )
+                    # With no job to come back to, a reference is settled
+                    # now; a job places it once every entry is written.
+                    if context is None:
+                        value = place_markdown_references(value, lambda _ref: None)
                 values[key] = value
             return values
 
@@ -180,6 +180,11 @@ class InstalledToolImporter(NamesPeopleInPassing):
                 session, located, {**columns, **placed, "name": name}
             )
             own = {"id": row_id, "initiative_id": target_initiative.id}
+            if context is not None and any(
+                has_source_references(values.get(column.name))
+                for column in text_columns(located.table)
+            ):
+                context.links.note_references(located.kind, row_id)
             if tool is None:
                 await grant_ownership(
                     session,

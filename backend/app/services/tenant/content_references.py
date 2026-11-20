@@ -30,6 +30,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
 
+import sqlalchemy as sa
 from sqlalchemy.orm import undefer
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -41,6 +42,7 @@ from app.core.tool_set import ToolSet
 from app.db import reference_targets
 from app.db.plugin_tools import tool_set
 from app.db.session import actor_context, routed_tools
+from app.db.tool_rows import locate, text_columns
 from app.models.tenant.comment import Comment, said_on
 from app.models.tenant.file import File
 from app.models.tenant.post import Post
@@ -117,12 +119,7 @@ async def sync_for_comment(
     named in the community's tool set: the request's, or, where the system
     routed this session itself, the one its installs make.
     """
-    tools = (
-        routed_tools(session)
-        if actor_context(session) is not None
-        else await tool_set(session)
-    )
-    parent = comment_parent(comment, tools)
+    parent = comment_parent(comment, await _tools(session))
     await sync_for_entity(
         session,
         parent,
@@ -161,11 +158,29 @@ def comment_parent(comment: Comment, tools: ToolSet) -> Endpoint:
     return Endpoint.of(tools, comment.subject_type, comment.subject_id)
 
 
+async def _tools(session: AsyncSession) -> ToolSet:
+    """The community's tool set: the request's, or, where the system routed
+    this session itself, the one its installs make."""
+    if actor_context(session) is not None:
+        return routed_tools(session)
+    return await tool_set(session)
+
+
 async def own_body(session: AsyncSession, entity: Endpoint) -> Any:
-    """A thing's stored body, or None if its kind has none."""
+    """A thing's stored body, or None if its kind has none. A tool
+    plug-in's row's body is its declared text fields, as one text."""
     source = BODY_COLUMNS.get(entity.kind)
     if source is None:
-        return None
+        located = locate(await _tools(session), entity.kind)
+        texts = text_columns(located.table) if located is not None else []
+        if not texts:
+            return None
+        row = (
+            await session.exec(
+                sa.select(*texts).where(located.table.c.id == entity.id)  # type: ignore[union-attr]
+            )
+        ).first()
+        return "\n\n".join(text for text in row or () if text) or None
     model, column = source
     return (
         await session.exec(
