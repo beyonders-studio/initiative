@@ -1,7 +1,38 @@
-import { describe, expect, it } from "vitest";
+import type { RobotToastOptions } from "robot-toast";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { MascotToastType } from "./mascotToast";
-import { computeAutoClose } from "./mascotToast";
+import { computeAutoClose, toast } from "./mascotToast";
+
+/** robot-toast stand-in: what is open, and each toast's close hook to run later. */
+const robot = vi.hoisted(() => ({
+  open: new Map<number, RobotToastOptions>(),
+  closing: [] as Array<() => void>,
+  next: 0,
+}));
+
+vi.mock("robot-toast", () => {
+  const show = (input: RobotToastOptions) => {
+    robot.next += 1;
+    robot.open.set(robot.next, input);
+    return robot.next;
+  };
+  // Like robot-toast, the close hook runs after the exit animation, not at once.
+  const closeById = (id: number) => {
+    const input = robot.open.get(id);
+    robot.open.delete(id);
+    if (input?.onClose) robot.closing.push(input.onClose);
+  };
+  const closeAll = () => {
+    for (const id of [...robot.open.keys()]) closeById(id);
+  };
+  return { toast: Object.assign(show, { closeById, closeAll }) };
+});
+
+const finishClosing = () => {
+  for (const onClose of robot.closing.splice(0)) onClose();
+};
+const openMessages = () => [...robot.open.values()].map((input) => input.message);
 
 const TYPE_SPEED = 20;
 
@@ -42,5 +73,51 @@ describe("computeAutoClose", () => {
 
   it("is shorter than the old fixed 5s dwell for a typical toast", () => {
     expect(computeAutoClose("Task created", "success", TYPE_SPEED, false)).toBeLessThan(5_000);
+  });
+});
+
+describe("toast", () => {
+  beforeEach(() => {
+    toast.dismiss();
+    finishClosing();
+  });
+
+  it("replaces the toast showing under the same id", () => {
+    toast.warning("Offline", { id: "offline" });
+    toast.warning("Offline, still", { id: "offline" });
+    expect(openMessages()).toEqual(["Offline, still"]);
+  });
+
+  it("still dismisses by id after the replaced toast finishes closing", () => {
+    // An effect that shows, is cleaned up, and shows again (StrictMode does this).
+    toast.warning("Offline", { id: "offline" });
+    toast.dismiss("offline");
+    toast.warning("Offline", { id: "offline" });
+    finishClosing();
+    toast.dismiss("offline");
+    expect(openMessages()).toEqual([]);
+  });
+
+  it("shows the same text of the same type once", () => {
+    toast.error("Could not save");
+    toast.error("Could not save");
+    expect(openMessages()).toEqual(["Could not save"]);
+  });
+
+  it("shows each toast that carries its own button, though the text matches", () => {
+    const onClick = () => {};
+    toast.success("Moved to Done", { action: { label: "Undo", onClick } });
+    toast.success("Moved to Done", { action: { label: "Undo", onClick } });
+    expect(openMessages()).toEqual(["Moved to Done", "Moved to Done"]);
+  });
+
+  it("drops a waiting toast that is dismissed before its turn", () => {
+    toast.info("One", { id: "one" });
+    toast.info("Two");
+    toast.warning("Three", { id: "three" });
+    toast.dismiss("three");
+    toast.dismiss("one");
+    finishClosing();
+    expect(openMessages()).toEqual(["Two"]);
   });
 });
