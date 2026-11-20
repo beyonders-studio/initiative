@@ -111,9 +111,10 @@ describe("SendToDialog", () => {
   it("copies the page it was sent from for a kind with no address of its own", async () => {
     const user = userEvent.setup();
     await renderDialog(
-      { kind: "counter", entityId: 9 },
+      // A tool plug-in's item, which no /go address names.
+      { kind: "counter.tsjvtcm0s7gv2x" as ContentKind, entityId: 9 },
       {
-        initialRoute: "/c/4/counter/9",
+        initialRoute: "/c/4/i/2/t/counter.tsjvtcm0s7gv2x/9",
         server: { getServerOrigin: () => "https://initiative.example.com" },
       }
     );
@@ -121,7 +122,7 @@ describe("SendToDialog", () => {
     await user.click(screen.getByRole("button", { name: "Copy link" }));
 
     expect(await navigator.clipboard.readText()).toBe(
-      "https://initiative.example.com/c/4/counter/9"
+      "https://initiative.example.com/c/4/i/2/t/counter.tsjvtcm0s7gv2x/9"
     );
   });
 });
