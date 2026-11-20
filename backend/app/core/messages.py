@@ -397,6 +397,8 @@ class InitiativeMessages:
     SET_BY_COMMUNITY = "INITIATIVE_SET_BY_COMMUNITY"
     # The community keeps its initiatives to their built-in roles.
     CUSTOM_ROLES_OFF = "INITIATIVE_CUSTOM_ROLES_OFF"
+    # A tool switch or role permission names a tool the community does not have.
+    TOOL_UNKNOWN = "INITIATIVE_TOOL_UNKNOWN"
     # Only the community's admins set what every initiative starts from.
     DEFAULTS_ADMIN_ONLY = "INITIATIVE_DEFAULTS_ADMIN_ONLY"
     # A PAM grant confers content read/write for a window; a membership row
