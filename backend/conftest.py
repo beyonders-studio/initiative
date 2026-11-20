@@ -26,11 +26,11 @@ from alembic.script import ScriptDirectory
 from cryptography.hazmat.primitives import serialization as _serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519 as _ed25519
 from httpx2 import ASGITransport, AsyncClient
-from sqlalchemy import event, text
+from sqlalchemy import delete, event, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
-from sqlmodel import SQLModel
+from sqlmodel import SQLModel, col
 from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.requests import HTTPConnection
 from starlette.testclient import TestClient
@@ -54,6 +54,7 @@ from app.db.session import (
 )
 from app.db.tenancy import SHARED_TABLES
 from app.main import app
+from app.models.platform.plugin_kind_code import FIRST_PLUGIN_KIND_CODE, PluginKindCode
 from app.testing import guild_pool
 from app.testing.schema_harness import clear_search_path_pin
 from app.testing.server import in_request_tasks
@@ -537,10 +538,9 @@ def _reset_app_caches():
     ``registration_lookup``, ``plugin_refs`` and ``plugin_tools.kept_tool_set``).
     Test databases are rebuilt per test while those caches are module state, so
     without this a row created in one test would still be answering reads in
-    the next. A kept tool set carries its plug-in kinds' codes, which each test
-    gives afresh (``plugin_kind_codes`` is emptied with the rest of ``public``),
-    and a test may build one with codes of its own; a set kept by digest from
-    another test would pack node ids with codes the database does not hold.
+    the next. A kept tool set carries its plug-in kinds' codes, and a code a
+    test gave is taken away after it, so a set kept by digest from another
+    test could pack node ids with a code the database does not hold.
     """
     from app.db import plugin_tools
     from app.services.marketplace.plugin_refs import forget_cached_install_refs
@@ -1045,14 +1045,22 @@ async def session(engine) -> AsyncGenerator[AsyncSession]:
         shared_tables = ", ".join(
             f'"{table.name}"'
             for table in SQLModel.metadata.sorted_tables
-            if table.name in SHARED_TABLES and table.name not in _CATALOG_TABLES
+            if table.name in SHARED_TABLES
+            and table.name not in _CATALOG_TABLES
+            and table.name != PluginKindCode.__tablename__
         )
         await conn.execute(
             text(f"TRUNCATE TABLE {shared_tables} RESTART IDENTITY CASCADE")
         )
         await conn.execute(text("SET session_replication_role = 'origin'"))
-        # A tool plug-in a test registered gave its kinds codes, which the
-        # truncate took away: the function goes back to the codes as they stand.
+        # The codes migrations gave are kept, as a server keeps them; the ones
+        # a tool plug-in the test registered gave its kinds go, and the
+        # function goes back to the codes as they stand.
+        await conn.execute(
+            delete(PluginKindCode).where(
+                col(PluginKindCode.code) >= FIRST_PLUGIN_KIND_CODE
+            )
+        )
         await apply_kind_codes_if_changed(conn)
 
     if template_changed:

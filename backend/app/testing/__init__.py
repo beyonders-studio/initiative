@@ -110,6 +110,7 @@ from app.testing.tool_plugins import (
     add_counter,
     convert_counters,
     counters_tool_manifest,
+    counters_tool_set,
     install_counters,
     install_tool_plugin,
 )
@@ -130,6 +131,7 @@ __all__ = [
     "community_plan",
     "convert_counters",
     "counters_tool_manifest",
+    "counters_tool_set",
     "create_access_grant",
     "create_auth_provider",
     "create_calendar",

@@ -558,22 +558,18 @@ def test_a_tool_plugins_tables_are_its_communitys_datasets():
     reaching its tool as a counter reaches its group; a community without the
     plug-in has none of them, and a statement naming one resolves only where
     it is installed."""
-    from app.db.plugin_tools import InstalledTool, community_tool_set
     from app.services.marketplace.tool_plugins import (
         normalize_tool_plugin_definition,
     )
     from app.services.query.resolve import QueryError
-    from app.testing.tool_plugins import COUNTERS_UID, counters_tool_manifest
+    from app.testing.tool_plugins import counters_tool_manifest, counters_tool_set
 
     manifest = counters_tool_manifest()
     # A declared person, which no foreign key marks as one.
     manifest["tool"]["items"][0]["fields"].append(
         {"key": "keeper", "name": {"en": "Keeper"}, "kind": "user_reference"}
     )
-    definition = normalize_tool_plugin_definition(manifest)
-    uid = COUNTERS_UID.lower()
-    codes = {f"counter_group.{uid}": 1024, f"counter.{uid}": 1025}
-    tools = community_tool_set([InstalledTool(COUNTERS_UID, definition)], codes)
+    tools = counters_tool_set(normalize_tool_plugin_definition(manifest))
     (tool,) = tools.installed
     (counters,) = tool.items
 

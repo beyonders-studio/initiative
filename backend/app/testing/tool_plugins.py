@@ -5,13 +5,15 @@ from __future__ import annotations
 
 import copy
 import json
+from contextlib import asynccontextmanager
 from functools import cache
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import AsyncGenerator, Callable
 
     from httpx import AsyncClient
+    from sqlalchemy.ext.asyncio import AsyncConnection
     from sqlmodel.ext.asyncio.session import AsyncSession
 
     from app.core.tool_set import ToolSet
@@ -24,8 +26,10 @@ __all__ = [
     "counters_conversion",
     "counters_follow_up",
     "counters_tool_manifest",
+    "counters_tool_set",
     "install_counters",
     "install_tool_plugin",
+    "provisioning_login",
     "run_as_a_revision",
 ]
 
@@ -47,6 +51,33 @@ def counters_tool_manifest() -> dict[str, Any]:
     return copy.deepcopy(_catalogued())
 
 
+def counters_tool_set(
+    definition: dict[str, Any] | None = None, *, uid: str = COUNTERS_UID
+) -> ToolSet:
+    """The built-in tools and Counters, as a community that installed it has
+    them, for a test of what is built or rendered from a tool set.
+    ``definition`` is a declaration of it as stored (the catalogue's unless
+    given), held to no check here, so a builder's own refusal can be tested.
+    Its kinds have the codes a server gives them: Counters' own the codes
+    its built-in kinds had (``ADOPTED_KIND_CODES``), any other the next from
+    ``FIRST_PLUGIN_KIND_CODE`` up."""
+    from app.db.plugin_tools import InstalledTool, community_tool_set
+    from app.models.platform.plugin_kind_code import (
+        ADOPTED_KIND_CODES,
+        FIRST_PLUGIN_KIND_CODE,
+    )
+    from app.services.marketplace.tool_plugins import normalize_tool_plugin_definition
+
+    if definition is None:
+        definition = normalize_tool_plugin_definition(counters_tool_manifest())
+    tool = definition["tool"]
+    keys = [tool["key"], *(item["key"] for item in tool.get("items", []))]
+    kinds = [f"{key}.{str(uid).lower()}" for key in keys]
+    fresh = iter(range(FIRST_PLUGIN_KIND_CODE, FIRST_PLUGIN_KIND_CODE + len(kinds)))
+    codes = {kind: ADOPTED_KIND_CODES.get(kind) or next(fresh) for kind in kinds}
+    return community_tool_set([InstalledTool(uid, definition)], codes)
+
+
 async def install_tool_plugin(
     client: AsyncClient,
     session: AsyncSession,
@@ -57,17 +88,13 @@ async def install_tool_plugin(
     placements: str | list[int] = "all",
 ) -> dict[str, Any]:
     """List a tool plug-in (Counters unless ``definition`` says otherwise),
-    give its kinds their codes as registering it does, and install it as
-    ``seat``, the community's seat, placed in ``placements`` (every
-    initiative there is, as the install dialog offers first). Returns the
-    install as the API reads it.
+    which gives its kinds their codes, and install it as ``seat``, the
+    community's seat, placed in ``placements`` (every initiative there is, as
+    the install dialog offers first). Returns the install as the API reads it.
     ``session`` is committed first, so it holds nothing the provisioning of
     the tool's tables waits on."""
-    from app.db.kind_codes import assign_plugin_kind_codes
-    from app.services.marketplace.tool_plugins import (
-        normalize_tool_plugin_definition,
-        tool_kinds,
-    )
+    from app.db import post_commit
+    from app.services.marketplace.tool_plugins import normalize_tool_plugin_definition
     from app.testing.factories import create_marketplace_listing
 
     declared = normalize_tool_plugin_definition(definition or counters_tool_manifest())
@@ -79,8 +106,7 @@ async def install_tool_plugin(
         name=declared["default_name"],
         definition=declared,
     )
-    await assign_plugin_kind_codes(session, tool_kinds(declared, listing_uid=uid))
-    await session.commit()
+    await post_commit.settle(session)
     response = await client.post(
         seat.g("/plugins/"),
         headers=seat.headers,
@@ -188,24 +214,54 @@ def counters_follow_up() -> Any:
     return _revision(_FOLLOW_UP)
 
 
-async def run_as_a_revision(
-    session: AsyncSession, guild_id: int, step: Callable[[], None]
-) -> None:
-    """``step``, a revision's work in ``guild_id``'s schema alone, as a
-    revision runs it: on the provisioning login, which owns the tables and is
-    neither a superuser nor exempt from row security, so a table it reads
-    with row security forced hides what its policies hide. The suite builds a
-    community's schema on its superuser, so the schema and what is in it are
-    handed to that login first. ``session`` is committed first."""
+@asynccontextmanager
+async def provisioning_login() -> AsyncGenerator[AsyncConnection]:
+    """A connection on the provisioning login, in a transaction committed on
+    leaving: the login a revision runs as, which owns the app's tables and is
+    neither a superuser nor exempt from row security. The suite's own
+    engines connect as its superuser."""
     import sqlalchemy as sa
-    from alembic.migration import MigrationContext
-    from alembic.operations import Operations
     from sqlalchemy.engine import make_url
     from sqlalchemy.ext.asyncio import create_async_engine
     from sqlalchemy.pool import NullPool
 
     from app.core.config import settings
     from app.db import session as db_session
+
+    engine = create_async_engine(
+        make_url(settings.DATABASE_URL).set(
+            database=db_session.provisioning_engine.url.database
+        ),
+        poolclass=NullPool,
+    )
+    try:
+        async with engine.begin() as conn:
+            assert await conn.scalar(
+                sa.text(
+                    "SELECT NOT rolsuper AND NOT rolbypassrls"
+                    " FROM pg_roles WHERE rolname = current_user"
+                )
+            )
+            yield conn
+    finally:
+        await engine.dispose()
+
+
+async def run_as_a_revision(
+    session: AsyncSession, guild_id: int, step: Callable[[], None]
+) -> None:
+    """``step``, a revision's work in ``guild_id``'s schema alone, as a
+    revision runs it: on the provisioning login (:func:`provisioning_login`),
+    so a table it reads with row security forced hides what its policies
+    hide. The suite builds a community's schema on its superuser, so the
+    schema and what is in it are handed to that login first. ``session`` is
+    committed first."""
+    import sqlalchemy as sa
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+    from sqlalchemy.engine import make_url
+
+    from app.core.config import settings
     from app.db.schema_provisioning import guild_schema_name
 
     schema = guild_schema_name(guild_id)
@@ -230,12 +286,6 @@ async def run_as_a_revision(
     await session.commit()
 
     def apply(bind: Any) -> None:
-        assert bind.execute(
-            sa.text(
-                "SELECT NOT rolsuper AND NOT rolbypassrls"
-                " FROM pg_roles WHERE rolname = current_user"
-            )
-        ).scalar_one()
         bind.execute(
             sa.text("SELECT set_config('search_path', :sp, true)"),
             {"sp": f"{schema}, public"},
@@ -243,15 +293,8 @@ async def run_as_a_revision(
         with Operations.context(MigrationContext.configure(bind)):
             step()
 
-    engine = create_async_engine(
-        login.set(database=db_session.provisioning_engine.url.database),
-        poolclass=NullPool,
-    )
-    try:
-        async with engine.begin() as conn:
-            await conn.run_sync(apply)
-    finally:
-        await engine.dispose()
+    async with provisioning_login() as conn:
+        await conn.run_sync(apply)
 
 
 async def convert_counters(

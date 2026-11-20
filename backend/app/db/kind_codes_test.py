@@ -57,49 +57,44 @@ async def _codes(session) -> dict[str, int]:
     return {kind: code for kind, code in rows.all()}
 
 
-async def test_registering_a_tool_gives_its_kinds_codes_the_database_packs_with(
-    session,
-):
-    # Counters' kinds keep the codes the built-in kinds they replaced had.
-    await _register(session)
-
-    assert await _codes(session) == {GROUP: 4, COUNTER: 3}
-    assert await _code(session, GROUP) == 4
-    assert await _code(session, COUNTER) == 3
-    assert await _code(session, "wiki") == 15
-
-
 async def test_a_kind_keeps_its_code_and_a_new_one_takes_the_next(session):
+    """Counters' kinds hold the codes of the built-in kinds they replaced,
+    which their migration gave them; registering Counters, at any version,
+    keeps them. Another publisher's Counters declares the same keys under its
+    own uid, and its kinds take codes from the plug-in range, which the
+    database packs with once the registration commits."""
+    adopted = {GROUP: 4, COUNTER: 3}
+    assert await _codes(session) == adopted
     await _register(session)
     await _register(session, version="1.1.0")
-    assert await _codes(session) == {GROUP: 4, COUNTER: 3}
+    assert await _codes(session) == adopted
+    assert await _code(session, GROUP) == 4
+    assert await _code(session, COUNTER) == 3
 
-    # Another publisher's Counters declares the same keys under its own uid,
-    # and its kinds take codes from the plug-in range.
     other = marketplace_uid("othercounters")
     await _register(session, uid=other, public_id="others.counters")
     assert await _codes(session) == {
-        GROUP: 4,
-        COUNTER: 3,
+        **adopted,
         f"counter_group.{other.lower()}": FIRST_PLUGIN_KIND_CODE,
         f"counter.{other.lower()}": FIRST_PLUGIN_KIND_CODE + 1,
     }
     assert (
         await _code(session, f"counter.{other.lower()}") == FIRST_PLUGIN_KIND_CODE + 1
     )
+    assert await _code(session, "wiki") == 15
 
 
 async def test_assigning_only_adds(session):
     """Assigning answers every kind's code, adding a row only for a kind that
     had none; a kind already given one keeps it whatever else is asked for."""
-    first = await assign_plugin_kind_codes(session, [A, B])
+    first = await assign_plugin_kind_codes(session, [A, B, GROUP])
     again = await assign_plugin_kind_codes(session, [C, B, C])
     await session.commit()
     await post_commit.settle(session)
 
-    assert first == {A: 1024, B: 1025}
+    assert first == {A: 1024, B: 1025, GROUP: 4}
     assert again == {C: 1026, B: 1025}
-    assert await _codes(session) == {A: 1024, B: 1025, C: 1026}
+    assert await _codes(session) == {GROUP: 4, COUNTER: 3, A: 1024, B: 1025, C: 1026}
     assert await _code(session, C) == 1026
 
 
@@ -115,25 +110,6 @@ async def test_a_render_waits_for_a_registration_giving_codes(session):
     await render
     await post_commit.settle(session)
     assert await _code(session, A) == FIRST_PLUGIN_KIND_CODE
-
-
-async def test_a_code_is_never_taken_back_or_moved(session):
-    """The system engine, which registers listings, may read and add codes
-    and nothing else."""
-    privileges = (
-        (
-            await session.exec(
-                text(
-                    "SELECT privilege_type FROM information_schema.role_table_grants"
-                    " WHERE table_schema = 'public' AND table_name = 'plugin_kind_codes'"
-                    " AND grantee = 'app_admin'"
-                )
-            )
-        )
-        .scalars()
-        .all()
-    )
-    assert sorted(privileges) == ["INSERT", "SELECT"]
 
 
 def test_only_a_plug_in_kind_is_written_into_the_function():

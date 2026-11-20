@@ -21,12 +21,9 @@ from app.core.palette import COLOR_PALETTE
 from app.core.tool_set import BUILTIN_TOOLS
 from app.db.event_capture import render_guild_capture_ddl
 from app.db.guild_ddl import render_guild_rls_ddl
-from app.db.kind_codes import assign_plugin_kind_codes
 from app.db.plugin_tools import (
-    InstalledTool,
     PluginToolError,
     _required,
-    community_tool_set,
     drop_ddl,
     provisioned_tools,
     structure_ddl,
@@ -60,6 +57,7 @@ from app.services.tenant import plugin_updates
 from app.testing import (
     COUNTERS_UID,
     counters_tool_manifest,
+    counters_tool_set,
     create_marketplace_listing,
     create_reaction,
     install_tool_plugin,
@@ -92,18 +90,6 @@ _UNIVERSAL_ITEM = {
 
 def _counters() -> dict[str, Any]:
     return normalize_tool_plugin_definition(counters_tool_manifest())
-
-
-def _kinds(definition: dict[str, Any], uid: str) -> list[str]:
-    """The kinds a declaration names, whether or not its keys are good."""
-    tool = definition["tool"]
-    keys = [tool["key"], *(item["key"] for item in tool.get("items", []))]
-    return [f"{key}.{str(uid).lower()}" for key in keys]
-
-
-def _set(definition: dict[str, Any], uid: str = COUNTERS_UID):
-    codes = {kind: 1024 + i for i, kind in enumerate(_kinds(definition, uid))}
-    return community_tool_set([InstalledTool(uid, definition)], codes)
 
 
 async def _stamp(session: AsyncSession, schema: str) -> str | None:
@@ -170,12 +156,12 @@ def test_the_builder_refuses_a_hostile_name(where: str, value: str):
     else:
         uid = value
     with pytest.raises(PluginToolError):
-        _set(definition, uid)
+        counters_tool_set(definition, uid=uid)
 
 
 def test_the_render_with_a_tool_rules_its_tables_and_without_one_names_none():
     group, counter = "p_tsjvtcm0s7gv2x_counter_group", "p_tsjvtcm0s7gv2x_counter"
-    ddl = render_guild_rls_ddl(_set(_counters()))
+    ddl = render_guild_rls_ddl(counters_tool_set())
     for table in (group, counter):
         for policy in (
             "initiative_member_select",
@@ -195,7 +181,7 @@ def test_the_render_with_a_tool_rules_its_tables_and_without_one_names_none():
 def test_a_tool_plugins_tables_are_captured_indexed_and_timed():
     """Its tables take the change capture, search and timer triggers a
     built-in tool's do, and a render without it names none of them."""
-    tools = _set(_counters())
+    tools = counters_tool_set()
     for table in ("p_tsjvtcm0s7gv2x_counter_group", "p_tsjvtcm0s7gv2x_counter"):
         assert f"CREATE TRIGGER capture_{table}\n" in render_guild_capture_ddl(tools)
         assert f"  AFTER INSERT OR DELETE ON {table}\n" in render_guild_search_ddl(
@@ -233,7 +219,7 @@ def test_an_item_under_an_item_walks_two_hops():
             "fields": [{"key": "note", "name": {"en": "Note"}, "kind": "text"}],
         },
     )
-    tools = _set(definition)
+    tools = counters_tool_set(definition)
     structure = structure_ddl(tools)
     assert structure.index("CREATE TABLE IF NOT EXISTS p_tsjvtcm0s7gv2x_counter (") < (
         structure.index("CREATE TABLE IF NOT EXISTS p_tsjvtcm0s7gv2x_tally (")
@@ -246,9 +232,24 @@ def test_an_item_under_an_item_walks_two_hops():
     )
 
 
-async def test_install_creates_exactly_the_declared_tables(
-    client: AsyncClient, session: AsyncSession, acting_user
+async def test_install_creates_exactly_the_declared_tables_ruled_as_built_in_ones(
+    client: AsyncClient, session: AsyncSession, acting_user, monkeypatch
 ):
+    """Installing makes the tables the tool declares and no other, stamped and
+    granted as a built-in tool's. An item's change is told under the sharing
+    of its tool, as a task's is under its project's; it is indexed under its
+    own kind; and its trash arms the community's purge. A counter takes its
+    required fields' defaults and a colour from the app's palette, and a row
+    breaking a check is refused. A tool set this process does not keep is
+    built reading the installs and the kind codes on one system connection
+    after the other, so a pool of one serves it."""
+    from collections import OrderedDict
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    from app.db import cohorts, plugin_tools
+    from app.db import session as db_session
+
     seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
     await install_tool_plugin(client, session, seat)
     schema = guild_schema_name(seat.guild.id)
@@ -287,15 +288,7 @@ async def test_install_creates_exactly_the_declared_tables(
             {"r": plugin_role, "t": f'"{schema}".{table}'},
         )
 
-
-async def test_a_tool_plugins_rows_are_heard_found_and_purged_on_time(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """An item's change is told under the sharing of its tool, as a task's is
-    under its project's; it is indexed under its own kind; and its trash arms
-    the community's purge."""
-    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
-    await install_tool_plugin(client, session, seat)
+    # Its rows are heard, found and purged on time.
     await route_session_to_guild(session, seat.guild.id)
     group = (
         await session.exec(
@@ -382,8 +375,49 @@ async def test_a_tool_plugins_rows_are_heard_found_and_purged_on_time(
     )
     assert gone == 0
 
+    # A row holds to its checks and takes its defaults; an empty side passes.
+    await route_session_to_guild(session, seat.guild.id)
+    await session.exec(
+        sa.text(
+            f"WITH g AS (INSERT INTO {_GROUP} (initiative_id, name)"
+            " VALUES (:i, 'Group') RETURNING id)"
+            f" INSERT INTO {_COUNTER} (counter_group_id, name, max)"
+            " SELECT id, 'Open', NULL FROM g"
+        ),
+        params={"i": seat.initiative.id},
+    )
+    row = (
+        await session.exec(sa.text(f"SELECT step, view_mode, color FROM {_COUNTER}"))
+    ).one()
+    assert (row.step, row.view_mode) == (1, "number")
+    assert row.color in COLOR_PALETTE
+    for breaking in ("step = 0", "min = 5, max = 1"):
+        with pytest.raises(IntegrityError, match="check_"):
+            async with session.begin_nested():
+                await session.exec(sa.text(f"UPDATE {_COUNTER} SET {breaking}"))
+    await session.exec(sa.text(f"UPDATE {_COUNTER} SET min = 5"))
+    await session.commit()
 
-async def test_the_tool_is_there_where_it_is_placed(
+    # Cold, its tool set is built on one system connection at a time.
+    one = create_async_engine(
+        db_session.system_engine.url, pool_size=1, max_overflow=0, pool_timeout=3
+    )
+    maker = async_sessionmaker(
+        bind=one, autoflush=False, expire_on_commit=False, class_=AsyncSession
+    )
+    monkeypatch.setattr(db_session, "system_engine", one)
+    monkeypatch.setattr(cohorts, "system_sessionmaker", lambda _guild_id: maker)
+    monkeypatch.setattr(plugin_tools, "_SETS", OrderedDict())
+    try:
+        tools = await provisioned_tools(seat.guild.id)
+    finally:
+        await one.dispose()
+    assert [tool.kind for tool in tools.installed] == [
+        f"counter_group.{COUNTERS_UID.lower()}"
+    ]
+
+
+async def test_the_tool_is_there_where_it_is_placed_and_switched_on(
     client: AsyncClient, session: AsyncSession, acting_user, role_session
 ):
     """Switched on in every initiative there is and every one made later, by
@@ -392,7 +426,8 @@ async def test_the_tool_is_there_where_it_is_placed(
     drawn as declared, so none is stored. It is on only where its install is
     placed, by the standing and by the initiative's ``can``: not in an
     initiative made after the install until placed there, and unplaced, its
-    rows stay for placing it again."""
+    rows stay for placing it again. Turned off, it is on in no initiative,
+    and still there for the community's admin as a switched-off tool is."""
     seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
     install = await install_tool_plugin(client, session, seat)
     made = await client.post(
@@ -450,6 +485,19 @@ async def test_the_tool_is_there_where_it_is_placed(
     assert len(rows) == await session.scalar(
         sa.select(sa.func.count()).where(InitiativeRule.key.startswith(_KIND))
     )
+    await session.commit()
+
+    pair = f"{first}:{_KIND}"
+    for enabled in (False, True):
+        response = await client.patch(
+            path, headers=seat.headers, json={"enabled": enabled}
+        )
+        assert response.status_code == 200, response.text
+        reader = await role_session("app_user")
+        context = await route_as(reader, user_id=seat.user.id, guild_id=seat.guild.id)
+        assert (pair in context.enabled_tools) is enabled
+        assert context.open_tools == (_KIND,)
+        await reader.rollback()
 
 
 async def test_two_plugins_with_one_key_install_side_by_side(
@@ -554,15 +602,39 @@ async def test_an_install_that_fails_once_rendered_leaves_nothing(
     assert stamp_tools(stamp) is None
 
 
-async def test_uninstalling_keeps_the_tool_until_its_window_ends(
+async def test_uninstalling_keeps_the_tool_until_its_window_ends_then_takes_it(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
     """Removing asks the seat to consent to the content's deletion; the tool
     is then gone from the community and its tables, rows and rules stay.
-    Installing it again in the window brings back the same install."""
+    Installing it again in the window brings back the same install. Past its
+    window, the sweep deletes the rows that name the tool, the install and its
+    rules, then drops its tables and renders the community without it, and no
+    further step is asked of anyone."""
     seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
     install = await install_tool_plugin(client, session, seat)
     path = seat.g(f"/plugins/{install['id']}")
+    await route_session_to_guild(session, seat.guild.id)
+    group = (
+        await session.exec(
+            sa.text(
+                f"INSERT INTO {_GROUP} (initiative_id, name) VALUES (:i, 'Scores')"
+                " RETURNING id"
+            ),
+            params={"i": seat.initiative.id},
+        )
+    ).scalar_one()
+    comment = Comment(
+        content="Nice",
+        created_by=seat.user.id,
+        created_by_kind=ActorKind.member,
+        subject_type=_KIND,
+        subject_id=group,
+    )
+    session.add(comment)
+    await session.commit()
+    comment_id = comment.id
+    await create_reaction(session, seat.user, comment=comment)
     refused = await client.delete(path, headers=seat.headers)
     assert refused.status_code == 409, refused.text
     assert refused.json()["detail"] == GuildPluginMessages.TOOL_DELETION_UNCONFIRMED
@@ -598,40 +670,8 @@ async def test_uninstalling_keeps_the_tool_until_its_window_ends(
     )
     assert again.json()["detail"] == GuildPluginMessages.ALREADY_INSTALLED
 
-
-async def test_the_window_ending_takes_the_tool_and_what_names_it(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Past its window, the sweep deletes the rows that name the tool, the
-    install and its rules, then drops its tables and renders the community
-    without it, and no further step is asked of anyone."""
-    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
-    install = await install_tool_plugin(client, session, seat)
-    await route_session_to_guild(session, seat.guild.id)
-    group = (
-        await session.exec(
-            sa.text(
-                f"INSERT INTO {_GROUP} (initiative_id, name) VALUES (:i, 'Scores')"
-                " RETURNING id"
-            ),
-            params={"i": seat.initiative.id},
-        )
-    ).scalar_one()
-    comment = Comment(
-        content="Nice",
-        created_by=seat.user.id,
-        created_by_kind=ActorKind.member,
-        subject_type=_KIND,
-        subject_id=group,
-    )
-    session.add(comment)
-    await session.commit()
-    comment_id = comment.id
-    await create_reaction(session, seat.user, comment=comment)
     removed = await client.delete(
-        seat.g(f"/plugins/{install['id']}"),
-        headers=seat.headers,
-        params={"delete_content": "true"},
+        path, headers=seat.headers, params={"delete_content": "true"}
     )
     assert removed.status_code == 204, removed.text
 
@@ -679,58 +719,6 @@ async def test_the_window_ending_takes_the_tool_and_what_names_it(
     )
     assert again.status_code == 201, again.text
     assert set(await _columns(session, schema)) == {_GROUP, _COUNTER}
-
-
-async def test_turning_a_tool_plugin_off_is_its_switch(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session
-):
-    """Off, the tool is on in no initiative, and still there for the
-    community's admin as a switched-off tool is."""
-    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
-    install = await install_tool_plugin(client, session, seat)
-    path = seat.g(f"/plugins/{install['id']}")
-    user_id, guild_id = seat.user.id, seat.guild.id
-    pair = f"{seat.initiative.id}:{_KIND}"
-    for enabled in (False, True):
-        response = await client.patch(
-            path, headers=seat.headers, json={"enabled": enabled}
-        )
-        assert response.status_code == 200, response.text
-        reader = await role_session("app_user")
-        context = await route_as(reader, user_id=user_id, guild_id=guild_id)
-        assert (pair in context.enabled_tools) is enabled
-        assert context.open_tools == (_KIND,)
-        await reader.rollback()
-
-
-async def test_a_row_holds_to_its_checks_and_takes_its_defaults(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """A counter takes its required fields' defaults and a colour from the
-    app's palette, and a row breaking a check is refused; an empty side
-    passes."""
-    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
-    await install_tool_plugin(client, session, seat)
-    await route_session_to_guild(session, seat.guild.id)
-    await session.exec(
-        sa.text(
-            f"WITH g AS (INSERT INTO {_GROUP} (initiative_id, name)"
-            " VALUES (:i, 'Group') RETURNING id)"
-            f" INSERT INTO {_COUNTER} (counter_group_id, name, max)"
-            " SELECT id, 'Open', NULL FROM g"
-        ),
-        params={"i": seat.initiative.id},
-    )
-    row = (
-        await session.exec(sa.text(f"SELECT step, view_mode, color FROM {_COUNTER}"))
-    ).one()
-    assert (row.step, row.view_mode) == (1, "number")
-    assert row.color in COLOR_PALETTE
-    for breaking in ("step = 0", "min = 5, max = 1"):
-        with pytest.raises(IntegrityError, match="check_"):
-            async with session.begin_nested():
-                await session.exec(sa.text(f"UPDATE {_COUNTER} SET {breaking}"))
-    await session.exec(sa.text(f"UPDATE {_COUNTER} SET min = 5"))
 
 
 async def test_a_version_adding_to_the_tool_waits_for_the_seat(
@@ -1023,99 +1011,22 @@ async def test_a_held_row_keeps_its_values_on_the_provisioning_login(
     assert tuple(kept.one()) == ("clock", "#112233", None)
 
 
-async def test_boot_brings_an_older_item_table_up_to_its_shape(
-    client: AsyncClient, session: AsyncSession, acting_user
+async def test_boot_brings_a_tool_plugins_tables_up_to_its_install(
+    session: AsyncSession, acting_user
 ):
-    """An item table made before items were archived has no stamp column. The
-    back-fill of a community whose render moved adds it, and what reads it."""
-    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
-    await install_tool_plugin(client, session, seat)
-    schema = guild_schema_name(seat.guild.id)
-    counter = f'"{schema}".p_tsjvtcm0s7gv2x_counter'
-    stamp = await _stamp(session, schema)
-    await session.exec(
-        sa.text(f"ALTER TABLE {counter} DROP COLUMN archived_at CASCADE")
-    )
-    behind = re.sub(r"schema=[^,]*", "schema=older", stamp)
-    await session.exec(sa.text(f"COMMENT ON SCHEMA \"{schema}\" IS '{behind}'"))
-    await session.commit()
-
-    assert await _backfill_guild(seat.guild.id, wait=True) is True
-
-    assert (
-        "archived_at" in (await _columns(session, schema))["p_tsjvtcm0s7gv2x_counter"]
-    )
-    frozen = await session.scalar(
-        sa.text(
-            "SELECT count(*) FROM pg_trigger WHERE tgrelid = to_regclass(:t)"
-            " AND tgname LIKE '%frozen%'"
-        ),
-        {"t": counter},
-    )
-    assert frozen > 0
-
-
-async def test_a_tool_plugins_search_is_current_by_its_own_sources(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """A community whose tool plug-in's rows were written before they were
-    indexed is behind its own search generation, not the built-in one, and
-    the back-fill indexes them."""
+    """An install row committed without its tables, its rules or its switch
+    rows, and a stamp naming no tools: the back-fill provisions all of it, and
+    once current leaves it alone. An item table made before items were
+    archived has no stamp column: the back-fill of a community whose render
+    moved adds it, and what reads it. A community whose tool plug-in's rows
+    were written before they were indexed is behind its own search
+    generation, not the built-in one, and the search back-fill indexes
+    them."""
     from app.db.schema_provisioning import backfill_guild_search
     from app.db.search_index import search_generation
 
     seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
-    await install_tool_plugin(client, session, seat)
-    schema = guild_schema_name(seat.guild.id)
-    await route_session_to_guild(session, seat.guild.id)
-    await session.exec(sa.text("SET LOCAL session_replication_role = replica"))
-    group = (
-        await session.exec(
-            sa.text(
-                "INSERT INTO p_tsjvtcm0s7gv2x_counter_group"
-                " (initiative_id, name, created_by_kind)"
-                " VALUES (:i, 'Unindexed', 'system') RETURNING id"
-            ),
-            params={"i": seat.initiative.id},
-        )
-    ).scalar_one()
-    await session.exec(
-        sa.text(
-            f"COMMENT ON TABLE \"{schema}\".search_entries IS '{search_generation()}'"
-        )
-    )
-    await session.commit()
-    tools = await provisioned_tools(seat.guild.id)
-    assert search_generation(tools) != search_generation()
-
-    await backfill_guild_search()
-
-    await route_session_to_guild(session, seat.guild.id)
-    found = await session.scalar(
-        sa.text(
-            "SELECT count(*) FROM search_entries WHERE entity_id = :g"
-            " AND entity_type = :k"
-        ),
-        {"g": group, "k": f"counter_group.{COUNTERS_UID.lower()}"},
-    )
-    assert found == 1
-    marker = await session.scalar(
-        sa.text("SELECT obj_description(to_regclass(:t), 'pg_class')"),
-        {"t": f'"{schema}".search_entries'},
-    )
-    assert marker == search_generation(tools)
-
-
-async def test_boot_provisions_an_install_whose_provisioning_never_ran(
-    session: AsyncSession, acting_user
-):
-    """An install row committed without its tables, its rules or its switch
-    rows, and a stamp naming no tools: the back-fill provisions all of it."""
-    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
     definition = _counters()
-    await assign_plugin_kind_codes(
-        session, tool_kinds(definition, listing_uid=COUNTERS_UID)
-    )
     await route_session_to_guild(session, seat.guild.id)
     install = GuildPlugin(
         listing_uid=COUNTERS_UID,
@@ -1164,35 +1075,65 @@ async def test_boot_provisions_an_install_whose_provisioning_never_ran(
     await session.commit()
     assert await _backfill_guild(seat.guild.id, wait=True) is False
 
-
-async def test_a_cold_tool_set_takes_one_system_connection_at_a_time(
-    client: AsyncClient, session: AsyncSession, acting_user, monkeypatch
-):
-    """Building a tool set this process does not keep reads the community's
-    installs and the deployment's kind codes on one system connection after
-    the other, so a pool of one serves it."""
-    from collections import OrderedDict
-
-    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-
-    from app.db import cohorts, plugin_tools
-    from app.db import session as db_session
-
-    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
-    await install_tool_plugin(client, session, seat)
-    one = create_async_engine(
-        db_session.system_engine.url, pool_size=1, max_overflow=0, pool_timeout=3
+    # An item table older than its shape.
+    counter = f'"{schema}".p_tsjvtcm0s7gv2x_counter'
+    stamp = await _stamp(session, schema)
+    await session.exec(
+        sa.text(f"ALTER TABLE {counter} DROP COLUMN archived_at CASCADE")
     )
-    maker = async_sessionmaker(
-        bind=one, autoflush=False, expire_on_commit=False, class_=AsyncSession
+    behind = re.sub(r"schema=[^,]*", "schema=older", stamp)
+    await session.exec(sa.text(f"COMMENT ON SCHEMA \"{schema}\" IS '{behind}'"))
+    await session.commit()
+
+    assert await _backfill_guild(seat.guild.id, wait=True) is True
+
+    assert (
+        "archived_at" in (await _columns(session, schema))["p_tsjvtcm0s7gv2x_counter"]
     )
-    monkeypatch.setattr(db_session, "system_engine", one)
-    monkeypatch.setattr(cohorts, "system_sessionmaker", lambda _guild_id: maker)
-    monkeypatch.setattr(plugin_tools, "_SETS", OrderedDict())
-    try:
-        tools = await provisioned_tools(seat.guild.id)
-    finally:
-        await one.dispose()
-    assert [tool.kind for tool in tools.installed] == [
-        f"counter_group.{COUNTERS_UID.lower()}"
-    ]
+    frozen = await session.scalar(
+        sa.text(
+            "SELECT count(*) FROM pg_trigger WHERE tgrelid = to_regclass(:t)"
+            " AND tgname LIKE '%frozen%'"
+        ),
+        {"t": counter},
+    )
+    assert frozen > 0
+
+    # Rows written before they were indexed.
+    await route_session_to_guild(session, seat.guild.id)
+    await session.exec(sa.text("SET LOCAL session_replication_role = replica"))
+    group = (
+        await session.exec(
+            sa.text(
+                "INSERT INTO p_tsjvtcm0s7gv2x_counter_group"
+                " (initiative_id, name, created_by_kind)"
+                " VALUES (:i, 'Unindexed', 'system') RETURNING id"
+            ),
+            params={"i": seat.initiative.id},
+        )
+    ).scalar_one()
+    await session.exec(
+        sa.text(
+            f"COMMENT ON TABLE \"{schema}\".search_entries IS '{search_generation()}'"
+        )
+    )
+    await session.commit()
+    tools = await provisioned_tools(seat.guild.id)
+    assert search_generation(tools) != search_generation()
+
+    await backfill_guild_search()
+
+    await route_session_to_guild(session, seat.guild.id)
+    found = await session.scalar(
+        sa.text(
+            "SELECT count(*) FROM search_entries WHERE entity_id = :g"
+            " AND entity_type = :k"
+        ),
+        {"g": group, "k": f"counter_group.{COUNTERS_UID.lower()}"},
+    )
+    assert found == 1
+    marker = await session.scalar(
+        sa.text("SELECT obj_description(to_regclass(:t), 'pg_class')"),
+        {"t": f'"{schema}".search_entries'},
+    )
+    assert marker == search_generation(tools)
