@@ -149,6 +149,7 @@ async def test_people_search_names_who_can_open_the_project(
         "avatar_url",
         "status",
         "profile_decorations",
+        "custom_status",
         "community_role",
     }
     # Asserted as a value, not only as a key: the schema leaves it unset, so a

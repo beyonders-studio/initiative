@@ -473,7 +473,7 @@
       "respectPresenceHelp": "Si vous êtes déjà là, la cloche vous l'a dit. L'e-mail attend quelques minutes et le mobile reste silencieux.",
       "pause": {
         "title": "Mettre les notifications en pause",
-        "description": "L'e-mail, le mobile et l'ordinateur s'arrêtent les jours que vous choisissez. La cloche continue de collecter, et vous recevez un récapitulatif à votre retour.",
+        "description": "E-mail, mobile et bureau se mettent en pause les jours que vous choisissez. Vous pouvez aussi suspendre jusqu'à la fin de votre statut, en le définissant. La cloche continue de collecter, et vous recevez un résumé de tout à votre retour.",
         "active": "En pause jusqu'au {{until}}",
         "scheduled": "Pause du {{from}} au {{until}}",
         "resume": "Reprendre",

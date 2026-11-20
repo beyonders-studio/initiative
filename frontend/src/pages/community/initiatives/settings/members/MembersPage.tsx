@@ -12,6 +12,7 @@ import { JoinRequestQueue } from "@/components/members/JoinRequestQueue";
 import { useSeenMembers } from "@/components/members/MemberSearchSelect";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { SettingsSection } from "@/components/settings/SettingsSection";
+import { StatusLine } from "@/components/user/ProfileStatus";
 import { UserHandle } from "@/components/user/UserHandle";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useInitiativeRoles } from "@/hooks/useInitiativeRoles";
@@ -277,11 +278,14 @@ const InitiativeSettingsMembersTab = ({
         accessorKey: "user.username",
         header: t("settings.handleColumn"),
         cell: ({ row }) => (
-          <span className="inline-flex items-center gap-2">
-            <UserHandle user={row.original.user} />
-            {row.original.guest_until ? (
-              <Badge variant="secondary">{t("detail.guest")}</Badge>
-            ) : null}
+          <span className="flex min-w-0 flex-col">
+            <span className="inline-flex items-center gap-2">
+              <UserHandle user={row.original.user} />
+              {row.original.guest_until ? (
+                <Badge variant="secondary">{t("detail.guest")}</Badge>
+              ) : null}
+            </span>
+            <StatusLine status={row.original.user.custom_status} className="text-xs" />
           </span>
         ),
       },

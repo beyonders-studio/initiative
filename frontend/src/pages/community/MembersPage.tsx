@@ -13,6 +13,7 @@ import { TimeOutMemberDialog } from "@/components/communities/TimeOutMemberDialo
 import { ConnectionActionButtons } from "@/components/connections/ConnectionActionButtons";
 import { ConnectionActionsMenu } from "@/components/connections/ConnectionActionsMenu";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
+import { StatusLine } from "@/components/user/ProfileStatus";
 import { UserHandle } from "@/components/user/UserHandle";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
@@ -199,7 +200,14 @@ export const MembersPage = () => {
               decorations={row.original.profile_decorations}
               className="size-7 shrink-0"
             />
-            <UserHandle user={row.original} className="min-w-0" nameClassName="min-w-0 truncate" />
+            <span className="flex min-w-0 flex-col">
+              <UserHandle
+                user={row.original}
+                className="min-w-0"
+                nameClassName="min-w-0 truncate"
+              />
+              <StatusLine status={row.original.custom_status} className="text-xs" />
+            </span>
             {/* Only the exception is worn. Badging the other nine rows in ten
                 "member" would say nothing and cost the width the actions
                 need. */}

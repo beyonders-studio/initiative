@@ -52,6 +52,7 @@ import { NewConversationDialog } from "./NewConversationDialog";
 const person = (id: number, username: string): PersonRead => ({
   id,
   username,
+  custom_status: { emoji: null, text: null, clear_at: null },
   discriminator: 1234,
   display_name: null,
   avatar_url: null,

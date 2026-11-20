@@ -1590,8 +1590,13 @@ async def update_me(
         current_user.locale = update_data["locale"]
     if "custom_status" in update_data:
         # Already held to shape by ``CustomStatus``; ``None`` is the status
-        # taken off, which is the empty object rather than a null column.
-        current_user.custom_status = update_data["custom_status"] or {}
+        # taken off, which is the empty object rather than a null column. In
+        # JSON form, because the end time is a datetime and the column JSONB.
+        current_user.custom_status = (
+            user_in.custom_status.model_dump(mode="json")
+            if user_in.custom_status
+            else {}
+        )
     if "presence" in update_data:
         # The column is the standing preference. The roll is told separately
         # below, once the write is safely down.

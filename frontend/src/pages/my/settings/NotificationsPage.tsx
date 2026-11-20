@@ -30,7 +30,7 @@ import { DateTimePicker } from "@/ui/date-time-picker";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
-import { formatDate } from "@/ui/lib/formatDate";
+import { formatDate, formatDateTime } from "@/ui/lib/formatDate";
 import { listFormat } from "@/ui/lib/intl";
 import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
@@ -78,6 +78,15 @@ const dayStart = (day: string): string => {
 const dayEnd = (day: string): string => {
   const [year, month, date] = day.split("-").map(Number);
   return new Date(year, month - 1, date, 23, 59, 59, 0).toISOString();
+};
+
+// A pause booked here ends with a day, and reads as that day. One set from a
+// status ends at a time, and reads as that time.
+const pauseEnd = (value: string): string => {
+  const end = new Date(value);
+  return end.getHours() === 23 && end.getMinutes() === 59
+    ? formatDate(value)
+    : formatDateTime(value);
 };
 
 interface UserSettingsNotificationsPageProps {
@@ -638,10 +647,10 @@ export const NotificationsPage = ({ user, refreshUser }: UserSettingsNotificatio
           <SettingsRow
             label={
               running
-                ? t("notifications.timing.pause.active", { until: formatDate(booked.until) })
+                ? t("notifications.timing.pause.active", { until: pauseEnd(booked.until) })
                 : t("notifications.timing.pause.scheduled", {
                     from: formatDate(booked.since),
-                    until: formatDate(booked.until),
+                    until: pauseEnd(booked.until),
                   })
             }
             description={t("notifications.timing.pause.note")}

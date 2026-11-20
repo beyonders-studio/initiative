@@ -473,7 +473,7 @@
       "respectPresenceHelp": "Wenn du schon hier bist, hat die Glocke es dir gesagt. E-Mail wartet ein paar Minuten, Mobil bleibt still.",
       "pause": {
         "title": "Benachrichtigungen pausieren",
-        "description": "E-Mail, Mobil und Desktop pausieren an den Tagen, die du wählst. Die Glocke sammelt weiter, und zum Schluss bekommst du eine Zusammenfassung.",
+        "description": "E-Mail, Mobil- und Desktop-Benachrichtigungen pausieren an den Tagen, die du wählst. Wenn du einen Status setzt, kannst du auch bis zu seinem Ende pausieren. Die Glocke sammelt weiter, und du bekommst eine Zusammenfassung von allem, wenn du zurück bist.",
         "active": "Pausiert bis {{until}}",
         "scheduled": "Pause von {{from}} bis {{until}}",
         "resume": "Fortsetzen",

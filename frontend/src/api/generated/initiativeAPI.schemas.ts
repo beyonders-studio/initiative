@@ -3363,6 +3363,23 @@ export interface CommunityAuthSettingsUpdate {
 }
 
 /**
+ * What a person is up to, in their own words.
+ *
+ * One object, stored in one column, because it is one thing a person sets
+ * and one thing every surface that names them renders: splitting it in two
+ * would mean two reads and two writes for a single line of text.
+ *
+ * Not to be confused with ``UserStatus`` (``users.status``), which is the
+ * account's standing — suspended, deactivated — and is not the person's to
+ * write.
+ */
+export interface CustomStatusOutput {
+  emoji: string | null;
+  text: string | null;
+  clear_at: string | null;
+}
+
+/**
  * Slim user projection for typeahead and picker surfaces.
  *
  * What it keeps is what it takes to *draw* a person and say where they stand
@@ -3376,8 +3393,9 @@ export interface CommunityAuthSettingsUpdate {
  * (an N+1 enrichment on the full roster), no timestamps. The payload is
  * bounded by pagination on the endpoints that serve it.
  *
- * ``profile_decorations`` is quoted and the model rebuilt below, because the
- * catalog shape it names is declared further down this file.
+ * ``profile_decorations`` and ``custom_status`` are quoted and the model
+ * rebuilt below, because the shapes they name are declared further down this
+ * file.
  */
 export interface UserSummary {
   id: number;
@@ -3387,6 +3405,7 @@ export interface UserSummary {
   status: UserStatus;
   display_name: string | null;
   profile_decorations: ProfileDecorationsOutput;
+  custom_status: CustomStatusOutput;
   community_role: string | null;
 }
 
@@ -4683,27 +4702,10 @@ export interface CommunityRead {
 }
 
 /**
- * What a person is up to, in their own words.
- *
- * One object, stored in one column, because it is one thing a person sets
- * and one thing every surface that names them renders: splitting it in two
- * would mean two reads and two writes for a single line of text.
- *
- * Not to be confused with ``UserStatus`` (``users.status``), which is the
- * account's standing — suspended, deactivated — and is not the person's to
- * write.
- */
-export interface CustomStatusOutput {
-  emoji: string | null;
-  text: string | null;
-}
-
-/**
  * One person on a community's people roster.
  *
  * ``UserSummary`` plus what a roster row draws beside the name: how they
- * appear right now and the line they wrote. Both are public, as they are on
- * the profile.
+ * appear right now. It is public, as it is on the profile.
  */
 export interface CommunityRosterMember {
   id: number;
@@ -4713,9 +4715,9 @@ export interface CommunityRosterMember {
   status: UserStatus;
   display_name: string | null;
   profile_decorations: ProfileDecorationsOutput;
+  custom_status: CustomStatusOutput;
   community_role: string | null;
   presence: Presence;
-  custom_status: CustomStatusOutput;
 }
 
 /**
@@ -5373,6 +5375,7 @@ export interface CustomRoleUpdate {
 export interface CustomStatusInput {
   emoji?: string | null;
   text?: string | null;
+  clear_at?: string | null;
 }
 
 export type DashboardCreateDefinition = { [key: string]: unknown };
@@ -8862,6 +8865,7 @@ export interface NotificationPreferencesRead {
   email: EmailScheduleOutput;
   digests: Partial<Record<NotificationCategory, DigestScheduleOutput>>;
   pause: PauseRead | null;
+  max_pause_days: number;
   respect_presence: boolean;
   communities: CommunityNotificationSettings[];
 }
@@ -9416,6 +9420,7 @@ export interface PersonRead {
   status: UserStatus;
   display_name: string | null;
   profile_decorations: ProfileDecorationsOutput;
+  custom_status: CustomStatusOutput;
   community_role: string | null;
   presence: Presence;
   shared_community_ids: number[];

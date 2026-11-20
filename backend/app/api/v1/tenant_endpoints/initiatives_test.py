@@ -603,6 +603,7 @@ async def test_search_initiative_members_slim_and_filtered(
         "avatar_url",
         "status",
         "profile_decorations",
+        "custom_status",
         "community_role",
     }
     # Asserted as a value, not only as a key: the schema leaves it unset, so a

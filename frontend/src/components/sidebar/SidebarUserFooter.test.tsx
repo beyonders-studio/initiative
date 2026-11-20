@@ -3,14 +3,16 @@
  *
  * What is worth asserting is the shape the row was cut down to — one line for
  * the person, the status under the name rather than in a bubble of its own,
- * the dot on the picture — and that the menu it opens leads with who you are
+ * the dot on the picture, each of those set in one click — and that the menu it opens leads with who you are
  * and carries everything the row stopped carrying.
  */
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { HttpResponse, http } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { buildUser } from "@/__tests__/factories";
+import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { UserRead } from "@/api/generated/initiativeAPI.schemas";
 import { currentHelp, updateHelp } from "@/components/help/helpStore";
@@ -76,33 +78,104 @@ describe("SidebarUserFooter", () => {
     expect(run).toHaveBeenCalled();
   });
 
-  it("puts the status under the name, in the same row", async () => {
-    renderFooter({ custom_status: { emoji: "🌱", text: "Planting things" } });
+  it("puts the status under the name, and opens its editor in one click", async () => {
+    const user = userEvent.setup();
+    renderFooter({ custom_status: { emoji: "🌱", text: "Planting things", clear_at: null } });
 
-    const row = await screen.findByRole("button", { name: /admin#1234/ });
-    expect(row).toHaveTextContent("admin#1234");
-    expect(row).toHaveTextContent("Planting things");
+    const status = await screen.findByRole("button", { name: "Your status" });
+    expect(status).toHaveTextContent("Planting things");
+
+    await user.click(status);
+
+    expect(await screen.findByLabelText("What are you up to?")).toHaveValue("Planting things");
   });
 
-  it("takes an emoji on its own as a status", async () => {
-    renderFooter({ custom_status: { emoji: "🌱", text: null } });
+  it("takes an emoji on its own as a status, and an ended one as none", async () => {
+    const { unmount } = renderFooter({
+      custom_status: { emoji: "🌱", text: null, clear_at: null },
+    });
+    const status = await screen.findByRole("button", { name: "Your status" });
+    expect(status).toHaveTextContent("🌱");
+    expect(status).not.toHaveTextContent("Say what you're up to");
+    unmount();
 
-    const row = await screen.findByRole("button", { name: /admin#1234/ });
-    expect(row).toHaveTextContent("🌱");
-    expect(row).not.toHaveTextContent("Say what you're up to");
+    // Gone the moment it ends, with nothing fetched again.
+    renderFooter({
+      custom_status: {
+        emoji: "🌱",
+        text: "Leaving soon",
+        clear_at: new Date(Date.now() + 300).toISOString(),
+      },
+    });
+    const ending = await screen.findByRole("button", { name: "Your status" });
+    expect(ending).toHaveTextContent("Leaving soon");
+    await waitFor(() => expect(ending).toHaveTextContent("Say what you're up to"));
   });
 
-  it("invites a status that has not been set", async () => {
-    renderFooter({ custom_status: { emoji: null, text: null } });
-
-    const row = await screen.findByRole("button", { name: /admin#1234/ });
-    expect(row).toHaveTextContent("Say what you're up to");
-  });
-
-  it("shows how you appear on the picture rather than beside it", async () => {
+  it("sets a suggestion with the time it usually ends, paused until then", async () => {
+    const user = userEvent.setup();
+    let sent: Record<string, unknown> | undefined;
+    let paused: Record<string, unknown> | undefined;
+    server.use(
+      http.patch("*/api/v1/me", async ({ request }) => {
+        sent = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(buildUser());
+      }),
+      http.put("*/api/v1/me/notification-preferences", async ({ request }) => {
+        paused = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({});
+      })
+    );
     renderFooter();
 
-    expect(await screen.findByRole("img", { name: "Online" })).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Your status" }));
+    await user.click(await screen.findByRole("button", { name: /In a meeting/ }));
+    expect(screen.getByRole("combobox")).toHaveTextContent("1 hour");
+    await user.click(screen.getByRole("switch", { name: /Pause notifications/ }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(sent).toBeDefined());
+    const status = sent?.custom_status as { emoji: string; text: string; clear_at: string };
+    expect([status.emoji, status.text]).toEqual(["📅", "In a meeting"]);
+    const hour = Date.parse(status.clear_at) - Date.now();
+    expect(hour).toBeGreaterThan(59 * 60_000);
+    expect(hour).toBeLessThanOrEqual(60 * 60_000);
+    expect(paused).toEqual({ pause_until: status.clear_at });
+  });
+
+  it("holds Save for an end it cannot keep, and not for an erased draft", async () => {
+    const user = userEvent.setup();
+    const far = new Date(Date.now() + 200 * 86_400_000).toISOString();
+    const { unmount } = renderFooter({
+      custom_status: { emoji: "🌴", text: "Away", clear_at: far },
+    });
+
+    await user.click(await screen.findByRole("button", { name: "Your status" }));
+    const pause = await screen.findByRole("switch", { name: /Pause notifications/ });
+    expect(await screen.findByText(/A pause runs at most 90 days/)).toBeInTheDocument();
+    expect(pause).toBeDisabled();
+    unmount();
+
+    renderFooter();
+    await user.click(await screen.findByRole("button", { name: "Your status" }));
+    await user.type(await screen.findByLabelText("What are you up to?"), "Out");
+    await user.click(screen.getByRole("combobox"));
+    await user.click(await screen.findByRole("option", { name: "Choose a date and time" }));
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Erase" }));
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+  });
+
+  it("sets how you appear from the dot on the picture", async () => {
+    const user = userEvent.setup();
+    renderFooter();
+
+    await user.click(
+      await screen.findByRole("button", { name: "Presence: Online. Change how you appear." })
+    );
+
+    expect(await screen.findByRole("menuitem", { name: /Busy/ })).toBeInTheDocument();
   });
 
   it("leads the menu with who you are", async () => {
@@ -117,7 +190,7 @@ describe("SidebarUserFooter", () => {
 
   it("hangs the status bubble over the banner, and it still edits", async () => {
     const user = userEvent.setup();
-    renderFooter({ custom_status: { emoji: null, text: "Planting things" } });
+    renderFooter({ custom_status: { emoji: null, text: "Planting things", clear_at: null } });
 
     const menu = await openMenu(user);
     const bubble = within(menu).getByRole("menuitem", { name: "Your status" });

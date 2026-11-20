@@ -142,6 +142,8 @@ class NotificationPreferencesRead(SanitizedBaseModel):
     digests: dict[NotificationCategory, DigestSchedule] = Field(default_factory=dict)
     #: The stand-down in force, or None. A lapsed one reads as None.
     pause: PauseRead | None = None
+    #: The longest a pause may run, so a form can say so before it is refused.
+    max_pause_days: int = MAX_PAUSE_DAYS
     #: Whether to hold off while the account is plainly already looking.
     respect_presence: bool = True
     communities: list[CommunityNotificationSettings] = Field(

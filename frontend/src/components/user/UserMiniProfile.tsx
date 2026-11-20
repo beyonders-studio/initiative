@@ -9,7 +9,7 @@ import { Skeleton } from "@/ui/skeleton";
 
 import { ProfileAvatar } from "./ProfileAvatar";
 import { ProfileJoined } from "./ProfileJoined";
-import { isStatusEmpty, StatusBubble } from "./ProfileStatus";
+import { StatusBubble, useStatusEmpty } from "./ProfileStatus";
 import { UserHandle } from "./UserHandle";
 
 /**
@@ -83,6 +83,7 @@ export const UserMiniProfile = ({
 }) => {
   const { t } = useTranslation("profiles");
   const { data: profile, isLoading } = useUserProfile(handle);
+  const statusEmpty = useStatusEmpty(profile?.custom_status);
 
   const person = profile ?? summary;
   const decorations = profile?.profile_decorations ?? summary?.profile_decorations;
@@ -115,7 +116,7 @@ export const UserMiniProfile = ({
         />
         {/* Over the banner, where there is room for it — the same place the
             account menu puts your own. */}
-        {profile && !isStatusEmpty(profile.custom_status) ? (
+        {profile && !statusEmpty ? (
           <StatusBubble
             status={profile.custom_status}
             className="absolute top-1.5 right-2 max-w-[70%] text-xs"

@@ -9,6 +9,7 @@ Tests the user API endpoints at /api/v1/users including:
 """
 
 import uuid
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import text, update
@@ -428,6 +429,7 @@ async def test_search_users_returns_slim_paginated_envelope(client, acting_user)
         "avatar_url",
         "status",
         "profile_decorations",
+        "custom_status",
         "community_role",
     }
     # Asserted as a value, not only as a key. The schema leaves it unset, so a
@@ -1346,6 +1348,7 @@ async def test_profile_carries_the_basics(client, session, acting_user):
     assert body["custom_status"] == {
         "emoji": "\N{GAME DIE}",
         "text": "rolling for initiative",
+        "clear_at": None,
     }
     assert body["profile_decorations"] == {
         "banner": "core.aurora",
@@ -1578,20 +1581,43 @@ async def test_profile_404s_on_something_that_is_not_a_handle(
     assert response.status_code == 404
 
 
-async def test_custom_status_round_trips_as_one_object(client, acting_user):
-    """One column, one write: the emoji and the line are set together."""
+async def test_custom_status_round_trips_as_one_object(
+    client, acting_user, session: AsyncSession
+):
+    """One column, one write: the emoji, the line and when it ends are set
+    together, and a status past its end reads as none."""
     a = await acting_user()
+    ends = datetime.now(UTC) + timedelta(hours=1)
 
     response = await client.patch(
         "/api/v1/me",
         headers=a.headers,
-        json={"custom_status": {"emoji": "\N{ROCKET}", "text": "  shipping  "}},
+        json={
+            "custom_status": {
+                "emoji": "\N{ROCKET}",
+                "text": "  shipping  ",
+                "clear_at": ends.isoformat(),
+            }
+        },
     )
 
     assert response.status_code == 200
-    assert response.json()["custom_status"] == {
-        "emoji": "\N{ROCKET}",
-        "text": "shipping",
+    body = response.json()["custom_status"]
+    assert (body["emoji"], body["text"]) == ("\N{ROCKET}", "shipping")
+    assert datetime.fromisoformat(body["clear_at"]) == ends
+
+    a.user.custom_status = {
+        **a.user.custom_status,
+        "clear_at": (datetime.now(UTC) - timedelta(minutes=1)).isoformat(),
+    }
+    session.add(a.user)
+    await session.commit()
+
+    ended = await client.get("/api/v1/me", headers=a.headers)
+    assert ended.json()["custom_status"] == {
+        "emoji": None,
+        "text": None,
+        "clear_at": None,
     }
 
     cleared = await client.patch(
@@ -1599,7 +1625,11 @@ async def test_custom_status_round_trips_as_one_object(client, acting_user):
     )
 
     assert cleared.status_code == 200
-    assert cleared.json()["custom_status"] == {"emoji": None, "text": None}
+    assert cleared.json()["custom_status"] == {
+        "emoji": None,
+        "text": None,
+        "clear_at": None,
+    }
 
 
 async def test_custom_status_holds_the_line_to_its_length(client, acting_user):
