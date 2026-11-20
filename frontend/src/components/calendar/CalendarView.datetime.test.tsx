@@ -45,7 +45,7 @@ describe("calendar date rescheduling", () => {
   it.each(["2026-03-29", "2026-10-25"])("refuses a skipped or repeated hour slot on %s", (day) => {
     vi.stubEnv("TZ", "Europe/Amsterdam");
     const selected = vi.fn();
-    const error = vi.spyOn(toast, "error").mockReturnValue(0);
+    const error = vi.spyOn(toast, "error").mockImplementation(() => {});
     renderWithProviders(
       <DayColumn day={new Date(`${day}T12:00:00`)} entries={[]} onSlotClick={selected} />
     );

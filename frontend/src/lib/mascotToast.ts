@@ -26,8 +26,8 @@ const VARIANT_BY_TYPE: Record<MascotToastType, string> = {
 };
 
 interface MascotToastOptions {
-  /** Custom dismissal handle. Sonner uses string|number; we accept both. */
-  id?: string | number;
+  /** Dismissal handle; showing another toast under it replaces this one. */
+  id?: string;
   /** ms to auto-dismiss; pass `Infinity` to keep open until dismissed. */
   duration?: number;
   /** Secondary line appended below the main message (Sonner parity). */
@@ -47,8 +47,6 @@ interface MascotToastOptions {
 }
 
 type RobotToastType = "default" | "success" | "error" | "warning" | "info";
-
-const idMap = new Map<string | number, number>();
 
 const ROBOT_TYPE_BY_TYPE: Record<MascotToastType, RobotToastType> = {
   default: "default",
@@ -114,10 +112,6 @@ const buildInput = (
     robotVariant: opts?.robotVariant ?? VARIANT_BY_TYPE[type],
     position: opts?.position ?? "bottom-center",
     typeSpeed,
-    // Cap how many toasts are visible at once; the rest queue and appear as
-    // slots free up (robot-toast reads this per call, falling back to its
-    // unlimited default otherwise).
-    limit: 2,
   };
   if (opts?.duration !== undefined) {
     input.autoClose = Number.isFinite(opts.duration) ? opts.duration : false;
@@ -127,21 +121,61 @@ const buildInput = (
   if (opts?.action) {
     input.buttons = [{ label: opts.action.label, onClick: opts.action.onClick }];
   }
-  const userId = opts?.id;
-  const userOnClose = opts?.onClose;
-  if (userId !== undefined || userOnClose) {
-    input.onClose = () => {
-      if (userId !== undefined) idMap.delete(userId);
-      userOnClose?.();
-    };
-  }
   return input;
 };
 
-const fire = (message: string, type: MascotToastType, opts?: MascotToastOptions): number => {
-  const internalId = robotToast(buildInput(message, type, opts));
-  if (opts?.id !== undefined) idMap.set(opts.id, internalId);
-  return internalId;
+/** How many toasts are on screen at once; the rest wait their turn. */
+const VISIBLE_LIMIT = 2;
+
+/**
+ * Every toast on screen or waiting, by key: the caller's `id`, or else its
+ * type and text. A toast waiting has no `robotId` yet. The queue is kept here
+ * rather than in robot-toast, whose queue cannot drop one waiting toast.
+ */
+const entries = new Map<string, { input: RobotToastOptions; robotId?: number }>();
+
+const showWaiting = () => {
+  let shown = [...entries.values()].filter((entry) => entry.robotId !== undefined).length;
+  for (const entry of entries.values()) {
+    if (shown >= VISIBLE_LIMIT) return;
+    if (entry.robotId === undefined) {
+      entry.robotId = robotToast(entry.input);
+      shown += 1;
+    }
+  }
+};
+
+const close = (key: string) => {
+  const entry = entries.get(key);
+  if (!entry) return;
+  entries.delete(key);
+  if (entry.robotId !== undefined) robotToast.closeById(entry.robotId);
+  showWaiting();
+};
+
+/**
+ * Show a toast. A toast with an `id` replaces the one showing under that id
+ * (Sonner's behaviour); one without is dropped while the same text of the
+ * same type is already showing or waiting.
+ */
+const fire = (message: string, type: MascotToastType, opts?: MascotToastOptions): string => {
+  const input = buildInput(message, type, opts);
+  const key = opts?.id ?? `${type}:${input.message}`;
+  if (entries.has(key)) {
+    if (opts?.id === undefined) return key;
+    close(key);
+  }
+  const entry: { input: RobotToastOptions; robotId?: number } = { input };
+  input.onClose = () => {
+    // A toast closes after its exit animation, by which time a newer toast
+    // may hold its key; only its own entry is forgotten.
+    if (entries.get(key) === entry) entries.delete(key);
+    opts?.onClose?.();
+    showWaiting();
+  };
+  entries.set(key, entry);
+  showWaiting();
+  return key;
 };
 
 interface PromiseMessages<T> {
@@ -151,14 +185,14 @@ interface PromiseMessages<T> {
 }
 
 interface MascotToast {
-  (message: string, options?: MascotToastOptions): number;
-  success(message: string, options?: MascotToastOptions): number;
-  error(message: string, options?: MascotToastOptions): number;
-  warning(message: string, options?: MascotToastOptions): number;
-  info(message: string, options?: MascotToastOptions): number;
-  message(message: string, options?: MascotToastOptions): number;
-  loading(message: string, options?: MascotToastOptions): number;
-  dismiss(id?: string | number): void;
+  (message: string, options?: MascotToastOptions): void;
+  success(message: string, options?: MascotToastOptions): void;
+  error(message: string, options?: MascotToastOptions): void;
+  warning(message: string, options?: MascotToastOptions): void;
+  info(message: string, options?: MascotToastOptions): void;
+  message(message: string, options?: MascotToastOptions): void;
+  loading(message: string, options?: MascotToastOptions): void;
+  dismiss(id?: string): void;
   promise<T>(
     promise: Promise<T>,
     msgs: PromiseMessages<T>,
@@ -166,8 +200,9 @@ interface MascotToast {
   ): Promise<T>;
 }
 
-const toast = ((message: string, options?: MascotToastOptions) =>
-  fire(message, "default", options)) as MascotToast;
+const toast = ((message: string, options?: MascotToastOptions) => {
+  fire(message, "default", options);
+}) as MascotToast;
 
 toast.success = (message, options) => fire(message, "success", options);
 toast.error = (message, options) => fire(message, "error", options);
@@ -179,15 +214,11 @@ toast.loading = (message, options) =>
 
 toast.dismiss = (id) => {
   if (id === undefined) {
+    entries.clear();
     robotToast.closeAll();
-    idMap.clear();
     return;
   }
-  const internalId = idMap.get(id);
-  if (internalId !== undefined) {
-    robotToast.closeById(internalId);
-    idMap.delete(id);
-  }
+  close(id);
 };
 
 toast.promise = async <T>(
@@ -198,7 +229,7 @@ toast.promise = async <T>(
   const loadingId = fire(msgs.loading, "loading", { ...options, duration: Infinity });
   try {
     const value = await promise;
-    robotToast.closeById(loadingId);
+    close(loadingId);
     fire(
       typeof msgs.success === "function" ? msgs.success(value) : msgs.success,
       "success",
@@ -206,7 +237,7 @@ toast.promise = async <T>(
     );
     return value;
   } catch (err) {
-    robotToast.closeById(loadingId);
+    close(loadingId);
     fire(typeof msgs.error === "function" ? msgs.error(err) : msgs.error, "error", options);
     throw err;
   }

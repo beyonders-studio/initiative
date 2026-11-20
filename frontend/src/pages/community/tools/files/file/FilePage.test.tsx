@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,22 +9,43 @@ import { server } from "@/__tests__/helpers/msw-server";
 import { createTestQueryClient, renderPage } from "@/__tests__/helpers/render";
 import { getReadFileQueryKey } from "@/api/generated/files/files";
 import { queryClient as appQueryClient } from "@/lib/queryClient";
+import { CollaborationError } from "@/lib/yjs/CollaborationProvider";
 
 const collaborating = { value: false };
+const network = { online: true };
+const collaboration: { onError?: (error: Error) => void } = {};
+const toasts = vi.hoisted(() => ({ warning: vi.fn(), error: vi.fn() }));
+
+vi.mock("@/lib/mascotToast", () => ({
+  toast: Object.assign(vi.fn(), {
+    success: vi.fn(),
+    info: vi.fn(),
+    error: toasts.error,
+    warning: toasts.warning,
+    dismiss: vi.fn(),
+  }),
+}));
+
+vi.mock("@/hooks/useNetworkStatus", () => ({
+  useNetworkStatus: () => ({ isOnline: network.online }),
+}));
 
 vi.mock("@/hooks/useCollaboration", () => ({
-  useCollaboration: () => ({
-    providerFactory: null,
-    connectionStatus: collaborating.value ? "connected" : "disconnected",
-    isSynced: collaborating.value,
-    collaborators: [],
-    collaboratorsReady: collaborating.value,
-    isCollaborating: collaborating.value,
-    isReady: true,
-    connect: vi.fn(),
-    resume: vi.fn(),
-    disconnect: vi.fn(),
-  }),
+  useCollaboration: (options: { onError?: (error: Error) => void }) => {
+    collaboration.onError = options.onError;
+    return {
+      providerFactory: null,
+      connectionStatus: collaborating.value ? "connected" : "disconnected",
+      isSynced: collaborating.value,
+      collaborators: [],
+      collaboratorsReady: collaborating.value,
+      isCollaborating: collaborating.value,
+      isReady: true,
+      connect: vi.fn(),
+      resume: vi.fn(),
+      disconnect: vi.fn(),
+    };
+  },
 }));
 
 vi.mock("@/components/tools/files/WhiteboardFileEditor", () => ({
@@ -56,6 +77,9 @@ beforeEach(() => {
   patches.length = 0;
   stored = { ...seed };
   collaborating.value = false;
+  network.online = true;
+  toasts.warning.mockClear();
+  toasts.error.mockClear();
   server.use(
     communityHttp.get("/files/:fileId", () => HttpResponse.json(stored)),
     communityHttp.patch("/files/:fileId", async ({ request }) => {
@@ -295,5 +319,37 @@ describe("opening a whiteboard", () => {
     renderDoc({ queryClient });
 
     expect(await screen.findByText("whiteboard canvas")).toBeInTheDocument();
+  });
+});
+
+describe("losing the connection to a room", () => {
+  it("tells an offline reader their edits will sync, though the socket is down", async () => {
+    network.online = false;
+    renderDoc();
+    await screen.findByRole("button", { name: "edit the body" });
+
+    expect(toasts.warning).toHaveBeenCalledWith(
+      "You're offline — edits will sync when you reconnect.",
+      expect.objectContaining({ id: "editor-offline" })
+    );
+  });
+
+  it("leaves a lost room to the offline warning while offline", async () => {
+    network.online = false;
+    renderDoc();
+    await screen.findByRole("button", { name: "edit the body" });
+
+    act(() => collaboration.onError?.(new CollaborationError("Connection lost.", true)));
+
+    expect(toasts.error).not.toHaveBeenCalled();
+  });
+
+  it("says so when the room is lost while the device is online", async () => {
+    renderDoc();
+    await screen.findByRole("button", { name: "edit the body" });
+
+    act(() => collaboration.onError?.(new CollaborationError("Connection lost.", true)));
+
+    expect(toasts.error).toHaveBeenCalledTimes(1);
   });
 });

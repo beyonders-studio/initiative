@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A notice no longer shows twice. Going offline in a live document now shows one warning, which says your edits will sync, and it goes away when you're back online.
 - **A refused connection says why it may have been.** When connecting a plug-in's account is refused, the page says the account may not be one you control (for an organization, you need to be one of its owners), not only that the other service didn't finish.
 - **Events that run past midnight.** On the month calendar, an evening event that ends after midnight is shown with its start time on the day it starts, not as a bar across two days. The list says when it stops on the second day ("Until 12:30am") instead of calling that day "All day". An event that ends at midnight no longer shows on the next day.
 - **Reload in the desktop app no longer leaves a blank window.** The page reloads where you were.

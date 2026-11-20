@@ -98,8 +98,8 @@ export const useUpdateTag = (
 
 export const useDeleteTag = (
   options?: MutationOpts<void, number> & {
-    /** Skip the per-delete success toast — for batch callers that show one
-     * summary toast instead. Error toasts still fire per tag. */
+    /** Skip the per-delete toasts, success and error — for batch callers that
+     * show one summary toast instead. */
     silent?: boolean;
   }
 ) => {
@@ -117,7 +117,7 @@ export const useDeleteTag = (
         void invalidate(q.allTags());
         invalidateTagBearers();
       },
-      errorKey: "tags:deleteError",
+      errorKey: silent ? undefined : "tags:deleteError",
     },
     rest
   );
