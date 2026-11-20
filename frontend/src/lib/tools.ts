@@ -420,9 +420,10 @@ export const entityRefRoute = (refType: string, id: number): string => `/go/${re
  * discriminator and entity-ref segment. */
 export const toolKebabSingular = (tool: Tool): string => tool.replaceAll("_", "-");
 
-/** Export endpoint (relative to /c/{communityId}), e.g. "/exports/calendar".
+/** Export endpoint (relative to /c/{communityId}), e.g. "/exports/calendar",
+ * a built-in tool's or a tool plug-in's by its kind.
  * It takes the selection as `ids`. */
-export const toolExportEndpoint = (tool: Tool): string => `/exports/${tool}`;
+export const toolExportEndpoint = (tool: string): string => `/exports/${tool}`;
 
 /** The envelope ``type`` discriminator a tool's single-entity export emits —
  * the same value its importer registers under: the kebab-singular. */

@@ -13,7 +13,6 @@ import { useDeleteTools, useDuplicateTools } from "@/hooks/toolHooks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { toast } from "@/lib/mascotToast";
 import { everyCan } from "@/lib/permissions";
-import { isBuiltInTool } from "@/lib/tools";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { SelectionBar } from "@/ui/selection-bar";
@@ -91,7 +90,7 @@ export function BulkAccessSection<T extends BulkItem>({
       {selection.active ? (
         <SelectionBar label={t("bulkBar.selected", { count })}>
           {actions}
-          {isBuiltInTool(tool) ? <BulkExportButton tool={tool} items={items} /> : null}
+          <BulkExportButton tool={tool} items={items} />
           <Button
             variant="outline"
             size="sm"
