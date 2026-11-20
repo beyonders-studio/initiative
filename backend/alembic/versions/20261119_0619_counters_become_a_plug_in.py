@@ -187,11 +187,13 @@ def _held(*tables: str) -> Iterator[None]:
         _run(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY")
     for table in present:
         _run(f"ALTER TABLE {table} DISABLE TRIGGER USER")
-    yield
-    for table in present:
-        _run(f"ALTER TABLE {table} ENABLE TRIGGER USER")
-    for table in forced:
-        _run(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
+    try:
+        yield
+    finally:
+        for table in present:
+            _run(f"ALTER TABLE {table} ENABLE TRIGGER USER")
+        for table in forced:
+            _run(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
 
 
 def _kind_columns(schema: str) -> list[tuple[str, str]]:
@@ -466,7 +468,10 @@ def _keep_rules() -> None:
 
 def _rewrite_sql(sql: str, mapping: Mapping[str, str]) -> str | None:
     """``sql`` reading ``mapping``'s tables by their new names, or None where it
-    names none of them (or cannot be read)."""
+    names none of them (or cannot be read). A table read by its bare name
+    keeps that name as its alias, so whatever names it, a column or a
+    subquery, still does; a name the query gives a ``WITH`` of its own is
+    that, and is left as it is."""
     from pglast import ast, parse_sql
     from pglast.stream import RawStream
     from pglast.visitors import Visitor
@@ -475,36 +480,33 @@ def _rewrite_sql(sql: str, mapping: Mapping[str, str]) -> str | None:
         tree = parse_sql(sql)
     except Exception:
         return None
+    named: set[str] = set()
     changed = False
+
+    class Named(Visitor):
+        def visit_CommonTableExpr(
+            self, ancestors: Any, node: ast.CommonTableExpr
+        ) -> None:
+            named.add(node.ctename)
 
     class Rename(Visitor):
         def visit_RangeVar(self, ancestors: Any, node: ast.RangeVar) -> Any:
             nonlocal changed
-            if node.schemaname is None and node.relname in mapping:
+            if (
+                node.schemaname is None
+                and node.relname in mapping
+                and node.relname not in named
+            ):
                 changed = True
                 return ast.RangeVar(
                     relname=mapping[node.relname],
                     inh=node.inh,
                     relpersistence=node.relpersistence,
-                    alias=node.alias,
+                    alias=node.alias or ast.Alias(aliasname=node.relname),
                 )
             return None
 
-        def visit_ColumnRef(self, ancestors: Any, node: ast.ColumnRef) -> Any:
-            nonlocal changed
-            fields = node.fields or ()
-            first = fields[0] if fields else None
-            if (
-                len(fields) > 1
-                and isinstance(first, ast.String)
-                and first.sval in mapping
-            ):
-                changed = True
-                return ast.ColumnRef(
-                    fields=(ast.String(sval=mapping[first.sval]), *fields[1:])
-                )
-            return None
-
+    Named()(tree)
     Rename()(tree)
     return RawStream()(tree) if changed else None
 

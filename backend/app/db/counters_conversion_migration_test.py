@@ -348,7 +348,10 @@ async def test_a_community_without_counters_loses_the_tables(
     [
         (
             "SELECT name, count FROM counters ORDER BY name",
-            "SELECT name, count FROM p_tsjvtcm0s7gv2x_counter ORDER BY name",
+            (
+                "SELECT name, count FROM p_tsjvtcm0s7gv2x_counter AS counters"
+                " ORDER BY name"
+            ),
         ),
         (
             (
@@ -356,12 +359,18 @@ async def test_a_community_without_counters_loses_the_tables(
                 " JOIN counter_groups g ON g.id = counters.counter_group_id"
             ),
             (
-                "SELECT p_tsjvtcm0s7gv2x_counter.name, g.name"
-                " FROM p_tsjvtcm0s7gv2x_counter"
+                "SELECT counters.name, g.name"
+                " FROM p_tsjvtcm0s7gv2x_counter AS counters"
                 " INNER JOIN p_tsjvtcm0s7gv2x_counter_group AS g"
-                " ON g.id = p_tsjvtcm0s7gv2x_counter.counter_group_id"
+                " ON g.id = counters.counter_group_id"
             ),
         ),
+        (
+            "SELECT counters.name FROM counters AS counters",
+            "SELECT counters.name FROM p_tsjvtcm0s7gv2x_counter AS counters",
+        ),
+        ("SELECT counters.title FROM tasks AS counters", None),
+        ("WITH counters AS (SELECT 1 AS n) SELECT n FROM counters", None),
         ("SELECT name FROM tasks", None),
     ],
 )
