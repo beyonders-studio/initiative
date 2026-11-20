@@ -14,7 +14,7 @@ import { WidgetType } from "@/api/generated/initiativeAPI.schemas";
 
 import { BUILTIN_WIDGET_TYPES, builtinWidgetSource } from "./registry";
 import { renderInSandbox } from "./runtime/sandbox";
-import { emptySample, sampleFor } from "./sampleData";
+import { sampleFor } from "./sampleData";
 import { resolveMapping } from "./shape";
 import { validateScene } from "./validateScene";
 
@@ -131,7 +131,7 @@ describe("built-ins run in the sandbox like any other widget", () => {
   );
 
   it.each(BUILTIN_WIDGET_TYPES)("%s survives empty data", async (type) => {
-    const data = emptySample(type);
+    const data = { ...sampleFor(type), rows: [] };
     const result = await renderInSandbox({
       source: builtinWidgetSource(type) as string,
       data,

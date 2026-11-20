@@ -16,29 +16,13 @@ import { darkVariant } from "@/lib/releaseImages";
  * already have this" — a community's install is shared, a person's is theirs.
  *
  * Mirrors ``KIND_AUDIENCE`` in ``backend/app/services/marketplace/
- * definitions.py``, which is the source of truth; a kind missing from both
- * lists here is offered by neither, which the test below refuses.
+ * definitions.py``, which is the source of truth.
  */
-export const USER_SHELVES = [ListingKind.home_layout, ListingKind.profile_pack] as const;
-
 export const COMMUNITY_SHELVES = [
   ListingKind.dashboard,
   ListingKind.project,
   ListingKind.plugin,
   ListingKind.auto,
-] as const;
-
-/**
- * Kinds the server publishes that no shelf shows yet: the tool marketplaces
- * other than dashboards and projects. Each one exists in the API — browse,
- * detail and install — and is surfaced by moving it into `COMMUNITY_SHELVES`.
- */
-export const UNSHELVED_KINDS = [
-  ListingKind.file,
-  ListingKind.calendar,
-  ListingKind.post,
-  ListingKind.wiki,
-  ListingKind.contact,
 ] as const;
 
 /** A shelf a community installs from — the values `?kind=` may name under

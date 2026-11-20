@@ -6,24 +6,14 @@ import { describe, expect, it } from "vitest";
 import { DECORATIONS, resolveDecoration, resolveTrophies } from "./profileDecorations";
 
 describe("resolving a decoration", () => {
-  it("finds the artwork an id names", () => {
-    expect(resolveDecoration("core.aurora", "banner")?.src).toBe(
-      "/decorations/banners/core-aurora.svg"
-    );
-  });
-
-  it("has nothing for an id this build does not ship", () => {
+  it("has nothing for an id this build does not ship, in another slot, or built out of a path", () => {
     // What a profile wearing something from a later catalog gets: bare, not
     // broken, and not a request for a file that isn't there.
     expect(resolveDecoration("thirdparty.holo", "banner")).toBeUndefined();
-  });
-
-  it("will not hand a banner back as a frame", () => {
     expect(resolveDecoration("core.aurora", "frame")).toBeUndefined();
-  });
-
-  it("resolves nothing for an id built out of a path", () => {
     expect(resolveDecoration("../../../etc/passwd", "banner")).toBeUndefined();
+    expect(resolveDecoration(null, "frame")).toBeUndefined();
+    expect(resolveTrophies(null)).toEqual([]);
   });
 
   it("keeps the trophies it can draw, in the order they are worn", () => {
@@ -36,11 +26,6 @@ describe("resolving a decoration", () => {
     });
 
     expect(trophies.map((badge) => badge.id)).toEqual(["spooky.lantern", "core.fan"]);
-  });
-
-  it("draws nothing for a profile with no decorations at all", () => {
-    expect(resolveTrophies(null)).toEqual([]);
-    expect(resolveDecoration(null, "frame")).toBeUndefined();
   });
 });
 
@@ -62,7 +47,7 @@ describe("the catalog and what it names", () => {
     expect(missing).toEqual([]);
   });
 
-  it("draws every decoration the shipped packs grant", () => {
+  it("draws every decoration the shipped packs grant, and ships each pack's card picture", () => {
     const catalog = join(process.cwd(), "..", "backend", "app", "marketplace_catalog");
     const unknown: string[] = [];
 
@@ -73,26 +58,13 @@ describe("the catalog and what it names", () => {
         const known = DECORATIONS[declared.id];
         if (!known || known.kind !== declared.slot) unknown.push(`${file}: ${declared.id}`);
       }
-    }
-
-    expect(unknown).toEqual([]);
-  });
-
-  it("ships the picture every pack puts on its card", () => {
-    // A pack's avatar is a path in the manifest rather than an id, so nothing
-    // else here checks it — and a decoration leaving the pack is exactly when
-    // it goes stale.
-    const catalog = join(process.cwd(), "..", "backend", "app", "marketplace_catalog");
-    const missing: string[] = [];
-
-    for (const file of readdirSync(catalog).filter((name) => name.endsWith(".json"))) {
-      const manifest = JSON.parse(readFileSync(join(catalog, file), "utf8"));
-      if (manifest.kind !== "profile_pack" || !manifest.avatar_url) continue;
-      if (!existsSync(join(process.cwd(), "public", manifest.avatar_url))) {
-        missing.push(`${file}: ${manifest.avatar_url}`);
+      // A pack's avatar is a path in the manifest rather than an id, and a
+      // decoration leaving the pack is exactly when it goes stale.
+      if (manifest.avatar_url && !existsSync(join(process.cwd(), "public", manifest.avatar_url))) {
+        unknown.push(`${file}: ${manifest.avatar_url}`);
       }
     }
 
-    expect(missing).toEqual([]);
+    expect(unknown).toEqual([]);
   });
 });

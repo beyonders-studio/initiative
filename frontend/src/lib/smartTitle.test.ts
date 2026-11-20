@@ -70,95 +70,75 @@ const due = (text: string, overrides?: Partial<TitleContext>) => {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
-describe("readTitle — dates", () => {
-  it("reads today and tomorrow, due at the end of the day", () => {
+describe("readTitle — dates and times", () => {
+  it.each<[string, string | null, Partial<TitleContext>?]>([
+    // Today and tomorrow, due at the end of the day.
+    ["Call the bank today", "2026-10-22 23:59"],
+    ["Call the bank tomorrow", "2026-10-23 23:59"],
+    // A weekday is the coming one, today included.
+    ["Report friday", "2026-10-23 23:59"],
+    ["Report thursday", "2026-10-22 23:59"],
+    ["Report wednesday", "2026-10-28 23:59"],
+    ["Report monday", "2026-10-26 23:59"],
+    // Next weekday is that day of next week, wherever the week starts.
+    ["Report next friday", "2026-10-30 23:59"],
+    ["Report next monday", "2026-10-26 23:59"],
+    ["Report next monday", "2026-10-26 23:59", { weekStartsOn: 0 }],
+    // A shortened weekday only after a word that leads a date.
+    ["Report by fri", "2026-10-23 23:59"],
+    ["Sit in the sun", null],
+    // Next week, month and year are where they start.
+    ["Plan next week", "2026-10-26 23:59"],
+    ["Plan next week", "2026-10-25 23:59", { weekStartsOn: 0 }],
+    ["Plan next month", "2026-11-01 23:59"],
+    ["Plan next year", "2027-01-01 23:59"],
+    ["Renew in 3 days", "2026-10-25 23:59"],
+    ["Renew in a week", "2026-10-29 23:59"],
+    ["Renew in 2 months", "2026-12-22 23:59"],
+    // A month and day either way round, past dates rolling to next year.
+    ["Party oct 30", "2026-10-30 23:59"],
+    ["Party 30th of October", "2026-10-30 23:59"],
+    ["Party on 3 march", "2027-03-03 23:59"],
+    ["Party October 30 2027", "2027-10-30 23:59"],
+    ["Party 2026-12-01", "2026-12-01 23:59"],
+    ["Party feb 30", null],
+    // Only the first date.
+    ["Move today's thing to friday or monday", "2026-10-23 23:59"],
+    // A time after a date, or anywhere before it.
+    ["Standup tomorrow at 9am", "2026-10-23 09:00"],
+    ["Standup friday 5:30pm", "2026-10-23 17:30"],
+    ["Standup friday at 17:00", "2026-10-23 17:00"],
+    ["At 3pm call Sam on friday", "2026-10-23 15:00"],
+    // A time alone is today, or tomorrow once today's has gone.
+    ["Stretch at 4pm", "2026-10-22 16:00"],
+    ["Stretch at 8am", "2026-10-23 08:00"],
+    ["Stretch at noon", "2026-10-22 12:00"],
+    ["Stretch 9 p.m.", "2026-10-22 21:00"],
+    // A bare number only when led by at.
+    ["Meet at 14", "2026-10-22 14:00"],
+  ])("reads %j as due %s", (text, expected, overrides) => {
+    expect(due(text, overrides)).toBe(expected);
+  });
+
+  it("takes what it read out of the title, with or without a time", () => {
     expect(read("Call the bank today").title).toBe("Call the bank");
-    expect(due("Call the bank today")).toBe("2026-10-22 23:59");
-    expect(due("Call the bank tomorrow")).toBe("2026-10-23 23:59");
     expect(read("Call the bank tomorrow").dueHasTime).toBe(false);
-  });
-
-  it("reads a weekday as the coming one, today included", () => {
-    expect(due("Report friday")).toBe("2026-10-23 23:59");
-    expect(due("Report thursday")).toBe("2026-10-22 23:59");
-    expect(due("Report wednesday")).toBe("2026-10-28 23:59");
-    expect(due("Report monday")).toBe("2026-10-26 23:59");
-  });
-
-  it("reads next weekday as that day of next week", () => {
-    expect(due("Report next friday")).toBe("2026-10-30 23:59");
-    expect(due("Report next monday")).toBe("2026-10-26 23:59");
-    // A week starting on Sunday puts next Monday in the same place.
-    expect(due("Report next monday", { weekStartsOn: 0 })).toBe("2026-10-26 23:59");
-  });
-
-  it("reads a shortened weekday only after a word that leads a date", () => {
-    expect(due("Report by fri")).toBe("2026-10-23 23:59");
     expect(read("Report by fri").title).toBe("Report");
-    expect(due("Sit in the sun")).toBeNull();
     expect(read("Sit in the sun").title).toBe("Sit in the sun");
-  });
-
-  it("reads next week, month and year as where they start", () => {
-    expect(due("Plan next week")).toBe("2026-10-26 23:59");
-    expect(due("Plan next week", { weekStartsOn: 0 })).toBe("2026-10-25 23:59");
-    expect(due("Plan next month")).toBe("2026-11-01 23:59");
-    expect(due("Plan next year")).toBe("2027-01-01 23:59");
-  });
-
-  it("reads in a count of units", () => {
-    expect(due("Renew in 3 days")).toBe("2026-10-25 23:59");
-    expect(due("Renew in a week")).toBe("2026-10-29 23:59");
-    expect(due("Renew in 2 months")).toBe("2026-12-22 23:59");
-    expect(read("Put 5 in 2 boxes").parts).toEqual([]);
-  });
-
-  it("reads a month and day either way round, rolling past dates to next year", () => {
-    expect(due("Party oct 30")).toBe("2026-10-30 23:59");
-    expect(due("Party 30th of October")).toBe("2026-10-30 23:59");
-    expect(due("Party on 3 march")).toBe("2027-03-03 23:59");
-    expect(due("Party October 30 2027")).toBe("2027-10-30 23:59");
-    expect(due("Party 2026-12-01")).toBe("2026-12-01 23:59");
-    expect(due("Party feb 30")).toBeNull();
-  });
-
-  it("leaves a month without a day alone", () => {
-    expect(read("Write the March report").parts).toEqual([]);
-  });
-
-  it("reads only the first date", () => {
-    const reading = read("Move today's thing to friday or monday");
-    expect(reading.title).toBe("Move today's thing to or monday");
-    expect(due("Move today's thing to friday or monday")).toBe("2026-10-23 23:59");
-  });
-});
-
-describe("readTitle — times", () => {
-  it("reads a time after a date", () => {
-    expect(due("Standup tomorrow at 9am")).toBe("2026-10-23 09:00");
-    expect(due("Standup friday 5:30pm")).toBe("2026-10-23 17:30");
-    expect(due("Standup friday at 17:00")).toBe("2026-10-23 17:00");
+    expect(read("Move today's thing to friday or monday").title).toBe(
+      "Move today's thing to or monday"
+    );
     expect(read("Standup friday at 17:00").title).toBe("Standup");
     expect(read("Standup friday at 17:00").dueHasTime).toBe(true);
-  });
-
-  it("reads a time anywhere, before the date too", () => {
-    expect(due("At 3pm call Sam on friday")).toBe("2026-10-23 15:00");
     expect(read("At 3pm call Sam on friday").title).toBe("call Sam");
   });
 
-  it("puts a time alone today, or tomorrow once today's has gone", () => {
-    expect(due("Stretch at 4pm")).toBe("2026-10-22 16:00");
-    expect(due("Stretch at 8am")).toBe("2026-10-23 08:00");
-    expect(due("Stretch at noon")).toBe("2026-10-22 12:00");
-    expect(due("Stretch 9 p.m.")).toBe("2026-10-22 21:00");
-  });
-
-  it("leaves a bare number alone unless it is led by at", () => {
-    expect(read("Read chapter 5").parts).toEqual([]);
-    expect(due("Meet at 14")).toBe("2026-10-22 14:00");
-    expect(read("Buy 13pm things").parts).toEqual([]);
-  });
+  it.each(["Put 5 in 2 boxes", "Write the March report", "Read chapter 5", "Buy 13pm things"])(
+    "reads nothing in %j",
+    (text) => {
+      expect(read(text).parts).toEqual([]);
+    }
+  );
 });
 
 describe("readTitle — priority", () => {

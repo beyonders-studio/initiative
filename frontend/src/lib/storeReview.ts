@@ -78,7 +78,7 @@ export const noteDayOfUse = (now = new Date()): void => {
 };
 
 /** Whether this install may ask now. */
-export const dueForReview = (record: ReviewRecord): boolean =>
+const dueForReview = (record: ReviewRecord): boolean =>
   !record.asked && record.days >= DAYS_BEFORE_ASKING;
 
 /** Whether a store installed this app, which is where a rating goes. */

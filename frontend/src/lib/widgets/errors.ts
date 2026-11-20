@@ -35,5 +35,3 @@ export const WidgetErrorCode = {
 } as const;
 
 export type WidgetErrorCode = (typeof WidgetErrorCode)[keyof typeof WidgetErrorCode];
-
-export const WIDGET_ERROR_CODES = Object.values(WidgetErrorCode) as WidgetErrorCode[];

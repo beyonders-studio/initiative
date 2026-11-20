@@ -128,11 +128,3 @@ export const ALL_SAMPLES: TabularData[] = [labelled, parts, overTime, spans, car
  */
 export const sampleFor = (widgetType?: string): TabularData =>
   (widgetType && BY_WIDGET[widgetType]) || labelled;
-
-/** The same shape with nothing in it — the "no data yet" path every widget has
- *  to survive. */
-export const emptySample = (widgetType?: string): TabularData => ({
-  source: "rows",
-  columns: sampleFor(widgetType).columns,
-  rows: [],
-});

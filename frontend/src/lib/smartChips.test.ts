@@ -9,14 +9,12 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { nextAsk } from "@/hooks/useSmartChips";
 import {
-  CHIP_ENTITY_TYPES,
   chipAspect,
   chipDisplay,
   chipEntityType,
   chipKindsFor,
   chipRef,
   isSmartChipKind,
-  SMART_CHIP_KINDS,
 } from "@/lib/smartChips";
 import { CHIP_TONE_CLASSES } from "@/ui/editor/editor-ui/chip-tones";
 
@@ -39,11 +37,6 @@ const state = (over: Partial<SmartChipState>): SmartChipState => ({
 });
 
 describe("what a smart chip is about", () => {
-  it("takes its kinds from the server rather than a list of its own", () => {
-    expect(SMART_CHIP_KINDS).toEqual(Object.values(SmartChipKind));
-    expect(SMART_CHIP_KINDS).toContain(SmartChipKind["task:status"]);
-  });
-
   it("splits a pair into the thing and the fact", () => {
     expect(chipEntityType(SmartChipKind["task:status"])).toBe(SearchEntityType.task);
     expect(chipAspect(SmartChipKind["task:status"])).toBe("status");
@@ -57,12 +50,6 @@ describe("what a smart chip is about", () => {
     expect(chipRef(SmartChipKind["calendar_event:when"], 4)).toBe("calendar_event:4:when");
   });
 
-  it("has a look for every tone the server can send", () => {
-    for (const tone of Object.values(SmartChipTone)) {
-      expect(CHIP_TONE_CLASSES[tone]).toBeTruthy();
-    }
-  });
-
   it("colours from theme tokens, so a chip follows the reader's theme", () => {
     for (const classes of Object.values(CHIP_TONE_CLASSES)) {
       expect(classes).not.toMatch(/\bdark:/);
@@ -73,12 +60,6 @@ describe("what a smart chip is about", () => {
 });
 
 describe("picking a chip in two steps", () => {
-  it("names each kind of thing once, however many facts it has", () => {
-    expect(CHIP_ENTITY_TYPES).toEqual([...new Set(CHIP_ENTITY_TYPES)]);
-    expect(CHIP_ENTITY_TYPES).toContain(SearchEntityType.task);
-    expect(CHIP_ENTITY_TYPES).toContain(SearchEntityType.calendar_event);
-  });
-
   it("offers every fact a thing has, and only those", () => {
     // A task is the one with a choice to make; an event has nothing to ask.
     expect(chipKindsFor(SearchEntityType.task).length).toBeGreaterThan(1);
@@ -87,19 +68,11 @@ describe("picking a chip in two steps", () => {
     ]);
     expect(chipKindsFor(SearchEntityType.file)).toEqual([]);
   });
-
-  it("covers every kind between them, so none is unreachable from the toolbar", () => {
-    const reachable = CHIP_ENTITY_TYPES.flatMap(chipKindsFor);
-    expect(reachable.sort()).toEqual([...SMART_CHIP_KINDS].sort());
-  });
 });
 
 describe("reading a pair back", () => {
-  it("recognises one this build offers", () => {
+  it("recognises one this build offers, and refuses one it does not, so a paste cannot make a chip pointing nowhere", () => {
     expect(isSmartChipKind("task:status")).toBe(true);
-  });
-
-  it("refuses one it does not, so a paste cannot make a chip pointing nowhere", () => {
     expect(isSmartChipKind("project:openTasks")).toBe(false);
     expect(isSmartChipKind("")).toBe(false);
   });

@@ -5,13 +5,10 @@ import { itemsInRange, resolveCardClick } from "./selectionRange";
 const items = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }];
 
 describe("itemsInRange", () => {
-  it("returns the inclusive slice in either direction", () => {
+  it("returns the inclusive slice in either direction, or nothing when an end is missing", () => {
     expect(itemsInRange(items, 2, 4).map((i) => i.id)).toEqual([2, 3, 4]);
     expect(itemsInRange(items, 4, 2).map((i) => i.id)).toEqual([2, 3, 4]);
     expect(itemsInRange(items, 3, 3).map((i) => i.id)).toEqual([3]);
-  });
-
-  it("returns nothing when either end is missing from the list", () => {
     expect(itemsInRange(items, 2, 99)).toEqual([]);
     expect(itemsInRange(items, 99, 2)).toEqual([]);
   });

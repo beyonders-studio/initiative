@@ -171,32 +171,16 @@ describe("placeClip — blanks in the copied block", () => {
 });
 
 describe("clipMatchesClipboard", () => {
-  it("is false with no clip", () => {
+  it("holds a copy, or a cut that reached the clipboard, only while its text is still there", () => {
     expect(clipMatchesClipboard(null, "anything")).toBe(false);
-  });
-
-  it("accepts a copy whose text is still on the clipboard", () => {
-    const clip = take("copy", { "0:0": "a" }, range(0, 0, 0, 0));
-    expect(clipMatchesClipboard(clip, "a")).toBe(true);
-  });
-
-  it("rejects a copy once the clipboard holds something else", () => {
-    const clip = take("copy", { "0:0": "a" }, range(0, 0, 0, 0));
-    expect(clipMatchesClipboard(clip, "from another app")).toBe(false);
-  });
-
-  it("accepts a cut whose text never reached the clipboard", () => {
-    const clip = take("cut", { "0:0": "a" }, range(0, 0, 0, 0));
-    expect(clipMatchesClipboard(clip, "from another app")).toBe(true);
-  });
-
-  it("accepts a cut whose text is still on the clipboard", () => {
-    const clip = { ...take("cut", { "0:0": "a" }, range(0, 0, 0, 0)), textOnClipboard: true };
-    expect(clipMatchesClipboard(clip, "a")).toBe(true);
-  });
-
-  it("stands aside for a cut once something else has been copied", () => {
-    const clip = { ...take("cut", { "0:0": "a" }, range(0, 0, 0, 0)), textOnClipboard: true };
-    expect(clipMatchesClipboard(clip, "from another app")).toBe(false);
+    const copy = take("copy", { "0:0": "a" }, range(0, 0, 0, 0));
+    expect(clipMatchesClipboard(copy, "a")).toBe(true);
+    expect(clipMatchesClipboard(copy, "from another app")).toBe(false);
+    // A cut whose text never reached the clipboard holds regardless.
+    const cut = take("cut", { "0:0": "a" }, range(0, 0, 0, 0));
+    expect(clipMatchesClipboard(cut, "from another app")).toBe(true);
+    const copiedCut = { ...cut, textOnClipboard: true };
+    expect(clipMatchesClipboard(copiedCut, "a")).toBe(true);
+    expect(clipMatchesClipboard(copiedCut, "from another app")).toBe(false);
   });
 });

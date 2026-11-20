@@ -3,11 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { normalizeColor, themeColor, withAlpha } from "@/lib/cssColor";
 
 describe("normalizeColor", () => {
-  it("keeps a colour a canvas already understands", () => {
+  it("keeps a colour a canvas already understands, and says nothing about one it cannot read", () => {
     expect(normalizeColor("#0ea5e9")).toBe("#0ea5e9");
-  });
-
-  it("says nothing about a colour it cannot read", () => {
     // Nonsense never comes back as a colour — a wrong colour is harder to
     // spot than none.
     expect(normalizeColor("not-a-colour")).toBeNull();
@@ -24,16 +21,10 @@ describe("themeColor", () => {
 });
 
 describe("withAlpha", () => {
-  it("says a hex colour more quietly", () => {
+  it("says a hex or rgb colour more quietly, and leaves one it cannot read alone", () => {
     expect(withAlpha("#0ea5e9", 0.4)).toBe("#0ea5e966");
     expect(withAlpha("#fff", 0.4)).toBe("#ffffff66");
-  });
-
-  it("says an rgb colour more quietly", () => {
     expect(withAlpha("rgb(14, 165, 233)", 0.5)).toContain("rgba(");
-  });
-
-  it("leaves a colour it cannot read alone rather than corrupting it", () => {
     expect(withAlpha("not-a-colour", 0.5)).toBe("not-a-colour");
   });
 });

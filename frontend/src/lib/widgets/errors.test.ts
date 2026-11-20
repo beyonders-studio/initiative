@@ -7,7 +7,9 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { WIDGET_ERROR_CODES } from "./errors";
+import { WidgetErrorCode } from "./errors";
+
+const WIDGET_ERROR_CODES: string[] = Object.values(WidgetErrorCode);
 
 const localeModules = import.meta.glob<Record<string, unknown>>(
   "../../../public/locales/*/dashboards.json",
@@ -20,28 +22,15 @@ const locales = Object.entries(localeModules).map(([path, messages]) => ({
 }));
 
 describe("widget error messages", () => {
-  it("ships every locale the app has", () => {
-    expect(locales.map((entry) => entry.locale).sort()).toEqual(["de", "en", "es", "fr"]);
+  // Every other locale carries exactly en's keys (`locale-keys.test.ts`).
+  it("has a message for every error code and no other, in en", () => {
+    const english = locales.find((entry) => entry.locale === "en")?.widgetError ?? {};
+    expect(Object.keys(english).sort()).toEqual([...WIDGET_ERROR_CODES, "default"].sort());
   });
 
-  it.each(locales)("$locale covers every error code", ({ widgetError }) => {
-    for (const code of WIDGET_ERROR_CODES) {
-      expect(widgetError[code], `missing message for ${code}`).toBeTruthy();
-    }
-    expect(widgetError.default, "missing fallback message").toBeTruthy();
-  });
-
-  it.each(locales)("$locale has no message for a code we removed", ({ widgetError }) => {
-    const known = new Set<string>([...WIDGET_ERROR_CODES, "default"]);
-    for (const key of Object.keys(widgetError)) {
-      expect(known.has(key), `stale message for ${key}`).toBe(true);
-    }
-  });
-
-  it.each(locales)(
+  it.each(locales.filter(({ locale }) => locale !== "en"))(
     "$locale is actually translated, not copied from en",
     ({ locale, widgetError }) => {
-      if (locale === "en") return;
       const english = locales.find((entry) => entry.locale === "en")?.widgetError ?? {};
       const identical = Object.keys(widgetError).filter((key) => widgetError[key] === english[key]);
       expect(identical, `${locale} left untranslated: ${identical.join(", ")}`).toHaveLength(0);

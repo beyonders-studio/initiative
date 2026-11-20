@@ -16,21 +16,12 @@ describe("checkNewPassword", () => {
     expect(checkNewPassword("short", "other")).toBe("auth:passwordPolicy.mismatch");
   });
 
-  it("flags a matching pair one character shorter than the minimum", () => {
-    const password = "a".repeat(PASSWORD_MIN_LENGTH - 1);
-    expect(checkNewPassword(password, password)).toBe("auth:passwordPolicy.minLength");
-  });
-
-  it("accepts a matching pair at exactly the minimum length", () => {
-    const password = "a".repeat(PASSWORD_MIN_LENGTH);
-    expect(checkNewPassword(password, password)).toBeNull();
-  });
-
-  it("accepts a long password regardless of character classes", () => {
+  it("holds a matching pair to the minimum length, and to nothing else", () => {
+    const short = "a".repeat(PASSWORD_MIN_LENGTH - 1);
+    expect(checkNewPassword(short, short)).toBe("auth:passwordPolicy.minLength");
+    const exact = "a".repeat(PASSWORD_MIN_LENGTH);
+    expect(checkNewPassword(exact, exact)).toBeNull();
     // Mirror of the NIST 800-63B stance: no class requirements client-side.
-    expect(
-      checkNewPassword("correct-horse-battery-staple", "correct-horse-battery-staple")
-    ).toBeNull();
     expect(checkNewPassword("all-lowercase-passphrase", "all-lowercase-passphrase")).toBeNull();
   });
 });
