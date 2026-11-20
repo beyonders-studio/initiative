@@ -492,3 +492,49 @@ describe("a tool plug-in's row and its items", () => {
     await waitFor(() => expect(sent).toEqual({ tag_ids: [99] }));
   });
 });
+
+describe("a counter on its row's page", () => {
+  /** A book on the shelf, its pages read counted in the bar its list draws. */
+  const novel = (id: number, name: string) =>
+    buildToolRowRead({
+      kind: book,
+      id,
+      initiative_id: 3,
+      parent_id: 5,
+      name,
+      fields: { pages: 800, read: 200, cover: "#1e3a8a" },
+      can: ownerCan(),
+    });
+
+  it("is drawn in its list's look, and full screen as its row, stepping to the rows beside it", async () => {
+    const { router } = show(book, novel(8, "Middlemarch"));
+    server.use(
+      communityHttp.get(`/plugin-tools/${book}/`, () =>
+        HttpResponse.json(page([novel(7, "Emma"), novel(8, "Middlemarch"), novel(9, "Persuasion")]))
+      ),
+      communityHttp.get(`/plugin-tools/${book}/9`, () => HttpResponse.json(novel(9, "Persuasion")))
+    );
+    const user = userEvent.setup();
+
+    // A bar, as the list's `displays` say, not a box for a number.
+    expect(await screen.findByText("/ 800")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Open Read full screen" }));
+    const full = await screen.findByRole("dialog");
+    expect(within(full).getByRole("heading", { name: "Middlemarch" })).toBeInTheDocument();
+    expect(full.firstElementChild).toHaveStyle({ background: "#1e3a8a" });
+    expect(await within(full).findByText("2 / 3")).toBeInTheDocument();
+    expect(router.state.location.search).toEqual({ focus: "read" });
+
+    await user.click(within(full).getByRole("button", { name: "Next counter" }));
+    await waitFor(() => expect(router.state.location.pathname).toMatch(/\/9$/));
+    expect(router.state.location.search).toEqual({ focus: "read" });
+    expect(
+      await within(await screen.findByRole("dialog")).findByRole("heading", { name: "Persuasion" })
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Exit full screen" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(router.state.location.search).toEqual({});
+  });
+});

@@ -39,10 +39,12 @@ import type { LayoutEnv } from "@/ui/layouts/fields";
 /** `table`'s rows in one place, the tool's own in an initiative or an item
  *  table's under one row, each with what its card previews of the items under
  *  it: the page `params` names, or with `page_size: 0` every one, walking the
- *  server's windows, so a preset sorts all of them. */
+ *  server's windows, so a preset sorts all of them. Read only while
+ *  `enabled`. */
 export const usePluginToolRows = (
   { kind, items }: Pick<ToolTable, "kind" | "items">,
-  params: ListPluginToolRowsParams
+  params: ListPluginToolRowsParams,
+  { enabled = true }: { enabled?: boolean } = {}
 ) => {
   const communityId = useActiveCommunityId();
   const asked = { ...(items.length > 0 ? { include_preview: true } : {}), page_size: 0, ...params };
@@ -50,6 +52,7 @@ export const usePluginToolRows = (
     queryKey: getListPluginToolRowsQueryKey(communityId, kind, asked),
     queryFn: () => fetchAllPages((p) => listPluginToolRows(communityId, kind, p), asked),
     placeholderData: keepPreviousData,
+    enabled,
   });
 };
 

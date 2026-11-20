@@ -27,6 +27,17 @@ export interface CounterFocusNavigation {
   onMove: (by: 1 | -1) => void;
 }
 
+/** What a counter's full screen is given by the page it opens from: the
+ *  name and colour it is drawn with, whether it is open where the page keeps
+ *  that, and the counters it moves between. */
+export interface CounterFocusHost {
+  name?: string;
+  color?: string | null;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  navigation?: CounterFocusNavigation;
+}
+
 export interface CounterFocusProps {
   counter: CounterShown;
   name: string;

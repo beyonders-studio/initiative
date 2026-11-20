@@ -1,4 +1,4 @@
-import { useParams } from "@tanstack/react-router";
+import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { SearchX } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { ToolBreadcrumb } from "@/components/tools/ToolBreadcrumb";
 import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
 import { itemSaves } from "@/hooks/useFieldSave";
-import { pluginToolRowSaves, usePluginToolRow } from "@/hooks/usePluginToolRows";
+import { pluginToolRowSaves, usePluginToolRow, usePluginToolRows } from "@/hooks/usePluginToolRows";
 import { useRouteId } from "@/hooks/useRouteId";
 import { useToolLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
@@ -19,6 +19,7 @@ import {
   toolRow,
   toolText,
 } from "@/lib/toolPlugins";
+import { toolViewParams } from "@/lib/tools";
 import { DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
 import type { StoredRegions } from "@/ui/layouts/detailLayout";
 import { detailLayoutOf } from "@/ui/layouts/layoutSet";
@@ -28,7 +29,7 @@ import { StatusMessage } from "@/ui/status-message";
 
 import { ItemRows } from "./ItemRows";
 import { RowActions } from "./RowActions";
-import { toolDetail } from "./toolDetail";
+import { type ToolRowContext, toolDetail } from "./toolDetail";
 
 /**
  * One row of a tool plug-in, the tool's own or an item's, on its own page: its
@@ -38,7 +39,9 @@ import { toolDetail } from "./toolDetail";
 export function ToolPluginRowPage() {
   const { t, i18n } = useTranslation("plugins");
   const gp = useCommunityPath();
+  const navigate = useNavigate();
   const { kind = "" } = useParams({ strict: false }) as { kind?: string };
+  const { focus: focused = null } = useSearch({ strict: false }) as { focus?: string };
   const rowId = useRouteId("rowId");
   const initiativeId = useRouteId("initiativeId");
   // The installs, the row and its page's layouts are read side by side: the
@@ -61,6 +64,42 @@ export function ToolPluginRowPage() {
       ? null
       : toolLayoutTarget(kind, initiativeId, parentId)
   );
+  // The rows a counter full screen moves between, read once it is open: those
+  // listed beside this one, in their own order.
+  const siblings = usePluginToolRows(
+    { kind, items: table?.items ?? [] },
+    {
+      ...(row?.parent_id ? { parent_id: row.parent_id } : { initiative_id: row?.initiative_id }),
+      ...toolViewParams(kind, "active"),
+    },
+    { enabled: focused !== null && row !== null }
+  );
+  const focus = useMemo<ToolRowContext["focus"]>(() => {
+    if (!row) return undefined;
+    const rows = siblings.data?.items ?? [];
+    const index = rows.findIndex((each) => each.id === row.id);
+    const open = (field: string | null, id = row.id) =>
+      void navigate({
+        to: gp(toolPluginRowRoute(row.initiative_id, kind, id)),
+        search: field === null ? {} : { focus: field },
+        replace: true,
+      });
+    return (field) => ({
+      open: focused === field,
+      onOpenChange: (next) => open(next ? field : null),
+      navigation:
+        index < 0
+          ? undefined
+          : {
+              index,
+              total: rows.length,
+              onMove: (by) => {
+                const next = rows[(index + by + rows.length) % rows.length];
+                if (next) open(field, next.id);
+              },
+            },
+    });
+  }, [row, siblings.data, focused, kind, gp, navigate]);
 
   if (installs.isLoading || query.isLoading) {
     return (
@@ -117,6 +156,7 @@ export function ToolPluginRowPage() {
           initiativeId: row.initiative_id,
           saves,
           actions: <RowActions table={table} row={row} language={i18n.language} />,
+          focus,
         }}
       />
       {table.items.map((itemKind) => {
