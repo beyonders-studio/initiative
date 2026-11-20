@@ -5,8 +5,9 @@
  * from the validator's allow-lists, the fields from the field registry — so a
  * name offered while somebody types is one the validator accepts. Neither
  * describes anybody's rows, and the datasets are the community's tool set's: the
- * answer never changes while the tab is open, so both are cached for the session
- * and every consumer in a community shares one request.
+ * answer changes only when an install does, so both are cached until then
+ * (`q.plugins()` reaches them) and every consumer in a community shares one
+ * request.
  */
 
 import { useQueries } from "@tanstack/react-query";
@@ -18,7 +19,7 @@ import {
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import type { DatasetFields } from "@/lib/widgets/completion";
 
-/** Neither answer changes while the tab is open, or after it. */
+/** Neither answer changes until the community's installs do. */
 const FOREVER = {
   staleTime: Number.POSITIVE_INFINITY,
   gcTime: Number.POSITIVE_INFINITY,

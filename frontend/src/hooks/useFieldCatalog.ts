@@ -8,9 +8,9 @@
  * second list being edited.
  *
  * The answer describes a dataset's shape rather than anybody's rows, and the
- * datasets are the community's tool set's: it never changes while the tab is
- * open, so it is cached indefinitely and every consumer of a dataset in a
- * community shares one request.
+ * datasets are the community's tool set's: it changes only when an install
+ * does, so it is cached until then (`q.plugins()` reaches it) and every
+ * consumer of a dataset in a community shares one request.
  */
 
 import { useMemo } from "react";

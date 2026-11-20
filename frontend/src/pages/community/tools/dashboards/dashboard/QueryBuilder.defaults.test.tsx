@@ -139,6 +139,33 @@ describe("seeding a new statement", () => {
   });
 });
 
+describe("a tool plug-in's dataset", () => {
+  it("is offered beside the built-in ones and read once chosen", async () => {
+    // The vocabulary lists the community's tool set, so a dataset the
+    // generated types never heard of is one a statement may name.
+    server.use(
+      communityHttp.get("/query/vocabulary", () =>
+        HttpResponse.json({ datasets: ["hoard_items", "tasks"], functions: [], tokens: [] })
+      )
+    );
+    const onChange = vi.fn();
+    renderWithProviders(
+      <QueryBuilder
+        spec={spec("tasks")}
+        onChange={onChange}
+        initiativeId={7}
+        spreadsheets={NONE}
+        plugins={NO_PLUGINS}
+      />
+    );
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("combobox", { name: "Show data from" }));
+    await user.click(await screen.findByRole("option", { name: "hoard_items" }));
+    expect(onChange).toHaveBeenCalledWith(spec("hoard_items"));
+  });
+});
+
 describe("grouping", () => {
   it("groups by every column shown as it is once one is a count", async () => {
     const onChange = vi.fn();

@@ -389,8 +389,13 @@ const pluginServices = (): Spec => ({ personalPrefix: ["/api/v1/plugin-services"
 // them — the sidebar's list, the settings dialog's detail, the members view —
 // and because the bus names the install community-wide, with no parent to carry it.
 // Every one is keyed by its path, so one prefix reaches them all, and the
-// widget catalog, which is read under the same path, with them.
-const plugins = (): Spec => ({ communityPrefix: ["/api/v1/plugins"] });
+// widget catalog, which is read under the same path, with them. The field
+// catalogue and the query vocabulary go too: the datasets they list are the
+// installed tools', so a change to an install changes them.
+const plugins = (): Spec => ({
+  communityPrefix: ["/api/v1/plugins", "/api/v1/fields/"],
+  communityExact: ["/api/v1/query/vocabulary"],
+});
 
 // ── AI Settings (platform config is personal; community/resolved are community) ──
 
