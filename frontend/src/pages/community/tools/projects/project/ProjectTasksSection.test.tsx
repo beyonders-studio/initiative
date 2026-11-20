@@ -14,6 +14,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   buildDefaultTaskStatuses,
+  buildInitiative,
   buildTag,
   buildTagSummary,
   buildTask,
@@ -740,5 +741,27 @@ describe("ProjectTasksSection table", () => {
     await pickLayout(user, "Board");
 
     await waitFor(() => expect(screen.queryByText(/1 task selected/i)).not.toBeInTheDocument());
+  });
+
+  it("offers no export of a selection in an initiative that keeps its content in", async () => {
+    let initiativeRead = false;
+    server.use(
+      communityHttp.get("/initiatives/:id", () => {
+        initiativeRead = true;
+        return HttpResponse.json(buildInitiative({ id: 1, keep_content_in: true }));
+      }),
+      communityHttp.get("/tasks/", () =>
+        HttpResponse.json(buildTaskListResponse([buildTask({ title: "Chore 1" })]))
+      )
+    );
+    section();
+    const user = userEvent.setup();
+    await screen.findByRole("link", { name: "Chore 1" });
+    await waitFor(() => expect(initiativeRead).toBe(true));
+    await user.click(await screen.findByRole("button", { name: /^select$/i }));
+    await user.click(await screen.findByRole("checkbox", { name: /select row/i }));
+
+    expect(await screen.findByRole("button", { name: /edit tags/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /export/i })).not.toBeInTheDocument();
   });
 });
