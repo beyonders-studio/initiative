@@ -13,32 +13,32 @@ It changes how things are drawn, never what anybody is allowed to see, and filte
 | Tool | Its layouts |
 |---|---|
 | [Projects](projects-and-tasks.md) | **Table**, **Board**, **Gantt** and **Calendar**, plus a page for each [task type](project-setup.md#task-types). One set per project. |
-| [Counters](counters.md) | **Counter detail**, one per counter group. |
+| [Counters](counters.md) | **Grid**, **Table** and the **Counter group page** for the groups, once for the whole initiative. **Grid**, **Table** and the **Counter page** for the counters, one set per counter group. |
 | [Collections](files.md#put-files-in-a-collection) | **Grid**, **Table**, **Masonry** and **Timeline**, plus the **File page**. One set per collection. |
 | [Calendar](calendar.md) | **Event detail** and the calendar's presets, once for the whole initiative. |
 | [Posts](posts.md) | **Notice detail**, once for the whole initiative. |
 
-A page layout (a task's, an event's, a counter's) also lays out the dialog for adding one, so the form you fill in looks like the thing you get.
+A page layout (a task's, an event's) also lays out the dialog for adding one, so the form you fill in looks like the thing you get.
 
 A project's layouts go wherever the project goes: into a [duplicate](tools.md#duplicating), into an [export](project-setup.md#exporting-a-project), and out of the marketplace, where a ready-made project arrives laid out the way its maker set it up.
 
 ## Who can change them
 
-- **A project or a counter group:** its owner, the initiative's managers and community admins, as long as they can edit it.
+- **A project, or the counters in a counter group:** its owner, the initiative's managers and community admins, as long as they can edit it.
 - **A collection:** anyone who can change the collection.
-- **The calendar and posts:** the initiative's managers and community admins.
+- **The calendar, posts and the list of counter groups:** the initiative's managers and community admins.
 
 Everybody else sees the result. Changing a layout needs a tablet or a computer, because a phone screen is no place to rearrange anything.
 
 ## Open the layout editor
 
-For a project or a counter group:
+For a project:
 
 1. Open it and select **Settings**.
 2. Select the **Layouts** tab.
 3. Select **Edit layouts**, or select one layout's name to open the editor on that one.
 
-For a collection, open **Layouts** from the collection's menu. For the calendar and posts, open the initiative's settings and select **Layouts**: that tab lists every layout in the initiative, when each last changed, and the way into each one's editor.
+For a collection, open **Layouts** from the collection's menu. For counters, open **More actions** (the **…**) on the **Counters** tab for the groups, or beside a group's counters for the counters in it, select **Layouts**, then **Edit layouts**. For the calendar and posts, open the initiative's settings and select **Layouts**: that tab lists every layout in the initiative, when each last changed, and the way into each one's editor.
 
 The editor fills the screen:
 
