@@ -67,51 +67,52 @@ async def _second_initiative(session, a, **flags):
     return initiative
 
 
-async def test_envelope_import_roundtrips_wiki(client, acting_user, session):
-    """Export a wiki as its envelope, import it into another initiative: its
-    pages and tags survive; the importer gets an owner grant; tags
+async def test_envelope_import_roundtrips_project(client, acting_user, session):
+    """Export a project as its envelope, import it into another initiative:
+    its tasks and tags survive; the importer gets an owner grant; tags
     match-or-create against the guild."""
     from sqlmodel import select
 
+    from app.models.tenant.project import Project
     from app.models.tenant.resource_grant import ResourceGrant
-    from app.models.tenant.wiki import Wiki, WikiPage
-    from app.testing.factories import create_wiki, create_wiki_page
+    from app.models.tenant.task import Task
 
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    await switch_tools(session, a.initiative, {Tool.wiki: True})
-    wiki = await create_wiki(session, a.initiative, a.user, name="Party Lore")
-    await create_wiki_page(session, wiki, a.user, title="GP")
-    await assign_tag(session, wiki, await create_tag(session, a.guild, name="Loot"))
+    project = a.project
+    project.name = "Party Lore"
+    session.add(project)
+    await create_task(session, project, title="GP")
+    await assign_tag(session, project, await create_tag(session, a.guild, name="Loot"))
     await session.commit()
 
-    envelope = await _export_json(client, a, "/exports/wiki", {"ids": [wiki.id]})
-    assert envelope["tags"] == ["Loot"]
+    envelope = await _export_json(client, a, "/exports/project", {"ids": [project.id]})
+    assert [tag["name"] for tag in envelope["tags"]] == ["Loot"]
     # A name listed again in another case is the same tag, attached once.
-    envelope["tags"].append("loot")
-    target = await _second_initiative(session, a, tools={Tool.wiki: True})
+    envelope["tags"].append({**envelope["tags"][0], "name": "loot"})
+    target = await _second_initiative(session, a, tools={Tool.project: True})
     resp = await _import_envelope(client, a, envelope, target.id)
     assert resp.status_code == 201, resp.text
     assert resp.json()["result"]["matched"]["tags"] == 1
 
     imported = (
         await session.exec(
-            select(Wiki).where(
-                Wiki.initiative_id == target.id, Wiki.name == "Party Lore"
+            select(Project).where(
+                Project.initiative_id == target.id, Project.name == "Party Lore"
             )
         )
     ).one()
-    page = (
-        await session.exec(select(WikiPage).where(WikiPage.wiki_id == imported.id))
+    task = (
+        await session.exec(select(Task).where(Task.project_id == imported.id))
     ).one()
-    assert page.title == "GP"
+    assert task.title == "GP"
     await tags_service.annotate_tags(session, [imported])
     assert [tag.name for tag in annotated_tags(imported)] == ["Loot"]
     grant = (
         await session.exec(
             select(ResourceGrant).where(
-                ResourceGrant.resource_type == "wiki",
+                ResourceGrant.resource_type == "project",
                 ResourceGrant.resource_id == imported.id,
                 ResourceGrant.user_id == a.user.id,
             )
@@ -394,11 +395,11 @@ async def test_a_renamed_property_is_one_definition_for_every_row(
     from app.testing.factories import (
         create_property_definition,
         create_property_value,
-        create_wiki,
-        create_wiki_page,
     )
 
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    a = await acting_user(
+        guild_role=CommunityRole.member, initiative=True, project=True
+    )
     await _all_tools_enabled(session, a.initiative)
     target = await _second_initiative(session, a)
     await _all_tools_enabled(session, target)
@@ -406,12 +407,13 @@ async def test_a_renamed_property_is_one_definition_for_every_row(
     await create_property_definition(
         session, target, name="Status", type=MetadataType.number
     )
-    wiki = await create_wiki(session, a.initiative, a.user)
     for name in ("First", "Second"):
-        page = await create_wiki_page(session, wiki, a.user, title=name)
-        await create_property_value(session, page, status, value_text=name)
+        task = await create_task(session, a.project, title=name)
+        await create_property_value(session, task, status, value_text=name)
 
-    envelope = await _export_json(client, a, "/exports/wiki", {"ids": [wiki.id]})
+    envelope = await _export_json(
+        client, a, "/exports/project", {"ids": [a.project.id]}
+    )
     resp = await _import_envelope(client, a, envelope, target.id)
     assert resp.status_code == 201, resp.text
 
@@ -420,7 +422,7 @@ async def test_a_renamed_property_is_one_definition_for_every_row(
             select(MetadataDefinition.name)
             .join(MetadataValue)
             .where(
-                MetadataValue.entity_type == "wiki_page",
+                MetadataValue.entity_type == "task",
                 MetadataDefinition.initiative_id == target.id,
             )
         )

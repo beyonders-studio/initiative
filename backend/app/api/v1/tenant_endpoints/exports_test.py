@@ -62,6 +62,7 @@ from app.testing.factories import (
     create_calendar,
     create_calendar_event,
     create_comment,
+    create_contact,
     create_dashboard,
     create_export_job,
     create_file,
@@ -1999,8 +2000,10 @@ async def test_bulk_wiki_selection_exports_envelope_zip(
     assert all(n.endswith(".initiative-wiki.json") for n in names)
     assert {e["name"] for e in _zip_json(resp)} == {"Alpha Lore", "Beta Lore"}
 
-    # Single-id selection stays a plain (unzipped) file.
-    single = await _export(client, a, "wiki", ids=[w1.id], format="json")
+    # A single contact's selection stays a plain (unzipped) file; a wiki's
+    # carries its pages beside it.
+    contact = await create_contact(session, a.initiative, a.user, name="Ada")
+    single = await _export(client, a, "contact", ids=[contact.id], format="json")
     assert single.status_code == 200
     assert single.headers["content-type"] == "application/json"
 
