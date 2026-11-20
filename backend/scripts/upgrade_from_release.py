@@ -486,7 +486,9 @@ def _divergence(
     A community's schema carries the tables of the tool plug-ins it installed,
     and its kind checks name their kinds, so it is compared with a fresh one
     that installed the same: the Primary Community the first boot makes holds
-    none, and the seeded one holds Counters."""
+    none, and the seeded one holds Counters. Where no fresh community installed
+    the same plug-ins, it is compared with the one that comes closest, and the
+    tables one has and the other lacks are reported as any difference is."""
     communities = sorted(name for name in fresh if _COMMUNITY.fullmatch(name))
     assert communities, "the fresh install has no community schema to compare with"
     lines: list[str] = []
@@ -494,19 +496,25 @@ def _divergence(
         lines += _differences(name, upgraded[name], fresh[name])
     for name, shape in upgraded.items():
         if _COMMUNITY.fullmatch(name):
-            tools = _tool_tables(shape)
+            plug_ins = _tool_plug_ins(shape)
             reference = min(
                 communities,
-                key=lambda fresh_name: len(tools ^ _tool_tables(fresh[fresh_name])),
+                key=lambda fresh_name: len(
+                    plug_ins ^ _tool_plug_ins(fresh[fresh_name])
+                ),
             )
             lines += _differences(name, shape, fresh[reference])
     return lines
 
 
-def _tool_tables(shape: dict[str, str]) -> set[str]:
-    """The tables and sequences of the tool plug-ins a community installed,
-    named ``p_<listing>_<key>`` (``app.db.plugin_tools.TABLE_PREFIX``)."""
-    return {key for key in shape if key.startswith("relation p_")}
+def _tool_plug_ins(shape: dict[str, str]) -> set[str]:
+    """The listings of the tool plug-ins a community installed, read off their
+    tables, named ``p_<listing>_<key>`` (``app.db.plugin_tools.tool_table_name``)."""
+    return {
+        key.removeprefix("relation p_").split("_", 1)[0]
+        for key in shape
+        if key.startswith("relation p_")
+    }
 
 
 def _other_setup(

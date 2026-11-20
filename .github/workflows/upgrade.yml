@@ -97,6 +97,11 @@ jobs:
 
       - uses: ./.github/actions/setup-backend
 
+      - name: Test the comparison
+        run: |
+          cd backend
+          uv run python scripts/upgrade_from_release_test.py
+
       - name: Set up Docker Buildx
         if: inputs.image == ''
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
