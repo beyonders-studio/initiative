@@ -329,6 +329,54 @@ tool plug-ins bring kinds of their own. A kind the community does not have is
 - POST /api/v1/c/{community_id}/unarchive/{entity_type}/{entity_id} removed the enum value `task` from the `path` request parameter `entity_type`
 - POST /api/v1/c/{community_id}/unarchive/{entity_type}/{entity_id} removed the enum value `wiki` from the `path` request parameter `entity_type`
 
+### A tool's layouts take a tool plug-in's table
+
+The layouts routes take their `tool` as a string, in place of an enum of the
+built-in tools, so a tool plug-in's table is named by its kind. A target the
+community does not have is 400 `TOOL_LAYOUTS_TARGET_INVALID`, where a value
+outside the enum was 422. A set can hold a tool plug-in's rows' page (`ToolPluginDetailLayoutRead`),
+and the body of `PUT /layouts/` is a built-in tool's layout or a tool plug-in
+table's.
+
+- DELETE /api/v1/c/{community_id}/layouts/{kind} added `#/components/schemas/ToolPluginDetailLayoutRead` to the `layouts/items/` response property `oneOf` list for the response status `200`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} removed the enum value `calendar` from the `query` request parameter `tool`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} removed the enum value `collection` from the `query` request parameter `tool`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} removed the enum value `contact` from the `query` request parameter `tool`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} removed the enum value `dashboard` from the `query` request parameter `tool`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} removed the enum value `file` from the `query` request parameter `tool`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} removed the enum value `post` from the `query` request parameter `tool`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} removed the enum value `project` from the `query` request parameter `tool`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} removed the enum value `wiki` from the `query` request parameter `tool`
+- GET /api/v1/c/{community_id}/layouts/ added `#/components/schemas/ToolPluginDetailLayoutRead` to the `layouts/items/` response property `oneOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/ removed the enum value `calendar` from the `query` request parameter `tool`
+- GET /api/v1/c/{community_id}/layouts/ removed the enum value `collection` from the `query` request parameter `tool`
+- GET /api/v1/c/{community_id}/layouts/ removed the enum value `contact` from the `query` request parameter `tool`
+- GET /api/v1/c/{community_id}/layouts/ removed the enum value `dashboard` from the `query` request parameter `tool`
+- GET /api/v1/c/{community_id}/layouts/ removed the enum value `file` from the `query` request parameter `tool`
+- GET /api/v1/c/{community_id}/layouts/ removed the enum value `post` from the `query` request parameter `tool`
+- GET /api/v1/c/{community_id}/layouts/ removed the enum value `project` from the `query` request parameter `tool`
+- GET /api/v1/c/{community_id}/layouts/ removed the enum value `wiki` from the `query` request parameter `tool`
+- GET /api/v1/c/{community_id}/layouts/initiative added `#/components/schemas/ToolPluginDetailLayoutRead` to the `items/layouts/items/` response property `oneOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/ added `#/components/schemas/ToolPluginDetailLayoutRead` to the `layouts/items/` response property `oneOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/ListLayoutWrite, #/components/schemas/DetailLayoutWrite` from the request body `oneOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `calendar` from the `query` request parameter `tool`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `collection` from the `query` request parameter `tool`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `contact` from the `query` request parameter `tool`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `dashboard` from the `query` request parameter `tool`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `file` from the `query` request parameter `tool`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `post` from the `query` request parameter `tool`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `project` from the `query` request parameter `tool`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `wiki` from the `query` request parameter `tool`
+- PUT /api/v1/c/{community_id}/layouts/default added `#/components/schemas/ToolPluginDetailLayoutRead` to the `layouts/items/` response property `oneOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/default removed the enum value `calendar` from the `query` request parameter `tool`
+- PUT /api/v1/c/{community_id}/layouts/default removed the enum value `collection` from the `query` request parameter `tool`
+- PUT /api/v1/c/{community_id}/layouts/default removed the enum value `contact` from the `query` request parameter `tool`
+- PUT /api/v1/c/{community_id}/layouts/default removed the enum value `dashboard` from the `query` request parameter `tool`
+- PUT /api/v1/c/{community_id}/layouts/default removed the enum value `file` from the `query` request parameter `tool`
+- PUT /api/v1/c/{community_id}/layouts/default removed the enum value `post` from the `query` request parameter `tool`
+- PUT /api/v1/c/{community_id}/layouts/default removed the enum value `project` from the `query` request parameter `tool`
+- PUT /api/v1/c/{community_id}/layouts/default removed the enum value `wiki` from the `query` request parameter `tool`
+
 ### A guest invite names any tool's row
 
 The item a guest invite gives is a row of any of the community's tools, a
