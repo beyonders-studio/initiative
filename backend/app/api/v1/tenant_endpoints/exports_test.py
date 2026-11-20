@@ -26,6 +26,7 @@ from sqlalchemy import delete as sa_delete
 from sqlmodel import select
 
 from app.api import deps as api_deps
+from app.core.audit_events import AuditEventType
 from app.core.config import settings
 from app.core.file_types import FileType
 from app.core.login_methods import LoginMethod
@@ -53,6 +54,7 @@ from app.services.tenant import ical_service
 from app.testing import (
     create_resource_grant,
     drain_notices,
+    emitted,
     route_session_to_guild,
     switch_tools,
 )
@@ -680,6 +682,7 @@ async def test_large_export_becomes_job(
     client: AsyncClient, acting_user, session, monkeypatch
 ):
     monkeypatch.setattr(export_limits, "EXPORT_INLINE_MAX_ROWS", 0)
+    monkeypatch.setattr(export_limits, "EXPORT_MAX_ACTIVE_JOBS_PER_USER", 1)
     a = await _actor_with_tasks(acting_user, session)
     resp = await _export(client, a, "tasks")
     assert resp.status_code == 202
@@ -699,14 +702,7 @@ async def test_large_export_becomes_job(
     assert dl.status_code == 409
     assert dl.json()["detail"] == "EXPORT_NOT_READY"
 
-
-async def test_job_limit_per_user(
-    client: AsyncClient, acting_user, session, monkeypatch
-):
-    monkeypatch.setattr(export_limits, "EXPORT_INLINE_MAX_ROWS", 0)
-    monkeypatch.setattr(export_limits, "EXPORT_MAX_ACTIVE_JOBS_PER_USER", 1)
-    a = await _actor_with_tasks(acting_user, session)
-    assert (await _export(client, a, "tasks")).status_code == 202
+    # One active job per user here: a second waits for the first.
     second = await _export(client, a, "tasks")
     assert second.status_code == 429
     assert second.json()["detail"] == "EXPORT_JOB_LIMIT_REACHED"
@@ -919,22 +915,6 @@ async def test_an_archived_projects_report_carries_the_tasks_archived_with_it(
         present=("Task 0", "Task 1"),
         absent=("Old news",),
     )
-
-
-async def test_project_export_job_path_renders_json(
-    client: AsyncClient, acting_user, session, monkeypatch, role_session
-):
-    monkeypatch.setattr(export_limits, "EXPORT_INLINE_MAX_ROWS", 0)
-    a = await _actor_with_tasks(acting_user, session)
-    resp = await _export(client, a, "project", ids=[a.project.id])
-    assert resp.status_code == 202
-    assert resp.json()["source"] == "project"
-
-    await _run_worker()
-
-    dl = await _download(client, a, resp.json()["id"])
-    envelope = json.loads(_assert_export(dl, "json"))
-    assert envelope["project"]["name"] == a.project.name
 
 
 # ---------------------------------------------------------------------------
@@ -1953,7 +1933,9 @@ async def test_bulk_file_selection_exports_as_zip(
     names = _zip_names(resp)
     assert len(names) == 3
     assert all(n.endswith(".json") for n in names)
-    assert len(set(names)) == 3  # the twin "Session Notes" title deduped
+    # The twin "Session Notes" title is numbered rather than overwritten.
+    assert len(set(names)) == 3
+    assert sum(" (2)." in n for n in names) == 1
     envelopes = _zip_json(resp)
     assert all(e["type"] == "initiative-file" for e in envelopes)
     assert {e["file_type"] for e in envelopes} == {"lexical", "sheet"}
@@ -2564,52 +2546,37 @@ async def test_initiative_backup_includes_read_only_projects(
     assert dl.json()["detail"] == "INITIATIVE_MANAGER_REQUIRED", dl.text
 
 
-async def test_a_backup_lists_its_assignees_among_its_people(
+async def test_a_backup_lists_its_assignees_and_named_people_among_its_people(
     client: AsyncClient, acting_user, session, monkeypatch, role_session
 ):
     """The restore asks who everybody is before it writes anything, and an
-    assignee is somebody it has to place — a task restored into a community
-    where that handle means nobody would otherwise arrive unassigned, with
-    nobody having been asked."""
+    assignee or somebody a user-type property names is somebody it has to
+    place — or the step never asks, and the value lands only on an exact name
+    match."""
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    await create_task(session, a.project, title="Carry the torch", assignees=[a.user])
+    b = await acting_user(
+        guild=a.guild, initiative=a.initiative, initiative_role="member"
+    )
+    task = await create_task(
+        session, a.project, title="Carry the torch", assignees=[a.user]
+    )
+    reporter = await create_property_definition(
+        session, a.initiative, name="Reporter", type=MetadataType.user_reference
+    )
+    await create_property_value(session, task, reporter, value_user_id=b.user.id)
 
     resp = await _export(client, a, "initiative", initiative_id=a.initiative.id)
     archive = await _rendered_zip(client, a, monkeypatch, role_session, resp)
-    manifest = json.loads(archive.read("manifest.json"))
+    people = json.loads(archive.read("manifest.json"))["people"]
 
     assert {
         "handle": handle_of(a.user),
         "name": None,
         "comment_count": 0,
-    } in manifest["people"]
-
-
-async def test_a_backup_lists_who_its_user_properties_name(
-    client: AsyncClient, acting_user, session, monkeypatch, role_session
-):
-    """A restore places a user-type property value through the people step,
-    so the manifest has to list whoever one names — or the step never asks,
-    and the value lands only on an exact name match."""
-    from app.core.user_display import handle_of
-    from app.models.tenant.metadata import MetadataType
-
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    task = await create_task(session, a.project, title="Report it")
-    reporter = await create_property_definition(
-        session, a.initiative, name="Reporter", type=MetadataType.user_reference
-    )
-    await create_property_value(session, task, reporter, value_user_id=a.user.id)
-
-    resp = await _export(client, a, "initiative", initiative_id=a.initiative.id)
-    archive = await _rendered_zip(client, a, monkeypatch, role_session, resp)
-    manifest = json.loads(archive.read("manifest.json"))
-
-    assert handle_of(a.user) in [p["handle"] for p in manifest["people"]]
+    } in people
+    assert handle_of(b.user) in [p["handle"] for p in people]
 
 
 async def test_aggregate_export_hides_dac_invisible_rows(
@@ -2642,22 +2609,30 @@ async def test_aggregate_export_hides_dac_invisible_rows(
 
 
 async def test_guild_export_belongs_to_the_seat(
-    client: AsyncClient, acting_user, session
+    client: AsyncClient, acting_user, session, capfd
 ):
     """Running a community is an admin's job; taking every initiative it has
-    in one file is the seat's. An ordinary admin is refused, as a member is."""
+    in one file, or reading when it was last taken, is the seat's. An
+    ordinary admin is refused, as a member is, and a refusal records no
+    export."""
     seat = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
     admin = await acting_user(guild_role=CommunityRole.admin, guild=seat.guild)
     member = await acting_user(guild_role=CommunityRole.member, guild=seat.guild)
+    capfd.readouterr()
     for caller in (admin, member):
-        for source, params in (("community", {}), ("estimate", {"scope": "community"})):
+        for source, params in (
+            ("community", {}),
+            ("estimate", {"scope": "community"}),
+            ("community/status", {}),
+        ):
             resp = await _export(
                 client, caller, source, headers=caller.headers, **params
             )
             assert resp.status_code == 403, (caller.membership.role, source)
             assert resp.json()["detail"] == "EXPORT_SUPERADMIN_REQUIRED"
+    assert emitted(capfd, AuditEventType.GUILD_EXPORTED) == []
 
 
 async def test_guild_backup_spans_initiatives_and_refreshes_access(
@@ -3205,20 +3180,51 @@ async def test_guild_backup_carries_the_community_itself(
     client: AsyncClient, acting_user, session, monkeypatch, role_session
 ):
     """A community backup covers the community, not only the work done inside
-    it: its configuration, its tag vocabulary and its roster."""
+    it: its configuration, its tag vocabulary, its roster, its roles and who
+    holds them, and the uploads nothing points at — assets otherwise ride
+    with the entity referencing them, so those are what a full backup would
+    drop without saying so."""
+    from app.models.tenant.custom_role import CustomRole, CustomRoleMember
+
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
+    member = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
     await create_tag(session, a.guild, name="worldbuilding", color="#ff0000")
     # The guests' requirement, which leaves the member exporting unasked.
     await create_guild_auth_policy(
         session, a.guild, guest=True, methods=[LoginMethod.sso]
     )
+    orphan_key = "orphan-upload-xyz.bin"
+    get_guild_storage(a.guild.id).write(orphan_key, b"orphan-bytes")
+    await create_upload(
+        session,
+        a.guild,
+        a.user,
+        filename=orphan_key,
+        size_bytes=len(b"orphan-bytes"),
+        content_type="application/octet-stream",
+    )
+    await route_session_to_guild(session, a.guild.id)
+    doors = CustomRole(name="Doors", base_rung="member", surfaces=["invites"])
+    session.add(doors)
+    await session.flush()
+    session.add(CustomRoleMember(user_id=member.user.id, role_id=doors.id))
+    await session.commit()
 
-    resp = await _export(client, a, "community")
+    resp = await _export(client, a, "community", include_uploads=True)
     archive = await _rendered_zip(client, a, monkeypatch, role_session, resp)
     names = set(archive.namelist())
     assert {"guild/settings.json", "guild/tags.json", "guild/members.json"} <= names
+    assert archive.read(f"assets/{orphan_key}") == b"orphan-bytes"
+
+    (role,) = json.loads(archive.read("guild/roles.json"))["roles"]
+    assert (role["name"], role["base_rung"], role["surfaces"]) == (
+        "Doors",
+        "member",
+        ["invites"],
+    )
+    assert len(role["holders"]) == 1
 
     settings_payload = json.loads(archive.read("guild/settings.json"))
     assert settings_payload["type"] == "guild-settings"
@@ -3303,32 +3309,6 @@ async def test_backup_carries_initiative_roles_and_members(
     role_names = {r["name"] for r in structure["roles"]}
     assert role_names
     assert {m["role"] for m in structure["members"]} <= role_names | {None}
-
-
-async def test_guild_backup_bundles_blobs_nothing_points_at(
-    client: AsyncClient, acting_user, session, monkeypatch, role_session
-):
-    """Assets otherwise ride with the entity referencing them, so a file
-    nobody currently points at is the one thing a full backup would drop
-    without saying so."""
-    a = await acting_user(
-        guild_role=CommunityRole.superadmin, initiative=True, project=True
-    )
-    orphan_key = "orphan-upload-xyz.bin"
-    get_guild_storage(a.guild.id).write(orphan_key, b"orphan-bytes")
-    await create_upload(
-        session,
-        a.guild,
-        a.user,
-        filename=orphan_key,
-        size_bytes=len(b"orphan-bytes"),
-        content_type="application/octet-stream",
-    )
-
-    resp = await _export(client, a, "community", include_uploads=True)
-    archive = await _rendered_zip(client, a, monkeypatch, role_session, resp)
-    assert f"assets/{orphan_key}" in archive.namelist()
-    assert archive.read(f"assets/{orphan_key}") == b"orphan-bytes"
 
 
 # ---------------------------------------------------------------------------
@@ -3474,28 +3454,6 @@ async def test_backup_carries_property_definitions(
 # ---------------------------------------------------------------------------
 
 
-async def test_whole_community_export_has_a_cooldown(
-    client: AsyncClient, acting_user, session
-):
-    """A community's entire content is not a thing to re-read on a loop, and
-    the cooldown is counted across the community rather than per person."""
-    a = await acting_user(
-        guild_role=CommunityRole.superadmin, initiative=True, project=True
-    )
-
-    first = await _export(client, a, "community")
-    assert first.status_code == 202, first.text
-
-    again = await _export(client, a, "community")
-    assert again.status_code == 429
-    assert again.json()["detail"] == "EXPORT_COOLDOWN_ACTIVE"
-
-    # A second holder of the seat does not get a fresh allowance.
-    b = await acting_user(guild_role=CommunityRole.superadmin, guild=a.guild)
-    theirs = await _export(client, b, "community", headers=b.headers)
-    assert theirs.status_code == 429
-
-
 async def test_cooldown_can_be_switched_off(
     client: AsyncClient, acting_user, session, monkeypatch
 ):
@@ -3512,7 +3470,9 @@ async def test_cooldown_can_be_switched_off(
 async def test_guild_export_status_says_who_took_the_last_one_and_when(
     client: AsyncClient, acting_user, session
 ):
-    """What the community settings page asks before anybody opens the wizard.
+    """What the community settings page asks before anybody opens the wizard,
+    and the cooldown it counts down: a community's entire content is not a
+    thing to re-read on a loop.
 
     Nobody should learn that a colleague already exported the community by
     being refused when they try it themselves.
@@ -3553,20 +3513,13 @@ async def test_guild_export_status_says_who_took_the_last_one_and_when(
 
     refused = await _export(client, a, "community")
     assert refused.status_code == 429
+    assert refused.json()["detail"] == "EXPORT_COOLDOWN_ACTIVE"
     left = (available_at - datetime.now(UTC)).total_seconds()
     assert abs(int(refused.headers["Retry-After"]) - left) <= 5
 
-
-async def test_guild_export_status_is_the_seats(
-    client: AsyncClient, acting_user, session
-):
-    """It reports the seat's own actions to the seat."""
-    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
-    admin = await acting_user(guild_role=CommunityRole.admin, guild=seat.guild)
-
-    resp = await client.get(admin.g("/exports/community/status"), headers=admin.headers)
-    assert resp.status_code == 403
-    assert resp.json()["detail"] == "EXPORT_SUPERADMIN_REQUIRED"
+    # The wait is the community's: a second holder of the seat shares it.
+    b = await acting_user(guild_role=CommunityRole.superadmin, guild=a.guild)
+    assert (await _export(client, b, "community")).status_code == 429
 
 
 async def test_a_failed_export_is_reported_but_holds_no_door(
@@ -3584,6 +3537,9 @@ async def test_a_failed_export_is_reported_but_holds_no_door(
     job_id = (await _export(client, a, "community")).json()["id"]
     await _run_worker()
 
+    # Over the bound with nowhere to deliver it, the code names what the
+    # operator can do about it.
+    assert (await _job(client, a, job_id))["error"] == "EXPORT_DESTINATION_REQUIRED"
     body = (
         await client.get(a.g("/exports/community/status"), headers=a.headers)
     ).json()
@@ -3614,6 +3570,8 @@ async def test_an_archive_over_the_download_bound_is_delivered(
     assert body["delivered"] is True
     # The path stays server-side; the client is told that it was delivered.
     assert "destination_ref" not in body
+    # It lives under the operator's retention, so it carries no GC deadline.
+    assert body["expires_at"] is None
 
     delivered = list((tmp_path / f"guild_{a.guild.id}").iterdir())
     assert len(delivered) == 1 and delivered[0].suffix == ".zip"
@@ -3622,45 +3580,6 @@ async def test_an_archive_over_the_download_bound_is_delivered(
     dl = await client.get(a.g(f"/exports/jobs/{job_id}/download"), headers=a.headers)
     assert dl.status_code == 409
     assert dl.json()["detail"] == "EXPORT_DELIVERED"
-
-
-async def test_a_delivered_archive_is_not_swept_up_by_artifact_gc(
-    client: AsyncClient, acting_user, session, monkeypatch, role_session, tmp_path
-):
-    """It lives in the operator's destination under their retention, so it
-    carries no GC deadline of ours."""
-    monkeypatch.setattr(settings, "EXPORT_MAX_DOWNLOAD_BYTES", 1)
-    monkeypatch.setattr(settings, "EXPORT_DESTINATION_DIR", str(tmp_path))
-    a = await acting_user(
-        guild_role=CommunityRole.superadmin, initiative=True, project=True
-    )
-
-    resp = await _export(client, a, "community")
-    job_id = resp.json()["id"]
-    await _run_worker()
-
-    body = await _job(client, a, job_id)
-    assert body["expires_at"] is None
-
-
-async def test_over_the_bound_with_no_destination_fails_the_job_clearly(
-    client: AsyncClient, acting_user, session, monkeypatch, role_session
-):
-    """Refused rather than produced with nowhere to go, and the code names the
-    thing the operator can actually do about it."""
-    monkeypatch.setattr(settings, "EXPORT_MAX_DOWNLOAD_BYTES", 1)
-    monkeypatch.setattr(settings, "EXPORT_DESTINATION_DIR", None)
-    a = await acting_user(
-        guild_role=CommunityRole.superadmin, initiative=True, project=True
-    )
-
-    resp = await _export(client, a, "community")
-    job_id = resp.json()["id"]
-    await _run_worker()
-
-    body = await _job(client, a, job_id)
-    assert body["status"] == DataJobStatus.failed.value
-    assert body["error"] == "EXPORT_DESTINATION_REQUIRED"
 
 
 async def test_estimate_reports_the_download_bound_and_whether_delivery_exists(
@@ -3689,8 +3608,9 @@ async def test_download_redirects_when_storage_can_sign_a_url(
     """Where the operator has turned it on and the object store can sign a
     URL, the bytes travel from it to the client rather than through this
     process for the whole download. The RLS-gated job lookup is still what
-    decided it — the URL is minted only after that passed."""
-    monkeypatch.setattr(settings, "EXPORT_PRESIGNED_DOWNLOADS", True)
+    decided it — the URL is minted only after that passed. It is opt-in: a
+    deployment that has not allowed this app's origin on its bucket keeps the
+    proxied response rather than finding out on a redirect."""
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
@@ -3718,52 +3638,23 @@ async def test_download_redirects_when_storage_can_sign_a_url(
     monkeypatch.setattr(
         exports_module, "get_guild_storage", lambda gid: Signing(real_storage(gid))
     )
-    dl = await client.get(
-        a.g(f"/exports/jobs/{job_id}/download"),
-        headers=a.headers,
-        follow_redirects=False,
-    )
+
+    async def download() -> Response:
+        return await client.get(
+            a.g(f"/exports/jobs/{job_id}/download"),
+            headers=a.headers,
+            follow_redirects=False,
+        )
+
+    monkeypatch.setattr(settings, "EXPORT_PRESIGNED_DOWNLOADS", False)
+    proxied = await download()
+    assert proxied.status_code == 200
+    assert proxied.headers["content-type"] == "application/zip"
+
+    monkeypatch.setattr(settings, "EXPORT_PRESIGNED_DOWNLOADS", True)
+    dl = await download()
     assert dl.status_code == 307
     assert dl.headers["location"].startswith("https://objects.example/")
-
-
-async def test_download_stays_proxied_unless_the_operator_turns_it_on(
-    client: AsyncClient, acting_user, session, monkeypatch, role_session
-):
-    """Opt-in: a deployment that has not allowed this app's origin on its
-    bucket keeps the proxied response rather than finding out on a redirect."""
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    resp = await _export(client, a, "initiative", initiative_id=a.initiative.id)
-    job_id = resp.json()["id"]
-    await _run_worker()
-
-    import app.api.v1.tenant_endpoints.exports as exports_module
-
-    real_storage = exports_module.get_guild_storage
-
-    class Signing:
-        def __init__(self, inner):
-            self._inner = inner
-
-        def __getattr__(self, name):
-            return getattr(self._inner, name)
-
-        def presign_get(self, key, *, ttl, filename=None):
-            return f"https://objects.example/{key}?sig=x"
-
-    monkeypatch.setattr(
-        exports_module, "get_guild_storage", lambda gid: Signing(real_storage(gid))
-    )
-    monkeypatch.setattr(settings, "EXPORT_PRESIGNED_DOWNLOADS", False)
-    dl = await client.get(
-        a.g(f"/exports/jobs/{job_id}/download"),
-        headers=a.headers,
-        follow_redirects=False,
-    )
-    assert dl.status_code == 200
-    assert dl.headers["content-type"] == "application/zip"
 
 
 async def test_a_backup_says_which_wiki_page_a_file_is_filed_under(

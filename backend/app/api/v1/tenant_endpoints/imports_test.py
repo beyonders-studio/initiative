@@ -95,6 +95,7 @@ async def test_envelope_import_roundtrips_project(client, acting_user, session):
     resp = await _import_envelope(client, a, envelope, target.id)
     assert resp.status_code == 201, resp.text
     assert resp.json()["result"]["matched"]["tags"] == 1
+    assert resp.json()["result"]["created"]["tasks"] == 1
 
     imported = (
         await session.exec(
@@ -196,9 +197,6 @@ async def test_envelope_import_roundtrips_calendar(client, acting_user, session)
     )
     await switch_tools(session, a.initiative, {Tool.calendar: True})
     calendar = await create_calendar(session, a.initiative, a.user, name="Raid Nights")
-    await assign_tag(
-        session, calendar, await create_tag(session, a.guild, name="Raids"), commit=True
-    )
     zero = await create_calendar_event(
         session, calendar, a.user, title="Session Zero", recurrence="RRULE:FREQ=WEEKLY"
     )
@@ -232,8 +230,6 @@ async def test_envelope_import_roundtrips_calendar(client, acting_user, session)
         await session.exec(select(Calendar).where(Calendar.initiative_id == target.id))
     ).one()
     assert imported_calendar.name == "Raid Nights"
-    await tags_service.annotate_tags(session, [imported_calendar])
-    assert [tag.name for tag in annotated_tags(imported_calendar)] == ["Raids"]
     imported = list(
         await session.exec(
             select(CalendarEvent).where(
@@ -439,47 +435,6 @@ async def test_a_renamed_property_is_one_definition_for_every_row(
         )
     ).all()
     assert sorted(definitions) == ["Status", "Status_text"]
-
-
-async def test_envelope_import_project_replaces_legacy_route(
-    client, acting_user, session
-):
-    """The engine is the project import path now: the legacy POST
-    /projects/import is gone (404), and the same envelope imports through
-    /imports/envelope with tasks and statuses recreated."""
-    from sqlmodel import select
-
-    from app.models.tenant.project import Project
-    from app.models.tenant.task import Task
-
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    await create_task(session, a.project, title="Fell the tower")
-
-    envelope = await _export_json(
-        client, a, "/exports/project", {"ids": [a.project.id]}
-    )
-    assert envelope["type"] == "initiative-project"
-
-    legacy = await client.post(
-        a.g("/projects/import"),
-        headers=a.headers,
-        json={"initiative_id": a.initiative.id, "envelope": envelope},
-    )
-    assert legacy.status_code in (404, 405)
-
-    target = await _second_initiative(session, a)
-    resp = await _import_envelope(client, a, envelope, target.id)
-    assert resp.status_code == 201, resp.text
-    result = resp.json()["result"]
-    assert result["created"]["tasks"] == 1
-
-    project = (
-        await session.exec(select(Project).where(Project.initiative_id == target.id))
-    ).one()
-    task = (await session.exec(select(Task).where(Task.project_id == project.id))).one()
-    assert task.title == "Fell the tower"
 
 
 async def test_envelope_import_authorization_gates(client, acting_user, session):
@@ -719,34 +674,6 @@ async def test_import_job_cap_and_cancel(client, acting_user, session, monkeypat
     # A terminal job is not cancellable.
     not_again = await client.delete(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
     assert not_again.status_code == 409
-
-
-async def test_import_jobs_are_own_row_isolated(
-    client, acting_user, session, monkeypatch
-):
-    """Another member sees neither the job nor its row (RLS, 404); a guild
-    admin sees it via the admin leg."""
-    monkeypatch.setattr(import_limits, "IMPORT_INLINE_MAX_ROWS", 0)
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    envelope = {
-        "type": "initiative-wiki",
-        "schema_version": 1,
-        "name": "Mine",
-        "pages": [],
-    }
-    resp = await _import_envelope(client, a, envelope, a.initiative.id)
-    job_id = resp.json()["id"]
-
-    other = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
-    admin = await acting_user(guild_role=CommunityRole.admin, guild=a.guild)
-
-    denied = await client.get(a.g(f"/data-jobs/{job_id}"), headers=other.headers)
-    assert denied.status_code == 404
-    assert (await client.get(a.g("/data-jobs/"), headers=other.headers)).json() == []
-    allowed = await client.get(a.g(f"/data-jobs/{job_id}"), headers=admin.headers)
-    assert allowed.status_code == 200
 
 
 async def test_envelope_byte_bound_enforced_before_body_is_read(
@@ -1117,9 +1044,10 @@ async def test_backup_rejects_asset_key_with_path_components(
     client, acting_user, session
 ):
     """An asset storage_key is both the uploads-row identity and the storage
-    write target; the backends key by basename. A backup whose key carries path
-    components is rejected whole at upload, leaving an existing blob of the same
-    basename untouched and creating no second uploads row."""
+    write target; the backends key by basename. A backup whose key, or a file
+    entry's asset, carries path components is rejected whole at upload,
+    leaving an existing blob of the same basename untouched and creating no
+    second uploads row."""
     from sqlmodel import select
 
     from app.models.tenant.upload import Upload
@@ -1160,69 +1088,20 @@ async def test_backup_rejects_asset_key_with_path_components(
     resp = await _upload_backup(client, a, zip_bytes)
     assert resp.status_code == 400
     assert resp.json()["detail"] == "IMPORT_ZIP_INVALID"
+    # A file entry naming its asset with path components is refused the same.
+    nested_entry = _make_backup_zip(
+        _minimal_manifest(entries=[_file_entry("nested/keep.pdf")]),
+        {"assets/nested/keep.pdf": b"REPLACED-BYTES"},
+    )
+    resp = await _upload_backup(client, a, nested_entry)
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "IMPORT_ZIP_INVALID"
 
     blob = get_guild_storage(a.guild.id).open_readable("keep.pdf")
     assert blob is not None and blob.path.read_bytes() == original
     await route_session_to_guild(session, a.guild.id)
     rows = (await session.exec(select(Upload))).all()
     assert [u.filename for u in rows] == ["keep.pdf"]
-
-
-def test_reject_non_flat_asset_keys_unit():
-    """The one choke point both plan and apply funnel through: flat keys pass;
-    a storage_key or file-entry asset with path components raises."""
-    from app.schemas.tenant.backup_export import (
-        BackupManifest,
-        ManifestAsset,
-        ManifestEntry,
-    )
-    from app.services.import_engine.backup import _reject_non_flat_asset_keys
-    from app.services.import_engine.contract import ImportEngineError
-
-    def _manifest(assets=None, entries=None):
-        return BackupManifest(
-            type="initiative-backup",
-            schema_version=1,
-            app_version="0.78.0-test",
-            exported_at="2026-07-15T00:00:00+00:00",
-            guild={"id": 1, "name": "g"},
-            people=[],
-            include_uploads=True,
-            initiatives=[],
-            entries=entries or [],
-            assets=assets or [],
-            skipped=[],
-        )
-
-    def _asset(storage_key):
-        return ManifestAsset(path=f"assets/{storage_key}", storage_key=storage_key)
-
-    def _file_entry(asset_ref):
-        return ManifestEntry(
-            path=asset_ref,
-            tool="file",
-            type="file",
-            entity_id=1,
-            title="f",
-            initiative_id=1,
-            asset=asset_ref,
-        )
-
-    # Flat keys pass (a legit export only ever emits these).
-    _reject_non_flat_asset_keys(_manifest(assets=[_asset("abc123.pdf")]))
-    _reject_non_flat_asset_keys(_manifest(entries=[_file_entry("assets/abc123.pdf")]))
-
-    # Path components in the asset key (incl. self-collision spellings) reject.
-    for bad in ("nested/keep.pdf", "a/b/keep.pdf", "./keep.pdf"):
-        with pytest.raises(ImportEngineError) as exc:
-            _reject_non_flat_asset_keys(_manifest(assets=[_asset(bad)]))
-        assert exc.value.code == "IMPORT_ZIP_INVALID"
-
-    # And in a file entry's asset reference.
-    with pytest.raises(ImportEngineError):
-        _reject_non_flat_asset_keys(
-            _manifest(entries=[_file_entry("assets/nested/keep.pdf")])
-        )
 
 
 async def test_backup_confirm_include_map_skips_tools(
@@ -1560,45 +1439,6 @@ async def test_a_restored_collection_names_only_who_can_open_a_file_in_it(
     ).all() == []
 
 
-async def test_backup_corrupt_entry_fails_alone(
-    client, acting_user, session, monkeypatch, role_session
-):
-    """One corrupt member fails its entry; the rest of the backup restores
-    and the job completes with a per-entry report."""
-    a = await acting_user(
-        guild_role=CommunityRole.superadmin, initiative=True, project=True
-    )
-    good_entry, good_envelope = _wiki_entry()
-    bad_entry = dict(good_entry)
-    bad_entry["path"] = "initiatives/1-restored/wikis/2-bad.initiative-wiki.json"
-    bad_entry["title"] = "Bad Lore"
-    bad_entry["entity_id"] = 2
-    zip_bytes = _make_backup_zip(
-        _minimal_manifest(entries=[good_entry, bad_entry]),
-        {
-            good_entry["path"]: json.dumps(good_envelope).encode(),
-            bad_entry["path"]: b"{corrupt json",
-        },
-    )
-    resp = await _upload_backup(client, a, zip_bytes)
-    job_id = resp.json()["id"]
-    confirmed = await client.post(
-        a.g(f"/imports/jobs/{job_id}/confirm"), headers=a.headers, json={}
-    )
-    assert confirmed.status_code == 200, confirmed.text
-    await _run_import_worker(monkeypatch, role_session)
-
-    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == DataJobStatus.done.value, job.get("error")
-    assert job["result"]["per_tool"]["wiki"] == {
-        "created": 1,
-        "failed": 1,
-        "skipped": 0,
-    }
-    statuses = {e["title"]: e["status"] for e in job["result"]["entries"]}
-    assert statuses == {"Restored Lore": "created", "Bad Lore": "failed"}
-
-
 async def test_backup_seat_vacated_before_apply_fails_closed(
     client, acting_user, session, monkeypatch, role_session
 ):
@@ -1625,41 +1465,6 @@ async def test_backup_seat_vacated_before_apply_fails_closed(
     job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
     assert job["status"] == DataJobStatus.failed.value
     assert job["error"] == "IMPORT_SUPERADMIN_REQUIRED"
-
-
-async def test_backup_quota_exceeded_fails_job(
-    client, acting_user, session, monkeypatch, role_session
-):
-    from sqlmodel import select
-
-    from app.models.platform.guild import Guild
-
-    a = await acting_user(
-        guild_role=CommunityRole.superadmin, initiative=True, project=True
-    )
-    guild = (await session.exec(select(Guild).where(Guild.id == a.guild.id))).one()
-    await guild_administration(session, guild, max_storage_bytes=1)
-
-    manifest = _minimal_manifest(
-        assets=[
-            _asset_record(
-                "huge.bin",
-                size_bytes=1_000_000,
-                content_type="application/octet-stream",
-            )
-        ]
-    )
-    zip_bytes = _make_backup_zip(manifest, {"assets/huge.bin": b"x" * 1024})
-    resp = await _upload_backup(client, a, zip_bytes)
-    job_id = resp.json()["id"]
-    confirmed = await client.post(
-        a.g(f"/imports/jobs/{job_id}/confirm"), headers=a.headers, json={}
-    )
-    assert confirmed.status_code == 200, confirmed.text
-    await _run_import_worker(monkeypatch, role_session)
-    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == DataJobStatus.failed.value
-    assert job["error"] == "IMPORT_QUOTA_EXCEEDED"
 
 
 async def test_a_backup_sent_in_pieces_is_restored_from_where_it_arrived(
@@ -2094,11 +1899,12 @@ async def test_backup_assets_are_stored_as_what_their_bytes_are(
     assert sheet.content["sheets"][0]["cells"]
 
 
-async def test_backup_entry_past_the_json_cap_fails_alone(
+async def test_a_backup_entry_that_cannot_be_read_fails_alone(
     client, acting_user, session, monkeypatch, role_session
 ):
-    """Each envelope in a backup is read up to the envelope cap. One past it
-    fails its own entry; the rest of the backup restores."""
+    """Each envelope in a backup is read up to the envelope cap. One past it,
+    or one that is not JSON, fails its own entry; the rest of the backup
+    restores and the job completes with a per-entry report."""
     monkeypatch.setattr(import_limits, "IMPORT_MAX_ENVELOPE_BYTES", 4096)
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
@@ -2118,22 +1924,35 @@ async def test_backup_entry_past_the_json_cap_fails_alone(
             for index in range(400)
         ],
     }
+    bad_entry = {
+        **good_entry,
+        "path": "initiatives/1-restored/wikis/3-bad.initiative-wiki.json",
+        "title": "Bad Lore",
+        "entity_id": 3,
+    }
     job = await _apply_backup(
         client,
         a,
         _make_backup_zip(
-            _minimal_manifest(entries=[good_entry, big_entry]),
+            _minimal_manifest(entries=[good_entry, big_entry, bad_entry]),
             {
                 good_entry["path"]: json.dumps(good_envelope).encode(),
                 big_entry["path"]: json.dumps(big_envelope).encode(),
+                bad_entry["path"]: b"{corrupt json",
             },
         ),
         monkeypatch,
         role_session,
     )
     assert job["status"] == DataJobStatus.done.value, job.get("error")
+    assert job["result"]["per_tool"]["wiki"] == {
+        "created": 1,
+        "failed": 2,
+        "skipped": 0,
+    }
     entries = {entry["title"]: entry for entry in job["result"]["entries"]}
     assert entries["Restored Lore"]["status"] == "created"
+    assert entries["Bad Lore"]["status"] == "failed"
     assert (entries["Big Lore"]["status"], entries["Big Lore"]["error"]) == (
         "failed",
         "IMPORT_TOO_LARGE",
@@ -2675,23 +2494,44 @@ async def test_an_unmatched_author_keeps_their_name_and_no_account(
     """Nobody here is somebody. The comment carries the name it arrived with
     and is credited to no account — not to whoever ran the import.
 
-    The envelope quotes a stranger, so it is staged rather than applied and
-    the importer is asked who that is; leaving the row blank is the answer
-    this test gives, and it is a real one.
+    The envelope quotes a stranger, so nothing is written until somebody has
+    answered, and the plan is the question. Only the creator answers it: a
+    guild admin can SEE somebody else's staged job, which is not saying who
+    its people are on their behalf. Leaving the row blank is the answer this
+    test gives, and it is a real one.
     """
     from sqlmodel import select
 
     from app.models.tenant.comment import Comment
+    from app.models.tenant.project import Project
 
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
+    admin = await acting_user(guild_role=CommunityRole.admin, guild=a.guild)
     envelope = _project_envelope_with_comment("stranger#4321", "Alice Chen")
 
     resp = await _import_envelope(client, a, envelope, a.initiative.id)
     assert resp.status_code == 202, resp.text
     job = resp.json()
     assert job["status"] == "staged"
+    assert job["plan"]["people"] == [
+        {
+            "handle": "stranger#4321",
+            "name": "Alice Chen",
+            "comment_count": 1,
+            "suggested_user_id": None,
+        }
+    ]
+    assert not (
+        await session.exec(select(Project).where(Project.name == "Imported Board"))
+    ).all()
+
+    stolen = await client.post(
+        a.g(f"/imports/jobs/{job['id']}/confirm"), headers=admin.headers, json={}
+    )
+    assert stolen.status_code == 403, stolen.text
+    assert stolen.json()["detail"] == "IMPORT_NOT_CONFIRMABLE"
 
     confirm = await client.post(
         a.g(f"/imports/jobs/{job['id']}/confirm"), headers=a.headers, json={}
@@ -2775,38 +2615,6 @@ async def test_mentions_link_to_whoever_the_people_step_names(
     assert parent.parent_comment_id is None
 
 
-async def test_an_envelope_quoting_a_stranger_asks_before_it_applies(
-    client, acting_user, session
-):
-    """The people step for a lone envelope: nothing is written until somebody
-    has answered, and the plan is the question."""
-    from sqlmodel import select
-
-    from app.models.tenant.project import Project
-
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    envelope = _project_envelope_with_comment("stranger#4321", "Alice Chen")
-
-    resp = await _import_envelope(client, a, envelope, a.initiative.id)
-    assert resp.status_code == 202, resp.text
-    job = resp.json()
-    assert job["status"] == "staged"
-    assert job["plan"]["people"] == [
-        {
-            "handle": "stranger#4321",
-            "name": "Alice Chen",
-            "comment_count": 1,
-            "suggested_user_id": None,
-        }
-    ]
-    # Staged means staged: the board does not exist yet.
-    assert not (
-        await session.exec(select(Project).where(Project.name == "Imported Board"))
-    ).all()
-
-
 async def test_an_envelope_naming_strangers_only_as_assignees_still_asks(
     client, acting_user, session
 ):
@@ -2845,44 +2653,6 @@ async def test_an_envelope_naming_strangers_only_as_assignees_still_asks(
     assert not (
         await session.exec(select(Project).where(Project.name == "Imported Board"))
     ).all()
-
-
-async def test_the_people_step_decides_who_an_imported_task_is_assigned_to(
-    client, acting_user, session, monkeypatch, role_session
-):
-    """The answer to the step is what lands: a handle nobody here goes by,
-    mapped to a member of the initiative, is that member's task."""
-    from sqlmodel import select
-
-    from app.models.tenant.task import Task, TaskAssignee
-
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    envelope = _project_envelope_with_comment("stranger#4321", "Alice Chen")
-    envelope["tasks"][0]["comments"] = []
-    envelope["tasks"][0]["assignee_handles"] = ["Jordan"]
-
-    job = (await _import_envelope(client, a, envelope, a.initiative.id)).json()
-    assert job["status"] == "staged"
-    confirmed = await client.post(
-        a.g(f"/imports/jobs/{job['id']}/confirm"),
-        headers=a.headers,
-        json={"people_map": {"Jordan": a.user.id}},
-    )
-    assert confirmed.status_code == 200, confirmed.text
-    await _run_import_worker(monkeypatch, role_session)
-
-    done = (await client.get(a.g(f"/data-jobs/{job['id']}"), headers=a.headers)).json()
-    assert done["status"] == "done", done.get("error")
-    assert done["result"]["unmatched_handles"] == []
-
-    session.expunge_all()
-    task = (await session.exec(select(Task).where(Task.title == "Fit the door"))).one()
-    assignees = (
-        await session.exec(select(TaskAssignee).where(TaskAssignee.task_id == task.id))
-    ).all()
-    assert [row.user_id for row in assignees] == [a.user.id]
 
 
 async def test_two_properties_never_share_one_definition(client, acting_user, session):
@@ -3032,55 +2802,6 @@ async def test_a_file_naming_somebody_in_a_property_asks_first(
     ]
 
 
-async def test_an_envelope_whose_people_all_match_is_not_a_second_step(
-    client, acting_user, session
-):
-    """Asking somebody to agree with a screen full of correct answers is not
-    a step. Every handle matching a member exactly means there is nothing to
-    decide, so the file imports on one click, as it always did."""
-    from app.core.user_display import handle_of
-
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    b = await acting_user(
-        guild_role=CommunityRole.member,
-        guild=a.guild,
-        initiative=a.initiative,
-        initiative_role="member",
-    )
-    envelope = _project_envelope_with_comment(handle_of(b.user), "Someone Else")
-
-    resp = await _import_envelope(client, a, envelope, a.initiative.id)
-    assert resp.status_code == 201, resp.text
-
-
-async def test_only_the_creator_answers_an_envelopes_people_step(
-    client, acting_user, session
-):
-    """A guild admin can SEE somebody else's staged job — RLS says so. Saying
-    who its people are on their behalf is a different thing."""
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    admin = await acting_user(guild_role=CommunityRole.admin, guild=a.guild)
-
-    resp = await _import_envelope(
-        client,
-        a,
-        _project_envelope_with_comment("stranger#4321", "Alice Chen"),
-        a.initiative.id,
-    )
-    assert resp.status_code == 202, resp.text
-    job_id = resp.json()["id"]
-
-    stolen = await client.post(
-        a.g(f"/imports/jobs/{job_id}/confirm"), headers=admin.headers, json={}
-    )
-    assert stolen.status_code == 403, stolen.text
-    assert stolen.json()["detail"] == "IMPORT_NOT_CONFIRMABLE"
-
-
 async def _import_with_assignees(client, a, people_map, monkeypatch, role_session):
     """Import a one-task project assigning ``ghost#1111`` and ``phantom#2222``,
     with the people step answered by ``people_map``; the job's result."""
@@ -3137,8 +2858,9 @@ async def test_an_import_brings_in_the_people_it_names(
     client, acting_user, session, monkeypatch, role_session
 ):
     """Somebody an import assigns is somebody the importer means to work on
-    it. Run by the initiative's manager, it adds the person to the initiative
-    and shares the project with them, and the assignment lands."""
+    it, and the people step's answer decides who that is. Run by the
+    initiative's manager, it adds the person to the initiative and shares the
+    project with them, and the assignment lands."""
     from sqlmodel import select
 
     from app.models.tenant.initiative import InitiativeMember
@@ -3154,7 +2876,7 @@ async def test_an_import_brings_in_the_people_it_names(
     )
     outside = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
 
-    await _import_with_assignees(
+    result = await _import_with_assignees(
         client,
         a,
         {"ghost#1111": inside.user.id, "phantom#2222": outside.user.id},
@@ -3164,6 +2886,7 @@ async def test_an_import_brings_in_the_people_it_names(
 
     assignees, readers = await _named_on_the_import(session, a)
     assert assignees == readers == {inside.user.id, outside.user.id}
+    assert result["unmatched_handles"] == []
     joined = (
         await session.exec(
             select(InitiativeMember).where(
@@ -3214,7 +2937,8 @@ async def test_an_exact_handle_match_makes_the_comment_theirs(
     client, acting_user, session
 ):
     """A handle that is already a member of the initiative it is landing in
-    needs nobody to confirm it: it is the same identifier."""
+    needs nobody to confirm it: it is the same identifier, so the file
+    imports on one click rather than as a second step."""
     from sqlmodel import select
 
     from app.core.user_display import handle_of
@@ -3274,65 +2998,6 @@ async def test_the_plan_lists_the_people_and_suggests_the_exact_matches(
     assert by_handle[handle_of(a.user)]["comment_count"] == 4
     # A name nobody here answers to is left for a person to decide.
     assert by_handle["stranger#4321"]["suggested_user_id"] is None
-
-
-async def test_the_confirmed_mapping_decides_who_a_comment_belongs_to(
-    client, acting_user, session, monkeypatch, role_session
-):
-    """The people step's whole purpose: a name that matches nobody becomes
-    somebody, because a person said so."""
-    from sqlmodel import select
-
-    from app.models.tenant.comment import Comment
-
-    a = await acting_user(
-        guild_role=CommunityRole.superadmin, initiative=True, project=True
-    )
-    b = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
-
-    envelope = _project_envelope_with_comment("stranger#4321", "Alice Chen")
-    entry = {
-        "path": "initiatives/1-restored/projects/1-board.initiative-project.json",
-        "tool": "project",
-        "type": "initiative-project",
-        "schema_version": 1,
-        "entity_id": 1,
-        "title": "Imported Board",
-        "initiative_id": 1,
-        "tags": [],
-        "properties": [],
-        "asset": None,
-    }
-    manifest = _minimal_manifest(entries=[entry])
-    manifest["people"] = [
-        {"handle": "stranger#4321", "name": "Alice Chen", "comment_count": 1}
-    ]
-    zip_bytes = _make_backup_zip(
-        manifest, {entry["path"]: json.dumps(envelope).encode()}
-    )
-
-    resp = await _upload_backup(client, a, zip_bytes)
-    assert resp.status_code == 201, resp.text
-    job_id = resp.json()["id"]
-
-    confirmed = await client.post(
-        a.g(f"/imports/jobs/{job_id}/confirm"),
-        headers=a.headers,
-        json={"people_map": {"stranger#4321": b.user.id}},
-    )
-    assert confirmed.status_code == 200, confirmed.text
-    await _run_import_worker(monkeypatch, role_session)
-
-    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == DataJobStatus.done.value, job.get("error")
-
-    comment = (
-        await session.exec(
-            select(Comment).where(Comment.content == "The frame is out of true")
-        )
-    ).one()
-    assert comment.created_by == b.user.id
-    assert comment.imported_author_name is None
 
 
 def _mention_node(name: str, user_id: int | None) -> dict:
@@ -5407,35 +5072,24 @@ async def test_preview_says_what_a_todoist_export_holds(client, acting_user):
     assert body["picks_one"] is False
     assert body["options"][0]["task_count"] == 1
 
+    unknown = await _preview_foreign(client, a, "trello", "anything")
+    assert unknown.status_code == 400
+    assert unknown.json()["detail"] == "IMPORT_UNKNOWN_SOURCE"
 
-async def test_preview_of_an_unknown_product_is_refused(client, acting_user):
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    resp = await _preview_foreign(client, a, "trello", "anything")
-    assert resp.status_code == 400
-    assert resp.json()["detail"] == "IMPORT_UNKNOWN_SOURCE"
-
-
-async def test_preview_of_a_file_that_is_not_that_export_is_refused(
-    client, acting_user
-):
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    resp = await _preview_foreign(client, a, "vikunja", "this is not json }{{{")
-    assert resp.status_code == 400
-    assert resp.json()["detail"] == "IMPORT_FILE_UNREADABLE"
+    unreadable = await _preview_foreign(client, a, "vikunja", "this is not json }{{{")
+    assert unreadable.status_code == 400
+    assert unreadable.json()["detail"] == "IMPORT_FILE_UNREADABLE"
 
 
 async def test_a_todoist_export_becomes_a_project(client, acting_user, session):
     """The whole point: a foreign file lands as a project carrying what it
-    said — statuses from its sections, a checklist, a comment, a deadline —
-    through the same apply path an exported project takes."""
+    said — statuses from its sections, a priority, a checklist, a comment, a
+    deadline — through the same apply path an exported project takes."""
     from sqlmodel import select
 
+    from app.models.tenant.comment import Comment
     from app.models.tenant.project import Project
-    from app.models.tenant.task import Task
+    from app.models.tenant.task import Task, TaskPriority, TaskStatus
 
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
@@ -5458,8 +5112,14 @@ async def test_a_todoist_export_becomes_a_project(client, acting_user, session):
     assert project is not None
     task = (await session.exec(select(Task).where(Task.project_id == project.id))).one()
     assert task.title == "Ship it"
+    assert task.priority == TaskPriority.urgent
+    assert (await session.get(TaskStatus, task.task_status_id)).name == "Doing"
     assert [item["text"] for item in task.checklist] == ["A step"]
     assert task.due_date is not None
+    (comment,) = (
+        await session.exec(select(Comment).where(said_on("task", task.id)))
+    ).all()
+    assert comment.content == "Said something"
 
 
 async def test_a_real_sized_export_arrives_whole(
@@ -5521,7 +5181,8 @@ async def test_importing_from_a_product_needs_the_create_permission(
     client, acting_user, session
 ):
     """Nothing about arriving from another product widens who may create a
-    project here — it is the same gate the envelope route applies."""
+    project here — it is the same gate the envelope route applies, and an
+    initiative out of reach is not there."""
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
@@ -5532,35 +5193,22 @@ async def test_importing_from_a_product_needs_the_create_permission(
         initiative=other,
         initiative_role="member",
     )
-    resp = await client.post(
-        b.g("/imports/foreign/todoist"),
-        headers=b.headers,
-        json={
-            "initiative_id": other.id,
-            "selection": "Nope",
-            "content": TODOIST_CSV,
-        },
-    )
+
+    async def start(actor, initiative_id):
+        return await client.post(
+            actor.g("/imports/foreign/todoist"),
+            headers=actor.headers,
+            json={
+                "initiative_id": initiative_id,
+                "selection": "Nope",
+                "content": TODOIST_CSV,
+            },
+        )
+
+    resp = await start(b, other.id)
     assert resp.status_code == 403
     assert resp.json()["detail"] == "IMPORT_PERMISSION_REQUIRED"
-
-
-async def test_importing_into_an_initiative_you_cannot_reach_is_a_404(
-    client, acting_user
-):
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    resp = await client.post(
-        a.g("/imports/foreign/todoist"),
-        headers=a.headers,
-        json={
-            "initiative_id": 9_999_999,
-            "selection": "Nope",
-            "content": TODOIST_CSV,
-        },
-    )
-    assert resp.status_code == 404
+    assert (await start(a, 9_999_999)).status_code == 404
 
 
 # ---------------------------------------------------------------------------

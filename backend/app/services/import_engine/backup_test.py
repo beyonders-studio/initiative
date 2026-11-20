@@ -10,6 +10,7 @@ from sqlmodel import select
 
 from app.core.config import settings
 from app.models.platform.guild import CommunityRole
+from app.models.platform.user import User
 from app.models.tenant.data_job import DataJob, DataJobStatus
 from app.models.tenant.initiative import Initiative, InitiativeJoinPolicy
 from app.models.tenant.project import Project
@@ -53,14 +54,15 @@ async def exported(client, acting_user, session, tmp_path):
     return a, due, bundle
 
 
-async def _restore(session, a, bundle: Path, anchor: datetime | None) -> Initiative:
+async def _restore(
+    session, guild_id: int, user_id: int, bundle: Path, anchor: datetime | None
+) -> Initiative:
     """The bundle restored by a queued job, and the initiative it made."""
-    guild_id = a.guild.id
     await route_session_to_guild(session, guild_id)
     job = await stage_backup_job(
         session,
         guild_id=guild_id,
-        user=a.user,
+        user=await session.get(User, user_id),
         payload=bundle,
         status=DataJobStatus.queued,
         anchor=anchor,
@@ -88,25 +90,27 @@ async def _restored_due_date(session, initiative: Initiative) -> datetime:
     return due
 
 
-async def test_an_anchored_backup_lands_its_dates_as_far_from_now(exported, session):
+async def test_a_backup_restores_its_dates_as_they_were_or_from_an_anchor(
+    exported, session
+):
+    """Restored as it is, a backup keeps its dates and its initiative's join
+    policy; restored from an anchor, its dates are as far from now as they
+    were from the anchor."""
     a, due, bundle = exported
+    guild_id, user_id = a.guild.id, a.user.id
+
+    initiative = await _restore(session, guild_id, user_id, bundle, anchor=None)
+    assert await _restored_due_date(session, initiative) == due
+    assert initiative.join_policy == InitiativeJoinPolicy.request.value
 
     initiative = await _restore(
-        session, a, bundle, anchor=datetime.now(UTC) - timedelta(days=30)
+        session,
+        guild_id,
+        user_id,
+        bundle,
+        anchor=datetime.now(UTC) - timedelta(days=30),
     )
-
     # Due two days after the anchor, so two days from now.
     assert (await _restored_due_date(session, initiative)).date() == (
         due + timedelta(days=30)
     ).date()
-
-
-async def test_a_backup_restores_its_dates_and_join_policy_as_they_were(
-    exported, session
-):
-    a, due, bundle = exported
-
-    initiative = await _restore(session, a, bundle, anchor=None)
-
-    assert await _restored_due_date(session, initiative) == due
-    assert initiative.join_policy == InitiativeJoinPolicy.request.value

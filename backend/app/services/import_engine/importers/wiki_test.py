@@ -1,4 +1,5 @@
-"""The wiki importer's placing of what a page names."""
+"""The wiki importer's placing of what a page names, past what the Confluence
+imports in ``imports_test`` place."""
 
 from __future__ import annotations
 
@@ -33,15 +34,6 @@ def _person(name, user_id=None):
         "mentionUserId": user_id,
         "text": name,
     }
-
-
-def test_a_page_mention_points_at_the_page_its_slug_became():
-    placed = _place_references(
-        _doc(_page_mention("guide")), page_ids={"guide": 12}, mentioned={}
-    )
-    assert placed is not None
-    (node,) = placed["root"]["children"][0]["children"]
-    assert node["entityId"] == 12 and "importSlug" not in node
 
 
 def test_a_mention_of_a_page_that_did_not_arrive_is_its_words_again():
@@ -108,89 +100,6 @@ def test_the_people_a_wiki_names_are_asked_about_most_named_first():
     ]
 
 
-def _jira_mention(key):
-    return {
-        "type": "entity-mention",
-        "version": 1,
-        "entityType": "task",
-        "entityId": 0,
-        "text": key,
-        "importJiraKey": key,
-        "importUrl": f"https://acme.atlassian.net/browse/{key}",
-    }
-
-
-def _jira_chip(key):
-    return {
-        "type": "smart-chip",
-        "version": 1,
-        "chipKind": "task:status",
-        "entityId": 0,
-        "text": key,
-        "importJiraKey": key,
-    }
-
-
-def _jira_link(key, words):
-    return {
-        "type": "link",
-        "url": f"https://acme.atlassian.net/browse/{key}",
-        "children": [{"type": "text", "text": words}],
-        "importJiraKey": key,
-    }
-
-
-def test_a_jira_issue_that_came_over_is_its_task_and_its_live_status():
-    placed = _place_references(
-        _doc(
-            _jira_mention("SCRUM-1"),
-            _jira_chip("SCRUM-1"),
-            _jira_link("SCRUM-1", "see it"),
-        ),
-        page_ids={},
-        mentioned={},
-        jira_tasks={"SCRUM-1": 41},
-    )
-    assert placed is not None
-    mention, chip, link = placed["root"]["children"][0]["children"]
-    assert mention == {
-        "type": "entity-mention",
-        "version": 1,
-        "entityType": "task",
-        "entityId": 41,
-        "text": "SCRUM-1",
-    }
-    assert chip["entityId"] == 41 and "importJiraKey" not in chip
-    assert link == {
-        "type": "entity-mention",
-        "version": 1,
-        "entityType": "task",
-        "entityId": 41,
-        "text": "see it",
-    }
-
-
-def test_a_jira_issue_that_did_not_come_over_links_back_to_jira():
-    placed = _place_references(
-        _doc(
-            _jira_mention("SCRUM-9"),
-            _jira_chip("SCRUM-9"),
-            _jira_link("SCRUM-9", "see it"),
-        ),
-        page_ids={},
-        mentioned={},
-        jira_tasks={},
-    )
-    assert placed is not None
-    link, kept = placed["root"]["children"][0]["children"]
-    # The mention is a link to the issue again, and the chip — with nothing to
-    # read — is gone.
-    assert link["type"] == "link"
-    assert link["url"] == "https://acme.atlassian.net/browse/SCRUM-9"
-    assert link["children"][0]["text"] == "SCRUM-9"
-    assert kept["type"] == "link" and "importJiraKey" not in kept
-
-
 def _file_mention(ref, text="spec.pdf"):
     return {
         "type": "entity-mention",
@@ -202,15 +111,13 @@ def _file_mention(ref, text="spec.pdf"):
     }
 
 
-def test_a_file_the_page_links_to_is_the_file_it_became():
+def test_a_file_that_did_not_arrive_is_its_name_again():
     placed = _place_references(
-        _doc(_file_mention("entry:assets/a.pdf"), _file_mention("entry:assets/b.pdf")),
+        _doc(_file_mention("entry:assets/b.pdf")),
         page_ids={},
         mentioned={},
         file_ids={"entry:assets/a.pdf": 31},
     )
     assert placed is not None
-    found, missing = placed["root"]["children"][0]["children"]
-    assert found["entityId"] == 31 and "importRef" not in found
-    # One that did not arrive is its name again.
+    (missing,) = placed["root"]["children"][0]["children"]
     assert missing["type"] == "text" and missing["text"] == "spec.pdf"
