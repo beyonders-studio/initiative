@@ -1,4 +1,4 @@
-import { HttpResponse, http } from "msw";
+import { HttpResponse } from "msw";
 
 import {
   buildDefaultTaskStatuses,
@@ -18,7 +18,7 @@ export const taskHandlers = [
   // A list grouped by anything has no groups until a test says what they are.
   communityHttp.get("/tasks/groups", () => HttpResponse.json({ groups: [], rows: {} })),
 
-  http.get("/api/v1/fields/tasks", () =>
+  communityHttp.get("/fields/tasks", () =>
     HttpResponse.json({
       dataset: "tasks",
       fields: [],

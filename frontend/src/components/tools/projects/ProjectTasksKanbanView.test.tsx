@@ -1,7 +1,7 @@
 import type { DragEndEvent, DragOverEvent } from "@dnd-kit/core";
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -79,7 +79,7 @@ describe("a board grouped by type", () => {
   const board = async () => {
     const patched: Record<string, unknown>[] = [];
     server.use(
-      http.get("/api/v1/fields/tasks", () =>
+      communityHttp.get("/fields/tasks", () =>
         HttpResponse.json({
           dataset: "tasks",
           fields: [],

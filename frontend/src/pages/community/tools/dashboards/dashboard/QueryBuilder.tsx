@@ -22,20 +22,19 @@ import { Plus, X } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
-import {
-  DatasetName,
-  type QueryBuildRequest,
-  type QueryColumnSpec,
-  type QueryPluginDescription,
-  type QueryPluginSpec,
-  type QueryPluginSpecParams,
-  type QuerySheetDescription,
-  type QuerySheetSpec,
+import type {
+  QueryBuildRequest,
+  QueryColumnSpec,
+  QueryPluginDescription,
+  QueryPluginSpec,
+  QueryPluginSpecParams,
+  QuerySheetDescription,
+  QuerySheetSpec,
 } from "@/api/generated/initiativeAPI.schemas";
 import type { QueryablePlugin } from "@/api/pluginData";
 import { PluginParamControl } from "@/components/plugins/PluginParamControl";
 import { useFieldCatalog } from "@/hooks/useFieldCatalog";
-import { useFieldCatalogs } from "@/hooks/useQueryVocabulary";
+import { useFieldCatalogs, useQueryVocabulary } from "@/hooks/useQueryVocabulary";
 import { joinRange, splitRange } from "@/lib/spreadsheet/range";
 import { type FilterLeaf, type FilterNode, toFilterFieldSpec } from "@/lib/widgets/conditions";
 import { withParamAnswer } from "@/lib/widgets/pluginParams";
@@ -47,11 +46,6 @@ import { listFormat } from "@/ui/lib/intl";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 import { FilterBuilder, fieldLabel } from "./FilterBuilder";
-
-/** The datasets a query may name. Read from the generated enum, which is the
- *  backend's own registry — so a dataset declared there is offered here on the
- *  next generation rather than after an edit to a second list. */
-const DATASETS = Object.values(DatasetName) as DatasetName[];
 
 /** What a column may be reduced to, mirroring the builder's own set. */
 const AGGREGATES = ["count", "sum", "avg", "min", "max"] as const;
@@ -128,7 +122,11 @@ export function QueryBuilder({
   const ownColumns = Boolean(reading || calling);
   const installed = plugins.find((candidate) => candidate.publicId === calling?.plugin);
   const endpoint = installed?.endpoints.find((candidate) => candidate.name === calling?.endpoint);
-  const catalog = useFieldCatalog(spec.dataset as DatasetName);
+  // The datasets a query may name: the community's tool set's, from the
+  // backend's own registry, so an installed tool's are offered beside the
+  // built-in ones.
+  const { datasets } = useQueryVocabulary();
+  const catalog = useFieldCatalog(spec.dataset as string);
   const { relations, defaultFilters } = catalog;
   // A range's columns are named by its header as written, and an endpoint's by
   // their keys, so each carries its name as its label rather than being worded
@@ -291,7 +289,7 @@ export function QueryBuilder({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {DATASETS.map((name) => (
+            {datasets.map((name) => (
               <SelectItem key={name} value={name}>
                 {t(`dashboards:dataset.${name}` as const, { defaultValue: name })}
               </SelectItem>

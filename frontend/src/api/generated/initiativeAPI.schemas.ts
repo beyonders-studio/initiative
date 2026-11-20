@@ -5804,35 +5804,6 @@ export interface DashboardViewModeRequest {
 }
 
 /**
- * A dataset the field registry describes.
- */
-export type DatasetName = (typeof DatasetName)[keyof typeof DatasetName];
-
-export const DatasetName = {
-  tasks: "tasks",
-  projects: "projects",
-  calendar_events: "calendar_events",
-  counter_groups: "counter_groups",
-  counters: "counters",
-  task_statuses: "task_statuses",
-  task_types: "task_types",
-  task_assignees: "task_assignees",
-  members: "members",
-  metadata_definitions: "metadata_definitions",
-  metadata_values: "metadata_values",
-  relationships: "relationships",
-  files: "files",
-  file_versions: "file_versions",
-  calendars: "calendars",
-  dashboards: "dashboards",
-  posts: "posts",
-  collections: "collections",
-  wikis: "wikis",
-  wiki_pages: "wiki_pages",
-  contacts: "contacts",
-} as const;
-
-/**
  * What a date is grouped by: the calendar's day, week, month, quarter or
  * year it falls in. A week starts on Monday, as Postgres counts one.
  */

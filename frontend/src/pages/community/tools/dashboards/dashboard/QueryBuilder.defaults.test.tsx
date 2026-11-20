@@ -8,10 +8,11 @@
  */
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildPluginCatalogEntry } from "@/__tests__/factories";
+import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import type {
@@ -41,7 +42,7 @@ const DEFAULTS: Record<string, { field: string; op: string; value: unknown }[]> 
 
 beforeEach(() => {
   server.use(
-    http.get("/api/v1/fields/:dataset", ({ params }) => {
+    communityHttp.get("/fields/:dataset", ({ params }) => {
       const dataset = String(params.dataset);
       return HttpResponse.json({
         dataset,
@@ -135,6 +136,33 @@ describe("seeding a new statement", () => {
     show(spec("members"));
     await new Promise((done) => setTimeout(done, 50));
     expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
+describe("a tool plug-in's dataset", () => {
+  it("is offered beside the built-in ones and read once chosen", async () => {
+    // The vocabulary lists the community's tool set, so a dataset the
+    // generated types never heard of is one a statement may name.
+    server.use(
+      communityHttp.get("/query/vocabulary", () =>
+        HttpResponse.json({ datasets: ["hoard_items", "tasks"], functions: [], tokens: [] })
+      )
+    );
+    const onChange = vi.fn();
+    renderWithProviders(
+      <QueryBuilder
+        spec={spec("tasks")}
+        onChange={onChange}
+        initiativeId={7}
+        spreadsheets={NONE}
+        plugins={NO_PLUGINS}
+      />
+    );
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("combobox", { name: "Show data from" }));
+    await user.click(await screen.findByRole("option", { name: "hoard_items" }));
+    expect(onChange).toHaveBeenCalledWith(spec("hoard_items"));
   });
 });
 

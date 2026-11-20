@@ -25,7 +25,6 @@ the set, the built-in tools' where the caller names none.
 from __future__ import annotations
 
 from collections.abc import Callable
-from enum import Enum
 from functools import cache, lru_cache
 from typing import Any
 
@@ -70,14 +69,6 @@ _BUILDERS: dict[str, Callable[[], Dataset]] = {
     "wiki_pages": tool_datasets.build_wiki_pages,
     "contacts": tool_datasets.build_contacts,
 }
-
-
-#: The datasets, as a type. Derived from the builders above rather than typed
-#: out again, so a new dataset is nameable by a client — and refused by FastAPI
-#: when it is not one — the moment it is declared, with no second list and no
-#: hand-rolled "unknown dataset" branch to keep in step.
-DatasetName = Enum("DatasetName", {name: name for name in _BUILDERS}, type=str)
-DatasetName.__doc__ = "A dataset the field registry describes."
 
 
 @cache
@@ -214,8 +205,11 @@ _ARCHIVED_FIELD = "archived_at"
 _TEMPLATE_FIELD = "is_template"
 
 
-def default_filters(dataset_name: str) -> list[dict[str, Any]]:
-    """The conditions a new statement about *dataset_name* starts with.
+def default_filters(
+    dataset_name: str, tools: ToolSet = BUILTIN_TOOLS
+) -> list[dict[str, Any]]:
+    """The conditions a new statement about *dataset_name*, in a community
+    with ``tools``, starts with.
 
     Derived rather than listed, so a dataset that gains either lifecycle gets
     the filter without anybody remembering to add it here.
@@ -227,18 +221,18 @@ def default_filters(dataset_name: str) -> list[dict[str, Any]]:
     through that relation, so ``tasks`` excludes the work inside a template
     project without ``tasks`` having to know what a template is.
     """
-    spec = dataset(dataset_name)
+    spec = dataset(dataset_name, tools)
     conditions: list[dict[str, Any]] = []
     if _ARCHIVED_FIELD in spec.by_name:
         conditions.append({"field": _ARCHIVED_FIELD, "op": "is_null", "value": True})
 
-    template_field = _template_field(spec)
+    template_field = _template_field(spec, tools)
     if template_field is not None:
         conditions.append({"field": template_field, "op": "eq", "value": False})
     return conditions
 
 
-def _template_field(spec: Dataset) -> str | None:
+def _template_field(spec: Dataset, tools: ToolSet) -> str | None:
     """Where this dataset's template flag is read from, if it has one at all.
 
     A dataset that has no flag of its own may still be *governed* by something
@@ -254,7 +248,7 @@ def _template_field(spec: Dataset) -> str | None:
     if spec.tool is None:
         return None
     for relation in spec.relations:
-        related = dataset(relation.dataset)
+        related = dataset(relation.dataset, tools)
         if related.tool is spec.tool and _TEMPLATE_FIELD in related.by_name:
             return f"{relation.name}.{_TEMPLATE_FIELD}"
     return None
