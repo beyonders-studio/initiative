@@ -25,18 +25,17 @@ afterEach(() => {
 });
 
 describe("parseTimeFormat", () => {
-  it("keeps the three answers the app knows", () => {
-    expect(parseTimeFormat("system")).toBe("system");
-    expect(parseTimeFormat("12")).toBe("12");
-    expect(parseTimeFormat("24")).toBe("24");
-  });
-
-  it("falls back to system for anything else", () => {
-    // An older client, a hand-edited row, or a field that isn't there yet all
-    // arrive here, and none of them should force a convention on the reader.
-    expect(parseTimeFormat("48")).toBe("system");
-    expect(parseTimeFormat(undefined)).toBe("system");
-    expect(parseTimeFormat(null)).toBe("system");
+  // An older client, a hand-edited row, or a field that isn't there yet all
+  // fall back to system, and none of them should force a convention on the reader.
+  it.each([
+    ["system", "system"],
+    ["12", "12"],
+    ["24", "24"],
+    ["48", "system"],
+    [undefined, "system"],
+    [null, "system"],
+  ])("reads %s as %s", (raw, expected) => {
+    expect(parseTimeFormat(raw)).toBe(expected);
   });
 });
 
@@ -49,48 +48,29 @@ describe("parseWeekStart", () => {
   });
 });
 
-describe("hour12Option", () => {
-  it("leaves the locale alone on system", () => {
-    expect(hour12Option()).toBeUndefined();
-  });
-
-  it("states the convention once one is picked", () => {
-    setClock({ timeFormat: "12" });
-    expect(hour12Option()).toBe(true);
-    setClock({ timeFormat: "24" });
-    expect(hour12Option()).toBe(false);
-  });
-});
-
-describe("isHour12", () => {
-  it("answers definitely once a convention is picked", () => {
-    setClock({ timeFormat: "24" });
-    expect(isHour12()).toBe(false);
-    setClock({ timeFormat: "12" });
-    expect(isHour12()).toBe(true);
-  });
-
-  it("asks the runtime on system", () => {
-    // The test runtime is en-US, which is a 12-hour locale.
-    expect(isHour12()).toBe(true);
+describe("the hour convention", () => {
+  // The test runtime is en-US, which is a 12-hour locale.
+  it.each([
+    ["system", undefined, true],
+    ["12", true, true],
+    ["24", false, false],
+  ] as const)("on %s, states %s and answers %s", (timeFormat, option, hour12) => {
+    setClock({ timeFormat });
+    expect(hour12Option()).toBe(option);
+    expect(isHour12()).toBe(hour12);
   });
 });
 
 describe("patterns", () => {
-  it("switches the date-fns time pattern", () => {
+  it("switches the date-fns time pattern, keeping seconds when asked", () => {
     setClock({ timeFormat: "12" });
     expect(timePattern()).toBe("h:mm a");
     expect(dateTimePattern("PP")).toBe("PP h:mm a");
+    expect(timePattern({ seconds: true })).toBe("h:mm:ss a");
 
     setClock({ timeFormat: "24" });
     expect(timePattern()).toBe("HH:mm");
     expect(dateTimePattern("PP")).toBe("PP HH:mm");
-  });
-
-  it("keeps seconds when asked for them", () => {
-    setClock({ timeFormat: "12" });
-    expect(timePattern({ seconds: true })).toBe("h:mm:ss a");
-    setClock({ timeFormat: "24" });
     expect(dateTimePattern("PP", { seconds: true })).toBe("PP HH:mm:ss");
   });
 });
@@ -126,14 +106,13 @@ describe("formatHourLabel", () => {
 describe("formatCompactTime", () => {
   const at = (hours: number, minutes: number) => new Date(2026, 0, 15, hours, minutes);
 
-  it("drops the minutes on the hour, in 12-hour", () => {
+  it("drops the minutes on the hour in 12-hour, and always shows both in 24-hour", () => {
     setClock({ timeFormat: "12" });
     expect(formatCompactTime(at(9, 0))).toBe("9am");
     expect(formatCompactTime(at(9, 30))).toBe("9:30am");
     expect(formatCompactTime(at(13, 5))).toBe("1:05pm");
-  });
 
-  it("always shows both parts in 24-hour, so widths line up", () => {
+    // So widths line up.
     setClock({ timeFormat: "24" });
     expect(formatCompactTime(at(9, 0))).toBe("09:00");
     expect(formatCompactTime(at(13, 5))).toBe("13:05");
@@ -184,21 +163,13 @@ describe("subscribeClock", () => {
 });
 
 describe("formatDateTime", () => {
-  it("follows the preference", () => {
-    const value = "2026-08-03T21:15:00Z";
-
-    setClock({ timeFormat: "12" });
-    expect(formatDateTime(value)).toMatch(/\b(AM|PM)\b/);
-
+  it("follows the preference, a date-only value's midnight included", () => {
     setClock({ timeFormat: "24" });
-    expect(formatDateTime(value)).not.toMatch(/\b(AM|PM)\b/);
-  });
-
-  it("renders a date-only value's midnight on the picked clock", () => {
-    setClock({ timeFormat: "24" });
+    expect(formatDateTime("2026-08-03T21:15:00Z")).not.toMatch(/\b(AM|PM)\b/);
     expect(formatDateTime("2026-08-03")).toBe("Aug 3, 2026, 00:00");
 
     setClock({ timeFormat: "12" });
+    expect(formatDateTime("2026-08-03T21:15:00Z")).toMatch(/\b(AM|PM)\b/);
     expect(formatDateTime("2026-08-03")).toBe("Aug 3, 2026, 12:00 AM");
   });
 });

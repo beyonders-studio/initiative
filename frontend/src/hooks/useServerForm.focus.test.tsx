@@ -101,6 +101,7 @@ describe("coming back to a window mid-edit", () => {
 
     await waitFor(() => expect(queryFn).toHaveBeenCalledTimes(2));
     expect(result.current.values.name).toBe("Sent, and then some");
+    expect(result.current.edited).toBe(true);
   });
 
   it("asks for nothing while the answer is still fresh", async () => {

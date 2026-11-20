@@ -14,12 +14,16 @@ describe("fileIcon", () => {
     expect(colorClass).toBe("text-emerald-500");
   });
 
-  it("draws a whiteboard as a pen", () => {
-    expect(fileIcon({ file_type: "excalidraw" }).Icon).toBe(PenTool);
-  });
-
-  it("draws an ordinary file as a scroll", () => {
-    expect(fileIcon({ file_type: "lexical" }).Icon).toBe(ScrollText);
+  it.each([
+    ["a whiteboard as a pen", { file_type: "excalidraw" }, PenTool],
+    ["an ordinary file as a scroll", { file_type: "lexical" }, ScrollText],
+    ["a smart link with no url as a scroll, rather than failing", { file_type: "url" }, ScrollText],
+    ["a row that says nothing about itself as a scroll", {}, ScrollText],
+    ["an archive by its category", { file_type: "zip" }, FileArchive],
+    ["a design file by its category", { file_type: "psd" }, Palette],
+    ["an illustration by its category", { file_type: "ai" }, Palette],
+  ])("draws %s", (_case, row, Icon) => {
+    expect(fileIcon(row).Icon).toBe(Icon);
   });
 
   it("draws a file by its format rather than by being a file", () => {
@@ -37,16 +41,6 @@ describe("fileIcon", () => {
     expect(figma.Icon).not.toBe(ScrollText);
   });
 
-  it("falls back rather than failing on a smart link with no url", () => {
-    expect(fileIcon({ file_type: "url" }).Icon).toBe(ScrollText);
-  });
-
-  it("draws a format by its category", () => {
-    expect(fileIcon({ file_type: "zip" }).Icon).toBe(FileArchive);
-    expect(fileIcon({ file_type: "psd" }).Icon).toBe(Palette);
-    expect(fileIcon({ file_type: "ai" }).Icon).toBe(Palette);
-  });
-
   it("gives every category but the plain one a mark of its own", () => {
     const plain: FileKind[] = [FileKind.text, FileKind.link, FileKind.other];
     const marked = Object.values(FileType).filter(
@@ -57,9 +51,5 @@ describe("fileIcon", () => {
     }
     // The generic page is left to text and to nothing in particular.
     expect(fileIcon({ file_type: "other" }).Icon).toBe(FileText);
-  });
-
-  it("survives a row that says nothing about itself", () => {
-    expect(fileIcon({}).Icon).toBe(ScrollText);
   });
 });

@@ -43,43 +43,40 @@ afterEach(() => {
 });
 
 describe("useToolPageTitle", () => {
-  it("names the tool on its own page", async () => {
-    visit("/c/$communityId/i/$initiativeId/projects/$projectId", {
-      communityId: "3",
-      initiativeId: "5",
-      projectId: "1",
-    });
-    await waitFor(() => expect(document.title).toBe("Sprint 3 - Initiative"));
-  });
-
-  it("names the parent tool on a page of something it holds", async () => {
-    visit("/c/$communityId/i/$initiativeId/wikis/$wikiId/pages/$pageId", {
-      communityId: "3",
-      initiativeId: "5",
-      wikiId: "4",
-      pageId: "11",
-    });
-    await waitFor(() => expect(document.title).toBe("Handbook - Initiative"));
-  });
-
-  it("names the wiki, not the file, when a file is read inside a wiki", async () => {
-    visit("/c/$communityId/i/$initiativeId/wikis/$wikiId/files/$fileId", {
-      communityId: "3",
-      initiativeId: "5",
-      wikiId: "4",
-      fileId: "8",
-    });
-    await waitFor(() => expect(document.title).toBe("Handbook - Initiative"));
-  });
-
-  it("names the tool on its settings", async () => {
-    visit("/c/$communityId/i/$initiativeId/projects/$projectId/settings/access", {
-      communityId: "3",
-      initiativeId: "5",
-      projectId: "1",
-    });
-    await waitFor(() => expect(document.title).toBe("Sprint 3 - Initiative"));
-  });
+  it.each([
+    [
+      "on its own page",
+      "/c/$communityId/i/$initiativeId/projects/$projectId",
+      { projectId: "1" },
+      "Sprint 3",
+    ],
+    [
+      "of the parent, on a page of something it holds",
+      "/c/$communityId/i/$initiativeId/wikis/$wikiId/pages/$pageId",
+      { wikiId: "4", pageId: "11" },
+      "Handbook",
+    ],
+    [
+      "of the wiki, not the file, when a file is read inside a wiki",
+      "/c/$communityId/i/$initiativeId/wikis/$wikiId/files/$fileId",
+      { wikiId: "4", fileId: "8" },
+      "Handbook",
+    ],
+    [
+      "on its settings",
+      "/c/$communityId/i/$initiativeId/projects/$projectId/settings/access",
+      { projectId: "1" },
+      "Sprint 3",
+    ],
+  ])(
+    "names the tool %s, and puts the title back when it leaves",
+    async (_case, route, params, name) => {
+      const { unmount } = visit(route, { communityId: "3", initiativeId: "5", ...params });
+      await waitFor(() => expect(document.title).toBe(`${name} - Initiative`));
+      unmount();
+      expect(document.title).toBe("Initiative");
+    }
+  );
 
   it("does not name the last tool while the next one loads", async () => {
     // The app's own default keeps a query's previous data across a key change.
@@ -114,16 +111,5 @@ describe("useToolPageTitle", () => {
 
     releaseWiki();
     await waitFor(() => expect(document.title).toBe("Handbook - Initiative"));
-  });
-
-  it("puts the title back when it leaves", async () => {
-    const { unmount } = visit("/c/$communityId/i/$initiativeId/projects/$projectId", {
-      communityId: "3",
-      initiativeId: "5",
-      projectId: "1",
-    });
-    await waitFor(() => expect(document.title).toBe("Sprint 3 - Initiative"));
-    unmount();
-    expect(document.title).toBe("Initiative");
   });
 });

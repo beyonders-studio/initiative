@@ -58,16 +58,12 @@ beforeEach(() => {
 });
 
 describe("a query binding", () => {
-  it("asks for the statement it was given", () => {
+  it("asks for the statement it was given, about the dashboard's own initiative", () => {
     run({ source: "query", sql: "SELECT title FROM tasks" }, 4);
     expect(asked()).toBe("SELECT title FROM tasks");
     expect(enabled()).toBe(true);
-  });
-
-  it("asks about the dashboard's own initiative", () => {
     // A statement names datasets, not a scope, so the dashboard's own
     // initiative is what decides which rows the answer is about.
-    run({ source: "query", sql: "SELECT title FROM tasks" }, 4);
     expect(scopedTo()).toBe(4);
   });
 

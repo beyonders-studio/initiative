@@ -99,17 +99,17 @@ const comment = (id: number, parents: { type: string; id: number }[]) => ({
   action: "created",
 });
 
+beforeEach(() => {
+  queryClient.clear();
+  setInvalidationCommunity(COMMUNITY);
+});
+
+afterEach(() => {
+  queryClient.clear();
+  setInvalidationCommunity(null);
+});
+
 describe("realtime comment frames", () => {
-  beforeEach(() => {
-    queryClient.clear();
-    setInvalidationCommunity(COMMUNITY);
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-    setInvalidationCommunity(null);
-  });
-
   it.each(TOOLS)("puts a new comment into a %s's thread and refreshes the entity", async (tool) => {
     const thread = seedThread(tool, ENTITY_ID);
     const entity = seed([`/api/v1/c/${COMMUNITY}/${toolRouteSegment(tool)}/${ENTITY_ID}`]);
@@ -236,16 +236,6 @@ describe("realtime comment frames", () => {
 });
 
 describe("realtime frames for a case's conversation", () => {
-  beforeEach(() => {
-    queryClient.clear();
-    setInvalidationCommunity(COMMUNITY);
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-    setInvalidationCommunity(null);
-  });
-
   it("keeps what is said with the requester out of the task's thread and reads the case again", async () => {
     const onTask = { subject_type: "task", subject_id: ENTITY_ID } as const;
     const thread = seedThread("task", ENTITY_ID);
@@ -269,16 +259,6 @@ describe("realtime frames for a case's conversation", () => {
 });
 
 describe("realtime resource frames", () => {
-  beforeEach(() => {
-    queryClient.clear();
-    setInvalidationCommunity(COMMUNITY);
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-    setInvalidationCommunity(null);
-  });
-
   it.each(TOOLS)("refreshes a %s that changed", (tool) => {
     const entity = seed([`/api/v1/c/${COMMUNITY}/${toolRouteSegment(tool)}/${ENTITY_ID}`]);
 
@@ -427,11 +407,12 @@ describe("realtime resource frames", () => {
     expect(properties(), "properties").toBe(true);
   });
 
-  it("refreshes the plug-in list and an install's own reads", () => {
+  it("refreshes the plug-in list and an install's own reads, in this community only", () => {
     // Community-wide and parentless: nothing else on the client covers it.
     const list = seed([`/api/v1/c/${COMMUNITY}/plugins/`]);
     const detail = seed([`/api/v1/c/${COMMUNITY}/plugins/${ENTITY_ID}`]);
     const members = seed([`/api/v1/c/${COMMUNITY}/plugins/${ENTITY_ID}/members`, { page: 1 }]);
+    const other = seed([`/api/v1/c/${COMMUNITY + 1}/plugins/${ENTITY_ID}`]);
 
     applyChanges(
       [{ resource: { type: "plugins", id: ENTITY_ID }, parents: [], action: "updated" }],
@@ -441,51 +422,29 @@ describe("realtime resource frames", () => {
     expect(list(), "plug-in list").toBe(true);
     expect(detail(), "plug-in detail").toBe(true);
     expect(members(), "plug-in members").toBe(true);
+    expect(other(), "another community's install").toBe(false);
   });
 
-  it("leaves another community's install reads alone", () => {
-    const other = seed([`/api/v1/c/${COMMUNITY + 1}/plugins/${ENTITY_ID}`]);
-
-    applyChanges(
-      [{ resource: { type: "plugins", id: ENTITY_ID }, parents: [], action: "created" }],
-      COMMUNITY
-    );
-
-    expect(other()).toBe(false);
-  });
-
-  it("ignores a resource type it has no invalidation for", () => {
+  it("ignores an unknown resource or a malformed frame, still refreshing the parents named", () => {
     const untouched = seed([`/api/v1/c/${COMMUNITY}/tasks/${ENTITY_ID}`]);
+    const project = seed([`/api/v1/c/${COMMUNITY}/projects/7`]);
 
     expect(() =>
       applyChanges(
-        [{ resource: { type: "something_new", id: 1 }, parents: [], action: "created" }],
+        [
+          { resource: { type: "something_new", id: 1 }, parents: [], action: "created" },
+          {},
+          { resource: undefined, parents: undefined },
+          {
+            resource: { type: "mystery_items", id: 3 },
+            parents: [{ type: "projects", id: 7 }],
+            action: "updated",
+          },
+        ],
         COMMUNITY
       )
     ).not.toThrow();
     expect(untouched()).toBe(false);
-  });
-
-  it("ignores a malformed frame rather than throwing", () => {
-    expect(() =>
-      applyChanges([{}, { resource: undefined, parents: undefined }], COMMUNITY)
-    ).not.toThrow();
-  });
-
-  it("still refreshes the parents when the resource itself is unknown", () => {
-    const project = seed([`/api/v1/c/${COMMUNITY}/projects/7`]);
-
-    applyChanges(
-      [
-        {
-          resource: { type: "mystery_items", id: 3 },
-          parents: [{ type: "projects", id: 7 }],
-          action: "updated",
-        },
-      ],
-      COMMUNITY
-    );
-
     expect(project()).toBe(true);
   });
 });
@@ -510,8 +469,6 @@ describe("realtime socket lifecycle", () => {
     // puts it — the auth frame reads it as it writes.
     setAuthToken("test-token");
     MockWebSocket.instances = [];
-    queryClient.clear();
-    setInvalidationCommunity(COMMUNITY);
     vi.stubGlobal("WebSocket", MockWebSocket);
     vi.useFakeTimers();
     // Reconnects are jittered; pin the draw so each lands mid-window.
@@ -521,8 +478,6 @@ describe("realtime socket lifecycle", () => {
   afterEach(() => {
     setAuthToken(null);
     vi.useRealTimers();
-    queryClient.clear();
-    setInvalidationCommunity(null);
   });
 
   it("authenticates in the first frame and names no gap", () => {
@@ -625,30 +580,33 @@ describe("realtime frames and dashboards", () => {
     action: "updated",
   });
 
-  beforeEach(() => queryClient.clear());
-  afterEach(() => queryClient.clear());
-
-  it("refreshes a dashboard when something it reads changes in its initiative", () => {
-    const stale = seedCanvas(COMMUNITY, ["tasks"]);
-    applyChanges([task(INITIATIVE)], COMMUNITY);
-    expect(stale()).toBe(true);
-  });
-
-  it("leaves it alone when the change is to something it does not read", () => {
-    const stale = seedCanvas(COMMUNITY, ["projects"]);
-    applyChanges([task(INITIATIVE)], COMMUNITY);
-    expect(stale()).toBe(false);
-  });
-
-  it("leaves it alone when the change is in another initiative", () => {
-    const stale = seedCanvas(COMMUNITY, ["tasks"]);
-    applyChanges([task(INITIATIVE + 1)], COMMUNITY);
-    expect(stale()).toBe(false);
-  });
-
-  it("leaves another community's dashboard alone, whose initiative ids are its own", () => {
-    const stale = seedCanvas(COMMUNITY + 1, ["tasks"]);
-    applyChanges([task(INITIATIVE)], COMMUNITY);
-    expect(stale()).toBe(false);
+  it.each([
+    [
+      "refreshes a dashboard when something it reads changes in its initiative",
+      COMMUNITY,
+      ["tasks"],
+      INITIATIVE,
+      true,
+    ],
+    [
+      "leaves it alone when the change is to something it does not read",
+      COMMUNITY,
+      ["projects"],
+      INITIATIVE,
+      false,
+    ],
+    [
+      "leaves it alone when the change is in another initiative",
+      COMMUNITY,
+      ["tasks"],
+      INITIATIVE + 1,
+      false,
+    ],
+    // Another community's initiative ids are its own.
+    ["leaves another community's dashboard alone", COMMUNITY + 1, ["tasks"], INITIATIVE, false],
+  ])("%s", (_case, communityId, relations, initiative, refreshed) => {
+    const stale = seedCanvas(communityId, relations);
+    applyChanges([task(initiative)], COMMUNITY);
+    expect(stale()).toBe(refreshed);
   });
 });

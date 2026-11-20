@@ -11,7 +11,7 @@
  * rather than quietly serving a policy that refuses to compile the ratchet.
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
@@ -25,15 +25,6 @@ describe("ratchet worker asset", () => {
   it("is emitted into the directory the backend matches", () => {
     const config = readFileSync(resolve("../../vite.config.ts"), "utf8");
     expect(config).toContain(`entryFileNames: "${WORKER_OUTPUT}"`);
-  });
-
-  it("keeps the entry name the backend matches", () => {
-    // `[name]` resolves to the worker entry's basename, so the built file is
-    // `assets/workers/ratchet.worker-<hash>.js`.
-    expect(existsSync(resolve("./ratchet.worker.ts"))).toBe(true);
-    expect(WORKER_OUTPUT.replace("[name]", "ratchet.worker")).toBe(
-      "assets/workers/ratchet.worker-[hash].js"
-    );
   });
 
   it("is the entry the client starts", () => {

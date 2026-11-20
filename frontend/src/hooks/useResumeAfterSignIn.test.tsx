@@ -57,18 +57,15 @@ describe("resuming after sign-in", () => {
     expect(mocks.refreshCommunities).not.toHaveBeenCalled();
   });
 
-  it("starts at home when there was no page to return to", async () => {
+  it("starts at home with no page to return to, or anything that is not a path in this app", async () => {
     const { result } = renderHook(() => useResumeAfterSignIn());
 
-    await act(() => result.current(undefined));
-
-    expect(landedOn()).toEqual({ to: "/", replace: true });
-  });
-
-  it("starts at home for anything that is not a path in this app", async () => {
-    const { result } = renderHook(() => useResumeAfterSignIn());
-
-    for (const next of ["//example.test/x", "/\\example.test/x", "https://example.test/x"]) {
+    for (const next of [
+      undefined,
+      "//example.test/x",
+      "/\\example.test/x",
+      "https://example.test/x",
+    ]) {
       await act(() => result.current(next));
       expect(landedOn()).toEqual({ to: "/", replace: true });
     }

@@ -29,45 +29,29 @@ describe("useCommunityBillingSummary", () => {
     read.mockResolvedValue({ available: true, payment_failed: false });
   });
 
-  it("asks for the seat of a hosted install", async () => {
-    const community = buildCommunity({ id: 42, role: "superadmin" });
-    const { result } = renderHook(() => useCommunityBillingSummary(community), { wrapper });
-    await waitFor(() => expect(result.current.data?.available).toBe(true));
-    expect(read).toHaveBeenCalledWith(42);
+  const seatGrant = (configure: boolean) => ({
+    ...buildCommunity({
+      id: 42,
+      role: "superadmin",
+      can: communityCan("superadmin", { configure }),
+    }),
+    accessType: "grant" as const,
+    grantSettingsLevel: "superadmin" as const,
   });
 
-  it("never asks for an ordinary admin", () => {
-    const community = buildCommunity({ id: 42, role: "admin" });
-    renderHook(() => useCommunityBillingSummary(community), { wrapper });
-    expect(read).not.toHaveBeenCalled();
-  });
-
-  it("asks for support holding the seat with write access", async () => {
-    const community = {
-      ...buildCommunity({
-        id: 42,
-        role: "superadmin",
-        can: communityCan("superadmin", { configure: true }),
-      }),
-      accessType: "grant" as const,
-      grantSettingsLevel: "superadmin" as const,
-    };
-    renderHook(() => useCommunityBillingSummary(community), { wrapper });
-    await waitFor(() => expect(read).toHaveBeenCalledWith(42));
-  });
-
-  it("never asks for support whose grant only reads", () => {
-    const community = {
-      ...buildCommunity({
-        id: 42,
-        role: "superadmin",
-        can: communityCan("superadmin", { configure: false }),
-      }),
-      accessType: "grant" as const,
-      grantSettingsLevel: "superadmin" as const,
-    };
-    renderHook(() => useCommunityBillingSummary(community), { wrapper });
-    expect(read).not.toHaveBeenCalled();
+  it.each([
+    ["the seat of a hosted install", () => buildCommunity({ id: 42, role: "superadmin" }), true],
+    ["support holding the seat with write access", () => seatGrant(true), true],
+    ["an ordinary admin", () => buildCommunity({ id: 42, role: "admin" }), false],
+    ["support whose grant only reads", () => seatGrant(false), false],
+  ])("for %s, asks: %s", async (_who, community, asks) => {
+    const { result } = renderHook(() => useCommunityBillingSummary(community()), { wrapper });
+    if (asks) {
+      await waitFor(() => expect(result.current.data?.available).toBe(true));
+      expect(read).toHaveBeenCalledWith(42);
+    } else {
+      expect(read).not.toHaveBeenCalled();
+    }
   });
 
   it("never asks on a self-hosted install", () => {

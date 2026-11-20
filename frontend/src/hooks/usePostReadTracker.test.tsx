@@ -46,30 +46,14 @@ describe("the post read tracker", () => {
     vi.useRealTimers();
   });
 
-  it("sends what was reported, once, as one batch", () => {
-    const api = mount();
-
-    act(() => {
-      api.report(1);
-      api.report(2);
-      api.report(1);
-    });
-    expect(mutate).not.toHaveBeenCalled();
-
-    act(() => {
-      vi.runAllTimers();
-    });
-    expect(mutate).toHaveBeenCalledTimes(1);
-    expect(mutate.mock.calls[0][0]).toEqual({ post_ids: [1, 2] });
-  });
-
-  it("holds the batch while more arrive rather than sending each one", () => {
+  it("holds the batch while more arrive, then sends each reported id once", () => {
     const api = mount();
 
     act(() => {
       api.report(1);
       vi.advanceTimersByTime(1_000);
       api.report(2);
+      api.report(1);
       vi.advanceTimersByTime(1_000);
     });
     // The second report pushed the flush out; nothing has gone yet.
@@ -78,13 +62,16 @@ describe("the post read tracker", () => {
     act(() => {
       vi.runAllTimers();
     });
+    expect(mutate).toHaveBeenCalledTimes(1);
     expect(mutate.mock.calls[0][0]).toEqual({ post_ids: [1, 2] });
   });
 
-  it("never re-reads a notice somebody just marked unread", () => {
+  it("never reads a notice somebody just marked unread, queued or not", () => {
     const api = mount();
 
     act(() => {
+      api.report(9);
+      api.suppress(9);
       api.suppress(7);
       api.report(7);
       api.report(8);
@@ -93,17 +80,5 @@ describe("the post read tracker", () => {
 
     expect(mutate).toHaveBeenCalledTimes(1);
     expect(mutate.mock.calls[0][0]).toEqual({ post_ids: [8] });
-  });
-
-  it("drops an id already queued when it is marked unread", () => {
-    const api = mount();
-
-    act(() => {
-      api.report(7);
-      api.suppress(7);
-      vi.runAllTimers();
-    });
-
-    expect(mutate).not.toHaveBeenCalled();
   });
 });

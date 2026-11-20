@@ -73,7 +73,7 @@ beforeEach(() => {
 });
 
 describe("this browser's device", () => {
-  it("registers one even though the app already asked whether there was one", async () => {
+  it("registers one though the app already asked, and starts collecting", async () => {
     // A browser that has never opened Messages. Both hooks under one cache, in
     // the order the app mounts them.
     mocks.registeredDevice.mockResolvedValue(undefined);
@@ -89,20 +89,7 @@ describe("this browser's device", () => {
 
     await waitFor(() => expect(result.current.data).toBe("device-1"));
     expect(mocks.ensureDevice).toHaveBeenCalled();
-  });
-
-  it("starts collecting as soon as one is registered", async () => {
-    mocks.registeredDevice.mockResolvedValue(undefined);
-    const Wrapper = wrapper();
-
-    renderHook(
-      () => {
-        useCollectMessagesWhereRegistered();
-        useDmDevice();
-      },
-      { wrapper: Wrapper }
-    );
-
+    // Registering turns collection on without waiting for a reload.
     await waitFor(() => expect(mocks.collect).toHaveBeenCalled());
   });
 
@@ -172,24 +159,7 @@ describe("telling the server a thread was read", () => {
     expect(mocks.reportThreadRead).not.toHaveBeenCalled();
   });
 
-  it("retries a report that did not land", async () => {
-    // The local marker has already advanced, so a second look reads nothing and
-    // would otherwise never mention the messages the failed report covered.
-    mocks.markRead.mockResolvedValueOnce(2).mockResolvedValue(0);
-    mocks.reportThreadRead.mockRejectedValueOnce(new Error("offline"));
-
-    const { rerender } = renderHook(
-      ({ count }: { count: number }) => useMarkThreadRead("conv-1", count, [7]),
-      { wrapper: wrapper(), initialProps: { count: 2 } }
-    );
-    await waitFor(() => expect(mocks.reportThreadRead).toHaveBeenCalledTimes(1));
-
-    rerender({ count: 3 });
-
-    await waitFor(() => expect(mocks.reportThreadRead).toHaveBeenCalledTimes(2));
-  });
-
-  it("stops retrying once one lands", async () => {
+  it("retries a report that did not land, and stops once one lands", async () => {
     mocks.markRead.mockResolvedValueOnce(2).mockResolvedValue(0);
     mocks.reportThreadRead.mockRejectedValueOnce(new Error("offline"));
 
@@ -205,16 +175,5 @@ describe("telling the server a thread was read", () => {
 
     await waitFor(() => expect(mocks.markRead).toHaveBeenCalledTimes(3));
     expect(mocks.reportThreadRead).toHaveBeenCalledTimes(2);
-  });
-
-  it("does not surface a failed report to the thread", async () => {
-    mocks.markRead.mockResolvedValue(1);
-    mocks.reportThreadRead.mockRejectedValue(new Error("offline"));
-
-    expect(() =>
-      renderHook(() => useMarkThreadRead("conv-1", 1, [7]), { wrapper: wrapper() })
-    ).not.toThrow();
-
-    await waitFor(() => expect(mocks.reportThreadRead).toHaveBeenCalled());
   });
 });

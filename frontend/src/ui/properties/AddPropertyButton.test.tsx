@@ -9,7 +9,8 @@ import type { MetadataType } from "@/api/generated/initiativeAPI.schemas";
 import { AddPropertyButton } from "./AddPropertyButton";
 
 describe("AddPropertyButton", () => {
-  it("lists every definition the caller can see (no applies_to scope)", async () => {
+  it("lists every definition the caller can see but those already on, searches them, and adds the one picked", async () => {
+    const onAdd = vi.fn();
     renderWithProviders(
       <AddPropertyButton
         definitions={[
@@ -19,14 +20,20 @@ describe("AddPropertyButton", () => {
         ]}
         initiativeId={7}
         create={vi.fn()}
-        currentPropertyIds={[]}
-        onAdd={vi.fn()}
+        currentPropertyIds={[3]}
+        onAdd={onAdd}
       />
     );
     await userEvent.click(screen.getByRole("button", { name: /Add metadata/i }));
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
-    expect(screen.getByText("Beta")).toBeInTheDocument();
-    expect(screen.getByText("Gamma")).toBeInTheDocument();
+    expect(screen.queryByText("Gamma")).not.toBeInTheDocument();
+
+    // Searched case-insensitively.
+    await userEvent.type(await screen.findByPlaceholderText(/Search/i), "BET");
+    await waitFor(() => expect(screen.queryByText("Alpha")).not.toBeInTheDocument());
+    await userEvent.click(screen.getByText("Beta"));
+    expect(onAdd).toHaveBeenCalledTimes(1);
+    expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({ id: 2, name: "Beta" }));
   });
 
   it("offers a task's project properties beside the metadata, each under its own heading", async () => {
@@ -50,65 +57,6 @@ describe("AddPropertyButton", () => {
     const properties = screen.getByRole("group", { name: "The initiative's metadata" });
     expect(within(properties).getByText("Budget")).toBeInTheDocument();
     expect(within(properties).queryByText("Sprint")).not.toBeInTheDocument();
-  });
-
-  it("filters out definitions whose id is in currentPropertyIds", async () => {
-    renderWithProviders(
-      <AddPropertyButton
-        definitions={[
-          buildPropertyDefinition({ id: 1, name: "Alpha" }),
-          buildPropertyDefinition({ id: 2, name: "Beta" }),
-        ]}
-        initiativeId={7}
-        create={vi.fn()}
-        currentPropertyIds={[1]}
-        onAdd={vi.fn()}
-      />
-    );
-    await userEvent.click(screen.getByRole("button", { name: /Add metadata/i }));
-    await waitFor(() => expect(screen.getByText("Beta")).toBeInTheDocument());
-    expect(screen.queryByText("Alpha")).not.toBeInTheDocument();
-  });
-
-  it("calls onAdd(definition) when an existing definition is picked", async () => {
-    const defs = [buildPropertyDefinition({ id: 7, name: "Priority" })];
-    const onAdd = vi.fn();
-    renderWithProviders(
-      <AddPropertyButton
-        definitions={defs}
-        initiativeId={7}
-        create={vi.fn()}
-        currentPropertyIds={[]}
-        onAdd={onAdd}
-      />
-    );
-    await userEvent.click(screen.getByRole("button", { name: /Add metadata/i }));
-    const item = await screen.findByText("Priority");
-    await userEvent.click(item);
-    expect(onAdd).toHaveBeenCalledTimes(1);
-    expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({ id: 7, name: "Priority" }));
-  });
-
-  it("filters the list case-insensitively by the search input", async () => {
-    renderWithProviders(
-      <AddPropertyButton
-        definitions={[
-          buildPropertyDefinition({ id: 1, name: "Alpha" }),
-          buildPropertyDefinition({ id: 2, name: "Beta" }),
-        ]}
-        initiativeId={7}
-        create={vi.fn()}
-        currentPropertyIds={[]}
-        onAdd={vi.fn()}
-      />
-    );
-    await userEvent.click(screen.getByRole("button", { name: /Add metadata/i }));
-    const searchInput = await screen.findByPlaceholderText(/Search/i);
-    await userEvent.type(searchInput, "BET");
-    await waitFor(() => {
-      expect(screen.getByText("Beta")).toBeInTheDocument();
-      expect(screen.queryByText("Alpha")).not.toBeInTheDocument();
-    });
   });
 
   it("creates a new property through create and calls onAdd with the returned definition", async () => {
