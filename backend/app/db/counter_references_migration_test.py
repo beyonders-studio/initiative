@@ -7,7 +7,7 @@ The test builds a community that uses the plug-in, writes into it what a
 build before 0619 stored (``#counter-group[…](4)`` in a comment, a task's
 description and the group's own text, a chip and a link in a post, a link
 and an embed in a file's body and its Yjs state), and runs the revision on
-the provisioning connection as a revision runs."""
+the provisioning login with row security forced, as a revision runs."""
 
 from __future__ import annotations
 
@@ -19,18 +19,20 @@ from types import ModuleType
 from typing import Any
 
 import sqlalchemy as sa
-from alembic.migration import MigrationContext
-from alembic.operations import Operations
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from alembic import op
 from app.core.references import references_in_body, references_in_text
-from app.db import session as db_session
 from app.db.schema_provisioning import guild_schema_name
 from app.models.platform.guild import CommunityRole
 from app.services import editor_engine
 from app.testing import create_comment, create_file, create_post, create_task
-from app.testing.tool_plugins import add_counter, install_tool_plugin
+from app.testing.tool_plugins import (
+    add_counter,
+    install_tool_plugin,
+    run_as_a_revision,
+)
 
 GROUP = "counter_group.tsjvtcm0s7gv2x"
 COUNTER = "counter.tsjvtcm0s7gv2x"
@@ -51,21 +53,26 @@ def _load() -> ModuleType:
     return module
 
 
-async def _run(session: AsyncSession, schema: str, forward: bool) -> None:
-    """The revision one way or the other in ``schema`` alone."""
+#: The tables the test writes content into.
+_WRITTEN = ("comments", "tasks", "posts", "files", "p_tsjvtcm0s7gv2x_counter_group")
+
+
+async def _run(session: AsyncSession, guild_id: int, forward: bool) -> None:
+    """The revision one way or the other in ``guild_id``'s schema alone, as a
+    revision runs, with every table the test wrote into forced."""
     migration = _load()
 
-    def apply(bind: Any) -> None:
-        bind.execute(
-            sa.text("SELECT set_config('search_path', :sp, true)"),
-            {"sp": f"{schema}, public"},
+    def step() -> None:
+        forced = op.get_bind().execute(
+            sa.text(
+                "SELECT relname FROM pg_class WHERE relforcerowsecurity"
+                " AND relnamespace = current_schema()::regnamespace"
+            )
         )
-        with Operations.context(MigrationContext.configure(bind)):
-            migration._apply(forward)
+        assert set(_WRITTEN) <= set(forced.scalars())
+        migration._apply(forward)
 
-    await session.commit()
-    async with db_session.provisioning_engine.begin() as conn:
-        await conn.run_sync(apply)
+    await run_as_a_revision(session, guild_id, step)
 
 
 def _body(*nodes: dict[str, Any]) -> dict[str, Any]:
@@ -195,7 +202,7 @@ async def test_references_stored_before_counters_moved_name_the_plug_in(
             "live": await editor_engine.render(bytes(yjs)),
         }
 
-    await _run(session, schema, forward=True)
+    await _run(session, admin.guild.id, forward=True)
     after = await stored()
     assert (
         after["comment"]
@@ -216,10 +223,10 @@ async def test_references_stored_before_counters_moved_name_the_plug_in(
     assert references_in_body(after["live"]) == {(COUNTER, counter)}
 
     # Twice changes nothing more.
-    await _run(session, schema, forward=True)
+    await _run(session, admin.guild.id, forward=True)
     assert await stored() == after
 
-    await _run(session, schema, forward=False)
+    await _run(session, admin.guild.id, forward=False)
     before = await stored()
     assert before["comment"] == before["task"] == said
     assert before["group"] == f"#counter[Laps]({counter})"
@@ -228,4 +235,4 @@ async def test_references_stored_before_counters_moved_name_the_plug_in(
         _link("counter", counter, "Laps"),
     ]
     assert _kinds(before["file"]) == _kinds(before["live"]) == ["counter"]
-    await _run(session, schema, forward=True)
+    await _run(session, admin.guild.id, forward=True)
