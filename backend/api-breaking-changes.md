@@ -543,6 +543,27 @@ for every community.
 - POST /api/v1/plugin-services/{registration_id}/connect removed the required property `shared_routes` from the response with the `200` status
 - POST /api/v1/plugin-services/{registration_id}/vendor-setup/complete removed the required property `shared_routes` from the response with the `200` status
 
+### An initiative's tools and role keys name any tool its community has
+
+An initiative's `tools` switches, a role's `permissions` and the community's
+initiative defaults (`tools`, `member_permissions`, `own_tools`,
+`own_member_permissions`) are keyed by a string in place of the `Tool` and
+`PermissionKey` enums: a tool plug-in's tool is switched by its kind and its
+role keys are `<kind>:enabled` and `<kind>:create`. A kind or key the
+community does not have is 422 `INITIATIVE_TOOL_UNKNOWN`.
+
+- GET /api/v1/c/{community_id}/initiatives/defaults removed 'propertyNames' constraint from the `member_permissions` response property for the status `200`
+- GET /api/v1/c/{community_id}/initiatives/defaults removed 'propertyNames' constraint from the `own_member_permissions` response property for the status `200`
+- GET /api/v1/c/{community_id}/initiatives/defaults removed 'propertyNames' constraint from the `own_tools` response property for the status `200`
+- GET /api/v1/c/{community_id}/initiatives/defaults removed 'propertyNames' constraint from the `tools` response property for the status `200`
+- PATCH /api/v1/c/{community_id}/initiatives/defaults removed 'propertyNames' constraint from the `member_permissions` response property for the status `200`
+- PATCH /api/v1/c/{community_id}/initiatives/defaults removed 'propertyNames' constraint from the `own_member_permissions` response property for the status `200`
+- PATCH /api/v1/c/{community_id}/initiatives/defaults removed 'propertyNames' constraint from the `own_tools` response property for the status `200`
+- PATCH /api/v1/c/{community_id}/initiatives/defaults removed 'propertyNames' constraint from the `tools` response property for the status `200`
+- GET /api/v1/c/{community_id}/initiatives/{initiative_id}/roles removed 'propertyNames' constraint from the `items/permissions` response property for the status `200`
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/roles removed 'propertyNames' constraint from the `permissions` response property for the status `201`
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id}/roles/{role_id} removed 'propertyNames' constraint from the `permissions` response property for the status `200`
+
 ## After 0.79.0
 
 ### A plug-in is suspended, not switched off

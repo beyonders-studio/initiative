@@ -77,11 +77,19 @@ def own_switch(initiative: Any, tool: Tool | ToolRecord) -> bool:
     return tool.view_permission in (initiative.switched_on or ())
 
 
-def switches(asked: Mapping[Tool, bool], tools: ToolSet) -> dict[ToolRecord, bool]:
+def switch(context: ActorContext, initiative: Any, tool: Tool | ToolRecord) -> bool:
+    """The switch ``tool`` has in ``initiative``: the community's where it
+    set one, the initiative's own otherwise. A tool plug-in's is read whether
+    or not its install is placed there."""
+    community = community_switch(context, tool)
+    return own_switch(initiative, tool) if community is None else community
+
+
+def switches(asked: Mapping[str, bool], tools: ToolSet) -> dict[ToolRecord, bool]:
     """Every tool's switch for a new initiative in a community with
-    ``tools``: ``asked`` where it names one, the tool's record otherwise."""
-    named = {tool.value: on for tool, on in asked.items()}
-    return {tool: named.get(tool.kind, tool.spec.on_by_default) for tool in tools}
+    ``tools``: ``asked`` where it names one by kind, the tool's record
+    otherwise."""
+    return {tool: asked.get(tool.kind, tool.spec.on_by_default) for tool in tools}
 
 
 async def write_switches(
@@ -175,10 +183,7 @@ def tool_on(context: ActorContext, initiative: Any, tool: Tool | ToolRecord) -> 
     its install's and its placement in every initiative the reader reaches."""
     if isinstance(tool, ToolRecord) and tool.installed:
         return f"{initiative.id}:{tool.kind}" in context.enabled_tools
-    switch = community_switch(context, tool)
-    if switch is None:
-        return own_switch(initiative, tool)
-    return switch
+    return switch(context, initiative, tool)
 
 
 async def tool_on_in(

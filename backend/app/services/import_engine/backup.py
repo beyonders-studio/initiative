@@ -380,7 +380,7 @@ async def stage_backup_job(
     return job
 
 
-def _manifest_tool_flags(tools: dict[str, str] | None) -> dict[Tool, bool]:
+def _manifest_tool_flags(tools: dict[str, str] | None) -> dict[str, bool]:
     """A manifest's per-tool states as the initiative's tool switches.
 
     "disabled" -> off; "included"/"excluded" -> on, because the switch records
@@ -392,13 +392,13 @@ def _manifest_tool_flags(tools: dict[str, str] | None) -> dict[Tool, bool]:
     those name no switch, so they are skipped rather than raising on an
     initiative that is otherwise importable.
     """
-    flags: dict[Tool, bool] = {}
+    flags: dict[str, bool] = {}
     for name, state in (tools or {}).items():
         try:
             tool = Tool(name)
         except ValueError:
             continue
-        flags[tool] = state != "disabled"
+        flags[tool.value] = state != "disabled"
     return flags
 
 

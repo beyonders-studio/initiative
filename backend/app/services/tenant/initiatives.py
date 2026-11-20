@@ -14,7 +14,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.audit_events import AuditEventType
 from app.core.errors import CodedError
 from app.core.messages import GuildPluginMessages, InitiativeMessages
-from app.core.tools import Tool
 from app.db.query import ids_in
 from app.db.session import routed_context, routed_guild_id, routed_tools
 from app.models.platform.guild import GUILD_ADMIN_ROLES, GuildMembership
@@ -24,10 +23,9 @@ from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.initiative import (
     BUILTIN_MEMBER_ROLE,
     BUILTIN_ROLES,
-    DEFAULT_PERMISSION_VALUES,
     INITIATIVE_CUSTOM_ROLES,
     INITIATIVE_MEMBER_PREFIX,
-    INITIATIVE_TOOL_KEYS,
+    INITIATIVE_TOOL_PREFIX,
     Initiative,
     InitiativeJoinPolicy,
     InitiativeJoinRequest,
@@ -35,7 +33,7 @@ from app.models.tenant.initiative import (
     InitiativeRoleModel,
     InitiativeRule,
     JoinRequestStatus,
-    PermissionKey,
+    permission_defaults,
 )
 from app.models.tenant.resource_grant import ResourceGrant
 from app.schemas.platform.user import UserInitiativeRole, UserSummary
@@ -473,7 +471,7 @@ async def update_role_permissions(
     session: AsyncSession,
     *,
     role: InitiativeRoleModel,
-    permissions: dict[PermissionKey, bool],
+    permissions: Mapping[str, bool],
     plugin_permissions: Iterable[PluginPermissionRule] = (),
 ) -> InitiativeRoleModel:
     """Update permissions for a role: tools' keys, and plug-ins' initiative
@@ -1160,7 +1158,7 @@ async def create_imported_initiative(
     name: str,
     description: str | None,
     color: str | None,
-    tools: Mapping[Tool, bool],
+    tools: Mapping[str, bool],
     manager_id: int,
     join_policy: InitiativeJoinPolicy | None = None,
     member_ids: Sequence[int] = (),
@@ -1213,8 +1211,12 @@ async def create_imported_initiative(
     return initiative
 
 
-def _member_key(key: PermissionKey) -> str:
-    return f"{INITIATIVE_MEMBER_PREFIX}{key.value}"
+def _member_key(key: str) -> str:
+    return f"{INITIATIVE_MEMBER_PREFIX}{key}"
+
+
+def _tool_key(kind: str) -> str:
+    return f"{INITIATIVE_TOOL_PREFIX}{kind}"
 
 
 async def _community_rows(session: AsyncSession) -> dict[str, InitiativeRule]:
@@ -1234,18 +1236,21 @@ async def community_defaults(
 ) -> InitiativeDefaultsRead:
     """What the community sets for every initiative in it. ``with_own`` adds,
     for whoever sets it, which live initiatives have each tool and each member
-    permission on of their own, beneath anything the community set."""
+    permission on of their own, beneath anything the community set. Every tool
+    of the community is answered for, its tool plug-ins' too."""
     rows = await _community_rows(session)
+    tools = routed_tools(session)
+    keys = permission_defaults(tools)
     custom_roles = rows.get(INITIATIVE_CUSTOM_ROLES)
     defaults = InitiativeDefaultsRead(
         tools={
-            tool: rows[key].enabled
-            for tool, key in INITIATIVE_TOOL_KEYS.items()
-            if key in rows
+            tool.kind: rows[_tool_key(tool.kind)].enabled
+            for tool in tools
+            if _tool_key(tool.kind) in rows
         },
         member_permissions={
             key: rows[_member_key(key)].enabled
-            for key in PermissionKey
+            for key in keys
             if _member_key(key) in rows
         },
         custom_roles=custom_roles is None or custom_roles.enabled,
@@ -1297,15 +1302,12 @@ async def community_defaults(
         for rule in member_rules
     }
     defaults.own_tools = {
-        tool: [iid for iid, i in live.items() if own_switch(i, tool)] for tool in Tool
+        tool.kind: [iid for iid, i in live.items() if own_switch(i, tool)]
+        for tool in tools
     }
     defaults.own_member_permissions = {
-        key: [
-            iid
-            for iid in live
-            if member.get((iid, None, key.value), DEFAULT_PERMISSION_VALUES[key])
-        ]
-        for key in PermissionKey
+        key: [iid for iid in live if member.get((iid, None, key), default)]
+        for key, default in keys.items()
     }
     from app.services.marketplace.service_plugins import (
         declared_permissions,
@@ -1347,6 +1349,12 @@ async def set_community_defaults(
     keeps its own values beneath, which apply again where the community hands
     a tool or a permission back. Written on the admin's own session: the
     community's rows have no initiative, so no manager's policy admits them."""
+    tools = routed_tools(session)
+    if not (
+        changes.tools.keys() <= tools.by_kind.keys()
+        and changes.member_permissions.keys() <= permission_defaults(tools).keys()
+    ):
+        raise CodedError(InitiativeMessages.TOOL_UNKNOWN, 422)
     before = await community_defaults(session)
     if changes.plugin_member_permissions:
         from app.services.tenant.guild_plugins import declared_permission_ids
@@ -1377,7 +1385,7 @@ async def set_community_defaults(
                     )
                 )
     stored: dict[str, bool | None] = {
-        **{INITIATIVE_TOOL_KEYS[tool]: on for tool, on in changes.tools.items()},
+        **{_tool_key(kind): on for kind, on in changes.tools.items()},
         **{_member_key(key): on for key, on in changes.member_permissions.items()},
     }
     if changes.custom_roles is not None:

@@ -2,14 +2,15 @@ import { Check, Lock, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { InitiativeRoleRead, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { ToolIconTile, ToolSketch } from "@/components/initiatives/ToolSkeletons";
+import type { InitiativeRoleRead } from "@/api/generated/initiativeAPI.schemas";
+import { IconTile, ToolSketch } from "@/components/initiatives/ToolSkeletons";
 import { SettingsSection } from "@/components/settings/SettingsSection";
+import { builtInTool, type CommunityTool } from "@/hooks/useCommunityTools";
 import {
   DEFAULT_ENABLED_TOOLS,
+  isBuiltInTool,
   SIDEBAR_TOOLS,
   toolCamelPlural,
-  toolRouteSegment,
   toolViewPermission,
 } from "@/lib/tools";
 import { Button } from "@/ui/button";
@@ -26,7 +27,7 @@ import { cn } from "@/ui/lib/utils";
  */
 export const rolesThatCanView = (
   roles: InitiativeRoleRead[],
-  tool: Tool
+  tool: string
 ): { granted: InitiativeRoleRead[]; nonManagerGranted: InitiativeRoleRead[] } => {
   const key = toolViewPermission(tool);
   const granted = roles.filter((role) => role.is_manager || (role.permissions[key] ?? false));
@@ -34,10 +35,13 @@ export const rolesThatCanView = (
 };
 
 export interface ToolsSectionProps {
-  /** Current master-switch value per tool. */
-  values: Record<Tool, boolean> | Partial<Record<Tool, boolean>>;
-  /** Toggle one tool's master switch. */
-  onToggle: (tool: Tool, value: boolean) => void;
+  /** The tools to list: the built-in tools where it is not given (the create
+   *  wizard, where no tool plug-in is placed yet). */
+  tools?: CommunityTool[];
+  /** Current master-switch value per tool, by kind. */
+  values: Partial<Record<string, boolean>>;
+  /** Toggle one tool's master switch, by kind. */
+  onToggle: (tool: string, value: boolean) => void;
   canManage: boolean;
   isSaving: boolean;
   /** "card" wraps the rows in a settings section with title+description (settings page). "plain" returns just the rows (for use inside an Accordion). */
@@ -52,13 +56,13 @@ export interface ToolsSectionProps {
   /** Open the roles screen. Rendered as a link beside the audience line. */
   onManageRoles?: () => void;
   /** Grant a tool's view permission to every non-manager role, in one step. */
-  onGrantToEveryone?: (tool: Tool) => void;
+  onGrantToEveryone?: (tool: string) => void;
   /** The switches the community set for every initiative: shown, not changed. */
-  setByCommunity?: Partial<Record<Tool, boolean>>;
+  setByCommunity?: Partial<Record<string, boolean>>;
 }
 
 interface ToolPickerCardProps {
-  tool: Tool;
+  tool: CommunityTool;
   id: string;
   title: string;
   description: string;
@@ -113,7 +117,7 @@ export const ToolPickerCard = ({
       )}
     >
       <span className="flex items-center gap-2">
-        <ToolIconTile tool={tool} active={checked} />
+        <IconTile icon={tool.icon} active={checked} />
         <span className="flex-1 font-medium text-sm">{title}</span>
         {fixed ? (
           <Lock className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
@@ -129,7 +133,7 @@ export const ToolPickerCard = ({
           </span>
         )}
       </span>
-      <ToolSketch tool={tool} active={checked} />
+      {tool.builtIn && <ToolSketch tool={tool.builtIn} active={checked} />}
       <span className="text-xs leading-snug">{description}</span>
     </button>
     {audience}
@@ -149,10 +153,10 @@ const ToolAudience = ({
   onGrantToEveryone,
   disabled,
 }: {
-  tool: Tool;
+  tool: string;
   roles: InitiativeRoleRead[];
   onManageRoles?: () => void;
-  onGrantToEveryone?: (tool: Tool) => void;
+  onGrantToEveryone?: (tool: string) => void;
   disabled: boolean;
 }) => {
   const { t } = useTranslation("initiatives");
@@ -204,11 +208,13 @@ const ToolAudience = ({
  * The tool grid, derived from the registry — projects and files included.
  * They were exempt when everything else hung off them; relationships ended
  * that, so they are cards here like the rest and differ only in starting on.
+ * A tool plug-in's tool follows them, a card like theirs without a sketch.
  *
  * Pass `roles` and each enabled card gains its audience line; omit it (the
  * create wizard, where no roles exist yet) and it does not.
  */
 export const ToolsSection = ({
+  tools,
   values,
   onToggle,
   canManage,
@@ -222,27 +228,33 @@ export const ToolsSection = ({
 }: ToolsSectionProps) => {
   const { t } = useTranslation("initiatives");
   const disabled = !canManage || isSaving;
+  const listed =
+    tools ?? SIDEBAR_TOOLS.map((tool) => builtInTool(tool, t as unknown as (key: never) => string));
 
   const rows = (
     // Sized to the space it is in, not to the viewport: this grid renders
     // both inside a dialog and across a full settings page, and a viewport
     // breakpoint would give the narrow one three columns on a wide screen.
     <div className="grid grid-cols-[repeat(auto-fill,minmax(min(13rem,100%),1fr))] gap-3">
-      {SIDEBAR_TOOLS.map((tool) => {
-        const camel = toolCamelPlural(tool);
+      {listed.map((tool) => {
+        const { kind } = tool;
         // Unset means the tool's own default, not off — projects and files
         // are in this list now and start on.
-        const enabled = values[tool] ?? DEFAULT_ENABLED_TOOLS.has(tool);
-        const fixed = tool in setByCommunity;
+        const enabled = values[kind] ?? (isBuiltInTool(kind) && DEFAULT_ENABLED_TOOLS.has(kind));
+        const fixed = kind in setByCommunity;
         return (
           <ToolPickerCard
-            key={tool}
+            key={kind}
             tool={tool}
-            id={`${idPrefix}-${toolRouteSegment(tool)}-toggle`}
-            title={t(`${camel}Feature` as never)}
-            description={t(`${camel}FeatureDescription` as never)}
+            id={`${idPrefix}-${kind}-toggle`}
+            title={tool.name}
+            description={
+              tool.builtIn
+                ? t(`${toolCamelPlural(tool.builtIn)}FeatureDescription` as never)
+                : t("settings.pluginToolDescription", { plugin: tool.plugin })
+            }
             checked={enabled}
-            onCheckedChange={(value) => onToggle(tool, value)}
+            onCheckedChange={(value) => onToggle(kind, value)}
             disabled={disabled}
             fixed={fixed}
             audience={
@@ -252,7 +264,7 @@ export const ToolsSection = ({
                 </p>
               ) : enabled && roles ? (
                 <ToolAudience
-                  tool={tool}
+                  tool={kind}
                   roles={roles}
                   onManageRoles={onManageRoles}
                   onGrantToEveryone={onGrantToEveryone}

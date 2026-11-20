@@ -37,11 +37,13 @@ from app.services.tenant import initiatives as initiatives_service
 from app.services.tenant.guild_plugins import set_placed_initiatives
 from app.services.tenant.initiative_tools import tool_on_sql
 from app.testing import (
+    COUNTERS_UID,
     create_guild_plugin,
     create_resource_grant,
     create_tool_entity,
     drain_notices,
     enable_all_tools,
+    install_tool_plugin,
     set_notification_prefs,
 )
 from app.testing.factories import create_guild_membership, create_initiative
@@ -2712,3 +2714,95 @@ async def test_a_role_holds_a_plug_in_s_permissions_as_it_holds_a_tool_s(
     )
     assert cleared.json()["plugin_member_permissions"] == []
     assert await opens() == [initiative_id]
+
+
+async def test_a_tool_plug_ins_switch_and_role_keys_are_a_tools(
+    client: AsyncClient, acting_user, session: AsyncSession
+):
+    """A tool plug-in's tool is switched in an initiative, held by each role
+    and set for every initiative by the community through the same fields as
+    a built-in tool, by its kind; a kind the community does not have is
+    refused."""
+    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    initiative_id = admin.initiative.id
+    seat = await acting_user(guild=admin.guild, guild_role=CommunityRole.superadmin)
+    await install_tool_plugin(client, session, seat, placements=[initiative_id])
+    member = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=admin.guild,
+        initiative=admin.initiative,
+        initiative_role="member",
+    )
+    kind = f"counter_group.{COUNTERS_UID.lower()}"
+    view, create = f"{kind}:enabled", f"{kind}:create"
+    initiative_url = admin.g(f"/initiatives/{initiative_id}")
+    defaults_url = admin.g("/initiatives/defaults")
+
+    async def members_view() -> dict:
+        seen = await client.get(
+            member.g(f"/initiatives/{initiative_id}"), headers=member.headers
+        )
+        assert seen.status_code == 200, seen.text
+        return seen.json()
+
+    async def member_role() -> dict:
+        roles = await client.get(f"{initiative_url}/roles", headers=admin.headers)
+        return next(r for r in roles.json() if r["name"] == "member")
+
+    seen = await members_view()
+    assert seen["tools"][kind] is True
+    assert kind in seen["can"]["view"]
+    assert kind not in seen["can"]["create"]
+    role = await member_role()
+    assert (role["permissions"][view], role["permissions"][create]) == (True, False)
+
+    off = await client.patch(
+        initiative_url, headers=admin.headers, json={"tools": {kind: False}}
+    )
+    assert off.status_code == 200, off.text
+    assert off.json()["tools"][kind] is False
+    assert kind not in (await members_view())["can"]["view"]
+    await client.patch(
+        initiative_url, headers=admin.headers, json={"tools": {kind: True}}
+    )
+
+    granted = await client.patch(
+        f"{initiative_url}/roles/{role['id']}",
+        headers=admin.headers,
+        json={"permissions": {create: True}},
+    )
+    assert granted.status_code == 200, granted.text
+    assert granted.json()["permissions"][create] is True
+    assert kind in (await members_view())["can"]["create"]
+
+    made = await client.patch(
+        defaults_url,
+        headers=admin.headers,
+        json={"tools": {kind: False}, "member_permissions": {create: False}},
+    )
+    assert made.status_code == 200, made.text
+    assert made.json()["tools"] == {kind: False}
+    assert made.json()["member_permissions"] == {create: False}
+    own = (await client.get(defaults_url, headers=admin.headers)).json()
+    assert initiative_id in own["own_tools"][kind]
+    assert initiative_id in own["own_member_permissions"][create]
+    seen = await members_view()
+    assert seen["tools"][kind] is False
+    assert kind not in seen["can"]["view"]
+    assert (await member_role())["permissions"][create] is False
+
+    unknown = "nothing.here"
+    for url, body in (
+        (initiative_url, {"tools": {unknown: True}}),
+        (f"{initiative_url}/roles/{role['id']}", {"permissions": {unknown: True}}),
+        (
+            f"{initiative_url}/roles",
+            {"name": "e", "display_name": "E", "permissions": {unknown: True}},
+        ),
+        (defaults_url, {"tools": {unknown: True}}),
+        (defaults_url, {"member_permissions": {unknown: True}}),
+    ):
+        method = client.post if url.endswith("/roles") else client.patch
+        refused = await method(url, headers=admin.headers, json=body)
+        assert refused.status_code == 422, (url, refused.text)
+        assert refused.json()["detail"] == InitiativeMessages.TOOL_UNKNOWN

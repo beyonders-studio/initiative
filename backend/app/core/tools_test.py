@@ -139,8 +139,9 @@ def test_kinds_keep_their_codes_and_live_where_their_sharing_says():
 
 def test_every_tool_has_an_initiative_switch():
     # EVERY tool has an initiative-level switch, a rule keyed by its view
-    # permission, read and written as the initiative's ``tools`` map —
-    # projects and files included, which is the whole of making them optional.
+    # permission, read and written as the initiative's ``tools`` map by kind —
+    # projects and files included, which is the whole of making them optional,
+    # and a tool plug-in's too.
     from app.models.tenant.initiative import PermissionKey
     from app.schemas.tenant.initiative import (
         InitiativeCreate,
@@ -151,7 +152,7 @@ def test_every_tool_has_an_initiative_switch():
     for tool in Tool:
         assert PermissionKey(tool.view_permission)
     for schema in (InitiativeCreate, InitiativeRead, InitiativeUpdate):
-        assert schema.model_fields["tools"].annotation == dict[Tool, bool]
+        assert schema.model_fields["tools"].annotation == dict[str, bool]
 
 
 def test_an_initiative_starts_with_projects_and_files_on():
@@ -165,7 +166,7 @@ def test_an_initiative_starts_with_projects_and_files_on():
     assert {t.kind: on for t, on in switches({}, BUILTIN_TOOLS).items()} == {
         tool.value: tool.spec.on_by_default for tool in Tool
     }
-    assert switches({Tool.post: True}, BUILTIN_TOOLS)[
+    assert switches({Tool.post.value: True}, BUILTIN_TOOLS)[
         BUILTIN_TOOLS.by_kind[Tool.post.value]
     ]
 

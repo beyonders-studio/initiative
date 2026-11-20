@@ -5,7 +5,6 @@ import type {
   InitiativeMemberRead,
   InitiativeRead,
   InitiativeRoleRead,
-  PermissionKey,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
   DEFAULT_ENABLED_TOOLS,
@@ -104,7 +103,7 @@ export function buildInitiativeRole(
       [toolViewPermission(tool), DEFAULT_ENABLED_TOOLS.has(tool)],
       [toolCreatePermission(tool), false],
     ])
-  ) as Record<PermissionKey, boolean>;
+  );
   const { permissions, ...rest } = overrides;
   return {
     id: counter,

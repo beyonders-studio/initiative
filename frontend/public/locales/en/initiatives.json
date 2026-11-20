@@ -150,6 +150,7 @@
     "rolesDescription": "What each role can see, and what it can make. Managers hold everything.",
     "addCustomRole": "Add custom role",
     "setByCommunity": "Your community sets this for every initiative.",
+    "pluginToolDescription": "A tool from the {{plugin}} plug-in.",
     "customRolesOff": "Your community keeps initiatives to their built-in roles.",
     "builtIn": "Built-in",
     "manager": "Manager",
@@ -224,6 +225,8 @@
       "createWikis": "Create Wikis",
       "viewContacts": "View Contacts",
       "createContacts": "Create Contacts",
+      "viewTool": "View {{tool}}",
+      "createTool": "Create in {{tool}}",
       "dashboards_run_as_initiative": "Run dashboards as Initiative"
     },
     "handleColumn": "Handle",

@@ -7,8 +7,10 @@ import {
   buildCommunity,
   buildInitiative,
   buildInitiativeRole,
+  buildToolPlugin,
   buildUser,
   initiativeCan,
+  TOOL_PLUGIN_UID,
 } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
@@ -263,6 +265,43 @@ describe("DetailsPage", () => {
 
       await userEvent.click(screen.getByRole("button", { name: "Turn it off" }));
       await waitFor(() => expect(patches).toEqual([{ tools: { post: false } }]));
+    });
+
+    it("switches a tool plug-in placed here as it does a built-in tool, after them", async () => {
+      const shelf = `shelf.${TOOL_PLUGIN_UID.toLowerCase()}`;
+      const patches = stubInitiative({ tools: { post: true, [shelf]: true } });
+      stubRoles([managerRole(), memberRole({ [`${shelf}:enabled`]: true })]);
+      server.use(
+        communityHttp.get("/plugins/", () =>
+          HttpResponse.json({
+            items: [
+              buildToolPlugin({ placed_initiative_ids: [INITIATIVE_ID] }),
+              // Placed elsewhere: not one of this initiative's tools.
+              buildToolPlugin({
+                listing_uid: "ELSEWHERE00001",
+                definition: { ...buildToolPlugin().definition, default_name: "Elsewhere" },
+                placed_initiative_ids: [INITIATIVE_ID + 1],
+              }),
+            ],
+          })
+        )
+      );
+
+      renderDetails();
+
+      const reading = await screen.findByRole("switch", { name: /Reading/ });
+      expect(reading).toHaveAttribute("aria-checked", "true");
+      const cards = screen.getAllByRole("switch");
+      expect(cards.at(-1)).toBe(reading);
+      expect(cards).toHaveLength(9);
+      const row = reading.closest("[data-slot='tool-card']") as HTMLElement;
+      expect(within(row).getByText("A tool from the Reading plug-in.")).toBeInTheDocument();
+      expect(within(row).getByText(/Visible to Member/)).toBeInTheDocument();
+
+      await userEvent.click(reading);
+      expect(await screen.findByRole("alertdialog")).toHaveTextContent(/hides Reading/);
+      await userEvent.click(screen.getByRole("button", { name: "Turn it off" }));
+      await waitFor(() => expect(patches).toEqual([{ tools: { [shelf]: false } }]));
     });
   });
 });

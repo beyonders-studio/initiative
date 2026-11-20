@@ -17,8 +17,11 @@ import {
   buildPropertyDefinition,
   buildPropertyGroup,
   buildToolLayoutSet,
+  buildToolPlugin,
   buildUserSummary,
   initiativeCan,
+  shelfDefinition,
+  TOOL_PLUGIN_UID,
 } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
@@ -274,6 +277,7 @@ describe("initiative settings sections", () => {
             {
               id: 3,
               name: "CI",
+              definition: {},
               permissions: [
                 { id: "use", level: "initiative", name: null, members: false },
                 { id: "export", level: "initiative", name: { en: "Export builds" }, members: true },
@@ -324,6 +328,59 @@ describe("initiative settings sections", () => {
     await waitFor(() => expect(patches).toHaveLength(1));
     expect(patches[0]).toEqual({
       plugin_permissions: [{ install_id: 3, permission: "use", enabled: true }],
+    });
+  });
+
+  it("gives a tool plug-in placed here the view and create a built-in tool has, and none placed elsewhere", async () => {
+    const shelf = `shelf.${TOOL_PLUGIN_UID.toLowerCase()}`;
+    const patches: Record<string, unknown>[] = [];
+    stubInitiative({ tools: { [shelf]: true } });
+    server.use(
+      communityHttp.get("/plugins/", () =>
+        HttpResponse.json({
+          items: [
+            buildToolPlugin({
+              placed_initiative_ids: [INITIATIVE_ID],
+              permissions: [{ id: "use", level: "initiative", name: null, members: false }],
+            }),
+            buildToolPlugin({
+              listing_uid: "ELSEWHERE00001",
+              definition: {
+                ...shelfDefinition(),
+                tool: { ...shelfDefinition().tool, name: { en: "Elsewhere" } },
+              },
+              placed_initiative_ids: [INITIATIVE_ID + 1],
+            }),
+          ],
+        })
+      ),
+      communityHttp.get("/initiatives/:id/roles", () =>
+        HttpResponse.json([
+          buildInitiativeRole({
+            id: 2,
+            name: "member",
+            display_name: "Member",
+            is_builtin: true,
+            permissions: { [`${shelf}:enabled`]: true, [`${shelf}:create`]: false },
+          }),
+        ])
+      ),
+      communityHttp.patch("/initiatives/:id/roles/:roleId", async ({ request }) => {
+        patches.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({ id: 2 });
+      })
+    );
+
+    renderSection(RolesPage, "roles");
+
+    expect(await screen.findByRole("switch", { name: "View Reading" })).toBeChecked();
+    expect(screen.queryByText("Elsewhere")).not.toBeInTheDocument();
+    // Its tool's keys are the role's answer; its install has no switch beside them.
+    expect(screen.queryByRole("switch", { name: "Reading: Use" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("switch", { name: "Create in Reading" }));
+    await waitFor(() => expect(patches).toHaveLength(1));
+    expect(patches[0]).toMatchObject({
+      permissions: { [`${shelf}:enabled`]: true, [`${shelf}:create`]: true },
     });
   });
 

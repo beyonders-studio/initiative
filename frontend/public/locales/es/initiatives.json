@@ -150,6 +150,7 @@
     "rolesDescription": "Lo que cada rol puede ver y lo que puede crear. Los gestores lo tienen todo.",
     "addCustomRole": "Agregar rol personalizado",
     "setByCommunity": "Tu comunidad define esto para todas las iniciativas.",
+    "pluginToolDescription": "Una herramienta del plug-in {{plugin}}.",
     "customRolesOff": "Tu comunidad limita las iniciativas a sus roles integrados.",
     "builtIn": "Integrado",
     "manager": "Gerente",
@@ -224,6 +225,8 @@
       "createWikis": "Crear wikis",
       "viewContacts": "Ver contactos",
       "createContacts": "Crear contactos",
+      "viewTool": "Ver {{tool}}",
+      "createTool": "Crear en {{tool}}",
       "dashboards_run_as_initiative": "Ejecutar paneles como Iniciativa"
     },
     "handleColumn": "Identificador",

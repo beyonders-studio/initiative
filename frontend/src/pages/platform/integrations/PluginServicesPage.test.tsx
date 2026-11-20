@@ -573,6 +573,19 @@ describe("PluginServicePage", () => {
       });
     });
 
+    it("holds a tool plug-in, which runs no code, to nothing about where it runs", async () => {
+      const user = userEvent.setup();
+      registrations = [buildRegistration({ kind: "tool", base_url: null, jwks: null })];
+      await renderPluginPage();
+
+      expect(screen.queryByText(/Not live until it has an address/)).toBeNull();
+      expect(screen.queryByText(/Not live until it has signing keys/)).toBeNull();
+      expect(screen.queryByLabelText("Base URL")).toBeNull();
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(updateMutate.mock.calls[0][0].data).toEqual({ mandatory: false });
+    });
+
     it("shows the compose service to copy, and its address as the base URL", async () => {
       const service = "github:\n  image: ghcr.io/beyonders-studio/github@sha256:abc\n";
       registrations = [

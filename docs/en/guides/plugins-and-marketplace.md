@@ -155,7 +155,7 @@ Whoever looks after the initiative's layouts can move a plug-in's fields and sec
 
 A tool from a plug-in sits in each initiative it's placed in, beside the built-in ones: under the initiative in the sidebar, and as a tab on the initiative's page. In an initiative it isn't placed in, it isn't there at all. Placing it is the superadmin's job; see [Change where a plug-in works](managing-plugins.md#change-where-a-plug-in-works).
 
-Everyone in the initiative can open it, and making new things in it is up to the initiative's managers. If there's no **New** button, that's why.
+Inside it, the tool works like a built-in one: the initiative's managers can [switch it off](tools.md#turn-a-tool-on-or-off-for-an-initiative) on the **Tools** card, and each role has **View** and **Create** for it on the [Roles screen](../sharing/initiative-roles.md#what-a-role-can-allow). Everyone starts able to open it, and making new things in it is up to the managers until a role is given **Create**. If there's no **New** button, that's why.
 
 ### Make something in a plug-in's tool
 
