@@ -5,7 +5,7 @@
     "version": "11.0.0",
     "x-initiative-source": {
       "version": "0.79.2",
-      "commit": "d8ff3981a36d36768349cdfe7dcee13a42ad2884"
+      "commit": "421760e9bedd7e2bdc3e2d7cc5323027a1c19ab9"
     }
   },
   "servers": [
@@ -6347,6 +6347,74 @@
         ]
       }
     },
+    "/plugin-tools/{kind}": {
+      "get": {
+        "tags": [
+          "plugin-tools"
+        ],
+        "summary": "Read Plugin Tool",
+        "description": "A tool plug-in's tool as it declares it, by its kind or one of its\nitems': its names, the fields of its rows and of each item with their\nkinds and options, which item sits under which, and its actions with the\nfields they ask for. Not found where it is on in no initiative the\ncaller reaches.",
+        "operationId": "read_plugin_tool",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginToolRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": {
+          "tool": "kind",
+          "access": "read"
+        },
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      }
+    },
     "/plugin-tools/{kind}/": {
       "get": {
         "tags": [
@@ -6756,6 +6824,93 @@
         },
         "responses": {
           "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginToolRowRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": {
+          "tool": "kind",
+          "access": "write"
+        },
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "row_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Row Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      }
+    },
+    "/plugin-tools/{kind}/{row_id}/step": {
+      "post": {
+        "tags": [
+          "plugin-tools"
+        ],
+        "summary": "Step Plugin Tool Row",
+        "description": "Move one counter field of a row, named by its key: by ``by``, signed,\nor by the field's own step, up or ``down``, held within its bounds. Two\nsteps landing together each count. Answers the row as it now stands.",
+        "operationId": "step_plugin_tool_row",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginToolStep"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
@@ -15341,9 +15496,6 @@
             "additionalProperties": {
               "type": "boolean"
             },
-            "propertyNames": {
-              "$ref": "#/components/schemas/Tool"
-            },
             "type": "object",
             "title": "Tools"
           },
@@ -15600,6 +15752,54 @@
         "title": "PluginPerson",
         "type": "object"
       },
+      "PluginToolActionRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Name"
+          },
+          "on": {
+            "type": "string",
+            "title": "On"
+          },
+          "params": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Params"
+          },
+          "confirm": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirm"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "on"
+        ],
+        "title": "PluginToolActionRead",
+        "description": "One action of the tool, run on a row of ``on``."
+      },
       "PluginToolActionRun": {
         "properties": {
           "fields": {
@@ -15652,6 +15852,304 @@
         "type": "object",
         "title": "PluginToolActionRun",
         "description": "The answers to an action's ``params``, as values of the fields they\nname."
+      },
+      "PluginToolCounterRead": {
+        "properties": {
+          "min": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min"
+          },
+          "max": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          },
+          "initial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial"
+          }
+        },
+        "type": "object",
+        "title": "PluginToolCounterRead",
+        "description": "A counter field's bounds, step and start: each a number, or the key of\na number field of the same row. Left out, a side is open, the step is 1\nand the start is 0."
+      },
+      "PluginToolFieldRead": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "default": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "default": false
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/PluginToolOptionRead"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "counter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PluginToolCounterRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "kind"
+        ],
+        "title": "PluginToolFieldRead",
+        "description": "One field a table of the tool declares, by its key in ``fields`` (or\nin ``people``, for a ``user_reference``)."
+      },
+      "PluginToolItemRead": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Name"
+          },
+          "parent": {
+            "type": "string",
+            "title": "Parent"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/PluginToolFieldRead"
+            },
+            "type": "array",
+            "title": "Fields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "key",
+          "name",
+          "parent",
+          "fields"
+        ],
+        "title": "PluginToolItemRead",
+        "description": "One item table of the tool: its rows sit under the rows of\n``parent``."
+      },
+      "PluginToolOptionRead": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "label": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Label"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "label"
+        ],
+        "title": "PluginToolOptionRead",
+        "description": "One option of a select or multi-select field."
+      },
+      "PluginToolRead": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Name"
+          },
+          "instance_name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Instance Name"
+          },
+          "icon": {
+            "type": "string",
+            "title": "Icon"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/PluginToolFieldRead"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PluginToolItemRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/PluginToolActionRead"
+            },
+            "type": "array",
+            "title": "Actions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "key",
+          "name",
+          "instance_name",
+          "icon",
+          "fields",
+          "items",
+          "actions"
+        ],
+        "title": "PluginToolRead",
+        "description": "A tool plug-in's tool as it declares it: its names, its own rows'\nfields, its items and its actions. Its layouts are the app's to draw."
       },
       "PluginToolRowCreate": {
         "properties": {
@@ -16044,6 +16542,37 @@
         "type": "object",
         "title": "PluginToolRowUpdate",
         "description": "A change to a row. Only what is sent changes."
+      },
+      "PluginToolStep": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Field"
+          },
+          "by": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By"
+          },
+          "down": {
+            "type": "boolean",
+            "title": "Down",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "field"
+        ],
+        "title": "PluginToolStep",
+        "description": "Move one counter field of a row: by ``by``, a signed amount, or, left\nout, by the field's own step, up, or down where ``down`` says so."
       },
       "PollOptionRead": {
         "properties": {

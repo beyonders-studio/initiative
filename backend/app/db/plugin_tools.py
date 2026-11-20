@@ -730,17 +730,37 @@ def _structure(table: sa.Table, record: ToolRecord) -> list[str]:
     return statements + triggers
 
 
-def _required(table: str, column: str) -> str:
-    """Makes ``column`` of ``table`` (both quoted) NOT NULL where it is not
-    yet, its empty cells first taking its default, as each row would have
-    had it been required from the start."""
+def _has_column(table: str, column: str, *, nullable: bool = False) -> str:
+    """Whether ``table`` (quoted) has ``column`` (quoted), and with
+    ``nullable``, whether the column is not yet NOT NULL."""
     regclass = _compiled(sa.literal(table, sa.Text))
     attname = _compiled(sa.literal(column.strip('"'), sa.Text))
     return (
-        "DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_attribute"
+        "EXISTS (SELECT 1 FROM pg_attribute"
         f" WHERE attrelid = {regclass}::regclass AND attname = {attname}"
-        " AND NOT attnotnull) THEN"
+        + (" AND NOT attnotnull)" if nullable else ")")
+    )
+
+
+def _refuse_held(table: str, holding: str, what: str) -> str:
+    """A plpgsql statement refusing the version where a row of ``table`` the
+    platform holds is ``holding``: a held row keeps every value it has. Run
+    with the table's row security lifted, so the check reads every row."""
+    return (
+        f"IF EXISTS (SELECT 1 FROM {table} WHERE held_at IS NOT NULL AND {holding})"
+        f" THEN RAISE EXCEPTION 'a held row has {what}'; END IF;"
+    )
+
+
+def _required(table: str, column: str) -> str:
+    """Makes ``column`` of ``table`` (both quoted) NOT NULL where it is not
+    yet, its empty cells first taking its default, as each row would have
+    had it been required from the start. A row the platform holds with the
+    cell empty refuses the version instead."""
+    return (
+        f"DO $$ BEGIN IF {_has_column(table, column, nullable=True)} THEN"
         f" ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY;"
+        f" {_refuse_held(table, f'{column} IS NULL', 'no value for a required field')}"
         f" ALTER TABLE {table} DISABLE TRIGGER USER;"
         f" UPDATE {table} SET {column} = DEFAULT WHERE {column} IS NULL;"
         f" ALTER TABLE {table} ENABLE TRIGGER USER;"
@@ -800,7 +820,8 @@ def drop_ddl(listing_uid: str, before: Mapping[str, Any], changes: Any) -> str:
     dropped option is emptied from the cells holding it (a select's set to
     NULL, or to the new version's default where the field is required, a
     multi-select's without it) and the rest keep their values. A cell
-    the platform holds is never emptied: the version is refused instead.
+    the platform holds is never emptied or dropped: the version is refused
+    instead.
     Schema-relative; the parts rendered after it put back what reads the
     tables and their row security."""
     quote = _DIALECT.identifier_preparer.quote
@@ -834,12 +855,8 @@ def drop_ddl(listing_uid: str, before: Mapping[str, Any], changes: Any) -> str:
                 f"ARRAY(SELECT v FROM unnest({column}) AS v WHERE v NOT IN ({listed}))"
             )
         statements += [
-            (
-                f"DO $$ BEGIN IF EXISTS (SELECT 1 FROM {table}"
-                f" WHERE held_at IS NOT NULL AND {holding}) THEN"
-                " RAISE EXCEPTION 'a held row holds a dropped option'; END IF; END $$"
-            ),
             f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY",
+            f"DO $$ BEGIN {_refuse_held(table, holding, 'a dropped option')} END $$",
             f"ALTER TABLE {table} DISABLE TRIGGER USER",
             # A required select's emptied cells take the version's default
             # as the structure rendered after this brings it back to NOT NULL.
@@ -851,12 +868,16 @@ def drop_ddl(listing_uid: str, before: Mapping[str, Any], changes: Any) -> str:
     for name in changes.dropped_fields:
         table_key, _, field_key = name.partition(".")
         table = quote(tool_table_name(listing_uid, table_key))
+        column = quote(_field_key(field_key))
+        held = _refuse_held(table, f"{column} IS NOT NULL", "a dropped field")
         # What reads the column goes with it, and the parts rendered after
         # this put back what the version still has.
-        statements.append(
-            f"ALTER TABLE {table}"
-            f" DROP COLUMN IF EXISTS {quote(_field_key(field_key))} CASCADE"
-        )
+        statements += [
+            f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY",
+            f"DO $$ BEGIN IF {_has_column(table, column)} THEN {held} END IF; END $$",
+            f"ALTER TABLE {table} DROP COLUMN IF EXISTS {column} CASCADE",
+            f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY",
+        ]
     return "".join(f"{statement};\n" for statement in statements)
 
 

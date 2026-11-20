@@ -1895,6 +1895,10 @@ class NamedPerson:
     #: The rows that keep the person, as a condition on ``t``, where ``%1$I``
     #: is the schema: what records something they did, rather than names them.
     kept: str | None = None
+    #: Archived or trashed rows keep the person on every departure, not only
+    #: on leaving the community: the row carries its own lifecycle stamp, and
+    #: is read-only while it is put away.
+    frozen_kept: bool = False
 
 
 NAMED_PEOPLE: tuple[NamedPerson, ...] = (
@@ -1912,6 +1916,21 @@ NAMED_PEOPLE: tuple[NamedPerson, ...] = (
     # What somebody asked for goes with them: nobody is left to answer for.
     NamedPerson("share_requests", "user_id"),
 )
+
+
+def named_people(tools: ToolSet) -> tuple[NamedPerson, ...]:
+    """Every column on a community's content that names a person: the
+    built-in tools' (:data:`NAMED_PEOPLE`), then each person field of its
+    installed tools' tables, emptied when the person leaves."""
+    return (
+        *NAMED_PEOPLE,
+        *(
+            NamedPerson(table.name, column.name, clear=True, frozen_kept=True)
+            for table in tools.installed_tables
+            for column in table.c
+            if column.info.get("field") == "user_reference"
+        ),
+    )
 
 
 def initiative_of(

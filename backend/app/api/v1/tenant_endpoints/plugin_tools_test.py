@@ -230,7 +230,8 @@ async def test_rows_are_tagged_and_trashed_as_a_built_in_tools_are(
 ):
     """A row and its items carry the tags they are made or changed with, and
     go to the trash: a tool's row on the delete right, an item on what
-    changing it asks. The trash lists both and puts them back."""
+    changing it asks, with the comments others said on them. The trash lists
+    both and puts them back, and the initiative goes with them in it."""
     a, member = await _counters(client, session, acting_user)
     tag = await create_tag(session, a.guild, name="Boss")
 
@@ -260,6 +261,12 @@ async def test_rows_are_tagged_and_trashed_as_a_built_in_tools_are(
     assert changed.json()["tags"] == []
 
     for kind, row in ((COUNTER, counter), (GROUP, group)):
+        said = await client.post(
+            member.g("/comments/"),
+            headers=member.headers,
+            json={"subject_type": kind, "subject_id": row["id"], "content": "Hi"},
+        )
+        assert said.status_code == 201, said.text
         refused = await call(member, "DELETE", f"{kind}/{row['id']}")
         assert refused.status_code in (403, 404), refused.text
     trashed = await call(a, "DELETE", f"{COUNTER}/{counter['id']}")
@@ -277,6 +284,10 @@ async def test_rows_are_tagged_and_trashed_as_a_built_in_tools_are(
     )
     assert restored.status_code == 200, restored.text
     assert (await call(a, "GET", f"{GROUP}/{group['id']}")).status_code == 200
+    gone = await client.delete(
+        a.g(f"/initiatives/{a.initiative.id}"), headers=a.headers
+    )
+    assert gone.status_code == 204, gone.text
 
 
 async def test_values_and_places_are_held_to_the_declaration(
@@ -629,6 +640,51 @@ async def test_a_tool_is_read_as_its_plugin_declares_it(client, session, acting_
         a.g(f"/plugin-tools/stranger.{'x' * 14}"), headers=a.headers
     )
     assert response.status_code == 404, response.text
+
+
+async def test_leaving_an_initiative_takes_the_person_off_its_rows(
+    client, session, acting_user
+):
+    """A person field names a member while they are in the row's initiative:
+    removed from it, they are taken off its rows, and the others stay. A row
+    in the trash keeps them, as archived or trashed content does."""
+    definition = counters_tool_manifest()
+    definition["tool"]["fields"].append(
+        {"key": "keeper", "name": {"en": "Keeper"}, "kind": "user_reference"}
+    )
+    a, member = await _counters(client, session, acting_user, definition)
+
+    async def group(keeper: int) -> int:
+        made = await client.post(
+            a.g(f"/plugin-tools/{GROUP}/"),
+            headers=a.headers,
+            json={
+                "initiative_id": a.initiative.id,
+                "name": "G",
+                "people": {"keeper": keeper},
+            },
+        )
+        assert made.status_code == 201, made.text
+        return made.json()["id"]
+
+    theirs, mine = await group(member.user.id), await group(a.user.id)
+    binned = await group(member.user.id)
+    trashed = await client.delete(
+        a.g(f"/plugin-tools/{GROUP}/{binned}"), headers=a.headers
+    )
+    assert trashed.status_code == 204, trashed.text
+    removed = await client.delete(
+        a.g(f"/initiatives/{a.initiative.id}/members/{member.user.id}"),
+        headers=a.headers,
+    )
+    assert removed.status_code == 204, removed.text
+    restored = await client.post(
+        a.g(f"/trash/{GROUP}/{binned}/restore"), headers=a.headers
+    )
+    assert restored.status_code == 200, restored.text
+    for row, keeper in ((theirs, None), (mine, a.user.id), (binned, member.user.id)):
+        read = await client.get(a.g(f"/plugin-tools/{GROUP}/{row}"), headers=a.headers)
+        assert read.json()["people"].get("keeper") == keeper, read.text
 
 
 def test_reading_a_tool_leaves_its_declaration_as_declared():

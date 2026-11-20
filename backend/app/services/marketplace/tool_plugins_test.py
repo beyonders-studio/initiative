@@ -234,6 +234,10 @@ REFUSALS: dict[str, tuple[Callable[[dict], None], str]] = {
         _add_field({"key": "position", "name": {"en": "P"}, "kind": "number"}),
         "every tool's rows have",
     ),
+    "a system column": (
+        _add_field({"key": "xmin", "name": {"en": "X"}, "kind": "number"}),
+        "every tool's rows have",
+    ),
     "a key to a parent": (
         _add_field({"key": "owner_id", "name": {"en": "O"}, "kind": "number"}),
         "'_id'",

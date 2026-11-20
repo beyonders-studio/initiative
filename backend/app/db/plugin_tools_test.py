@@ -6,14 +6,16 @@ from __future__ import annotations
 import copy
 import re
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 import sqlalchemy as sa
 from httpx import AsyncClient
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from alembic import op
 from app.core.messages import GuildPluginMessages
 from app.core.palette import COLOR_PALETTE
 from app.core.tool_set import BUILTIN_TOOLS
@@ -23,7 +25,9 @@ from app.db.kind_codes import assign_plugin_kind_codes
 from app.db.plugin_tools import (
     InstalledTool,
     PluginToolError,
+    _required,
     community_tool_set,
+    drop_ddl,
     provisioned_tools,
     structure_ddl,
 )
@@ -62,6 +66,7 @@ from app.testing import (
     route_as,
     route_session_to_guild,
 )
+from app.testing.tool_plugins import run_as_a_revision
 
 #: A second plug-in declaring the same key as Counters (owner ruling: both
 #: install side by side).
@@ -108,6 +113,20 @@ async def _stamp(session: AsyncSession, schema: str) -> str | None:
     )
 
 
+async def _hold(
+    session: AsyncSession, guild_id: int, table: str, name: str, held: datetime | None
+) -> None:
+    """Hold the row of ``table`` named ``name``, or let it go, past its own
+    guards."""
+    await route_session_to_guild(session, guild_id)
+    await session.exec(sa.text("SET LOCAL session_replication_role = replica"))
+    await session.exec(
+        sa.text(f"UPDATE {table} SET held_at = :held WHERE name = :name"),
+        params={"held": held, "name": name},
+    )
+    await session.commit()
+
+
 async def _columns(session: AsyncSession, schema: str) -> dict[str, set[str]]:
     rows = await session.exec(
         sa.text(
@@ -130,6 +149,7 @@ async def _columns(session: AsyncSession, schema: str) -> dict[str, set[str]]:
         ("key", "a" * 18),
         ("field", "id"),
         ("field", "parent_id"),
+        ("field", "ctid"),
         ("field", "view mode"),
         ("uid", "tsjvtcm0s7gv2x"),
         ("uid", "TSJVTCM0S7GV2'"),
@@ -619,18 +639,8 @@ async def test_the_window_ending_takes_the_tool_and_what_names_it(
     assert await guild_purge.uninstall_deleted_plugins(session, now=within) == 0
     past = datetime.now(UTC) + timedelta(days=PLUGIN_INSTALL_DELETION_DAYS + 1)
 
-    async def hold(held: datetime | None) -> None:
-        """Hold the group, or let it go, past its own guards."""
-        await route_session_to_guild(session, seat.guild.id)
-        await session.exec(sa.text("SET LOCAL session_replication_role = replica"))
-        await session.exec(
-            sa.text(f"UPDATE {_GROUP} SET held_at = :held WHERE id = :id"),
-            params={"held": held, "id": group},
-        )
-        await session.commit()
-
     # Held by the platform, it waits for the next sweep, deleting nothing.
-    await hold(datetime.now(UTC))
+    await _hold(session, seat.guild.id, _GROUP, "Scores", datetime.now(UTC))
     assert await guild_purge.uninstall_deleted_plugins(session, now=past) == 0
     assert set(await _columns(session, guild_schema_name(seat.guild.id))) == {
         _GROUP,
@@ -641,7 +651,7 @@ async def test_the_window_ending_takes_the_tool_and_what_names_it(
         sa.select(sa.func.count()).where(Comment.id == comment_id)
     )
     await session.commit()
-    await hold(None)
+    await _hold(session, seat.guild.id, _GROUP, "Scores", None)
     assert await guild_purge.uninstall_deleted_plugins(session, now=past) == 1
 
     schema = guild_schema_name(seat.guild.id)
@@ -841,11 +851,16 @@ async def test_a_select_made_required_takes_its_new_option(
             listed.pop("displays")
 
     await _publish(session, "1.1.0", dial)
-    taken = await client.post(
-        seat.g(f"/plugins/{install['id']}/upgrade"),
-        headers=seat.headers,
-        json={"version": "1.1.0"},
-    )
+    path, body = seat.g(f"/plugins/{install['id']}/upgrade"), {"version": "1.1.0"}
+    # A held row keeps its empty cell, so the version waits for its release.
+    await _hold(session, seat.guild.id, _COUNTER, "Unset", datetime.now(UTC))
+    refused = await client.post(path, headers=seat.headers, json=body)
+    assert refused.json()["detail"] == GuildPluginMessages.TOOL_NOT_PROVISIONED
+    await route_session_to_guild(session, seat.guild.id)
+    assert await session.scalar(sa.text(f"SELECT view_mode FROM {_COUNTER}")) is None
+    await session.commit()
+    await _hold(session, seat.guild.id, _COUNTER, "Unset", None)
+    taken = await client.post(path, headers=seat.headers, json=body)
     assert taken.status_code == 200, taken.text
     await route_session_to_guild(session, seat.guild.id)
     assert await session.scalar(sa.text(f"SELECT view_mode FROM {_COUNTER}")) == "dial"
@@ -931,15 +946,23 @@ async def test_a_major_drops_what_the_seat_confirms_and_keeps_the_rest(
     columns = await _columns(session, guild_schema_name(seat.guild.id))
     assert "color" in columns[_COUNTER]
 
-    taken = await client.post(
-        f"{path}/upgrade",
-        headers=seat.headers,
-        json={
-            "version": "2.0.0",
-            "drop_fields": ["counter.color"],
-            "drop_options": ["counter.view_mode.clock"],
-        },
-    )
+    confirmed = {
+        "version": "2.0.0",
+        "drop_fields": ["counter.color"],
+        "drop_options": ["counter.view_mode.clock"],
+    }
+    # A held row keeps its values, the dropped option's and the dropped
+    # field's, so the version waits for its release.
+    for held in ("Clock", "Bar"):
+        await _hold(session, seat.guild.id, _COUNTER, held, datetime.now(UTC))
+        refused = await client.post(
+            f"{path}/upgrade", headers=seat.headers, json=confirmed
+        )
+        assert refused.json()["detail"] == GuildPluginMessages.TOOL_NOT_PROVISIONED
+        columns = await _columns(session, guild_schema_name(seat.guild.id))
+        assert "color" in columns[_COUNTER]
+        await _hold(session, seat.guild.id, _COUNTER, held, None)
+    taken = await client.post(f"{path}/upgrade", headers=seat.headers, json=confirmed)
     assert taken.status_code == 200, taken.text
     columns = await _columns(session, guild_schema_name(seat.guild.id))
     assert "color" not in columns[_COUNTER]
@@ -955,6 +978,49 @@ async def test_a_major_drops_what_the_seat_confirms_and_keeps_the_rest(
         )
     )
     assert refused.scalar_one() is True
+
+
+async def test_a_held_row_keeps_its_values_on_the_provisioning_login(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """What a new version does to the cells already there, run as provisioning
+    runs it (on the login that owns the tables, neither a superuser nor exempt
+    from row security), refuses to drop an option or a field a held row has a
+    value in, or to fill a cell a held row leaves empty."""
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    await install_tool_plugin(client, session, seat)
+    await route_session_to_guild(session, seat.guild.id)
+    await session.exec(
+        sa.text(
+            f"WITH g AS (INSERT INTO {_GROUP} (initiative_id, name)"
+            " VALUES (:i, 'Group') RETURNING id)"
+            f" INSERT INTO {_COUNTER} (counter_group_id, name, view_mode, color, min)"
+            " SELECT id, 'Held', 'clock', '#112233', NULL FROM g"
+        ),
+        params={"i": seat.initiative.id},
+    )
+    await session.commit()
+    await _hold(session, seat.guild.id, _COUNTER, "Held", datetime.now(UTC))
+
+    def dropping(options: list[str], fields: list[str]) -> str:
+        changes = SimpleNamespace(dropped_options=options, dropped_fields=fields)
+        return drop_ddl(COUNTERS_UID, _counters(), changes)
+
+    for ddl in (
+        dropping(["counter.view_mode.clock"], []),
+        dropping([], ["counter.color"]),
+        _required(_COUNTER, "min"),
+    ):
+
+        def step(ddl: str = ddl) -> None:
+            for statement in filter(str.strip, ddl.split(";\n")):
+                op.get_bind().exec_driver_sql(statement)
+
+        with pytest.raises(DBAPIError, match="a held row has"):
+            await run_as_a_revision(session, seat.guild.id, step)
+    await route_session_to_guild(session, seat.guild.id)
+    kept = await session.exec(sa.text(f"SELECT view_mode, color, min FROM {_COUNTER}"))
+    assert tuple(kept.one()) == ("clock", "#112233", None)
 
 
 async def test_boot_brings_an_older_item_table_up_to_its_shape(
