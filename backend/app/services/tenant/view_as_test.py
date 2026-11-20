@@ -7,11 +7,19 @@ tasks.
 
 from __future__ import annotations
 
+import sqlalchemy as sa
+
 from app.core.messages import DashboardMessages
 from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserStatus
-from app.testing import create_project, create_task, create_wiki, switch_tools
+from app.testing import (
+    create_project,
+    create_task,
+    create_wiki,
+    route_session_to_guild,
+    switch_tools,
+)
 
 COUNT_TASKS = "SELECT count(*) AS n FROM tasks"
 
@@ -178,6 +186,17 @@ class TestWhatAReaderSees:
         admin, reader = await two_people(session, acting_user)
         await switch_tools(session, admin.initiative, {Tool.wiki: True})
         await create_wiki(session, admin.initiative, admin.user)
+        # The reader's role does not view wikis.
+        await route_session_to_guild(session, admin.guild.id)
+        await session.exec(
+            sa.text(
+                "UPDATE initiative_rules SET enabled = false"
+                " WHERE key = :key AND initiative_role_id = ("
+                "  SELECT id FROM initiative_roles"
+                "  WHERE initiative_id = :i AND name = 'member')"
+            ).bindparams(key=Tool.wiki.view_permission, i=admin.initiative.id)
+        )
+        await session.commit()
 
         dashboard_id = await make_dashboard(
             client, admin, "SELECT count(*) AS n FROM wikis"
