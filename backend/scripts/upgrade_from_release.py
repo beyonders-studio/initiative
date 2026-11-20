@@ -480,18 +480,33 @@ def _divergence(
     upgraded: dict[str, dict[str, str]], fresh: dict[str, dict[str, str]]
 ) -> list[str]:
     """Where the upgraded database differs from the fresh install: ``public``
-    and the template against theirs, and every community schema against a
-    community the fresh install created."""
+    and the template against theirs, and every community schema against the
+    community the fresh install created that holds the same tool plug-ins.
+
+    A community's schema carries the tables of the tool plug-ins it installed,
+    and its kind checks name their kinds, so it is compared with a fresh one
+    that installed the same: the Primary Community the first boot makes holds
+    none, and the seeded one holds Counters."""
     communities = sorted(name for name in fresh if _COMMUNITY.fullmatch(name))
     assert communities, "the fresh install has no community schema to compare with"
-    reference = fresh[communities[0]]
     lines: list[str] = []
     for name in ("public", "guild_template", "roles"):
         lines += _differences(name, upgraded[name], fresh[name])
     for name, shape in upgraded.items():
         if _COMMUNITY.fullmatch(name):
-            lines += _differences(name, shape, reference)
+            tools = _tool_tables(shape)
+            reference = min(
+                communities,
+                key=lambda fresh_name: len(tools ^ _tool_tables(fresh[fresh_name])),
+            )
+            lines += _differences(name, shape, fresh[reference])
     return lines
+
+
+def _tool_tables(shape: dict[str, str]) -> set[str]:
+    """The tables and sequences of the tool plug-ins a community installed,
+    named ``p_<listing>_<key>`` (``app.db.plugin_tools.TABLE_PREFIX``)."""
+    return {key for key in shape if key.startswith("relation p_")}
 
 
 def _other_setup(
