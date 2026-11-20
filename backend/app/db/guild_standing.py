@@ -112,6 +112,7 @@ __all__ = [
     "compute_install_standing",
     "named_ref_candidates",
     "standing_values",
+    "tools_on_sql",
 ]
 
 
@@ -382,6 +383,16 @@ def _enabled_tools(tools: ToolSet, initiatives: str, everywhere: str = "false") 
       SELECT '{writes}' FROM tool_states ts WHERE ts.writes
       ) p
     ), '')"""
+
+
+def tools_on_sql(tools: ToolSet) -> str:
+    """Each ``<initiative>:<tool>`` pair where a tool is on in the routed
+    community, by the terms ``app.enabled_tools`` is written by, for a reader
+    reaching every initiative: one string, as that key holds it. Read with no
+    person, by what reads the community as itself (the delivery of its
+    webhooks)."""
+    return f"""WITH {_COMMUNITY_DEFAULTS_CTE}{_tool_states(tools)}
+SELECT {_enabled_tools(tools, "SELECT id FROM initiatives", "true")}"""
 
 
 def _held_surfaces(membership: str) -> str:

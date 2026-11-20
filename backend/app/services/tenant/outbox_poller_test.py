@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlmodel import select, update
 
+from app.core.tool_set import ToolSet
 from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
 from app.models.tenant._mixins import ActorKind
@@ -596,11 +597,78 @@ def test_an_event_no_scope_reaches_is_never_a_plugins():
     subscription = _subscription(plugin_install_id=4, event_types=["plugins.created"])
     install = _row(1, 500, resource_type="plugins", initiative_id=None)
     everything = frozenset(
-        r.value for r in outbox_poller.webhook_events._read_scopes().values() if r
+        r for r in outbox_poller.webhook_events._read_scopes().values() if r
     )
     assert not outbox_poller._matches(
         install, subscription, _reach(readable=everything)
     )
+
+
+def _counters() -> ToolSet:
+    """A community's tools with Counters installed as a tool plug-in."""
+    from app.db.plugin_tools import InstalledTool, community_tool_set
+    from app.services.marketplace.tool_plugins import (
+        normalize_tool_plugin_definition,
+        tool_kinds,
+    )
+    from app.testing import COUNTERS_UID, counters_tool_manifest
+
+    declared = normalize_tool_plugin_definition(counters_tool_manifest())
+    kinds = tool_kinds(declared, listing_uid=COUNTERS_UID)
+    return community_tool_set(
+        [InstalledTool(COUNTERS_UID, declared)],
+        {kind: 900 + i for i, kind in enumerate(kinds)},
+    )
+
+
+def test_a_tool_plugins_change_is_named_by_its_kinds_and_heard_where_it_is_on():
+    """A change to a tool plug-in's item names it, its event type and its
+    parents by their kinds, and is heard with its tool's read scope only in
+    an initiative the tool is on in: by an installed plug-in's subscription
+    and the community's own alike."""
+    tools = _counters()
+    (tool,) = tools.installed
+    (item,) = tool.children
+    on = outbox_poller.CommunityTools(tools, frozenset({f"11:{tool.kind}"}))
+    off = outbox_poller.CommunityTools(tools, frozenset({f"12:{tool.kind}"}))
+
+    def changed(*columns: str) -> EventOutbox:
+        return _row(
+            1,
+            500,
+            resource_type=item.table,
+            action="updated",
+            changed=list(columns),
+            parents=[{"type": tool.table.name, "id": 9}],
+            dac_tool=tool.kind,
+            dac_id=9,
+        )
+
+    row = changed("count")
+    events = [f"{item.value}.updated"]
+    installs = _subscription(plugin_install_id=4, event_types=events, fields=["count"])
+    community = _subscription(event_types=events)
+    reach = _reach(readable=frozenset({tool.kind}))
+
+    assert outbox_poller._matches(row, installs, reach, on)
+    assert outbox_poller._matches(row, community, None, on)
+    # Without its tool's scope.
+    assert not outbox_poller._matches(row, installs, _reach(), on)
+    # Its tool not on in the change's initiative, or not read at all.
+    for elsewhere in (off, outbox_poller.BUILT_IN):
+        assert not outbox_poller._matches(row, installs, reach, elsewhere)
+        assert not outbox_poller._matches(row, community, None, elsewhere)
+    # Not one of the fields filtered for.
+    assert not outbox_poller._matches(changed("name"), installs, reach, on)
+
+    envelope = outbox_poller._envelope(
+        installs, 500, [row], guild_ref=_GUILD_REF, actor_ref=None, community=on
+    )
+    (change,) = envelope["changes"]
+    assert change["event_type"] == f"{item.value}.updated"
+    assert change["resource"] == {"type": item.value, "id": row.resource_id}
+    assert change["parents"] == [{"type": tool.kind, "id": 9}]
+    assert change["changed"] == ["count"]
 
 
 def test_the_reach_reads_what_the_grant_lets_it_read():
