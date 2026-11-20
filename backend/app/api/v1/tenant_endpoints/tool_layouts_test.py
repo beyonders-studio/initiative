@@ -1058,12 +1058,51 @@ def _layouts(response: Any) -> dict[str, dict[str, Any]]:
     return {each["kind"]: each for each in response.json()["layouts"]}
 
 
+#: Layouts a tool plug-in's counters do not take, by what is wrong with each.
+_UNDECLARED_LAYOUTS: dict[str, dict[str, Any]] = {
+    "a field it does not declare": {
+        "kind": "item",
+        "definition": {"main": [{"type": "field", "props": {"field": "title"}}]},
+    },
+    "a plug-in's part": {
+        "kind": "item",
+        "definition": {
+            "main": [{"type": "plugin", "props": {"plugin": 3, "part": "x"}}]
+        },
+    },
+    "a counter required": {
+        "kind": "item",
+        "definition": {
+            "main": [{"type": "field", "props": {"field": "count", "required": True}}]
+        },
+    },
+    "a column it does not declare": {
+        "kind": "table",
+        "definition": {"columns": ["name", "nope"]},
+    },
+    "a card on a table": {"kind": "table", "definition": {"card": {"type": "card"}}},
+    "a list it does not declare": {
+        "kind": "board",
+        "definition": {"card": {"type": "card"}},
+    },
+    "a look a number has not": {
+        "kind": "grid",
+        "definition": {"displays": {"min": "bar"}},
+    },
+}
+
+
 async def test_a_tool_plugins_table_is_laid_out_as_its_plugin_declares(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
     """Its lists and its rows' page are the declared ones, drawn as shipped
-    until they are changed; a change names the table's own fields, is read
-    back as stored, and a reset draws it as shipped again."""
+    until they are changed; a change names the table's own fields and is
+    held to the declaration, is read back as stored, and a reset draws it as
+    shipped again. A row purged takes the layouts of its items with it."""
+    from app.db.plugin_tools import provisioned_tools
+    from app.db.tool_rows import ToolRow
+    from app.services.tenant.soft_delete import hard_purge_entities
+
     admin, _member, counters, _groups = await _counters_installed(
         client, session, acting_user
     )
@@ -1111,66 +1150,33 @@ async def test_a_tool_plugins_table_is_laid_out_as_its_plugin_declares(
     ).all()
     assert sorted(row.kind for row in stored) == ["grid"]
 
+    for problem, change in _UNDECLARED_LAYOUTS.items():
+        if change["kind"] == "item":
+            change = {**change, "kind": item}
+        refused = await client.put(
+            path, params=counters, json=change, headers=admin.headers
+        )
+        assert refused.status_code == 400, (problem, refused.text)
+        assert refused.json()["detail"] == "TOOL_LAYOUTS_KIND_NOT_ALLOWED", problem
 
-@pytest.mark.parametrize(
-    "change",
-    [
-        {
-            "kind": "item",
-            "definition": {"main": [{"type": "field", "props": {"field": "title"}}]},
-        },
-        {
-            "kind": "item",
-            "definition": {
-                "main": [{"type": "plugin", "props": {"plugin": 3, "part": "x"}}]
-            },
-        },
-        {
-            "kind": "item",
-            "definition": {
-                "main": [
-                    {"type": "field", "props": {"field": "count", "required": True}}
-                ]
-            },
-        },
-        {"kind": "table", "definition": {"columns": ["name", "nope"]}},
-        {"kind": "table", "definition": {"card": {"type": "card"}}},
-        {"kind": "board", "definition": {"card": {"type": "card"}}},
-        {"kind": "grid", "definition": {"displays": {"min": "bar"}}},
-    ],
-    ids=[
-        "a field it does not declare",
-        "a plug-in's part",
-        "a counter required",
-        "a column it does not declare",
-        "a card on a table",
-        "a list it does not declare",
-        "a look a number has not",
-    ],
-)
-async def test_a_tool_plugins_layout_is_held_to_its_declaration(
-    client: AsyncClient, session: AsyncSession, acting_user, change: dict[str, Any]
-):
-    admin, _member, counters, _groups = await _counters_installed(
-        client, session, acting_user
+    tools = await provisioned_tools(admin.guild.id)
+    (tool,) = tools.installed
+    await route_session_to_guild(session, admin.guild.id)
+    await hard_purge_entities(
+        session, [ToolRow(tool.table, {"id": counters["tool_id"]})], tools=tools
     )
-    if change["kind"] == "item":
-        change = {**change, "kind": counters["tool"]}
-
-    response = await client.put(
-        admin.g("/layouts/"), params=counters, json=change, headers=admin.headers
-    )
-
-    assert response.status_code == 400, response.text
-    assert response.json()["detail"] == "TOOL_LAYOUTS_KIND_NOT_ALLOWED"
+    await session.commit()
+    left = await session.exec(select(ToolLayout).where(ToolLayout.tool == item))
+    assert left.all() == []
 
 
-async def test_a_tool_plugins_own_rows_are_laid_out_by_the_initiatives_managers(
+async def test_a_tool_plugins_layouts_are_the_initiatives(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
     """The tool's own rows are listed in the initiative, so their layouts are
-    the initiative's: its members read them, and its managers change them."""
-    admin, member, _counters, groups = await _counters_installed(
+    the initiative's: its members read them, and its managers change them.
+    Nobody outside the initiative reads or changes its tool's layouts."""
+    admin, member, counters, groups = await _counters_installed(
         client, session, acting_user
     )
     change = {"kind": "table", "definition": {"columns": ["name", "description"]}}
@@ -1192,16 +1198,8 @@ async def test_a_tool_plugins_own_rows_are_laid_out_by_the_initiatives_managers(
     assert saved.status_code == 200, saved.text
     assert _layouts(saved)["table"]["definition"]["columns"] == ["name", "description"]
 
-
-async def test_a_tool_plugins_layouts_are_not_reached_outside_its_initiative(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    admin, _member, counters, groups = await _counters_installed(
-        client, session, acting_user
-    )
     outsider = await acting_user(guild=admin.guild, initiative=True)
-    change = {"kind": "table", "definition": {"columns": ["name"]}}
-
+    names = {"kind": "table", "definition": {"columns": ["name"]}}
     for target in (counters, groups):
         read = await client.get(
             outsider.g("/layouts/"), params=target, headers=outsider.headers
@@ -1209,40 +1207,8 @@ async def test_a_tool_plugins_layouts_are_not_reached_outside_its_initiative(
         written = await client.put(
             outsider.g("/layouts/"),
             params=target,
-            json=change,
+            json=names,
             headers=outsider.headers,
         )
         assert read.status_code in (403, 404), read.text
         assert written.status_code in (403, 404), written.text
-
-
-async def test_a_purged_row_takes_the_layouts_of_its_items(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    from app.db.plugin_tools import provisioned_tools
-    from app.db.tool_rows import ToolRow
-    from app.services.tenant.soft_delete import hard_purge_entities
-
-    admin, _member, counters, _groups = await _counters_installed(
-        client, session, acting_user
-    )
-    saved = await client.put(
-        admin.g("/layouts/"),
-        params=counters,
-        json={"kind": "table", "definition": {"columns": ["name"]}},
-        headers=admin.headers,
-    )
-    assert saved.status_code == 200, saved.text
-
-    tools = await provisioned_tools(admin.guild.id)
-    (tool,) = tools.installed
-    await route_session_to_guild(session, admin.guild.id)
-    await hard_purge_entities(
-        session, [ToolRow(tool.table, {"id": counters["tool_id"]})], tools=tools
-    )
-    await session.commit()
-
-    left = await session.exec(
-        select(ToolLayout).where(ToolLayout.tool == counters["tool"])
-    )
-    assert left.all() == []
