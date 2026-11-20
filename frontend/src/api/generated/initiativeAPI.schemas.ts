@@ -10334,6 +10334,8 @@ export interface PluginToolRowCreate {
   name: string;
   position?: number | null;
   grants?: ResourceGrantSchema[];
+  /** @maxItems 100 */
+  tag_ids?: number[];
 }
 
 export type PluginToolRowReadFields = {
@@ -10362,6 +10364,7 @@ export interface PluginToolRowRead {
   people: PluginToolRowReadPeople;
   comments_enabled: boolean;
   grants: ResourceGrantSchema[];
+  tags: TagSummary[];
   created_at: string;
   updated_at: string;
 }
@@ -10389,6 +10392,7 @@ export interface PluginToolRowUpdate {
   people?: PluginToolRowUpdatePeople;
   name?: string | null;
   position?: number | null;
+  tag_ids?: number[] | null;
 }
 
 /**

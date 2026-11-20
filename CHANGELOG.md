@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Counter fields can show as a progress bar or a segmented clock, and open full screen.** Pick the look in the field's settings; a list draws it that way unless its layout says otherwise. On an item, the full-screen button beside a counter field opens it the way the Counters tool does, with big buttons to step it.
 - **Copy a page's link from the desktop app.** The share button beside Reload in the title bar copies the address of the page you're on, ready to open in a browser or send to someone.
 - **Connect a plug-in's account once for every community.** On a plug-in's page under Platform settings › Integrations, **Connect for every community** connects one account, such as a GitHub organization, that every community with the plug-in then uses. Communities see it as connected and can't change or disconnect it; **Disconnect** gives each community its own again.
+- **Tools that plug-ins add work like the built-in ones.** The menu on anything in one archives it or puts it in the trash, and on the tool's own page opens its **Access settings**. Everything in them takes tags, and the trash lists them and puts them back.
 - **Quit the desktop app from its taskbar button on Windows.** Right-click it and choose **Quit Initiative**. Closing the window only tucks the app into the tray.
 
 ### Changed

@@ -50,7 +50,7 @@ export const chipRef = (kind: SmartChipKind, entityId: number): string =>
   `${chipEntityType(kind)}${SEPARATOR}${entityId}${SEPARATOR}${chipAspect(kind)}`;
 
 /** What a link stores: `task:12`, which resolves to what it is called now. */
-export const referenceRef = (entityType: SearchEntityType, entityId: number): string =>
+export const referenceRef = (entityType: string, entityId: number): string =>
   `${entityType}${SEPARATOR}${entityId}`;
 
 /** The kind a stored reference names, or `null` if it names none. */

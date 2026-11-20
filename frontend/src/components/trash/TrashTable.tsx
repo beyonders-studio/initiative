@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ActorKind, type TrashItem } from "@/api/generated/initiativeAPI.schemas";
+import { useInstalledTools } from "@/hooks/usePluginToolRows";
 import {
   type EntityType,
   useCommunityTrashList,
@@ -10,6 +11,7 @@ import {
   useRestoreTrashEntity,
 } from "@/hooks/useTrash";
 import { toast } from "@/lib/mascotToast";
+import { isToolPluginKind, toolOfKind, toolText } from "@/lib/toolPlugins";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
@@ -36,8 +38,16 @@ interface TrashTableProps {
 }
 
 export const TrashTable = ({ variant, showPurgeAction }: TrashTableProps) => {
-  const { t } = useTranslation("trash");
+  const { t, i18n } = useTranslation("trash");
   const { t: tCommon } = useTranslation("common");
+  const installs = useInstalledTools();
+  // What a row is: a built-in kind by its word, a tool plug-in's by the name
+  // its table declares, where this community has it installed.
+  const typeLabel = (kind: string): string => {
+    if (!isToolPluginKind(kind)) return t(`entityType.${kind as EntityType}` as const);
+    const found = installs.status === "ready" ? toolOfKind(installs.tools, kind) : null;
+    return found ? toolText(found.table.name, i18n.language) : t("entityType.pluginItem");
+  };
   // Hooks must run unconditionally; pick the active query by variant. The
   // unused one is disabled so it never fires a request.
   const [page, setPage] = useState(1);
@@ -58,7 +68,7 @@ export const TrashTable = ({ variant, showPurgeAction }: TrashTableProps) => {
     | {
         open: true;
         communityId: number;
-        entityType: EntityType;
+        entityType: string;
         entityId: number;
         name: string;
       }
@@ -94,7 +104,7 @@ export const TrashTable = ({ variant, showPurgeAction }: TrashTableProps) => {
   const handleRestoreClick = (item: TrashItem) => {
     restoreMutation.mutate({
       communityId: item.community_id,
-      entityType: item.entity_type as EntityType,
+      entityType: item.entity_type,
       entityId: item.entity_id,
     });
   };
@@ -126,9 +136,7 @@ export const TrashTable = ({ variant, showPurgeAction }: TrashTableProps) => {
             {items.map((item) => (
               <TableRow key={`${item.entity_type}-${item.entity_id}`}>
                 <TableCell>
-                  <Badge variant="secondary">
-                    {t(`entityType.${item.entity_type as EntityType}` as const)}
-                  </Badge>
+                  <Badge variant="secondary">{typeLabel(item.entity_type)}</Badge>
                 </TableCell>
                 <TableCell className="font-medium">{item.name || `#${item.entity_id}`}</TableCell>
                 <TableCell className="text-muted-foreground">
@@ -164,7 +172,7 @@ export const TrashTable = ({ variant, showPurgeAction }: TrashTableProps) => {
                           setPurgeConfirm({
                             open: true,
                             communityId: item.community_id,
-                            entityType: item.entity_type as EntityType,
+                            entityType: item.entity_type,
                             entityId: item.entity_id,
                             name: item.name || `#${item.entity_id}`,
                           })
@@ -196,7 +204,7 @@ export const TrashTable = ({ variant, showPurgeAction }: TrashTableProps) => {
           onOpenChange={(open) => !open && setPurgeConfirm({ open: false })}
           title={t("deleteNowConfirmTitle")}
           description={t("deleteNowConfirmDescription", {
-            type: t(`entityType.${purgeConfirm.entityType}` as const).toLowerCase(),
+            type: typeLabel(purgeConfirm.entityType).toLowerCase(),
           })}
           confirmLabel={t("deleteNowConfirmAction")}
           onConfirm={handlePurgeConfirm}

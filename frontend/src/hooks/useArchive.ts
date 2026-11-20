@@ -18,7 +18,8 @@ import type { MutationOpts } from "@/types/mutation";
 /** What a built-in archive names: a tool, a kind inside one, or an initiative. */
 export type ArchivableType = ContentKind | "initiative";
 
-export type ArchiveTarget = { entityType: ArchivableType; entityId: number };
+/** What is archived: a built-in kind, or a kind of a tool plug-in's. */
+export type ArchiveTarget = { entityType: string; entityId: number };
 
 // Everything the community shows. Not a wide net for its own sake: archiving
 // cascades, so an initiative going away takes every tool in it and a project

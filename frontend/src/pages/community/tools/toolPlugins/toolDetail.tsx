@@ -7,8 +7,9 @@
 import type { ComponentType, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { PluginToolRowUpdate, Tool } from "@/api/generated/initiativeAPI.schemas";
+import type { PluginToolRowUpdate } from "@/api/generated/initiativeAPI.schemas";
 import { ToolCommentsPanel } from "@/components/comments/ToolCommentsPanel";
+import { TagsField } from "@/components/tags/TagsField";
 import { useSearchMembers } from "@/hooks/useUsers";
 import { type InitiativeDetail, useInitiativeExtension } from "@/lib/layouts/initiativeExtension";
 import {
@@ -60,6 +61,21 @@ const NameEditor = ({ item, label }: EditorProps) => {
       save={home.saves.useSave(label)}
       readOnly={home.readOnly}
       placeholder={t("tool.namePlaceholder")}
+    />
+  );
+};
+
+/** Its tags, picked as any tool's are and saved the moment they are. */
+const TagsEditor = ({ item, label }: EditorProps) => {
+  const { t } = useTranslation("tags");
+  const home = useRowHome();
+  return (
+    <TagsField
+      label={label}
+      tags={item.tags}
+      save={home.saves.useSave(label)}
+      readOnly={home.readOnly}
+      placeholder={t("picker.defaultPlaceholder")}
     />
   );
 };
@@ -187,7 +203,7 @@ const Byline = ({ row }: { row: ToolRow }) => {
 
 /** Its comments, the thread every tool's row has. */
 const Comments = ({ row, kind }: { row: ToolRow; kind: string }) => (
-  <ToolCommentsPanel tool={kind as Tool} entity={row} />
+  <ToolCommentsPanel tool={kind} entity={row} />
 );
 
 /** A declared layout's regions, a region it leaves out holding nothing. On
@@ -220,9 +236,10 @@ export const toolDetail = (
   }),
   fields: (_definitions, added) =>
     new Map([...toolFields(table, language), ...added.map((field) => [field.id, field] as const)]),
-  namespaces: ["plugins", "common"],
+  namespaces: ["plugins", "common", "tags"],
   editors: {
     name: NameEditor,
+    tags: TagsEditor,
     ...Object.fromEntries(
       table.fields.map((field): [string, ComponentType<EditorProps>] => [
         field.key,
@@ -241,7 +258,7 @@ export const toolDetail = (
     saves: context.saves,
     readOnly: context.readOnly,
     initiativeId: context.initiativeId,
-    canOpen: { tool: table.kind as Tool, id: row.id },
+    canOpen: { tool: table.kind, id: row.id },
     links: {
       entity: { id: row.id, initiative_id: context.initiativeId },
       title: row.name || toolText(table.name, language),

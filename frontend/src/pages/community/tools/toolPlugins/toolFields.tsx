@@ -3,9 +3,11 @@
  * fields its table declares, each drawn in its kind's look.
  */
 
+import { Tags } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { ActorKind, MetadataType } from "@/api/generated/initiativeAPI.schemas";
+import { TagsFieldBadges } from "@/components/tags/TagBadge";
 import { useActorName } from "@/hooks/useActorName";
 import {
   fieldSummary,
@@ -96,6 +98,16 @@ const universal = (): FieldDef<ToolRow>[] => [
     hideable: true,
     requireable: false,
     value: (row) => row.updated_at,
+  },
+  {
+    id: "tags",
+    render: TagsFieldBadges,
+    source: "builtin",
+    label: "common:toolSettings.tags",
+    icon: Tags,
+    hideable: true,
+    requireable: false,
+    value: (row) => row.tags,
   },
 ];
 
