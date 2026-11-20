@@ -193,15 +193,15 @@ describe("definitionsEqual", () => {
 describe("effectiveBinding", () => {
   it("layers instance config over the definition's binding", () => {
     // The seam that makes an installed listing work: the catalog definition
-    // cannot know this community's counter ids, so the install fills them in.
+    // cannot know this community's project ids, so the install fills them in.
     const definition = addWidget(EMPTY_DEFINITION, catalog, "stat", "query");
     const config = readConfig({
-      widgets: { w1: { counter_group_id: 4, counter_id: 9 } },
+      widgets: { w1: { project_id: 4, task_id: 9 } },
     });
     expect(effectiveBinding(definition.widgets[0], config)).toEqual({
       source: "query",
-      counter_group_id: 4,
-      counter_id: 9,
+      project_id: 4,
+      task_id: 9,
     });
   });
 
@@ -226,13 +226,13 @@ describe("unboundSlots", () => {
 describe("pruneConfig", () => {
   it("drops config for widgets the definition no longer has", () => {
     const definition = withWidgets("stat");
-    const config = readConfig({ widgets: { w1: { counter_id: 1 }, w9: { counter_id: 2 } } });
+    const config = readConfig({ widgets: { w1: { task_id: 1 }, w9: { task_id: 2 } } });
     expect(Object.keys(pruneConfig(definition, config).widgets)).toEqual(["w1"]);
   });
 
   it("leaves nothing behind when the last widget goes", () => {
     const definition = withWidgets("stat");
-    const config = readConfig({ widgets: { w1: { counter_id: 1 } } });
+    const config = readConfig({ widgets: { w1: { task_id: 1 } } });
     const emptied = removeWidget(definition, "w1");
     expect(pruneConfig(emptied, config).widgets).toEqual({});
   });

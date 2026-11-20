@@ -93,6 +93,7 @@ from app.testing import (
     COUNTERS_UID,
     Actor,
     add_counter,
+    convert_counters,
     create_initiative,
     create_property_definition,
     create_tag,
@@ -745,7 +746,9 @@ async def _tools_on(
     assert expected <= set(context.enabled_tools)
 
 
+@pytest.mark.parametrize("converted", [False, True], ids=["installed", "converted"])
 async def test_nobody_outside_an_initiative_reaches_its_rows(
+    converted: bool,
     session: AsyncSession,
     acting_user: Callable[..., Awaitable[Actor]],
     reading_as: Callable[[int, int], Awaitable[AsyncSession]],
@@ -855,6 +858,12 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
     for table in {case.table for case in cases.values()}:
         await _keep_only(session, table, initiative_a, paths)
     await session.commit()
+    if converted:
+        # Counters turned back into the built-in tool and converted again, as
+        # 20261119_0619 does in a community that uses it: every check below
+        # then holds for the converted tables.
+        install = {**install, "id": await convert_counters(session, guild.id)}
+        await route_session_to_guild(session, guild.id)
 
     await _tools_on(role_session, people.moderator_a, guild.id, initiative_a, tools)
     await _tools_on(role_session, people.moderator_b, guild.id, initiative_b_id, tools)
@@ -1905,9 +1914,16 @@ async def test_sharing_holds_and_responses_keep_a_tool_plugins_rows_in_their_ini
         "t": item_kind,
         "ti": rows[item_kind],
     }
+    # A symmetric edge is stored with its lower node id first.
+    flipped = {"s": ends["t"], "si": ends["ti"], "t": ends["s"], "ti": ends["si"]}
+    lower_first = (tools.endpoint_codes[tool.kind], rows[tool.kind]) < (
+        tools.endpoint_codes[item_kind],
+        rows[item_kind],
+    )
     for ty in linked:
+        given = ends if ty == "depends_on" or lower_first else flipped
         linking = await reading_as(moderator_a.user.id, guild.id)
-        assert await _attempt(linking, link.bindparams(**ends, ty=ty)) == 1, ty
+        assert await _attempt(linking, link.bindparams(**given, ty=ty)) == 1, ty
         await linking.rollback()
 
     read_only = {"status": PluginInstallStatus.read_only.value}

@@ -31,8 +31,6 @@ from app.testing import add_counter, install_tool_plugin
 from app.testing.factories import (
     create_calendar,
     create_calendar_event,
-    create_counter,
-    create_counter_group,
     create_file,
     create_task,
 )
@@ -202,37 +200,6 @@ async def test_a_recurring_event_has_no_opinion(session: AsyncSession, acting_us
     assert (
         await _is_open(session, SearchEntityType.calendar_event, event.id, a.user.id)
         is None
-    )
-
-
-async def test_a_counter_blocks_until_it_reaches_its_target(
-    session: AsyncSession, acting_user
-):
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    group = await create_counter_group(session, a.initiative, a.user)
-    short = await create_counter(session, group, count=3, max=10)
-    reached = await create_counter(session, group, count=10, max=10)
-
-    await route_session_to_guild(session, a.guild.id)
-    assert (
-        await _is_open(session, SearchEntityType.counter, short.id, a.user.id) is True
-    )
-    assert (
-        await _is_open(session, SearchEntityType.counter, reached.id, a.user.id)
-        is False
-    )
-
-
-async def test_a_counter_with_no_target_has_no_finish_line(
-    session: AsyncSession, acting_user
-):
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    group = await create_counter_group(session, a.initiative, a.user)
-    counter = await create_counter(session, group, count=3, max=None)
-
-    await route_session_to_guild(session, a.guild.id)
-    assert (
-        await _is_open(session, SearchEntityType.counter, counter.id, a.user.id) is None
     )
 
 

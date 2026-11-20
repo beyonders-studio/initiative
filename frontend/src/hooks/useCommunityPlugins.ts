@@ -129,7 +129,6 @@ export const useSetPluginScopes = (
 const ITEM_READS: Record<ItemKind, (id: number) => Spec[]> = {
   task: (id) => [q.allTasks(), q.task(id)],
   calendar_event: (id) => [q.allCalendarEvents(), q.calendarEvent(id)],
-  counter: (id) => [q.allCounterGroups(), q.counter(id)],
   post: (id) => [q.allPosts(), q.post(id)],
 };
 

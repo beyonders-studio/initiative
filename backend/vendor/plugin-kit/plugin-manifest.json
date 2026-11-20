@@ -36,7 +36,7 @@
         },
         "scopes": {
           "type": "array",
-          "maxItems": 54,
+          "maxItems": 52,
           "uniqueItems": true,
           "items": {
             "anyOf": [
@@ -46,8 +46,6 @@
                   "projects:write",
                   "files:read",
                   "files:write",
-                  "counter_groups:read",
-                  "counter_groups:write",
                   "calendars:read",
                   "calendars:write",
                   "dashboards:read",
@@ -162,7 +160,7 @@
     },
     "scopes": {
       "type": "array",
-      "maxItems": 54,
+      "maxItems": 52,
       "uniqueItems": true,
       "items": {
         "anyOf": [
@@ -172,8 +170,6 @@
               "projects:write",
               "files:read",
               "files:write",
-              "counter_groups:read",
-              "counter_groups:write",
               "calendars:read",
               "calendars:write",
               "dashboards:read",
@@ -1544,13 +1540,12 @@
         "on": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 4,
+          "maxItems": 3,
           "uniqueItems": true,
           "items": {
             "enum": [
               "task",
               "calendar_event",
-              "counter",
               "post"
             ]
           },
@@ -2003,13 +1998,12 @@
         "on": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 4,
+          "maxItems": 3,
           "uniqueItems": true,
           "items": {
             "enum": [
               "task",
               "calendar_event",
-              "counter",
               "post"
             ]
           },
@@ -2070,13 +2064,12 @@
         "on": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 4,
+          "maxItems": 3,
           "uniqueItems": true,
           "items": {
             "enum": [
               "task",
               "calendar_event",
-              "counter",
               "post"
             ]
           },
@@ -3374,7 +3367,6 @@
               "enum": [
                 "task",
                 "calendar_event",
-                "counter",
                 "post"
               ]
             },

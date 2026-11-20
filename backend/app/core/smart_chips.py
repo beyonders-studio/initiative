@@ -2,8 +2,8 @@
 
 A reference (:mod:`app.core.references`) names something and resolves to what
 it is called. A chip goes one step further and shows a fact ABOUT it that
-changes on its own: the column a task sits in, a counter's reading, when an
-event is.
+changes on its own: the column a task sits in, how far a project has got,
+when an event is.
 
 Only the facts live here. Which kinds can be referred to at all is a reference
 question, not a chip one.
@@ -26,8 +26,6 @@ class SmartChipAspect(str, Enum):
     due = "due"
     #: How urgent it was said to be.
     priority = "priority"
-    #: A counter's current reading.
-    value = "value"
     #: When something happens, and whether it has.
     when = "when"
     #: How much of the work in something is finished.
@@ -67,7 +65,6 @@ SMART_CHIP_KINDS: tuple[tuple[SearchEntityType, SmartChipAspect], ...] = (
     (SearchEntityType.calendar_event, SmartChipAspect.when),
     (SearchEntityType.contact, SmartChipAspect.email),
     (SearchEntityType.contact, SmartChipAspect.phone),
-    (SearchEntityType.counter, SmartChipAspect.value),
     (SearchEntityType.project, SmartChipAspect.progress),
     (SearchEntityType.task, SmartChipAspect.assignee),
     (SearchEntityType.task, SmartChipAspect.due),

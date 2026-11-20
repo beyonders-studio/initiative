@@ -163,7 +163,7 @@ async def test_a_view_the_tool_does_not_have_is_refused(
     actor = await acting_user(guild_role=CommunityRole.admin)
 
     response = await client.get(
-        actor.g("/tools/counter_group/counts"),
+        actor.g("/tools/wiki/counts"),
         headers=actor.headers,
         params={"view": "templates"},
     )

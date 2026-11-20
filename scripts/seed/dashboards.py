@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-from sqlmodel import select
-
 from app.core.tools import Tool
 from app.models.tenant._mixins import ActorKind
-from app.models.tenant.counter import Counter
 from app.models.tenant.dashboard import Dashboard
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.services.tenant.dashboard_definition import normalize_dashboard_definition
@@ -65,7 +62,7 @@ DASHBOARDS: dict[str, list[dict]] = {
                 widget(
                     "w1",
                     "stat",
-                    "SELECT count AS hit_points FROM counters WHERE id = {counter_id}",
+                    "SELECT count AS hit_points FROM p_tsjvtcm0s7gv2x_counter WHERE id = {counter_id}",
                     (0, 0, 3, 2),
                     title="Thorn's hit points",
                     counter=("Party Vitals (Strahd)", "Thorn HP"),
@@ -179,7 +176,7 @@ DASHBOARDS: dict[str, list[dict]] = {
                 widget(
                     "w1",
                     "progress",
-                    "SELECT count AS reading, max AS capacity FROM counters "
+                    "SELECT count AS reading, max AS capacity FROM p_tsjvtcm0s7gv2x_counter "
                     "WHERE id = {counter_id}",
                     (0, 0, 4, 3),
                     title="Hull integrity",
@@ -188,7 +185,7 @@ DASHBOARDS: dict[str, list[dict]] = {
                 widget(
                     "w2",
                     "stat",
-                    "SELECT count AS days FROM counters WHERE id = {counter_id}",
+                    "SELECT count AS days FROM p_tsjvtcm0s7gv2x_counter WHERE id = {counter_id}",
                     (4, 0, 3, 3),
                     title="Days to Kepler-442b",
                     counter=("Fleet Status", "Days to Kepler-442b"),
@@ -196,7 +193,7 @@ DASHBOARDS: dict[str, list[dict]] = {
                 widget(
                     "w3",
                     "chart",
-                    "SELECT name, count AS reading FROM counters "
+                    "SELECT name, count AS reading FROM p_tsjvtcm0s7gv2x_counter "
                     "WHERE counter_group_id = {counter_group_id} ORDER BY name",
                     (7, 0, 5, 4),
                     title="Fleet readings",
@@ -234,7 +231,7 @@ DASHBOARDS: dict[str, list[dict]] = {
                 widget(
                     "w1",
                     "progress",
-                    "SELECT count AS reading, max AS capacity FROM counters "
+                    "SELECT count AS reading, max AS capacity FROM p_tsjvtcm0s7gv2x_counter "
                     "WHERE id = {counter_id}",
                     (0, 0, 4, 3),
                     title="Hull",
@@ -243,7 +240,7 @@ DASHBOARDS: dict[str, list[dict]] = {
                 widget(
                     "w2",
                     "progress",
-                    "SELECT count AS reading, max AS capacity FROM counters "
+                    "SELECT count AS reading, max AS capacity FROM p_tsjvtcm0s7gv2x_counter "
                     "WHERE id = {counter_id}",
                     (4, 0, 4, 3),
                     title="Crew morale",
@@ -252,7 +249,7 @@ DASHBOARDS: dict[str, list[dict]] = {
                 widget(
                     "w3",
                     "stat",
-                    "SELECT count AS days FROM counters WHERE id = {counter_id}",
+                    "SELECT count AS days FROM p_tsjvtcm0s7gv2x_counter WHERE id = {counter_id}",
                     (8, 0, 4, 3),
                     title="Rations left",
                     counter=("The Crimson Maiden", "Rations (days)"),
@@ -291,17 +288,9 @@ async def _row_ids(c: Community, refs: dict) -> dict[str, int | None]:
         found["project_id"] = c.projects[refs["project"]].id
     group_name = refs["counter_group"] or (refs["counter"] or (None,))[0]
     if group_name:
-        found["counter_group_id"] = c.counter_groups[group_name].id
+        found["counter_group_id"] = c.counter_groups[group_name]
     if refs["counter"]:
-        counter = (
-            await c.session.exec(
-                select(Counter).where(
-                    Counter.counter_group_id == found["counter_group_id"],
-                    Counter.name == refs["counter"][1],
-                )
-            )
-        ).one()
-        found["counter_id"] = counter.id
+        found["counter_id"] = c.counters[refs["counter"]]
     return found
 
 
@@ -330,7 +319,8 @@ async def seed(c: Community) -> None:
                     "kind": "dashboard",
                     "layout": {"columns": 12},
                     "widgets": widgets,
-                }
+                },
+                c.tools,
             ),
             created_by=creator.id,
             created_by_kind=ActorKind.member,

@@ -15,7 +15,6 @@ import { useTranslation } from "react-i18next";
 import type {
   ListCalendarsParams,
   ListContactsParams,
-  ListCounterGroupsParams,
   ListDashboardsParams,
   ListFilesParams,
   ListPostsParams,
@@ -41,7 +40,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 type ToolListParams = {
   [Tool.project]: ListProjectsParams;
   [Tool.file]: ListFilesParams;
-  [Tool.counter_group]: ListCounterGroupsParams;
   [Tool.calendar]: ListCalendarsParams;
   [Tool.dashboard]: ListDashboardsParams;
   [Tool.post]: ListPostsParams;
@@ -287,7 +285,6 @@ const searchAndTags = (tool: Tool, placeholder: string) => (props: ToolFilterFie
 const TOOL_FILTER_FIELDS: { [T in Tool]: ComponentType<ToolFilterFieldsProps<T>> } = {
   [Tool.project]: searchAndTags(Tool.project, "filters.searchProjects"),
   [Tool.file]: FileFilterFields,
-  [Tool.counter_group]: searchAndTags(Tool.counter_group, "filters.searchGroups"),
   [Tool.calendar]: searchAndTags(Tool.calendar, "filters.searchCalendars"),
   [Tool.dashboard]: searchAndTags(Tool.dashboard, "filters.searchDashboards"),
   [Tool.post]: searchAndTags(Tool.post, "filters.searchPosts"),

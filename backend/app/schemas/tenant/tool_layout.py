@@ -238,19 +238,6 @@ class EventDetailFieldId(str, Enum):
     tags = "tags"
 
 
-class CounterDetailFieldId(str, Enum):
-    """What a counter's detail edits as a field. Its count, what is linked to
-    it and what can be done with it are parts of their own."""
-
-    name = "name"
-    color = "color"
-    min = "min"
-    max = "max"
-    step = "step"
-    start = "start"
-    view = "view"
-
-
 class PostDetailFieldId(str, Enum):
     """What a notice's detail draws as a field. Its title, tags and properties
     are its tool's, in its header; what it says, asks and answers, and when it
@@ -391,7 +378,6 @@ ColumnFieldId = Annotated[TaskColumnFieldId | FileFieldId | NamedFieldId, _ToolF
 DetailFieldId = Annotated[
     TaskDetailFieldId
     | EventDetailFieldId
-    | CounterDetailFieldId
     | PostDetailFieldId
     | FileFieldId
     | NamedFieldId,
@@ -546,7 +532,7 @@ class DetailStackPart(_Strict):
 #: The parts a detail draws as its own, which edit or show more than one
 #: field: a task's status, who made it, its read-only notice, its case and its
 #: comments; an event's answer; a picture itself, where it came from and its
-#: versions; a counter's count; a notice's body, schedule, reactions and poll;
+#: versions; a notice's body, schedule, reactions and poll;
 #: and any item's dates, menu and relations. Which of them a kind of
 #: detail draws is ``app.services.tenant.tool_layouts.DETAIL_PARTS``.
 OwnPartType = Literal[
@@ -559,7 +545,6 @@ OwnPartType = Literal[
     "case",
     "comments",
     "rsvp",
-    "count",
     "body",
     "schedule",
     "reactions",
@@ -622,7 +607,7 @@ ListLayoutKind = Literal[
 ]
 #: Every kind of thing a detail layout shows one of; which a tool holds is
 #: ``app.core.tools.DETAIL_LAYOUTS``.
-DetailLayoutKind = Literal["task", "calendar_event", "counter", "post", "file"]
+DetailLayoutKind = Literal["task", "calendar_event", "post", "file"]
 
 
 #: What a table can be sorted by, as the task list takes it.

@@ -76,13 +76,15 @@ describe("picking a chip in two steps", () => {
   it("names each kind of thing once, however many facts it has", () => {
     expect(CHIP_ENTITY_TYPES).toEqual([...new Set(CHIP_ENTITY_TYPES)]);
     expect(CHIP_ENTITY_TYPES).toContain(SearchEntityType.task);
-    expect(CHIP_ENTITY_TYPES).toContain(SearchEntityType.counter);
+    expect(CHIP_ENTITY_TYPES).toContain(SearchEntityType.calendar_event);
   });
 
   it("offers every fact a thing has, and only those", () => {
-    // A task is the one with a choice to make; a counter has nothing to ask.
+    // A task is the one with a choice to make; an event has nothing to ask.
     expect(chipKindsFor(SearchEntityType.task).length).toBeGreaterThan(1);
-    expect(chipKindsFor(SearchEntityType.counter)).toEqual([SmartChipKind["counter:value"]]);
+    expect(chipKindsFor(SearchEntityType.calendar_event)).toEqual([
+      SmartChipKind["calendar_event:when"],
+    ]);
     expect(chipKindsFor(SearchEntityType.file)).toEqual([]);
   });
 

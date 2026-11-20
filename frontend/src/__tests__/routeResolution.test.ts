@@ -39,11 +39,7 @@ describe("initiative route resolution", () => {
     ["/c/1/i/5/projects/7/settings", `${INITIATIVE}/projects/$projectId/settings/`],
     ["/c/1/i/5/projects/7/tasks/22", `${INITIATIVE}/projects/$projectId/tasks/$taskId`],
     ["/c/1/i/5/files/3", `${INITIATIVE}/files/$fileId/`],
-    ["/c/1/i/5/counter-groups/6", `${INITIATIVE}/counter-groups/$counterGroupId/`],
-    [
-      "/c/1/i/5/counter-groups/6/counter/9",
-      `${INITIATIVE}/counter-groups/$counterGroupId/counter/$counterId`,
-    ],
+    ["/c/1/i/5/wikis/6", `${INITIATIVE}/wikis/$wikiId/`],
     ["/c/1/i/5/calendars/2", `${INITIATIVE}/calendars/$calendarId/`],
     ["/c/1/i/5/calendars/2/events/8", `${INITIATIVE}/calendars/$calendarId/events/$eventId/`],
     ["/c/1/i/5/dashboards/5", `${INITIATIVE}/dashboards/$dashboardId/`],
@@ -90,10 +86,7 @@ describe("initiative route resolution", () => {
       `${INITIATIVE}/projects/$projectId/settings/task-types`,
     ],
     ["/c/1/i/5/files/3/settings/access", `${INITIATIVE}/files/$fileId/settings/access`],
-    [
-      "/c/1/i/5/counter-groups/6/settings/advanced",
-      `${INITIATIVE}/counter-groups/$counterGroupId/settings/advanced`,
-    ],
+    ["/c/1/i/5/wikis/6/settings/advanced", `${INITIATIVE}/wikis/$wikiId/settings/advanced`],
     [
       "/c/1/i/5/dashboards/5/settings/access",
       `${INITIATIVE}/dashboards/$dashboardId/settings/access`,

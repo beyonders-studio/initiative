@@ -473,8 +473,6 @@ export const SearchEntityType = {
   collection: "collection",
   comment: "comment",
   contact: "contact",
-  counter: "counter",
-  counter_group: "counter_group",
   dashboard: "dashboard",
   file: "file",
   post: "post",
@@ -490,7 +488,6 @@ export type Tool = (typeof Tool)[keyof typeof Tool];
 export const Tool = {
   project: "project",
   file: "file",
-  counter_group: "counter_group",
   calendar: "calendar",
   dashboard: "dashboard",
   post: "post",
@@ -1220,7 +1217,6 @@ export const ListingKind = {
   auto: "auto",
   calendar: "calendar",
   contact: "contact",
-  counter_group: "counter_group",
   dashboard: "dashboard",
   file: "file",
   home_layout: "home_layout",
@@ -5174,7 +5170,6 @@ export type ContentKind = (typeof ContentKind)[keyof typeof ContentKind];
 export const ContentKind = {
   project: "project",
   file: "file",
-  counter_group: "counter_group",
   calendar: "calendar",
   dashboard: "dashboard",
   post: "post",
@@ -5182,7 +5177,6 @@ export const ContentKind = {
   contact: "contact",
   task: "task",
   calendar_event: "calendar_event",
-  counter: "counter",
   wiki_page: "wiki_page",
   collection: "collection",
 } as const;
@@ -5210,7 +5204,6 @@ export const ControlKind = {
   project: "project",
   initiative: "initiative",
   calendar: "calendar",
-  counter_group: "counter_group",
   reference: "reference",
   property: "property",
   property_value: "property_value",
@@ -5261,162 +5254,6 @@ export interface CookieConsentUpdate {
   version: number;
 }
 
-export type CounterViewMode = (typeof CounterViewMode)[keyof typeof CounterViewMode];
-
-export const CounterViewMode = {
-  number: "number",
-  progress_bar: "progress_bar",
-  segmented_clock: "segmented_clock",
-} as const;
-
-export interface CounterCreate {
-  properties?: PropertyValueInput[];
-  /**
-   * @minLength 1
-   * @maxLength 255
-   */
-  name: string;
-  color?: string | null;
-  count?: number | string;
-  min?: number | string | null;
-  max?: number | string | null;
-  step?: number | string;
-  initial_count?: number | string;
-  view_mode?: CounterViewMode;
-  position?: number | string;
-}
-
-/**
- * What a counter's detail edits as a field. Its count, what is linked to
- * it and what can be done with it are parts of their own.
- */
-export type CounterDetailFieldId = (typeof CounterDetailFieldId)[keyof typeof CounterDetailFieldId];
-
-export const CounterDetailFieldId = {
-  name: "name",
-  color: "color",
-  min: "min",
-  max: "max",
-  step: "step",
-  start: "start",
-  view: "view",
-} as const;
-
-export interface CounterGroupCreate {
-  properties?: PropertyValueInput[];
-  /**
-   * @minLength 1
-   * @maxLength 255
-   */
-  name: string;
-  description?: string | null;
-  initiative_id: number;
-  grants?: ResourceGrantSchema[];
-}
-
-/**
- * One counter as a list's card draws it: its name, colour and count.
- */
-export interface CounterPreview {
-  id: number;
-  name: string;
-  color: string | null;
-  count: string;
-}
-
-/**
- * A counter group in a list: the group alone, without its counters —
- * unless the list was asked for previews, when its first few come along.
- */
-export interface CounterGroupSummary {
-  created_by: number | null;
-  created_by_kind: ActorKind;
-  created_by_install: number | null;
-  archived_at: string | null;
-  can: ToolCan;
-  id: number;
-  community_id: number;
-  created_at: string;
-  updated_at: string;
-  comments_enabled: boolean;
-  tags: TagSummary[];
-  properties: PropertySummary[];
-  grants: ResourceGrantSchema[];
-  /**
-   * @minLength 1
-   * @maxLength 255
-   */
-  name: string;
-  description: string | null;
-  initiative_id: number;
-  preview: CounterPreview[] | null;
-}
-
-export interface CounterGroupListResponse {
-  total_count: number;
-  page: number;
-  page_size: number;
-  has_next: boolean;
-  has_prev: boolean;
-  items: CounterGroupSummary[];
-}
-
-/**
- * Serialized counter. Numeric fields are plain decimal strings (e.g. "0",
- * "12.5"), never exponent notation.
- */
-export interface CounterRead {
-  id: number;
-  counter_group_id: number;
-  community_id: number;
-  name: string;
-  color: string | null;
-  count: string;
-  min: string | null;
-  max: string | null;
-  step: string;
-  initial_count: string;
-  view_mode: CounterViewMode;
-  position: string;
-  properties: PropertySummary[];
-  created_at: string;
-  updated_at: string;
-}
-
-export interface CounterGroupRead {
-  created_by: number | null;
-  created_by_kind: ActorKind;
-  created_by_install: number | null;
-  archived_at: string | null;
-  can: ToolCan;
-  id: number;
-  community_id: number;
-  created_at: string;
-  updated_at: string;
-  comments_enabled: boolean;
-  tags: TagSummary[];
-  properties: PropertySummary[];
-  grants: ResourceGrantSchema[];
-  /**
-   * @minLength 1
-   * @maxLength 255
-   */
-  name: string;
-  description: string | null;
-  initiative_id: number;
-  preview: CounterPreview[] | null;
-  counters: CounterRead[];
-}
-
-export interface CounterGroupUpdate {
-  name?: string | null;
-  description?: string | null;
-}
-
-export interface CounterSetCountRequest {
-  count: number | string;
-}
-
 /**
  * How a counter field moves: by ``step`` a tap, never past ``min`` or
  * ``max``, and back to ``initial`` on a reset. A counter with no value
@@ -5430,54 +5267,6 @@ export interface CounterSettingsInput {
   max?: number | null;
   initial?: number;
   look?: CounterLook;
-}
-
-export type CounterSortDirection = (typeof CounterSortDirection)[keyof typeof CounterSortDirection];
-
-export const CounterSortDirection = {
-  asc: "asc",
-  desc: "desc",
-} as const;
-
-export type CounterSortField = (typeof CounterSortField)[keyof typeof CounterSortField];
-
-export const CounterSortField = {
-  name: "name",
-  count: "count",
-} as const;
-
-export interface CounterSortRequest {
-  field: CounterSortField;
-  direction?: CounterSortDirection;
-}
-
-export type CounterStepRequestDirection =
-  (typeof CounterStepRequestDirection)[keyof typeof CounterStepRequestDirection];
-
-export const CounterStepRequestDirection = {
-  up: "up",
-  down: "down",
-} as const;
-
-/**
- * Move a counter up or down. ``amount`` left out moves it by the counter's
- * own ``step``; given, it must be more than nothing, since which way the
- * counter goes is ``direction``'s to say.
- */
-export interface CounterStepRequest {
-  direction: CounterStepRequestDirection;
-  amount?: number | string | null;
-}
-
-export interface CounterUpdate {
-  name?: string | null;
-  color?: string | null;
-  min?: number | string | null;
-  max?: number | string | null;
-  step?: number | string | null;
-  initial_count?: number | string | null;
-  view_mode?: CounterViewMode | null;
-  position?: number | string | null;
 }
 
 export interface CustomRoleAssignment {
@@ -5975,13 +5764,7 @@ export const PostDetailFieldId = {
 } as const;
 
 export interface DetailFieldProps {
-  field:
-    | TaskDetailFieldId
-    | EventDetailFieldId
-    | CounterDetailFieldId
-    | PostDetailFieldId
-    | FileFieldId
-    | string;
+  field: TaskDetailFieldId | EventDetailFieldId | PostDetailFieldId | FileFieldId | string;
   required?: boolean | null;
 }
 
@@ -6007,7 +5790,6 @@ export const OwnPartType = {
   case: "case",
   comments: "comments",
   rsvp: "rsvp",
-  count: "count",
   body: "body",
   schedule: "schedule",
   reactions: "reactions",
@@ -6165,7 +5947,6 @@ export type DetailLayoutReadKind = (typeof DetailLayoutReadKind)[keyof typeof De
 export const DetailLayoutReadKind = {
   task: "task",
   calendar_event: "calendar_event",
-  counter: "counter",
   post: "post",
   file: "file",
 } as const;
@@ -6187,7 +5968,6 @@ export type DetailLayoutWriteKind =
 export const DetailLayoutWriteKind = {
   task: "task",
   calendar_event: "calendar_event",
-  counter: "counter",
   post: "post",
   file: "file",
 } as const;
@@ -8193,7 +7973,6 @@ export type ItemKind = (typeof ItemKind)[keyof typeof ItemKind];
 export const ItemKind = {
   task: "task",
   calendar_event: "calendar_event",
-  counter: "counter",
   post: "post",
 } as const;
 
@@ -11409,7 +11188,7 @@ export interface ReferenceEmbedList {
  */
 export interface ReferenceRead {
   /**
-   * References to read. `task:12` names a thing, `task:12:status` a fact about it. One that names nothing is ignored. Chips: calendar_event:when, contact:email, contact:phone, counter:value, project:progress, task:assignee, task:due, task:priority, task:status, task:checklist
+   * References to read. `task:12` names a thing, `task:12:status` a fact about it. One that names nothing is ignored. Chips: calendar_event:when, contact:email, contact:phone, project:progress, task:assignee, task:due, task:priority, task:status, task:checklist
    * @maxItems 500
    */
   refs?: string[];
@@ -11878,7 +11657,6 @@ export const SmartChipAspect = {
   assignee: "assignee",
   due: "due",
   priority: "priority",
-  value: "value",
   when: "when",
   progress: "progress",
   checklist: "checklist",
@@ -13417,7 +13195,6 @@ export const SmartChipKind = {
   "calendar_event:when": "calendar_event:when",
   "contact:email": "contact:email",
   "contact:phone": "contact:phone",
-  "counter:value": "counter:value",
   "project:progress": "project:progress",
   "task:assignee": "task:assignee",
   "task:due": "task:due",
@@ -14030,31 +13807,6 @@ export type ListFilesParams = {
   archived?: boolean | null;
 };
 
-export type ListCounterGroupsParams = {
-  initiative_id?: number | null;
-  /** Full-text match over the row — its name and its description. Reads the same index the search page does, so a list's filter box and a search agree about what matches. */
-  search?: string | null;
-  /** Order by one of: name, initiative, updated_at. Omit for this tool's own default order. */
-  sort_by?: string | null;
-  /** asc (default) or desc. */
-  sort_dir?: string | null;
-  /** Only counter groups carrying any of these tags. */
-  tag_ids?: number[] | null;
-  /** JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request. */
-  property_filters?: string | null;
-  /** true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows. */
-  archived?: boolean | null;
-  /** Also send what each row's card shows of what is inside it, read for the whole page at once. */
-  include_preview?: boolean;
-  /** @minimum 1 */
-  page?: number;
-  /**
-   * @minimum 1
-   * @maximum 100
-   */
-  page_size?: number;
-};
-
 export type ListCalendarsParams = {
   initiative_id?: number | null;
   scope?: "community" | null;
@@ -14593,7 +14345,7 @@ export const ExportCommunityMode = {
 export type ExportToolParams = {
   /** What to export: one artifact per id, zipped when there is more than one */
   ids?: number[] | null;
-  /** One of the tool's export formats (project: json, pdf, csv, xlsx; file: pdf, md, docx, json, csv, xlsx, file; counter_group: pdf, csv, xlsx, md, json; calendar: ics, json; dashboard: json; post: json; wiki: pdf, md, docx, json; contact: json, csv; an installed tool plug-in: json, and csv or xlsx when it has one item table). ``json`` is the importable envelope. A file's formats depend on its type, so it has no default; a calendar defaults to ``ics``, every other tool to ``json`` */
+  /** One of the tool's export formats (project: json, pdf, csv, xlsx; file: pdf, md, docx, json, csv, xlsx, file; calendar: ics, json; dashboard: json; post: json; wiki: pdf, md, docx, json; contact: json, csv; an installed tool plug-in: json, and csv or xlsx when it has one item table). ``json`` is the importable envelope. A file's formats depend on its type, so it has no default; a calendar defaults to ``ics``, every other tool to ``json`` */
   format?: ExportToolFormat;
   /** Calendars only: with no ids, every calendar the caller may export in this initiative */
   initiative_id?: number | null;
@@ -14622,16 +14374,6 @@ export type PreviewContactsImportParams = {
 };
 
 export type ConfirmImportBody = { [key: string]: unknown } | null;
-
-export type ReadCounterGroupParams = {
-  /** Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one. */
-  include_deleted?: boolean;
-};
-
-export type ReadCounterParams = {
-  /** Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one. */
-  include_deleted?: boolean;
-};
 
 export type ReadCalendarParams = {
   /** Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one. */
@@ -14878,11 +14620,6 @@ export type SetFileGrantsParams = {
   note?: string | null;
 };
 
-export type SetCounterGroupGrantsParams = {
-  /** A note to each person the new sharing lets in. */
-  note?: string | null;
-};
-
 export type SetCalendarGrantsParams = {
   /** A note to each person the new sharing lets in. */
   note?: string | null;
@@ -14914,7 +14651,7 @@ export type SearchCommunityParams = {
    * @maxLength 1000
    */
   search: string;
-  /** Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, contact, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly. */
+  /** Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, contact, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly. */
   types?: string[] | null;
   /** Restrict to one initiative. */
   initiative_id?: number | null;
@@ -14932,7 +14669,7 @@ export type SearchCommunityParams = {
 };
 
 export type RecentCommunityParams = {
-  /** Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, contact, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly. */
+  /** Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, contact, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly. */
   types?: string[] | null;
   /** Restrict to one initiative. */
   initiative_id?: number | null;
@@ -14950,7 +14687,7 @@ export type SuggestCommunityParams = {
    * @maxLength 200
    */
   search: string;
-  /** Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, contact, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly. */
+  /** Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, contact, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly. */
   types?: string[] | null;
   /** Restrict to one initiative. */
   initiative_id?: number | null;
@@ -15095,24 +14832,6 @@ export type ListMyFilesParams = {
   community_ids?: number[] | null;
   search?: string | null;
   /** Narrow to files the caller created. */
-  created_by_me?: boolean;
-  /** Order by one of: name, updated_at, created_at. Omit for this tool's own default order. There is no `initiative` here — a merged cross-guild list is ordered by what the tool's own rows carry, and an initiative name is not one of them. */
-  sort_by?: string | null;
-  /** asc (default) or desc. */
-  sort_dir?: string | null;
-  /** @minimum 1 */
-  page?: number;
-  /**
-   * @minimum 0
-   * @maximum 100
-   */
-  page_size?: number;
-};
-
-export type ListMyCounterGroupsParams = {
-  community_ids?: number[] | null;
-  search?: string | null;
-  /** Narrow to counter groups the caller created. */
   created_by_me?: boolean;
   /** Order by one of: name, updated_at, created_at. Omit for this tool's own default order. There is no `initiative` here — a merged cross-guild list is ordered by what the tool's own rows carry, and an initiative name is not one of them. */
   sort_by?: string | null;

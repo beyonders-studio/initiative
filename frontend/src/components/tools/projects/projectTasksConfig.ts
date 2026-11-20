@@ -1,4 +1,4 @@
-import { CalendarDays, FileImage, FileText, Hash, Megaphone } from "lucide-react";
+import { CalendarDays, FileImage, FileText, Megaphone } from "lucide-react";
 
 import type { DetailLayoutRead, TaskPriority } from "@/api/generated/initiativeAPI.schemas";
 import type { LayoutLook } from "@/ui/layouts/looks";
@@ -28,7 +28,6 @@ export const priorityDotClass: Record<TaskPriority, string> = {
 export const detailLayoutLooks: Record<DetailLayoutRead["kind"], LayoutLook> = {
   task: { icon: FileText, labelKey: "layouts:taskLayout" },
   calendar_event: { icon: CalendarDays, labelKey: "layouts:eventDetail.name" },
-  counter: { icon: Hash, labelKey: "layouts:counterDetail.name" },
   post: { icon: Megaphone, labelKey: "layouts:postDetail.name" },
   file: { icon: FileImage, labelKey: "layouts:fileDetail.name" },
 };

@@ -26,13 +26,7 @@ import type { MutationOpts } from "@/types/mutation";
 /** Refresh every list that embeds TagSummary chips — a rename/recolor or
  * delete must reach all of them, not just the tags list. */
 const invalidateTagBearers = () => {
-  void invalidate(
-    q.allTasks(),
-    q.allProjects(),
-    q.allFiles(),
-    q.allCounterGroups(),
-    q.allCalendars()
-  );
+  void invalidate(q.allTasks(), q.allProjects(), q.allFiles(), q.allCalendars());
 };
 
 export const useTags = (options?: { enabled?: boolean }) => {

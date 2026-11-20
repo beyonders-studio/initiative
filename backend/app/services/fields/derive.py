@@ -65,7 +65,6 @@ FK_CONTROLS: dict[str, ControlKind] = {
     "tasks": ControlKind.task,
     "tags": ControlKind.tag,
     "calendars": ControlKind.calendar,
-    "counter_groups": ControlKind.counter_group,
     "metadata_definitions": ControlKind.property,
 }
 

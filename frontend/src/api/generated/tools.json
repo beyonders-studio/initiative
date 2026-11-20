@@ -30,22 +30,6 @@
       "layouts": null,
       "item_tables": ["file_versions"]
     },
-    "counter_group": {
-      "code": 4,
-      "on_by_default": false,
-      "export_formats": ["pdf", "csv", "xlsx", "md", "json"],
-      "report_formats": ["pdf", "csv", "xlsx", "md"],
-      "type_report_formats": {},
-      "feed": false,
-      "community_rows": null,
-      "layouts": {
-        "per_instance": true,
-        "lists": [],
-        "detail": "counter",
-        "typed": false
-      },
-      "item_tables": ["counters"]
-    },
     "calendar": {
       "code": 1,
       "on_by_default": false,
@@ -136,13 +120,6 @@
       "commentable": false,
       "archivable": false
     },
-    "counter": {
-      "code": 3,
-      "parent": "counter_group",
-      "standalone": false,
-      "commentable": false,
-      "archivable": false
-    },
     "wiki_page": {
       "code": 16,
       "parent": "wiki",
@@ -163,8 +140,6 @@
     "create_projects",
     "files_enabled",
     "create_files",
-    "counter_groups_enabled",
-    "create_counter_groups",
     "calendars_enabled",
     "create_calendars",
     "dashboards_enabled",

@@ -28,8 +28,8 @@ from app.core.tools import Tool
 
 
 def test_a_tool_scope_parses_to_its_tool():
-    resource, access = parse_scope("counter_groups:write")
-    assert resource is tool_resource(Tool.counter_group)
+    resource, access = parse_scope("wikis:write")
+    assert resource is tool_resource(Tool.wiki)
     assert access is PluginScopeAccess.write
 
 

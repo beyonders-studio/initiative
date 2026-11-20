@@ -52,7 +52,6 @@ from app.models.tenant._mixins import ActorKind, tool_models
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.collection import Collection
 from app.models.tenant.comment import Comment, CommentAudience, in_thread, said_on
-from app.models.tenant.counter import CounterGroup
 from app.models.tenant.dashboard import Dashboard
 from app.models.tenant.file import File
 from app.models.tenant.initiative import Initiative
@@ -108,7 +107,6 @@ class CommentTarget:
 #: what makes the lookup below independent of import order.
 _REGISTERED = (
     Calendar,
-    CounterGroup,
     Dashboard,
     File,
     Post,

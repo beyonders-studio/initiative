@@ -4,7 +4,7 @@ import { validatePage } from "@/lib/routeSearch";
 import { ToolsPage } from "@/pages/my/ToolsPage";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/my-tools")({
-  /** `tool` is a tool's route segment ("projects", "counter-groups", …). It is
+  /** `tool` is a tool's route segment ("projects", "calendars", …). It is
    *  passed through as-is; the page resolves it against the tool registry and
    *  falls back to the first tool it actually has a tab for. */
   /** `q`, `sort` and `dir` are the table's search box and its order, and

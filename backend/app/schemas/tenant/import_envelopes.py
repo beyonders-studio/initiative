@@ -47,7 +47,6 @@ def envelope_literal(tool: Tool) -> Any:
 # than calls, since an annotation holds a name.
 FileEnvelopeType: Any = envelope_literal(Tool.file)
 WikiEnvelopeType: Any = envelope_literal(Tool.wiki)
-CounterGroupEnvelopeType: Any = envelope_literal(Tool.counter_group)
 DashboardEnvelopeType: Any = envelope_literal(Tool.dashboard)
 PostEnvelopeType: Any = envelope_literal(Tool.post)
 ContactEnvelopeType: Any = envelope_literal(Tool.contact)
@@ -279,33 +278,6 @@ class WikiEnvelope(_EnvelopeBase):
     pages: list[WikiPageEnvelope] = []
     #: The files filed in the wiki, when its export carried them.
     files: list[WikiFiledFile] = []
-
-
-class CounterEnvelopeItem(SanitizedBaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    name: str
-    color: str | None = None
-    count: float = 0
-    min: float | None = None
-    max: float | None = None
-    step: float = 1
-    initial_count: float = 0
-    view_mode: str = "number"
-    position: float = 0
-    properties: list[EnvelopePropertyValue] = []
-    #: What this counter was called where it came from — a thing a reference
-    #: elsewhere in the same import can name. Refs live for one job.
-    external_ref: str | None = None
-
-
-class CounterGroupEnvelope(_EnvelopeBase):
-    type: CounterGroupEnvelopeType
-    name: str
-    description: str | None = None
-    tags: list[str] = []
-    properties: list[EnvelopePropertyValue] = []
-    counters: list[CounterEnvelopeItem] = []
 
 
 class DashboardEnvelope(_EnvelopeBase):

@@ -108,8 +108,6 @@
   "anchor": {
     "calendar": "This calendar",
     "calendar_event": "This event",
-    "counter": "This counter",
-    "counter_group": "This group",
     "dashboard": "This dashboard",
     "file": "This file",
     "generic": "This",
@@ -128,8 +126,6 @@
   },
   "empty_calendar": "Nothing linked yet. Link the project this calendar plans, or the file that explains it.",
   "empty_calendar_event": "Nothing linked yet. Link the task this event is for, or the file you'll work from.",
-  "empty_counter": "Nothing linked yet. Link the task this counts towards, or the project it reports on.",
-  "empty_counter_group": "Nothing linked yet. Link the project these numbers are about.",
   "empty_dashboard": "Nothing linked yet. Link the project this reports on, or the file that reads it.",
   "empty_post": "Nothing linked yet. Link the project this announces, or the file behind it.",
   "empty_wiki_page": "Nothing linked yet. Mention this page with [[ from anywhere and it will show up here.",

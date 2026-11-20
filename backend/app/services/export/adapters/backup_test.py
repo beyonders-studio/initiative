@@ -17,7 +17,7 @@ def _report(formats: dict[str, Any]) -> dict[str, Any]:
     "formats",
     [
         {"project": "pdf"},
-        {"counter_group": "xlsx"},
+        {"project": "xlsx"},
         {"calendar": "json"},
         {"contact": "csv"},
         {"file": {"lexical": "docx", "sheet": "csv"}},
@@ -43,7 +43,7 @@ def test_report_formats_a_section_offers_are_accepted(formats):
         {"file": {"lexical": "csv"}},
         {"not_a_tool": "pdf"},
         # A format that is not a string is refused rather than looked up.
-        {"counter_group": {"md": True}},
+        {"contact": {"md": True}},
     ],
 )
 def test_report_formats_a_section_does_not_offer_are_refused(formats):

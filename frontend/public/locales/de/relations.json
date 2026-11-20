@@ -108,8 +108,6 @@
   "anchor": {
     "calendar": "Dieser Kalender",
     "calendar_event": "Dieser Termin",
-    "counter": "Dieser Zähler",
-    "counter_group": "Diese Gruppe",
     "dashboard": "Dieses Dashboard",
     "file": "Diese Datei",
     "generic": "Dies",
@@ -128,8 +126,6 @@
   },
   "empty_calendar": "Noch nichts verknüpft. Verknüpfe das Projekt, das dieser Kalender plant, oder die Datei, die ihn erklärt.",
   "empty_calendar_event": "Noch nichts verknüpft. Verknüpfe die Aufgabe, um die es geht, oder die Datei, mit der du arbeitest.",
-  "empty_counter": "Noch nichts verknüpft. Verknüpfe die Aufgabe, auf die das einzahlt, oder das Projekt, über das es berichtet.",
-  "empty_counter_group": "Noch nichts verknüpft. Verknüpfe das Projekt, um dessen Zahlen es geht.",
   "empty_dashboard": "Noch nichts verknüpft. Verknüpfe das Projekt, über das dies berichtet, oder die Datei, die es auswertet.",
   "empty_post": "Noch nichts verknüpft. Verknüpfe das Projekt, das hier angekündigt wird, oder die Datei dahinter.",
   "empty_wiki_page": "Noch nichts verknüpft. Erwähne diese Seite mit [[ von irgendwo – dann erscheint sie hier.",

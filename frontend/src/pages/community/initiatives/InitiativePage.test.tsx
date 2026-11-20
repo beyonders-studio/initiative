@@ -28,7 +28,7 @@ const page = () =>
   HttpResponse.json({ items: [], total_count: 0, page: 1, page_size: 20, has_next: false });
 
 /** Every tool list answers the same envelope; the tabs only need it to be empty. */
-const VIEWABLE = [Tool.project, Tool.file, Tool.dashboard, Tool.calendar, Tool.counter_group];
+const VIEWABLE = [Tool.project, Tool.file, Tool.dashboard, Tool.calendar, Tool.wiki];
 
 function stubEverything(hidden: Tool[] = [], roster = true) {
   server.use(
@@ -39,7 +39,7 @@ function stubEverything(hidden: Tool[] = [], roster = true) {
           name: "Apollo",
           member_count: 4,
           role_display_name: "Project Manager",
-          tools: { dashboard: true, calendar: true, counter_group: true },
+          tools: { dashboard: true, calendar: true, wiki: true },
           can: {
             manage: false,
             moderate: false,
@@ -52,7 +52,7 @@ function stubEverything(hidden: Tool[] = [], roster = true) {
     ),
     communityHttp.get("/projects/", page),
     communityHttp.get("/files/", page),
-    communityHttp.get("/counter-groups/", page),
+    communityHttp.get("/wikis/", page),
     communityHttp.get("/calendars/", page),
     communityHttp.get("/dashboards/", page)
   );

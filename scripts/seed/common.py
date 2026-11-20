@@ -8,17 +8,18 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 from PIL import Image, ImageEnhance
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tool_set import BUILTIN_TOOLS, ToolRecord, ToolSet
 from app.core.tools import Tool
 from app.models.platform.guild import Guild
 from app.models.platform.user import User
 from app.models.tenant._mixins import ArchiveMixin
 from app.models.tenant.calendar_event import CalendarEvent
-from app.models.tenant.counter import CounterGroup
 from app.models.tenant.file import File
 from app.models.tenant.initiative import Initiative, InitiativeRoleModel
 from app.models.tenant.project import Project
@@ -61,7 +62,11 @@ class Community:
     projects: dict[str, Project] = field(default_factory=dict)
     tasks: dict[str, Task] = field(default_factory=dict)
     files: dict[str, File] = field(default_factory=dict)
-    counter_groups: dict[str, CounterGroup] = field(default_factory=dict)
+    #: The community's tools, its tool plug-ins' among them once installed.
+    tools: ToolSet = BUILTIN_TOOLS
+    #: Counter groups' ids by name, and counters' by group and name.
+    counter_groups: dict[str, int] = field(default_factory=dict)
+    counters: dict[tuple[str, str], int] = field(default_factory=dict)
     events: dict[str, CalendarEvent] = field(default_factory=dict)
     #: Rows to archive, and the date to stamp, once the community is filled.
     archives: list[tuple[ArchiveMixin, datetime]] = field(default_factory=list)
@@ -69,8 +74,8 @@ class Community:
 
 def share(
     c: Community,
-    tool: Tool,
-    row: SQLModel,
+    tool: Tool | ToolRecord,
+    row: SQLModel | Any,
     owner: User,
     *,
     writers: Iterable[str] = (),

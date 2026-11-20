@@ -63,9 +63,6 @@
     "finalizing": "Finalisation de la redirection…",
     "goHome": "Revenir à l'accueil"
   },
-  "counterGroups": "Compteurs",
-  "allCounterGroups": "Tous les compteurs",
-  "createCounterGroup": "Nouveau groupe de compteurs",
   "createExternally": "Créé dans {{name}}",
   "operatorDashboard": "Tableau de bord opérateur",
   "requestsWaiting_one": "{{count}} en attente",

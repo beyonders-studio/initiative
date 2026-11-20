@@ -301,7 +301,7 @@ describe("the tool index page", () => {
 
 describe("the tool index page's property filter", () => {
   it("offers only the properties of the initiative the list is in", async () => {
-    stubList(Tool.counter_group, [row(Tool.counter_group, { id: 1, name: "Running" })]);
+    stubList(Tool.wiki, [row(Tool.wiki, { id: 1, name: "Running" })]);
     const asked: URLSearchParams[] = [];
     server.use(
       communityHttp.get("/property-definitions/", ({ request }) => {
@@ -310,7 +310,7 @@ describe("the tool index page's property filter", () => {
       })
     );
 
-    renderIndex(Tool.counter_group);
+    renderIndex(Tool.wiki);
     await screen.findByText("Running");
     await userEvent.click(screen.getByRole("button", { name: shared("toolbar.filters") }));
 
@@ -356,24 +356,24 @@ describe("the tool index page's bulk actions", () => {
   };
 
   it("duplicates and deletes a selection through the tool's own routes", async () => {
-    stubList(Tool.counter_group, [
-      row(Tool.counter_group, { id: 4, name: "Standup" }),
-      row(Tool.counter_group, { id: 5, name: "Retro" }),
+    stubList(Tool.wiki, [
+      row(Tool.wiki, { id: 4, name: "Standup" }),
+      row(Tool.wiki, { id: 5, name: "Retro" }),
     ]);
     const duplicated: string[] = [];
     const deleted: string[] = [];
     server.use(
-      communityHttp.post("/counter-groups/:id/duplicate", ({ params }) => {
+      communityHttp.post("/wikis/:id/duplicate", ({ params }) => {
         duplicated.push(String(params.id));
         return HttpResponse.json({ id: 40, initiative_id: INITIATIVE_ID });
       }),
-      communityHttp.delete("/counter-groups/:id", ({ params }) => {
+      communityHttp.delete("/wikis/:id", ({ params }) => {
         deleted.push(String(params.id));
         return new HttpResponse(null, { status: 204 });
       })
     );
 
-    renderIndex(Tool.counter_group);
+    renderIndex(Tool.wiki);
     await screen.findByText("Standup");
 
     await select("Standup");

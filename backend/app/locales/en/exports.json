@@ -4,16 +4,13 @@
   },
   "footer": {
     "tasks": "Tasks export",
-    "project": "{{name}} — project report",
-    "counters": "{{name}} — counters export"
+    "project": "{{name}} — project report"
   },
   "summary": {
     "tasks_one": "{{count}} task",
     "tasks_other": "{{count}} tasks",
     "items_one": "{{count}} item",
-    "items_other": "{{count}} items",
-    "counters_one": "{{count}} counter",
-    "counters_other": "{{count}} counters"
+    "items_other": "{{count}} items"
   },
   "round": "round {{round}}",
   "pageOf": "of",
@@ -68,12 +65,7 @@
     "user_id": "Member",
     "notes": "Notes",
     "order": "#",
-    "status": "Status",
-    "name": "Counter",
-    "count": "Count",
-    "min": "Min",
-    "max": "Max",
-    "step": "Step"
+    "status": "Status"
   },
   "groups": {
     "empty": {

@@ -4,10 +4,10 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  buildRecentCounterGroupItem,
   buildRecentFileItem,
   buildRecentItem,
   buildRecentProjectItem,
+  buildRecentWikiItem,
 } from "@/__tests__/factories/recent.factory";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 
@@ -42,7 +42,7 @@ describe("RecentTabsBar", () => {
     const items = [
       buildRecentProjectItem({ name: "Lost Mines", icon: "⚒️" }),
       buildRecentFileItem({ name: "Session Notes" }),
-      buildRecentCounterGroupItem({ name: "HP Trackers" }),
+      buildRecentWikiItem({ name: "HP Trackers" }),
     ];
     renderWithProviders(
       <RecentTabsBar
@@ -64,7 +64,7 @@ describe("RecentTabsBar", () => {
     const items = [
       buildRecentProjectItem({ entity_id: 11, name: "ProjectX" }),
       buildRecentFileItem({ entity_id: 22, name: "DocY" }),
-      buildRecentCounterGroupItem({ entity_id: 44, name: "GroupW" }),
+      buildRecentWikiItem({ entity_id: 44, name: "GroupW" }),
     ];
     renderWithProviders(
       <RecentTabsBar
@@ -82,7 +82,7 @@ describe("RecentTabsBar", () => {
     expect(screen.getByRole("link", { name: /DocY/ })).toHaveAttribute("href", "/c/1/i/5/files/22");
     expect(screen.getByRole("link", { name: /GroupW/ })).toHaveAttribute(
       "href",
-      "/c/1/i/5/counter-groups/44"
+      "/c/1/i/5/wikis/44"
     );
   });
 
@@ -113,7 +113,7 @@ describe("RecentTabsBar", () => {
 
   it("dispatches onClose with the item when the X is clicked", async () => {
     const onClose = vi.fn();
-    const group = buildRecentCounterGroupItem({ entity_id: 7, name: "Combat" });
+    const group = buildRecentWikiItem({ entity_id: 7, name: "Combat" });
     renderWithProviders(
       <RecentTabsBar
         items={[group]}

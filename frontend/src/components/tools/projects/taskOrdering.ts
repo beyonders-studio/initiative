@@ -49,8 +49,7 @@ export const resolveKanbanDropTarget = (
  *
  * The backend stores task positions as NUMERIC(20, 10) and rebalances the
  * project when a gap is exhausted, so a drag-reorder only ever sends this one
- * computed value for the moved task — never the whole list. Counter reordering
- * (CounterGroupDetailPage) uses it too.
+ * computed value for the moved task — never the whole list.
  *
  * - Between two neighbors: their midpoint.
  * - At the top (only a task after it): one less than that neighbor.

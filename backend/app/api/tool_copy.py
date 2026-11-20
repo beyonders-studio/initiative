@@ -38,7 +38,6 @@ from app.models.tenant._mixins import (
 )
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
-from app.models.tenant.counter import Counter
 from app.models.tenant.metadata import MetadataDefinition
 from app.models.tenant.post import Post
 from app.models.tenant.post_poll import PostPoll, PostPollOption
@@ -366,28 +365,6 @@ def _beside(source: Any, copy: Any) -> bool:
     return source.initiative_id == copy.initiative_id
 
 
-def _rows_inside(model: type) -> Contents:
-    """The contents of a tool that is a list of ``model`` rows: each copied
-    into the copy."""
-    parent = resource_access.parent_column(model)
-
-    async def contents(
-        session: AsyncSession, source: Any, copy: Any, actor: ActorContext
-    ) -> list[Any]:
-        rows = (
-            await session.exec(select(model).where(getattr(model, parent) == source.id))
-        ).all()
-        pairs = await _copy_children(
-            session,
-            rows,
-            beside=_beside(source, copy),
-            values=lambda row: {parent: copy.id},
-        )
-        return [clone for _, clone in pairs]
-
-    return contents
-
-
 async def _post_contents(
     session: AsyncSession, source: Post, copy: Post, actor: ActorContext
 ) -> list[Any]:
@@ -627,9 +604,6 @@ TOOL_COPIERS: dict[Tool, ToolCopier] = {
         reset={"is_template": False, "yjs_state": None, "yjs_updated_at": None},
         name_taken=FileMessages.NAME_ALREADY_EXISTS,
         name_takes_sigils=True,
-    ),
-    Tool.counter_group: ToolCopier(
-        copies=frozenset({Counter}), contents=_rows_inside(Counter)
     ),
     Tool.dashboard: ToolCopier(),
     Tool.calendar: ToolCopier(

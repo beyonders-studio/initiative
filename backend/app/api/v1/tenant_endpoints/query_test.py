@@ -14,7 +14,7 @@ from app.core.file_types import FileType
 from app.core.messages import QueryMessages
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
-from app.db.session import routed_context
+from app.db.session import routed_context, routed_tools
 from app.models.platform.guild import CommunityRole
 from app.services.fields.spec import FieldType
 from app.services.marketplace import builtin
@@ -26,6 +26,7 @@ from app.testing import (
     create_project,
     create_relationship,
     create_task,
+    install_tool_plugin,
 )
 
 
@@ -467,8 +468,11 @@ class TestEveryShippedDashboardDrawsItsShape:
                 if sql:
                     yield listing["public_id"], widget, sql
 
-    async def test_each_widget_gets_the_columns_it_draws(self, client, acting_user):
+    async def test_each_widget_gets_the_columns_it_draws(
+        self, client, session, acting_user
+    ):
         actor = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+        await _install_shipped_tools(client, session, acting_user, actor)
         checked = 0
         for public_id, widget, sql in self._widgets():
             response = await client.post(
@@ -484,6 +488,13 @@ class TestEveryShippedDashboardDrawsItsShape:
             assert not unfilled, f"{where} cannot fill {unfilled} from {columns}"
             checked += 1
         assert checked, "no shipped dashboard widgets were checked"
+
+
+async def _install_shipped_tools(client, session, acting_user, actor) -> None:
+    """Counters, the tool plug-in this build ships, installed in ``actor``'s
+    community by its seat: a shipped dashboard may read its dataset."""
+    seat = await acting_user(guild=actor.guild, guild_role=CommunityRole.superadmin)
+    await install_tool_plugin(client, session, seat)
 
 
 def _unfilled(columns: list[FieldType], shape) -> list[str]:
@@ -813,6 +824,7 @@ class TestEveryShippedDashboardReportsOnLiveWork:
         from app.services import query as query_service
 
         actor = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+        await _install_shipped_tools(client, session, acting_user, actor)
         live = await create_project(session, actor.initiative, actor.user)
         await create_task(session, live, title="live work")
 
@@ -830,7 +842,10 @@ class TestEveryShippedDashboardReportsOnLiveWork:
             for public_id, widget, sql in statements:
                 where = f"{public_id}/{widget['id']}"
                 try:
-                    result = await query_service.run(sql, context=context)
+                    result = await query_service.execute(
+                        query_service.resolve(sql, tools=routed_tools(reader)),
+                        context=context,
+                    )
                 except query_service.QueryError as refused:
                     raise AssertionError(f"{where}: {refused}") from refused
                 out[where] = [list(row) for row in result.rows]

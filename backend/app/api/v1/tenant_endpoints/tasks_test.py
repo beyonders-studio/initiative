@@ -13,7 +13,7 @@ Tests the task API endpoints at /api/v1/tasks including:
 """
 
 import json
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -35,8 +35,8 @@ from app.testing import create_resource_grant, guild_of, route_as
 from app.testing.factories import (
     assign_tag,
     checklist_items,
-    create_counter,
-    create_counter_group,
+    create_calendar,
+    create_calendar_event,
     create_file,
     create_guild,
     create_guild_membership,
@@ -2308,12 +2308,15 @@ async def test_blocked_by_open_count_spans_kinds(
     )
     task = await create_task(session, a.project)
     blocker = await create_task(session, a.project)
-    group = await create_counter_group(session, a.initiative, a.user)
-    short = await create_counter(session, group, count=1, max=5)
+    calendar = await create_calendar(session, a.initiative, a.user)
+    soon = datetime.now(UTC) + timedelta(days=2)
+    coming = await create_calendar_event(
+        session, calendar, a.user, start_at=soon, end_at=soon + timedelta(hours=1)
+    )
 
     for kind, entity_id in (
         (SearchEntityType.task, blocker.id),
-        (SearchEntityType.counter, short.id),
+        (SearchEntityType.calendar_event, coming.id),
     ):
         await create_relationship(
             session,

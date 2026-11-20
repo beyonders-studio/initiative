@@ -19,9 +19,8 @@ a mutating route, so no definition can cause a write.
 
 What this module deliberately does **not** do is re-declare the shape of each
 binding's parameters. Those belong to the fetcher that consumes them (a
-``counter`` binding's ``counter_id``, a ``tasks`` binding's filter-DSL
-``conditions``), and mirroring them here would mean maintaining every parameter
-in two places. They are stored as given, bounded by the definition size cap, and
+``query`` binding's ``sql``, a ``plugin`` binding's ``params``), and
+mirroring them here would mean maintaining every parameter in two places. They are stored as given, bounded by the definition size cap, and
 checked where they are used: the filter DSL parser enforces its own limits, and
 every id is authorized against the viewer by RLS at fetch time.
 
@@ -271,7 +270,7 @@ WIDGET_SPECS: dict[str, WidgetSpec] = {
             "order": _option("source", "descending"),
         },
     ),
-    # A completion bar — a counter against its own min/max, or a done ratio.
+    # A completion bar — a number against its own min/max, or a done ratio.
     "progress": WidgetSpec(
         min_w=2,
         min_h=1,

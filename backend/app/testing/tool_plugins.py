@@ -16,7 +16,10 @@ if TYPE_CHECKING:
 __all__ = [
     "COUNTERS_UID",
     "add_counter",
+    "convert_counters",
+    "counters_conversion",
     "counters_tool_manifest",
+    "install_counters",
     "install_tool_plugin",
 ]
 
@@ -264,6 +267,45 @@ async def install_tool_plugin(
     return response.json()
 
 
+async def install_counters(
+    session: AsyncSession, guild_id: int, installer_id: int, placements: set[int]
+) -> ToolSet:
+    """Install the Counters this build's catalogue ships (``core.counters``)
+    in ``guild_id`` as ``installer_id``, its seat, through the service the
+    marketplace's install calls, placed in ``placements``; then make its
+    tables and switch it on in every initiative, as the install route does
+    once the install commits. Returns the community's tools. Committed."""
+    from app.db.schema_provisioning import provision_community_tools
+    from app.services.marketplace import catalog as catalog_service
+    from app.services.marketplace.installs import resolve_listing_install
+    from app.services.tenant import guild_plugins as guild_plugins_service
+    from app.services.tenant.initiative_tools import write_installed_tools
+    from app.testing.schema_harness import route_session_to_guild
+
+    await route_session_to_guild(session, guild_id)
+    found = await catalog_service.get_listing(session, "core.counters")
+    assert found is not None, "core.counters is not in the catalogue"
+    listing, version = await resolve_listing_install(session, found.uid, kind="plugin")
+    definition = dict(version.definition)
+    plugin = await guild_plugins_service.install_plugin(
+        session,
+        listing_uid=listing.uid,
+        listing_version=version.version,
+        definition=definition,
+        guild_id=guild_id,
+        name=definition["default_name"],
+        created_by=installer_id,
+        actor_user_id=installer_id,
+    )
+    await guild_plugins_service.set_placed_initiatives(session, plugin, placements)
+    await session.commit()
+    tools = await provision_community_tools(guild_id)
+    await route_session_to_guild(session, guild_id)
+    await write_installed_tools(session, tools)
+    await session.commit()
+    return tools
+
+
 async def add_counter(
     session: AsyncSession, guild_id: int, initiative_id: int, **counter: Any
 ) -> tuple[ToolSet, int, int]:
@@ -295,3 +337,75 @@ async def add_counter(
     )
     await session.commit()
     return tools, group, row
+
+
+#: The revision that turns the built-in Counters into its plug-in.
+_CONVERSION = "20261119_0619_counters_become_a_plug_in.py"
+
+
+def counters_conversion() -> Any:
+    """The revision that turns the built-in Counters into its plug-in,
+    loaded by path."""
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[2] / "alembic" / "versions" / _CONVERSION
+    spec = importlib.util.spec_from_file_location(path.stem, path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+async def convert_counters(
+    session: AsyncSession, guild_id: int, *, between: Any = None
+) -> int | None:
+    """Turn ``guild_id``'s Counters back into the built-in tool and convert it
+    again, as the revision does in each community, then provision what a start
+    renders for it. ``between`` is awaited with ``session`` while the built-in
+    tool is back, before the conversion. Returns the install's id afterwards,
+    None where the community has none. ``session`` is committed."""
+    import sqlalchemy as sa
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+    from sqlmodel import select
+
+    from app.db import session as db_session
+    from app.db.kind_codes import ensure_kind_codes
+    from app.db.schema_provisioning import provision_community_tools
+    from app.models.tenant.guild_plugin import GuildPlugin
+    from app.testing.schema_harness import route_session_to_guild
+
+    migration = counters_conversion()
+
+    def step(forward: bool) -> Any:
+        def apply(bind: Any) -> None:
+            bind.execute(
+                sa.text("SELECT set_config('search_path', :sp, true)"),
+                {"sp": f"guild_{guild_id}, public"},
+            )
+            with Operations.context(MigrationContext.configure(bind)):
+                if forward:
+                    migration._apply_upgrade()
+                else:
+                    migration._apply_downgrade()
+
+        return apply
+
+    # As a revision runs: on the provisioning connection, which owns the
+    # tables and is held to their row security.
+    await session.commit()
+    async with db_session.provisioning_engine.begin() as conn:
+        await conn.run_sync(step(forward=False))
+    if between is not None:
+        await between(session)
+        await session.commit()
+    async with db_session.provisioning_engine.begin() as conn:
+        await conn.run_sync(step(forward=True))
+    await ensure_kind_codes()
+    await provision_community_tools(guild_id)
+    await route_session_to_guild(session, guild_id)
+    found = await session.exec(
+        select(GuildPlugin.id).where(GuildPlugin.listing_uid == COUNTERS_UID)
+    )
+    return found.first()

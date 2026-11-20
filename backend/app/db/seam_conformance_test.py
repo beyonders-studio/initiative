@@ -70,7 +70,6 @@ from app.services.content_sockets import sockets
 from app.testing import (
     Actor,
     create_access_grant,
-    create_counter_group,
     create_file,
     create_project,
     create_resource_grant,
@@ -444,7 +443,6 @@ async def test_every_socket_admits_through_the_seam(
     await create_access_grant(
         session, user=visitor, guild=guild, purpose="settings", access_level="admin"
     )
-    group = await create_counter_group(session, initiative, owner)
     file = await create_file(session, initiative, owner)
     wiki = await create_wiki(session, initiative, owner)
     page = await create_wiki_page(session, wiki, owner)
@@ -460,9 +458,6 @@ async def test_every_socket_admits_through_the_seam(
     #: community's configuration and none of its content — or, for the
     #: account's own stream, a token that is none.
     channels = {
-        "/api/v1/c/{community_id}/counter-groups/{group_id}/ws": (
-            f"{base}/counter-groups/{group.id}/ws"
-        ),
         "/api/v1/c/{community_id}/plugin-tools/{kind}/{row_id}/ws": (
             f"{base}/plugin-tools/{tool.kind}/{tool_row}/ws"
         ),

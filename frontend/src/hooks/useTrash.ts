@@ -56,7 +56,7 @@ export type EntityType = ContentKind | "comment" | "initiative" | "tag";
 
 // Maps entity_type -> what a restore makes stale, so the row reappears in
 // active lists across the app without an explicit reload. Child entities (task,
-// comment, counter) name their parent tool's lists.
+// comment) name their parent tool's lists.
 const RESTORED: Record<EntityType, () => Spec> = {
   project: q.allProjects,
   wiki: q.allWikis,
@@ -68,8 +68,6 @@ const RESTORED: Record<EntityType, () => Spec> = {
   tag: q.allTags,
   calendar: q.allCalendars,
   calendar_event: q.allCalendarEvents,
-  counter_group: q.allCounterGroups,
-  counter: q.allCounterGroups,
   post: q.allPosts,
   collection: q.allCollections,
   dashboard: q.allDashboards,

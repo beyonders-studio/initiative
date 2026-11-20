@@ -23,9 +23,9 @@ describe("filenameFromDisposition", () => {
   it("prefers the RFC 5987 form and decodes it", () => {
     expect(
       filenameFromDisposition(
-        "attachment; filename=\"fallback.json\"; filename*=utf-8''party%20resources.initiative-counter-group.json"
+        "attachment; filename=\"fallback.json\"; filename*=utf-8''party%20resources.initiative-dashboard.json"
       )
-    ).toBe("party resources.initiative-counter-group.json");
+    ).toBe("party resources.initiative-dashboard.json");
   });
 
   it("reads the plain quoted form", () => {

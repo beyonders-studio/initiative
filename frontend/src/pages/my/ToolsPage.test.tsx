@@ -47,7 +47,6 @@ function stubMyTools({
         counts: {
           project: 0,
           file: 0,
-          counter_group: 0,
           calendar: 0,
           dashboard: 0,
           ...counts,
@@ -56,7 +55,6 @@ function stubMyTools({
     ),
     http.get("/api/v1/me/projects", () => page(projects)),
     http.get("/api/v1/me/files", () => page(files)),
-    http.get("/api/v1/me/counter-groups", () => page([])),
     http.get("/api/v1/me/calendars", () => page([])),
     http.get("/api/v1/me/dashboards", () => page([])),
     communityHttp.get("/initiatives/", () => HttpResponse.json([]))

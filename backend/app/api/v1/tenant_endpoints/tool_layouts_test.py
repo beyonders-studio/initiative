@@ -24,7 +24,6 @@ from app.services.tenant import task_types as task_types_service
 from app.services.tenant import tool_layouts as tool_layouts_service
 from app.testing import (
     add_counter,
-    create_counter_group,
     create_project,
     create_resource_grant,
     install_tool_plugin,
@@ -449,39 +448,6 @@ async def test_an_initiatives_layouts_list_each_project_the_reader_can_open(
     # A member reads only what they were let into, and changes none of it.
     assert [(each["tool_id"], each["can_configure"]) for each in read] == [
         (manager.project.id, False)
-    ]
-
-
-async def test_tools_lay_out_their_items(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Each its own item detail, listed among the initiative's layouts."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    group = await create_counter_group(session, a.initiative, a.user, name="Tally")
-    detail = _detail(
-        "counter",
-        {"type": "count"},
-        {"type": "section", "children": [_field("step"), _field("property:12")]},
-        {"type": "relations"},
-        _plugin_part(3),
-    )
-
-    saved = await client.put(
-        a.g("/layouts/"),
-        params={"tool": "counter_group", "tool_id": group.id},
-        json=detail,
-        headers=a.headers,
-    )
-    listed = await client.get(
-        a.g("/layouts/initiative"),
-        params={"initiative_id": a.initiative.id},
-        headers=a.headers,
-    )
-
-    assert saved.status_code == 200, saved.text
-    assert [layout["kind"] for layout in saved.json()["layouts"]] == ["counter"]
-    assert sorted((each["tool"], each["name"]) for each in listed.json()) == [
-        ("counter_group", "Tally"),
     ]
 
 

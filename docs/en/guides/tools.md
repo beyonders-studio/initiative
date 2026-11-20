@@ -22,7 +22,7 @@ Everything that lives inside an initiative is a **tool**: a project, a file, a c
 
 -   :material-counter: __Counters__
 
-    Numbers that move: tallies, totals, scores, seats left.
+    Numbers that move: tallies, totals, scores, seats left. A free plug-in.
 
     [:octicons-arrow-right-24: Counters](counters.md)
 

@@ -12,9 +12,9 @@ from app.models.platform.access_grant import AccessGrant
 from app.models.platform.guild import CommunityRole
 from app.testing import (
     Actor,
-    create_counter_group,
     create_guild,
     create_project,
+    create_wiki,
 )
 
 GRANTS = "/api/v1/access-grants/"
@@ -277,12 +277,7 @@ async def test_revoke_and_cancel(
     "tool,path,make",
     [
         pytest.param(Tool.project, "projects", create_project, id="a-project"),
-        pytest.param(
-            Tool.counter_group,
-            "counter-groups",
-            create_counter_group,
-            id="a-counter-group",
-        ),
+        pytest.param(Tool.wiki, "wikis", create_wiki, id="a-wiki"),
     ],
 )
 async def test_a_grant_reaches_a_tools_content_not_who_it_is_shared_with(

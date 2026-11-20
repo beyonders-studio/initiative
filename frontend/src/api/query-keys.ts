@@ -489,10 +489,6 @@ const collection = (id: number): Spec => ({
   communityPrefix: [`/api/v1/collections/${id}/`],
 });
 
-const counter = (counterId: number): Spec => ({
-  communityExact: [`/api/v1/counters/${counterId}`],
-});
-
 // ── Posts (community) ────────────────────────────────────────────────────────────
 
 /**
@@ -575,11 +571,9 @@ const toolLists = (which: Tool): Spec => {
     communityPrefix: [`/api/v1/tools/${which}/counts`],
   });
   if (which === Tool.calendar) return compose(lists, allCalendarEvents());
-  // An initiative's list of layouts names its projects and counter groups, by
-  // name. The entries carry projects by their dates and posts by their
-  // polls' closing.
+  // An initiative's list of layouts names its projects by name. The entries
+  // carry projects by their dates and posts by their polls' closing.
   if (which === Tool.project) return compose(lists, initiativeLayouts(), allCalendarEntries());
-  if (which === Tool.counter_group) return compose(lists, initiativeLayouts());
   if (which === Tool.post) return compose(lists, allCalendarEntries());
   return lists;
 };
@@ -614,8 +608,6 @@ const project = (id: number): Spec => toolEntity(Tool.project, id);
 // so a change to one refreshes them too.
 const allFiles = (): Spec => compose(toolList(Tool.file), allCollections());
 const file = (id: number): Spec => compose(toolEntity(Tool.file, id), allCollections());
-const allCounterGroups = (): Spec => toolList(Tool.counter_group);
-const counterGroup = (id: number): Spec => toolEntity(Tool.counter_group, id);
 const allCalendars = (): Spec => toolList(Tool.calendar);
 const calendar = (id: number): Spec => toolEntity(Tool.calendar, id);
 const allDashboards = (): Spec => toolList(Tool.dashboard);
@@ -667,7 +659,6 @@ export const q = {
   allCalendars,
   allComments,
   allContacts,
-  allCounterGroups,
   allDashboards,
   allFiles,
   allCollections,
@@ -693,7 +684,6 @@ export const q = {
   calendar,
   captchaSettings,
   calendarEvent,
-  counter,
   communitySettings,
   notificationSettings,
   platformAuthSettings,
@@ -703,7 +693,6 @@ export const q = {
   filedTickets,
   moderationReports,
   contactGrants,
-  counterGroup,
   customRoles,
   currentUser,
   dashboard,

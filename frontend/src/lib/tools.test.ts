@@ -23,7 +23,6 @@ import trash from "../../public/locales/en/trash.json";
 import { PALETTE_TOOLS, TOOL_PALETTE } from "./toolPalette";
 import { TOOL_HAS_DETAIL } from "./toolRows";
 import {
-  counterRoute,
   entityRefRoute,
   eventRoute,
   INITIATIVES_ROUTE,
@@ -263,25 +262,28 @@ describe("tool routes", () => {
   });
 
   it("pluralizes and singularizes by one rule, not by adding or chopping an s", () => {
-    expect(toolPlural(Tool.counter_group)).toBe("counter_groups");
-    expect(toolRouteSegment(Tool.counter_group)).toBe("counter-groups");
-    expect(toolCamelPlural(Tool.counter_group)).toBe("counterGroups");
-    expect(toolPascalPlural(Tool.counter_group)).toBe("CounterGroups");
+    // An underscore in a tool's name, as a child kind has one.
+    const twoWords = "calendar_event" as Tool;
+    expect(toolPlural(twoWords)).toBe("calendar_events");
+    expect(toolRouteSegment(twoWords)).toBe("calendar-events");
+    expect(toolCamelPlural(twoWords)).toBe("calendarEvents");
+    expect(toolPascalPlural(twoWords)).toBe("CalendarEvents");
     expect(toolPlural("calendar_entry" as Tool)).toBe("calendar_entries");
     expect(singularOf("calendar_entries")).toBe("calendar_entry");
-    expect(singularOf("counter_groups")).toBe("counter_group");
+    expect(singularOf("calendar_events")).toBe("calendar_event");
     expect(singularOf("tasks")).toBe("task");
   });
 
   it("derives the route param name from the enum", () => {
-    expect(toolCamelSingular(Tool.counter_group)).toBe("counterGroup");
+    expect(toolCamelSingular(Tool.calendar)).toBe("calendar");
+    expect(toolCamelSingular("calendar_event" as Tool)).toBe("calendarEvent");
   });
 });
 
 describe("tool route builders", () => {
   it("addresses a tool entity inside its initiative", () => {
-    expect(toolListRoute(Tool.counter_group, 12)).toBe("/i/12/counter-groups");
-    expect(toolDetailRoute(Tool.counter_group, 12, 3)).toBe("/i/12/counter-groups/3");
+    expect(toolListRoute(Tool.wiki, 12)).toBe("/i/12/wikis");
+    expect(toolDetailRoute(Tool.wiki, 12, 3)).toBe("/i/12/wikis/3");
     expect(toolSettingsRoute(Tool.project, 1, 7)).toBe("/i/1/projects/7/settings");
   });
 
@@ -312,7 +314,6 @@ describe("tool route builders", () => {
     expect(taskRoute(1, 2, 5)).toBe("/i/1/projects/2/tasks/5");
     expect(eventRoute(1, 2, 9)).toBe("/i/1/calendars/2/events/9");
     expect(eventRoute(null, 2, 9)).toBe("/calendars/2/events/9");
-    expect(counterRoute(1, 3, 7)).toBe("/i/1/counter-groups/3/counter/7");
   });
 
   it("names the initiative tree", () => {
@@ -493,7 +494,7 @@ describe("tool imports", () => {
 
 describe("toolInPath", () => {
   it("reads the tool and id a path is inside", () => {
-    expect(toolInPath("/c/1/i/2/counter-groups/3")).toEqual({ tool: Tool.counter_group, id: 3 });
+    expect(toolInPath("/c/1/i/2/wikis/3")).toEqual({ tool: Tool.wiki, id: 3 });
     expect(toolInPath("/c/1/calendars/5")).toEqual({ tool: Tool.calendar, id: 5 });
   });
 

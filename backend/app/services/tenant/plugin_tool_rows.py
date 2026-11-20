@@ -46,11 +46,11 @@ from app.core.messages import InitiativeMessages, KindMessages, ToolPluginMessag
 from app.core.tool_set import ToolSet
 from app.core.tools import kind_refusal
 from app.db.guild_standing import ActorContext, InstallContext
+from app.db.plugin_tools import NUMBER, NUMBER_LIMIT
 from app.db.query import apply_pagination
 from app.db.tool_rows import Located, ToolRow, load_row, locate, row_of, select_rows
 from app.models.platform.guild import GuildMembership
 from app.models.platform.user import User
-from app.models.tenant.counter import COUNTER_LIMIT, COUNTER_NUMBER
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.resource_grant import ResourceGrant
 from app.schemas.tenant.archive import ToolCan
@@ -629,7 +629,7 @@ def _term(table: sa.Table, raw: Any) -> sa.ColumnElement[Any] | None:
         return None
     if isinstance(raw, str):
         return table.c[raw]
-    return sa.literal(Decimal(str(raw)), COUNTER_NUMBER)
+    return sa.literal(Decimal(str(raw)), NUMBER)
 
 
 async def step(
@@ -654,19 +654,17 @@ async def step(
     counter = field.get("counter") or {}
     if by is None:
         amount = sa.func.coalesce(
-            _term(table, counter.get("step")), sa.literal(Decimal(1), COUNTER_NUMBER)
+            _term(table, counter.get("step")), sa.literal(Decimal(1), NUMBER)
         )
         if down:
             amount = -amount
     else:
-        amount = sa.literal(
-            _column_value({"key": key, "kind": "number"}, by), COUNTER_NUMBER
-        )
+        amount = sa.literal(_column_value({"key": key, "kind": "number"}, by), NUMBER)
     start = _term(table, counter.get("initial"))
     current = sa.func.coalesce(
         table.c[key],
         *([] if start is None else [start]),
-        sa.literal(Decimal(0), COUNTER_NUMBER),
+        sa.literal(Decimal(0), NUMBER),
     )
     low = _term(table, counter.get("min"))
     high = _term(table, counter.get("max"))
@@ -674,10 +672,10 @@ async def step(
         sa.func.greatest(
             current + amount,
             *([] if low is None else [low]),
-            sa.literal(-COUNTER_LIMIT, COUNTER_NUMBER),
+            sa.literal(-NUMBER_LIMIT, NUMBER),
         ),
         *([] if high is None else [high]),
-        sa.literal(COUNTER_LIMIT, COUNTER_NUMBER),
+        sa.literal(NUMBER_LIMIT, NUMBER),
     )
     try:
         async with session.begin_nested():

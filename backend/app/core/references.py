@@ -173,7 +173,7 @@ TEXT_REFERENCE = re.compile(r"#([\w-]+)\[([^\]]*)\]\((\d+)\)")
 def kind_for_trigger(word: str) -> SearchEntityType | None:
     """The kind the word after a ``#`` names in running text.
 
-    The composer writes a kind kebabed — ``#wiki-page``, ``#counter-group`` —
+    The composer writes a kind kebabed — ``#wiki-page``, ``#calendar-event`` —
     and the kind's own spelling reads too.
     """
     return _kind(word.replace("-", "_"))

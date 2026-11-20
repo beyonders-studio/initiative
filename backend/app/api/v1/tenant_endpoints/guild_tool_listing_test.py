@@ -20,11 +20,11 @@ from httpx2 import AsyncClient
 from app.models.platform.guild import CommunityRole
 from app.testing import (
     create_calendar,
-    create_counter_group,
     create_dashboard,
     create_file,
     create_initiative,
     create_project,
+    create_wiki,
 )
 
 # Every tool the guild home can show: its list path, and the factory that
@@ -33,7 +33,7 @@ from app.testing import (
 TOOL_LISTS = [
     pytest.param("/projects/", create_project, id="projects"),
     pytest.param("/files/", create_file, id="files"),
-    pytest.param("/counter-groups/", create_counter_group, id="counter-groups"),
+    pytest.param("/wikis/", create_wiki, id="wikis"),
     pytest.param("/calendars/", create_calendar, id="calendars"),
     pytest.param("/dashboards/", create_dashboard, id="dashboards"),
 ]

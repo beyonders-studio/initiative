@@ -2167,7 +2167,7 @@ class TestActions:
             (
                 "member",
                 "shared",
-                {"entity_type": "counter"},
+                {"entity_type": "calendar_event"},
                 404,
                 "ACTION_NOT_FOUND",
             ),

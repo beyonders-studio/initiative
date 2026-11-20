@@ -42,7 +42,6 @@ from app.models.platform.user import User
 from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.calendar_event import CalendarEvent
 from app.models.tenant.contact import Contact
-from app.models.tenant.counter import Counter
 from app.models.tenant.project import Project
 from app.models.tenant.task import (
     Task,
@@ -215,29 +214,6 @@ async def _task_checklist(
     }
 
 
-async def _counter_value(
-    session: AsyncSession, ids: list[int]
-) -> dict[int, SmartChipValue]:
-    """A counter's reading. Where it has a ceiling the chip says so, because a
-    number is worth more against the number it is heading for."""
-    rows = (
-        await session.exec(
-            select(Counter.id, Counter.count, Counter.max).where(
-                Counter.id.in_(ids), Counter.deleted_at.is_(None)
-            )
-        )
-    ).all()
-    values: dict[int, SmartChipValue] = {}
-    for counter_id, count, ceiling in rows:
-        reached = ceiling is not None and count >= ceiling
-        values[counter_id] = SmartChipValue(
-            text=f"{_plain(count)} / {_plain(ceiling)}" if ceiling else _plain(count),
-            tone=SmartChipTone.good if reached else SmartChipTone.neutral,
-            number=count,
-        )
-    return values
-
-
 async def _event_when(
     session: AsyncSession, ids: list[int]
 ) -> dict[int, SmartChipValue]:
@@ -345,12 +321,6 @@ def _first_detail(column: Any) -> Reader:
     return read
 
 
-def _plain(value: Decimal) -> str:
-    """A stored number as a person writes it — ``7`` rather than ``7.0000``."""
-    trimmed = value.normalize()
-    return format(trimmed, "f")
-
-
 #: (kind, aspect) -> how to read it. Adding a chip is one entry here: the
 #: endpoint, the accepted refs and the menu the editor offers all derive from
 #: this, so none of them is a second list to keep in step.
@@ -359,7 +329,6 @@ SMART_CHIP_SOURCES: dict[tuple[SearchEntityType, SmartChipAspect], Reader] = {
     (SearchEntityType.task, SmartChipAspect.assignee): _task_assignee,
     (SearchEntityType.task, SmartChipAspect.due): _task_due,
     (SearchEntityType.task, SmartChipAspect.priority): _task_priority,
-    (SearchEntityType.counter, SmartChipAspect.value): _counter_value,
     (SearchEntityType.project, SmartChipAspect.progress): _project_progress,
     (SearchEntityType.calendar_event, SmartChipAspect.when): _event_when,
     (SearchEntityType.task, SmartChipAspect.checklist): _task_checklist,

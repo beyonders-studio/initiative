@@ -61,11 +61,11 @@ describe("CommentSection", () => {
     await waitFor(() => expect(deleted).toBe(String(mine.id)));
   });
 
-  it("posts a counter-group comment on the counter group", async () => {
+  it("posts a dashboard comment on the dashboard", async () => {
     const created = captureCreate();
 
     renderPage(() => (
-      <CommentSection entityType={Tool.counter_group} entityId={9} comments={[]} initiativeId={7} />
+      <CommentSection entityType={Tool.dashboard} entityId={9} comments={[]} initiativeId={7} />
     ));
 
     await postComment("Reset these before the next session.");
@@ -73,7 +73,7 @@ describe("CommentSection", () => {
     await waitFor(() => expect(created.body()).not.toBeNull());
     expect(created.body()).toEqual({
       content: "Reset these before the next session.",
-      subject_type: "counter_group",
+      subject_type: "dashboard",
       subject_id: 9,
     });
   });
@@ -198,7 +198,7 @@ describe("CommentSection", () => {
 
     renderPage(() => (
       <CommentSection
-        entityType={Tool.counter_group}
+        entityType={Tool.dashboard}
         entityId={42}
         comments={[older, firstReply, newer, secondReply]}
         initiativeId={7}
@@ -430,7 +430,7 @@ describe("CommentSection", () => {
   it.each([
     ["task", 3],
     ["wiki_page", 4],
-    [Tool.counter_group, 9],
+    [Tool.dashboard, 9],
     [Tool.file, 11],
   ] as const)(
     "lets a moderator lock the thread on a %s from the thread itself",

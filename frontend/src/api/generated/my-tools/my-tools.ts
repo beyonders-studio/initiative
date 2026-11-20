@@ -20,14 +20,12 @@ import type {
 import type {
   CalendarListResponse,
   ContactListResponse,
-  CounterGroupListResponse,
   DashboardListResponse,
   FileListResponse,
   GetMyToolCountsParams,
   HTTPValidationError,
   ListMyCalendarsParams,
   ListMyContactsParams,
-  ListMyCounterGroupsParams,
   ListMyDashboardsParams,
   ListMyFilesParams,
   ListMyPostsParams,
@@ -423,137 +421,6 @@ export function useListMyFiles<
   queryClient?: QueryClient
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getListMyFilesQueryOptions(params, options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>;
-  };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-/**
- * Counter groups that reach the caller across every guild they belong to.
- * @summary List My Counter Groups
- */
-export const listMyCounterGroups = (
-  params?: ListMyCounterGroupsParams,
-  options?: SecondParameter<typeof apiMutator>,
-  signal?: AbortSignal
-) => {
-  return apiMutator<CounterGroupListResponse>(
-    { url: `/api/v1/me/counter-groups`, method: "GET", params, signal },
-    options
-  );
-};
-
-export const getListMyCounterGroupsQueryKey = (params?: ListMyCounterGroupsParams) => {
-  return [`/api/v1/me/counter-groups`, ...(params ? [params] : [])] as const;
-};
-
-export const getListMyCounterGroupsQueryOptions = <
-  TData = Awaited<ReturnType<typeof listMyCounterGroups>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  params?: ListMyCounterGroupsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listMyCounterGroups>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof apiMutator>;
-  }
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey = queryOptions?.queryKey ?? getListMyCounterGroupsQueryKey(params);
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listMyCounterGroups>>> = ({ signal }) =>
-    listMyCounterGroups(params, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listMyCounterGroups>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type ListMyCounterGroupsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listMyCounterGroups>>
->;
-export type ListMyCounterGroupsQueryError = ErrorType<HTTPValidationError>;
-
-export function useListMyCounterGroups<
-  TData = Awaited<ReturnType<typeof listMyCounterGroups>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  params: undefined | ListMyCounterGroupsParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listMyCounterGroups>>, TError, TData>
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listMyCounterGroups>>,
-          TError,
-          Awaited<ReturnType<typeof listMyCounterGroups>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-export function useListMyCounterGroups<
-  TData = Awaited<ReturnType<typeof listMyCounterGroups>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  params?: ListMyCounterGroupsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listMyCounterGroups>>, TError, TData>
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listMyCounterGroups>>,
-          TError,
-          Awaited<ReturnType<typeof listMyCounterGroups>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-export function useListMyCounterGroups<
-  TData = Awaited<ReturnType<typeof listMyCounterGroups>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  params?: ListMyCounterGroupsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listMyCounterGroups>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-/**
- * @summary List My Counter Groups
- */
-
-export function useListMyCounterGroups<
-  TData = Awaited<ReturnType<typeof listMyCounterGroups>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  params?: ListMyCounterGroupsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listMyCounterGroups>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getListMyCounterGroupsQueryOptions(params, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>;

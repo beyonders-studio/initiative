@@ -264,8 +264,8 @@ class TestDates:
         assert odd["original_start"].startswith("2000-01-09T15:00")
 
     def test_an_item_with_no_dates_is_unchanged(self):
-        counters = {"type": "initiative-counter-group", "name": "HP", "counters": []}
-        assert anchor_dates(Tool.counter_group, counters) == counters
+        contact = {"type": "initiative-contact", "name": "HP"}
+        assert anchor_dates(Tool.contact, contact) == contact
 
 
 class TestEveryListingIsStripped:

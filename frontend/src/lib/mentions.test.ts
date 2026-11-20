@@ -47,8 +47,8 @@ describe("the mention being typed", () => {
   });
 
   it("narrows to a kind that had no trigger of its own before", () => {
-    expect(activeMention("see #counter-group:q1")).toMatchObject({
-      types: [SearchEntityType.counter_group],
+    expect(activeMention("see #calendar-event:q1")).toMatchObject({
+      types: [SearchEntityType.calendar_event],
       query: "q1",
     });
   });
@@ -75,8 +75,8 @@ describe("the mention being typed", () => {
 describe("what gets written into the comment", () => {
   it("writes the kind's own name, so the renderer reads back what it wrote", () => {
     expect(entityMentionSyntax(SearchEntityType.wiki, "Fete", 4)).toBe("#wiki[Fete](4)");
-    expect(entityMentionSyntax(SearchEntityType.counter_group, "Q1", 7)).toBe(
-      "#counter-group[Q1](7)"
+    expect(entityMentionSyntax(SearchEntityType.calendar_event, "Q1", 7)).toBe(
+      "#calendar-event[Q1](7)"
     );
   });
 

@@ -72,7 +72,6 @@
     "projects": "Projekte",
     "calendars": "Kalender",
     "dashboards": "Dashboards",
-    "counterGroups": "Zähler",
     "posts": "Beiträge",
     "wikis": "Wikis",
     "contacts": "Kontakte"
@@ -201,7 +200,6 @@
       "projects": "Projekte",
       "calendars": "Termine",
       "dashboards": "Dashboards",
-      "counterGroups": "Zähler",
       "posts": "Beiträge",
       "wikis": "Wikis",
       "contacts": "Kontakte"
@@ -215,8 +213,6 @@
       "createCalendars": "Termine erstellen",
       "viewDashboards": "Dashboards anzeigen",
       "createDashboards": "Dashboards erstellen",
-      "viewCounterGroups": "Zähler anzeigen",
-      "createCounterGroups": "Zähler erstellen",
       "viewPosts": "Beiträge anzeigen",
       "createPosts": "Beiträge erstellen",
       "viewShort": "Ansehen",
@@ -265,8 +261,6 @@
   "calendarsFeatureDescription": "Dinge, die zu einer Zeit stattfinden. Zusagen, Erinnerungen und ein Ort zum Nachsehen, bevor jemand fragt, ob das diesen Donnerstag ist.",
   "dashboardsFeature": "Dashboards",
   "dashboardsFeatureDescription": "Wie die Arbeit läuft, für die Person, die dauernd fragt, wie die Arbeit läuft. Diagramme und Summen aus dem, was schon da ist, nur zum Lesen.",
-  "counterGroupsFeature": "Zähler",
-  "counterGroupsFeatureDescription": "Zahlen, die sich bewegen. Striche, Summen, Punkte, freie Plätze, Trefferpunkte — eine Zahl, auf die sich alle im Raum einigen.",
   "postsFeature": "Beiträge",
   "postsFeatureDescription": "Ein schwarzes Brett. Ankündigungen, Umfragen, wer sie gelesen hat — die wichtige oben angepinnt, damit sie nicht vier Leute verpassen.",
   "projectsFeature": "Projekte",
@@ -318,7 +312,6 @@
       "dashboards": "Dashboards",
       "files": "Dateien",
       "posts": "Beiträge",
-      "counterGroups": "Zähler",
       "wikis": "Wikis",
       "projects": "Projekte"
     },

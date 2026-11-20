@@ -13,7 +13,6 @@
 import {
   CalendarClock,
   FileText,
-  Hash,
   type LucideIcon,
   MessageSquare,
   SquareCheckBig,
@@ -25,7 +24,6 @@ import { SearchEntityType, Tool, ViewSource } from "@/api/generated/initiativeAP
 import { COLLECTION_ICON } from "@/lib/collections";
 import {
   collectionRoute,
-  counterRoute,
   eventRoute,
   TOOL_ICONS,
   taskRoute,
@@ -61,7 +59,6 @@ const TOOL_CHILDREN: Partial<Record<SearchEntityType, ToolChild>> = {
     icon: CalendarClock,
     path: eventRoute,
   },
-  [SearchEntityType.counter]: { icon: Hash, path: counterRoute },
   [SearchEntityType.collection]: {
     icon: COLLECTION_ICON,
     path: (initiativeId, _parentId, collectionId) => collectionRoute(initiativeId, collectionId),

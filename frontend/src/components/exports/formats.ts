@@ -60,8 +60,6 @@ const TOOL_FORMAT_LABELS: Partial<Record<Tool, Record<string, string>>> = {
     docx: "export.formatWikiDocx",
     json: "export.formatWikiJson",
   },
-  // One markdown table of the counters.
-  [Tool.counter_group]: { md: "export.formatMd" },
 };
 
 // Per-tool export formats, in the order the tool's record offers them. Files

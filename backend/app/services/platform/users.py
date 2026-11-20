@@ -270,7 +270,7 @@ async def _erase_in_guild(
         .where(col(BatchedNotice.actor_id) == user_id)
         .values(actor_id=None)
     )
-    # All per-user DAC grants (project, file, counter group, calendar event)
+    # All per-user DAC grants (project, file, calendar, …)
     # live in the polymorphic resource_grants table; one delete clears
     # every resource type for this user in the schema.
     await guild_session.exec(

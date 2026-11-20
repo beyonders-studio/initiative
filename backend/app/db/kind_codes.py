@@ -34,7 +34,11 @@ from app.core.relationships import PERSON
 from app.core.tools import KINDS
 from app.db import post_commit
 from app.db.advisory_locks import LockNamespace, advisory_lock
-from app.models.platform.plugin_kind_code import FIRST_PLUGIN_KIND_CODE, PluginKindCode
+from app.models.platform.plugin_kind_code import (
+    ADOPTED_KIND_CODES,
+    FIRST_PLUGIN_KIND_CODE,
+    PluginKindCode,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -131,7 +135,9 @@ async def assign_plugin_kind_codes(
     """Give each of ``kinds`` a code, if it has none, and return every one's.
 
     A kind keeps the code it was first given, and a new one takes the next
-    code after the highest ever given, so none is given twice. Registrations
+    code after the highest ever given, so none is given twice; a kind that
+    took over a retired built-in kind takes that kind's code
+    (``ADOPTED_KIND_CODES``). Registrations
     take turns, so two never reach for the same code. Once the session
     commits, the function is rendered with any code given here.
     """
@@ -146,9 +152,14 @@ async def assign_plugin_kind_codes(
     missing = [kind for kind in wanted if kind not in held]
     if not missing:
         return held
+    # A kind that took over a retired built-in kind keeps that kind's code.
+    given = {
+        kind: ADOPTED_KIND_CODES[kind] for kind in missing if kind in ADOPTED_KIND_CODES
+    }
+    fresh = [kind for kind in missing if kind not in given]
     highest = (await session.exec(select(func.max(PluginKindCode.code)))).one()
     first = max(highest + 1 if highest is not None else 0, FIRST_PLUGIN_KIND_CODE)
-    given = {kind: first + offset for offset, kind in enumerate(missing)}
+    given |= {kind: first + offset for offset, kind in enumerate(fresh)}
     await session.exec(
         insert(PluginKindCode).values(
             [{"kind": kind, "code": code} for kind, code in given.items()]

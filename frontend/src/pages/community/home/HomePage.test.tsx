@@ -265,15 +265,15 @@ describe("HomePage", () => {
     ],
     [
       "a tool entity, to that entity",
-      { initiative: { tools: { counter_group: true } } },
+      { initiative: { tools: { wiki: true } } },
       {
         title: "Combat Order",
-        entity_type: "counter_group",
+        entity_type: "wiki",
         entity_id: 8,
-        tool: "counter_group",
+        tool: "wiki",
         tool_id: 8,
       },
-      "/c/1/i/5/counter-groups/8",
+      "/c/1/i/5/wikis/8",
     ],
     [
       "a community-level calendar, at the community route",
@@ -322,17 +322,17 @@ describe("HomePage", () => {
     ],
     [
       "a comment left on a tool entity, to that entity",
-      { initiative: { tools: { counter_group: true } } },
+      { initiative: { tools: { wiki: true } } },
       {
         comment_id: 12,
         content: "Order looks wrong",
-        entity_type: "counter_group",
+        entity_type: "wiki",
         entity_id: 8,
         entity_name: "Combat Order",
         initiative_id: 5,
       },
       "on Combat Order",
-      "/c/1/i/5/counter-groups/8",
+      "/c/1/i/5/wikis/8",
     ],
     [
       "a community-level calendar's comment, at the community route",

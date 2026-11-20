@@ -122,8 +122,6 @@
       "projects:write",
       "files:read",
       "files:write",
-      "counter_groups:read",
-      "counter_groups:write",
       "calendars:read",
       "calendars:write",
       "dashboards:read",
@@ -165,7 +163,6 @@
     "itemKind": [
       "task",
       "calendar_event",
-      "counter",
       "post"
     ],
     "fieldKind": [

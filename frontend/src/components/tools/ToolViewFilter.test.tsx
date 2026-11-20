@@ -39,7 +39,7 @@ describe("ToolViewFilter", () => {
   });
 
   it("offers no templates for a tool without them", () => {
-    render(<ToolViewFilter tool={Tool.counter_group} value="active" onChange={vi.fn()} />);
+    render(<ToolViewFilter tool={Tool.wiki} value="active" onChange={vi.fn()} />);
     expect(options()).toEqual(["Active", "Archived"]);
   });
 

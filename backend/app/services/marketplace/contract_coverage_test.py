@@ -313,7 +313,7 @@ def maximal_manifest() -> dict:
                 "name": {"en": "Demo"},
                 "kind": "badge",
                 "list": True,
-                "on": ["task", "counter"],
+                "on": ["task", "post"],
                 "description": {"en": "The item's demo"},
                 "tone": "accent",
                 "states": {

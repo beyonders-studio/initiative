@@ -108,8 +108,6 @@
   "anchor": {
     "calendar": "Este calendario",
     "calendar_event": "Este evento",
-    "counter": "Este contador",
-    "counter_group": "Este grupo",
     "dashboard": "Este panel",
     "file": "Este archivo",
     "generic": "Esto",
@@ -128,8 +126,6 @@
   },
   "empty_calendar": "Aún no hay nada enlazado. Enlaza el proyecto que este calendario planifica, o el archivo que lo explica.",
   "empty_calendar_event": "Aún no hay nada enlazado. Enlaza la tarea a la que corresponde, o el archivo con el que trabajarás.",
-  "empty_counter": "Aún no hay nada enlazado. Enlaza la tarea a la que suma, o el proyecto del que informa.",
-  "empty_counter_group": "Aún no hay nada enlazado. Enlaza el proyecto del que hablan estos números.",
   "empty_dashboard": "Aún no hay nada enlazado. Enlaza el proyecto del que informa, o el archivo que lo interpreta.",
   "empty_post": "Aún no hay nada enlazado. Enlaza el proyecto que anuncia, o el archivo que hay detrás.",
   "empty_wiki_page": "Aún no hay nada enlazado. Menciona esta página con [[ desde cualquier sitio y aparecerá aquí.",

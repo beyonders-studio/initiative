@@ -56,17 +56,14 @@ import { RelativeTime } from "@/ui/relative-time";
 import { StatusMessage } from "@/ui/status-message";
 
 /** What a tool holds that can carry a tag, by tool: every built-in child
- *  kind but a counter (the backend's `TAGGABLE_EXTRAS`), so a new child kind
- *  gets its table by being one. */
-type TaggedChild = Exclude<ChildKind, "counter">;
+ *  kind (the backend's `TAGGABLE_EXTRAS`), so a new child kind gets its table
+ *  by being one. */
 export const TAGGED_CHILDREN = Object.fromEntries(
   TOOLS.map((tool) => [
     tool,
-    (Object.keys(PARENT_TOOL) as ChildKind[]).filter(
-      (kind): kind is TaggedChild => PARENT_TOOL[kind] === tool && kind !== "counter"
-    ),
+    (Object.keys(PARENT_TOOL) as ChildKind[]).filter((kind) => PARENT_TOOL[kind] === tool),
   ])
-) as Record<Tool, TaggedChild[]>;
+) as Record<Tool, ChildKind[]>;
 
 /** How many things of a tool's tab carry the tag: its own rows and its
  *  children's, from the tag's counts. */
@@ -325,7 +322,7 @@ const TagEntityTable = ({
   tagId,
   initiatives,
 }: {
-  kind: TaggedChild;
+  kind: ChildKind;
   tagId: number;
   initiatives: InitiativeRead[];
 }) => {

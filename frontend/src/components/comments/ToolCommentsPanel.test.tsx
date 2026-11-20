@@ -39,13 +39,13 @@ describe("ToolCommentsPanel", () => {
 
     renderPage(() => (
       <ToolCommentsPanel
-        tool={Tool.counter_group}
+        tool={Tool.dashboard}
         entity={{ id: 9, initiative_id: 4, comments_enabled: true }}
       />
     ));
 
     await waitFor(() => expect(requests).toHaveLength(1));
-    expect(requests[0].thread).toBe("counter_group:9");
+    expect(requests[0].thread).toBe("dashboard:9");
   });
 
   it("uses the same derivation for a different tool, with no per-tool wiring", async () => {
@@ -97,7 +97,7 @@ describe("ToolCommentsPanel", () => {
 
     const { container } = renderPage(() => (
       <ToolCommentsPanel
-        tool={Tool.counter_group}
+        tool={Tool.dashboard}
         entity={{ id: 3, initiative_id: 4, comments_enabled: false }}
       />
     ));

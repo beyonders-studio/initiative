@@ -72,7 +72,6 @@
     "projects": "Proyectos",
     "calendars": "Calendario",
     "dashboards": "Paneles",
-    "counterGroups": "Contadores",
     "posts": "Publicaciones",
     "wikis": "Wikis",
     "contacts": "Contactos"
@@ -201,7 +200,6 @@
       "projects": "Proyectos",
       "calendars": "Eventos",
       "dashboards": "Paneles",
-      "counterGroups": "Contadores",
       "posts": "Publicaciones",
       "wikis": "Wikis",
       "contacts": "Contactos"
@@ -215,8 +213,6 @@
       "createCalendars": "Crear eventos",
       "viewDashboards": "Ver paneles",
       "createDashboards": "Crear paneles",
-      "viewCounterGroups": "Ver contadores",
-      "createCounterGroups": "Crear contadores",
       "viewPosts": "Ver publicaciones",
       "createPosts": "Crear publicaciones",
       "viewShort": "Ver",
@@ -265,8 +261,6 @@
   "calendarsFeatureDescription": "Cosas que ocurren a una hora. Confirmaciones, recordatorios y un sitio donde mirar antes de que alguien pregunte si es este jueves.",
   "dashboardsFeature": "Paneles",
   "dashboardsFeatureDescription": "Cómo va el trabajo, para quien no para de preguntar cómo va el trabajo. Gráficos y totales sacados de lo que ya hay, solo lectura.",
-  "counterGroupsFeature": "Contadores",
-  "counterGroupsFeatureDescription": "Números que se mueven. Recuentos, totales, puntuaciones, plazas libres, puntos de vida: un número en el que todos en la sala coinciden.",
   "postsFeature": "Publicaciones",
   "postsFeatureDescription": "Un tablón de anuncios. Avisos, encuestas, quién los ha leído — con el importante fijado arriba, para que no se lo pierdan cuatro personas.",
   "projectsFeature": "Proyectos",
@@ -318,7 +312,6 @@
       "dashboards": "paneles",
       "files": "archivos",
       "posts": "publicaciones",
-      "counterGroups": "contadores",
       "wikis": "wikis",
       "projects": "proyectos"
     },

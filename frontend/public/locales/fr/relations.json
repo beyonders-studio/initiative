@@ -108,8 +108,6 @@
   "anchor": {
     "calendar": "Ce calendrier",
     "calendar_event": "Cet évènement",
-    "counter": "Ce compteur",
-    "counter_group": "Ce groupe",
     "dashboard": "Ce tableau de bord",
     "file": "Ce fichier",
     "generic": "Ceci",
@@ -128,8 +126,6 @@
   },
   "empty_calendar": "Rien n'est encore lié. Lie le projet que ce calendrier planifie, ou le fichier qui l'explique.",
   "empty_calendar_event": "Rien n'est encore lié. Lie la tâche concernée, ou le fichier dont tu partiras.",
-  "empty_counter": "Rien n'est encore lié. Lie la tâche à laquelle cela contribue, ou le projet dont cela rend compte.",
-  "empty_counter_group": "Rien n'est encore lié. Lie le projet dont ces chiffres parlent.",
   "empty_dashboard": "Rien n'est encore lié. Lie le projet dont ceci rend compte, ou le fichier qui le lit.",
   "empty_post": "Rien n'est encore lié. Lie le projet annoncé, ou le fichier qui le sous-tend.",
   "empty_wiki_page": "Rien n'est encore lié. Mentionnez cette page avec [[ depuis n’importe où et elle apparaîtra ici.",

@@ -77,17 +77,30 @@ async def test_an_aggregate_answers_without_shipping_the_rows(guild):
     assert result.rows == ((0,),)
 
 
-async def test_every_shipped_dashboard_asks_something_postgres_plans(guild):
+async def test_every_shipped_dashboard_asks_something_postgres_plans(
+    client, session, acting_user
+):
     """The validator reads a statement; only Postgres can say it groups what
     it shows and that its types meet. A shipped tile it refuses is an error in
-    every community that installed the dashboard."""
+    every community that installed the dashboard. Asked in a community with
+    Counters, the tool plug-in this build ships, whose dataset a shipped
+    dashboard may read."""
+    from app.db.plugin_tools import provisioned_tools
+    from app.models.platform.guild import CommunityRole
     from app.services.marketplace.builtin import load_builtin_manifests
+    from app.testing import install_tool_plugin
 
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    await install_tool_plugin(client, session, seat)
+    tools = await provisioned_tools(seat.guild.id)
     for manifest in load_builtin_manifests():
         if manifest.get("kind") != "dashboard":
             continue
         for widget in manifest["definition"]["widgets"]:
-            await describe(resolve(widget["binding"]["sql"]), context=_context(guild))
+            await describe(
+                resolve(widget["binding"]["sql"], tools=tools),
+                context=_context(seat.guild.id),
+            )
 
 
 async def test_it_reports_what_the_planner_expected(guild):
