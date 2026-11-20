@@ -93,23 +93,26 @@ class TestItIsTheSameEveryTime:
 
 
 class TestThePublishersOwnSample:
-    def test_it_must_answer_the_listings_own_widgets(self):
-        envelope = _listing(_query("w1", "SELECT count(*) AS n FROM tasks", "stat"))
-        with pytest.raises(ListingDefinitionError, match="no widget"):
-            normalize_dashboard_sample(envelope, {"w9": {"columns": [], "rows": []}})
-
-    def test_a_row_must_fit_its_columns(self):
-        envelope = _listing(_query("w1", "SELECT count(*) AS n FROM tasks", "stat"))
-        with pytest.raises(ListingDefinitionError, match="fit"):
-            normalize_dashboard_sample(
-                envelope,
+    @pytest.mark.parametrize(
+        ("sample", "problem"),
+        [
+            ({"w9": {"columns": [], "rows": []}}, "no widget"),
+            (
                 {
                     "w1": {
                         "columns": [{"name": "n", "type": "number"}],
                         "rows": [[1, 2]],
                     }
                 },
-            )
+                "fit",
+            ),
+        ],
+        ids=["answers-another-widget", "row-wider-than-its-columns"],
+    )
+    def test_one_that_does_not_fit_the_listing_is_refused(self, sample, problem):
+        envelope = _listing(_query("w1", "SELECT count(*) AS n FROM tasks", "stat"))
+        with pytest.raises(ListingDefinitionError, match=problem):
+            normalize_dashboard_sample(envelope, sample)
 
     def test_a_good_one_is_kept(self):
         envelope = _listing(_query("w1", "SELECT count(*) AS n FROM tasks", "stat"))

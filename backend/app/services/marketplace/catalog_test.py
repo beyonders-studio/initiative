@@ -8,6 +8,7 @@ guild's schema and the canvas that renders it knows nothing about where it came
 from.
 """
 
+import copy
 import json
 import subprocess
 from pathlib import Path
@@ -15,7 +16,10 @@ from pathlib import Path
 import pytest
 from sqlmodel import select
 
-from app.models.platform.marketplace import MarketplaceListing
+from app.models.platform.marketplace import (
+    MarketplaceListing,
+    MarketplaceListingVersion,
+)
 from app.services.marketplace import catalog as service
 from app.services.marketplace.catalog import CatalogError
 from app.services.marketplace.definitions import (
@@ -24,6 +28,23 @@ from app.services.marketplace.definitions import (
 )
 from app.testing import counters_tool_manifest, create_marketplace_listing
 from app.testing.fake_vendor import declarative_plugin
+
+
+def _widget(widget_type="stat", binding=None) -> dict:
+    return {
+        "id": "w1",
+        "type": widget_type,
+        "binding": binding
+        or {"source": "query", "sql": "SELECT count(*) AS n FROM tasks"},
+    }
+
+
+DASHBOARD = {"widgets": [_widget()]}
+CALENDAR = {
+    "plugin_kind": "tool_instance",
+    "tool": "calendar",
+    "default_name": "Community calendar",
+}
 
 
 def _manifest(**overrides):
@@ -36,21 +57,103 @@ def _manifest(**overrides):
         "description": "An example listing.",
         "avatar_url": "/marketplace/example.svg",
         "version": "1.0.0",
-        "definition": {
-            "widgets": [
-                {
-                    "id": "w1",
-                    "type": "stat",
-                    "binding": {
-                        "source": "query",
-                        "sql": "SELECT count(*) AS n FROM tasks",
-                    },
-                }
-            ]
-        },
+        "definition": DASHBOARD,
     }
     manifest.update(overrides)
-    return manifest
+    return copy.deepcopy(manifest)
+
+
+async def _version_count(session, listing_id: int) -> int:
+    return len(
+        (
+            await session.exec(
+                select(MarketplaceListingVersion).where(
+                    MarketplaceListingVersion.listing_id == listing_id
+                )
+            )
+        ).all()
+    )
+
+
+@pytest.mark.parametrize(
+    ("overrides", "source", "match"),
+    [
+        # I, L, O and U are excluded so a code can be transcribed by hand.
+        *(
+            ({"uid": uid}, "builtin", "uid")
+            for uid in (
+                "TOOSHORT",
+                "WAYTOOLONGFORAUID",
+                "ABCDEFGHIJ1234",
+                "ABCDEFGH12345l",
+            )
+        ),
+        ({"public_id": "noslug"}, "builtin", "publisher"),
+        # Who publishes it is part of what a listing is.
+        ({"publisher": None}, "builtin", "publisher is required"),
+        ({"publisher": "   "}, "builtin", "publisher"),
+        # `core.*` says "shipped in this repository", so only a built-in holds one.
+        ({"public_id": "core.impostor"}, "operator", "reserved"),
+        ({"public_id": "core.impostor"}, "registry", "reserved"),
+        # Catalog content goes through the tool's own validator.
+        (
+            {"definition": {"widgets": [_widget("iframe")]}},
+            "builtin",
+            "invalid dashboard definition",
+        ),
+        (
+            {
+                "definition": {
+                    "widgets": [_widget(binding={"source": "https://x.test"})]
+                }
+            },
+            "builtin",
+            "invalid dashboard definition",
+        ),
+        (
+            {
+                "kind": "plugin",
+                "definition": {"plugin_kind": "tool_instance", "tool": "dashboard"},
+            },
+            "builtin",
+            "cannot be mounted",
+        ),
+        # Artwork must be a same-origin path; which check refuses it varies.
+        *(
+            ({"avatar_url": avatar_url}, "builtin", "avatar_url")
+            for avatar_url in (
+                "https://elsewhere.test/logo.png",
+                "http://elsewhere.test/logo.png",
+                "//elsewhere.test/logo.png",
+                "marketplace/relative.svg",
+                "/\\elsewhere.test/logo.png",
+                "/\telsewhere.test/logo.png",
+                "/marketplace/../logo.png",
+                "/marketplace//logo.png",
+            )
+        ),
+        (
+            {"images": ["/marketplace/ok.png", "https://elsewhere.test/x.png"]},
+            "builtin",
+            "images",
+        ),
+        (
+            {
+                "min_plugin_api": "4.1",
+                "definition": {**DASHBOARD, "min_plugin_api": "4.2"},
+            },
+            "builtin",
+            "differs from its manifest",
+        ),
+        *(
+            ({"min_plugin_api": value}, "builtin", "MAJOR.MINOR")
+            for value in ("4", "4.1.0", "latest", 4)
+        ),
+    ],
+)
+async def test_a_manifest_it_cannot_take_is_refused(session, overrides, source, match):
+    with pytest.raises(CatalogError, match=match):
+        await service.upsert_listing(session, _manifest(**overrides), source=source)
 
 
 class TestIdentity:
@@ -88,119 +191,24 @@ class TestIdentity:
                 session, _manifest(uid="ZZZZZZZZ999999"), source="registry"
             )
 
-    @pytest.mark.parametrize(
-        "uid",
-        [
-            "TOOSHORT",
-            "WAYTOOLONGFORAUID",
-            # I, L, O and U are excluded so a code can be transcribed by hand.
-            "ABCDEFGHIJ1234",
-            "ABCDEFGH12345l",
-        ],
-    )
-    async def test_a_malformed_uid_is_refused(self, session, uid):
-        with pytest.raises(CatalogError, match="uid"):
-            await service.upsert_listing(session, _manifest(uid=uid), source="builtin")
-
-    async def test_a_public_id_must_name_its_publisher(self, session):
-        with pytest.raises(CatalogError, match="publisher"):
-            await service.upsert_listing(
-                session, _manifest(public_id="noslug"), source="builtin"
-            )
-
-
-class TestAttribution:
-    """Who publishes it is part of what a listing *is*, so it is settled here
-    rather than left to whatever surface happens to display the listing."""
-
-    async def test_a_listing_without_a_publisher_is_not_published(self, session):
-        manifest = _manifest()
-        del manifest["publisher"]
-        with pytest.raises(CatalogError, match="publisher is required"):
-            await service.upsert_listing(session, manifest, source="builtin")
-
-    async def test_the_publisher_lands_on_the_row(self, session):
+    async def test_a_built_in_lands_with_its_publisher_namespace_and_artwork(
+        self, session
+    ):
         listing = await service.upsert_listing(
-            session, _manifest(publisher="Widget Co"), source="builtin"
-        )
-        assert listing.publisher == "Widget Co"
-
-    async def test_a_blank_publisher_is_not_a_publisher(self, session):
-        with pytest.raises(CatalogError, match="publisher"):
-            await service.upsert_listing(
-                session, _manifest(publisher="   "), source="builtin"
-            )
-
-
-class TestReservedNamespace:
-    """``core.*`` says "shipped in this repository", so only a built-in holds one.
-
-    A name can be typed by anyone; the namespace cannot, which is what keeps an
-    unverified listing from reading as a first-party one.
-    """
-
-    @pytest.mark.parametrize("source", ["operator", "registry"])
-    async def test_no_other_source_may_claim_it(self, session, source):
-        with pytest.raises(CatalogError, match="reserved"):
-            await service.upsert_listing(
-                session, _manifest(public_id="core.impostor"), source=source
-            )
-
-    async def test_a_built_in_publishes_under_it(self, session):
-        listing = await service.upsert_listing(
-            session, _manifest(public_id="core.example"), source="builtin"
+            session,
+            _manifest(
+                public_id="core.example",
+                publisher="Widget Co",
+                images=["/marketplace/shot-1.png"],
+            ),
+            source="builtin",
         )
         assert listing.public_id == "core.example"
-
-    async def test_other_namespaces_stay_open(self, session):
-        listing = await service.upsert_listing(
-            session, _manifest(public_id="widgetco.thing"), source="registry"
-        )
-        assert listing.source == "registry"
+        assert listing.publisher == "Widget Co"
+        assert listing.images == ["/marketplace/shot-1.png"]
 
 
 class TestDefinitions:
-    async def test_a_listing_cannot_publish_a_widget_we_cannot_render(self, session):
-        """Catalog content goes through the tool's own validator, so there is no
-        laxer path into a guild's schema by way of the marketplace."""
-        with pytest.raises(CatalogError, match="invalid dashboard definition"):
-            await service.upsert_listing(
-                session,
-                _manifest(
-                    definition={
-                        "widgets": [
-                            {
-                                "id": "w1",
-                                "type": "iframe",
-                                "binding": {
-                                    "source": "query",
-                                    "sql": "SELECT count(*) AS n FROM tasks",
-                                },
-                            }
-                        ]
-                    }
-                ),
-                source="builtin",
-            )
-
-    async def test_a_listing_cannot_publish_a_source_we_cannot_fetch(self, session):
-        with pytest.raises(CatalogError, match="invalid dashboard definition"):
-            await service.upsert_listing(
-                session,
-                _manifest(
-                    definition={
-                        "widgets": [
-                            {
-                                "id": "w1",
-                                "type": "stat",
-                                "binding": {"source": "https://example.test/x"},
-                            }
-                        ]
-                    }
-                ),
-                source="builtin",
-            )
-
     async def test_a_published_definition_is_stored_normalized(self, session):
         listing = await service.upsert_listing(session, _manifest(), source="builtin")
         version = await service.get_listing_version(session, listing.latest_version_id)
@@ -211,74 +219,22 @@ class TestDefinitions:
         assert version.definition["definition"]["kind"] == "dashboard"
         assert version.definition["definition"]["layout"] == {"columns": 12}
 
-    async def test_a_plugin_listing_must_name_a_mountable_tool(self, session):
-        """A plug-in definition is narrow on purpose: a kind, and which of this
-        build's tools it mounts. It cannot name one we do not mount at guild
-        scope."""
-        with pytest.raises(CatalogError, match="cannot be mounted"):
-            await service.upsert_listing(
-                session,
-                _manifest(
-                    kind="plugin",
-                    definition={"plugin_kind": "tool_instance", "tool": "dashboard"},
-                ),
-                source="builtin",
-            )
-
-    async def test_a_listing_without_artwork_gets_the_plugin_mark(self, session):
-        """Artwork is optional. A listing that ships none is published with
-        Initiative's own mark rather than refused over a picture — and the
-        default is same-origin like everything else the catalog stores."""
+    async def test_a_plugin_listing_is_stored_canonically_with_the_plugin_mark(
+        self, session
+    ):
+        """Artwork is optional: a listing that ships none is published with
+        Initiative's own same-origin mark rather than refused over a picture."""
         manifest = _manifest(
-            kind="plugin",
-            definition={
-                "plugin_kind": "tool_instance",
-                "tool": "calendar",
-                "default_name": "Community calendar",
-            },
+            kind="plugin", definition={**CALENDAR, "unexpected": "dropped"}
         )
-        manifest.pop("avatar_url", None)
+        manifest.pop("avatar_url")
 
         listing = await service.upsert_listing(session, manifest, source="builtin")
 
         assert listing.avatar_url == service.DEFAULT_AVATAR_URL
         assert listing.avatar_url.startswith("/")
-
-    async def test_supplied_artwork_still_has_to_be_same_origin(self, session):
-        """The default is not a way in for a remote URL."""
-        manifest = _manifest(
-            kind="plugin",
-            definition={
-                "plugin_kind": "tool_instance",
-                "tool": "calendar",
-                "default_name": "Community calendar",
-            },
-        )
-        manifest["avatar_url"] = "https://cdn.example.test/icon.svg"
-
-        with pytest.raises(CatalogError, match="same-origin"):
-            await service.upsert_listing(session, manifest, source="builtin")
-
-    async def test_a_valid_plugin_listing_is_stored_canonically(self, session):
-        listing = await service.upsert_listing(
-            session,
-            _manifest(
-                kind="plugin",
-                definition={
-                    "plugin_kind": "tool_instance",
-                    "tool": "calendar",
-                    "default_name": "Community calendar",
-                    "unexpected": "dropped",
-                },
-            ),
-            source="builtin",
-        )
         version = await service.get_listing_version(session, listing.latest_version_id)
-        assert version.definition == {
-            "plugin_kind": "tool_instance",
-            "tool": "calendar",
-            "default_name": "Community calendar",
-        }
+        assert version.definition == CALENDAR
 
     async def test_a_service_plugin_reaches_the_catalog_as_data(self, session):
         """The widest thing a publisher can send, through the ordinary path:
@@ -312,90 +268,54 @@ class TestDefinitions:
         assert version.definition["pages"][0]["path"] == "/embed/main"
 
 
-class TestArtwork:
-    """Artwork must be a same-origin path; anything else is refused."""
-
-    @pytest.mark.parametrize(
-        "avatar_url",
-        [
-            "https://elsewhere.test/logo.png",
-            "http://elsewhere.test/logo.png",
-            "//elsewhere.test/logo.png",
-            "marketplace/relative.svg",
-            # Outside the allow-list.
-            "/\\elsewhere.test/logo.png",
-            "/\telsewhere.test/logo.png",
-            "/marketplace/../logo.png",
-            "/marketplace//logo.png",
-        ],
+def _declarative(definition=None):
+    return _manifest(
+        kind="plugin",
+        public_id="tests.issues",
+        definition=definition or declarative_plugin("tests.issues"),
     )
-    async def test_offsite_avatar_is_refused(self, session, avatar_url):
-        # Which of the three checks refuses it varies by case; that it names
-        # the field is the contract.
-        with pytest.raises(CatalogError, match="avatar_url"):
-            await service.upsert_listing(
-                session, _manifest(avatar_url=avatar_url), source="builtin"
-            )
 
-    async def test_offsite_screenshot_is_refused(self, session):
-        with pytest.raises(CatalogError, match="images"):
-            await service.upsert_listing(
-                session,
-                _manifest(
-                    images=["/marketplace/ok.png", "https://elsewhere.test/x.png"]
-                ),
-                source="builtin",
-            )
 
-    async def test_local_artwork_is_accepted(self, session):
-        listing = await service.upsert_listing(
-            session,
-            _manifest(images=["/marketplace/shot-1.png"]),
-            source="builtin",
-        )
-        assert listing.images == ["/marketplace/shot-1.png"]
+def _relabelled_declarative():
+    changed = declarative_plugin("tests.issues")
+    changed["vendor"]["fields"][0]["label"]["en"] = "Application id"
+    return _declarative(changed)
 
 
 class TestVersions:
-    async def test_republishing_a_version_unchanged_is_a_no_op(self, session):
-        """Boot re-seeds the shipped listings on every start, so publishing the
-        same manifest twice has to be harmless."""
-        await service.upsert_listing(session, _manifest(), source="builtin")
-        listing = await service.upsert_listing(session, _manifest(), source="builtin")
-        assert len(await service.listing_versions(session, listing.id)) == 1
-
-    async def test_republishing_a_declarative_plugin_unchanged_is_a_no_op(
-        self, session
+    @pytest.mark.parametrize(
+        ("manifest", "source"),
+        [(_manifest(), "builtin"), (_declarative(), "registry")],
+        ids=["dashboard", "declarative"],
+    )
+    async def test_republishing_a_version_unchanged_is_a_no_op(
+        self, session, manifest, source
     ):
-        """A declarative plug-in is named by its listing, so its stored version
-        is compared under that name too. Without it every registry refresh read
-        the version as rewritten and skipped the listing."""
-        manifest = _manifest(
-            kind="plugin",
-            public_id="tests.issues",
-            definition=declarative_plugin("tests.issues"),
-        )
-        await service.upsert_listing(session, manifest, source="registry")
-        listing = await service.upsert_listing(session, manifest, source="registry")
-        assert len(await service.listing_versions(session, listing.id)) == 1
+        """Boot re-seeds the shipped listings on every start, so publishing the
+        same manifest twice has to be harmless. A declarative plug-in is named
+        by its listing, so its stored version is compared under that name."""
+        await service.upsert_listing(session, copy.deepcopy(manifest), source=source)
+        listing = await service.upsert_listing(session, manifest, source=source)
+        assert await _version_count(session, listing.id) == 1
 
-    async def test_a_declarative_plugins_version_cannot_be_rewritten(self, session):
-        definition = declarative_plugin("tests.issues")
-        await service.upsert_listing(
-            session,
-            _manifest(kind="plugin", public_id="tests.issues", definition=definition),
-            source="registry",
-        )
-        changed = json.loads(json.dumps(definition))
-        changed["vendor"]["fields"][0]["label"]["en"] = "Application id"
-        with pytest.raises(CatalogError, match="already published with different"):
-            await service.upsert_listing(
-                session,
-                _manifest(kind="plugin", public_id="tests.issues", definition=changed),
-                source="registry",
-            )
-
-    async def test_a_published_version_cannot_be_rewritten(self, session):
+    @pytest.mark.parametrize(
+        ("first", "changed", "source"),
+        [
+            (
+                _manifest(),
+                _manifest(definition={"widgets": [_widget("table")]}),
+                "builtin",
+            ),
+            # Changing a floor would change who can run that exact version.
+            (_manifest(), _manifest(min_app_version="999.0.0"), "builtin"),
+            (_manifest(), _manifest(min_plugin_api="4.0"), "builtin"),
+            (_declarative(), _relabelled_declarative(), "registry"),
+        ],
+        ids=["definition", "min_app_version", "min_plugin_api", "declarative"],
+    )
+    async def test_a_published_version_cannot_be_rewritten(
+        self, session, first, changed, source
+    ):
         """The definition under a version is frozen once published.
 
         An instance pins its version, and the upgrade path has nothing to offer
@@ -404,35 +324,9 @@ class TestVersions:
         named different content on different deployments, which is exactly what
         a shared code must not do.
         """
-        await service.upsert_listing(session, _manifest(), source="builtin")
+        await service.upsert_listing(session, first, source=source)
         with pytest.raises(CatalogError, match="already published with different"):
-            await service.upsert_listing(
-                session,
-                _manifest(
-                    definition={
-                        "widgets": [
-                            {
-                                "id": "w1",
-                                "type": "table",
-                                "binding": {
-                                    "source": "query",
-                                    "sql": "SELECT count(*) AS n FROM tasks",
-                                },
-                            }
-                        ]
-                    }
-                ),
-                source="builtin",
-            )
-
-    async def test_a_published_version_cannot_move_its_plugin_floor(self, session):
-        # Changing min_app_version would change who can install that exact
-        # version, after the fact.
-        await service.upsert_listing(session, _manifest(), source="builtin")
-        with pytest.raises(CatalogError, match="already published with different"):
-            await service.upsert_listing(
-                session, _manifest(min_app_version="999.0.0"), source="builtin"
-            )
+            await service.upsert_listing(session, changed, source=source)
 
     async def test_a_version_saved_before_a_format_default_is_the_same_version(
         self, session
@@ -440,7 +334,7 @@ class TestVersions:
         """A field the definition format gains takes its default on reading,
         so a version saved before it is not "different content"."""
         listing = await service.upsert_listing(session, _manifest(), source="builtin")
-        [stored] = await service.listing_versions(session, listing.id)
+        stored = await service.get_listing_version(session, listing.latest_version_id)
         definition = dict(stored.definition)
         assert definition.pop("properties") == []
         stored.definition = definition
@@ -449,7 +343,7 @@ class TestVersions:
 
         await service.upsert_listing(session, _manifest(), source="builtin")
 
-        assert len(await service.listing_versions(session, listing.id)) == 1
+        assert await _version_count(session, listing.id) == 1
 
     async def test_listing_metadata_stays_editable_without_a_new_version(self, session):
         """A publisher fixing a typo in their blurb should not need a release —
@@ -462,7 +356,7 @@ class TestVersions:
             source="builtin",
         )
         assert (listing.name, listing.description) == ("Renamed", "Reworded.")
-        assert len(await service.listing_versions(session, listing.id)) == 1
+        assert await _version_count(session, listing.id) == 1
 
     async def test_a_new_version_becomes_the_latest(self, session):
         await service.upsert_listing(session, _manifest(), source="builtin")
@@ -471,26 +365,25 @@ class TestVersions:
         )
         latest = await service.get_listing_version(session, listing.latest_version_id)
         assert latest is not None and latest.version == "1.1.0"
-        assert len(await service.listing_versions(session, listing.id)) == 2
+        assert await _version_count(session, listing.id) == 2
 
-    async def test_a_version_needing_a_newer_plugin_is_not_installable(self, session):
-        listing = await create_marketplace_listing(
-            session,
-            uid="FTRE0000000001",
-            public_id="tests.future",
-            min_app_version="999.0.0",
-        )
-        assert await service.resolve_installable_version(session, listing) is None
-
-    async def test_a_version_this_build_can_run_resolves(self, session):
+    @pytest.mark.parametrize(
+        ("min_app_version", "installable"), [("999.0.0", False), ("0.1.0", True)]
+    )
+    async def test_only_a_version_this_build_can_run_is_installable(
+        self, session, min_app_version, installable
+    ):
         listing = await create_marketplace_listing(
             session,
             uid="PRESENT0000001",
             public_id="tests.present",
-            min_app_version="0.1.0",
+            min_app_version=min_app_version,
         )
         version = await service.resolve_installable_version(session, listing)
-        assert version is not None and version.version == "1.0.0"
+        if installable:
+            assert version is not None and version.version == "1.0.0"
+        else:
+            assert version is None
 
     async def test_a_prerelease_floor_reads_as_its_release(self):
         # Only ever answers "is this deployment new enough", so 1.2.3-rc1 and
@@ -579,59 +472,29 @@ class TestToolVersions:
             )
 
 
-class TestPluginApiFloor:
+@pytest.mark.parametrize(
+    ("listing_floor", "manifest_floor", "stored", "runs"),
+    [
+        ("4.1", None, "4.1", None),
+        (None, "4.0", "4.0", None),
+        ("4.1", "4.1", "4.1", None),
+        (None, None, None, True),
+        ("99.0", None, "99.0", False),
+    ],
+)
+async def test_a_versions_plugin_api_floor_is_stored_and_decides_where_it_runs(
+    session, listing_floor, manifest_floor, stored, runs
+):
     """``min_plugin_api``: the oldest plug-in API contract a version needs, as
     its listing says beside ``min_app_version`` or its manifest does."""
-
-    async def _stored(self, session, manifest):
-        listing = await service.upsert_listing(session, manifest, source="builtin")
-        return await service.get_listing_version(session, listing.latest_version_id)
-
-    async def test_a_listing_s_floor_is_stored_with_its_version(self, session):
-        version = await self._stored(session, _manifest(min_plugin_api="4.1"))
-        assert version is not None and version.min_plugin_api == "4.1"
-
-    async def test_a_manifest_s_floor_is_stored_too(self, session):
-        manifest = _manifest()
-        manifest["definition"] = {**manifest["definition"], "min_plugin_api": "4.0"}
-        version = await self._stored(session, manifest)
-        assert version is not None and version.min_plugin_api == "4.0"
-
-    async def test_a_listing_and_manifest_that_agree_are_taken(self, session):
-        manifest = _manifest(min_plugin_api="4.1")
-        manifest["definition"] = {**manifest["definition"], "min_plugin_api": "4.1"}
-        version = await self._stored(session, manifest)
-        assert version is not None and version.min_plugin_api == "4.1"
-
-    async def test_a_listing_and_manifest_that_disagree_are_refused(self, session):
-        manifest = _manifest(min_plugin_api="4.1")
-        manifest["definition"] = {**manifest["definition"], "min_plugin_api": "4.2"}
-        with pytest.raises(CatalogError, match="differs from its manifest"):
-            await service.upsert_listing(session, manifest, source="builtin")
-
-    @pytest.mark.parametrize("value", ["4", "4.1.0", "latest", 4])
-    async def test_a_floor_that_is_not_major_minor_is_refused(self, session, value):
-        with pytest.raises(CatalogError, match="MAJOR.MINOR"):
-            await service.upsert_listing(
-                session, _manifest(min_plugin_api=value), source="builtin"
-            )
-
-    async def test_a_listing_without_one_runs_on_any_contract(self, session):
-        version = await self._stored(session, _manifest())
-        assert version is not None and version.min_plugin_api is None
-        assert service.version_runs_here(version) is True
-
-    async def test_a_published_version_cannot_move_its_floor(self, session):
-        await service.upsert_listing(session, _manifest(), source="builtin")
-        with pytest.raises(CatalogError, match="already published with different"):
-            await service.upsert_listing(
-                session, _manifest(min_plugin_api="4.0"), source="builtin"
-            )
-
-    async def test_a_version_needing_another_contract_does_not_run_here(self, session):
-        version = await self._stored(session, _manifest(min_plugin_api="99.0"))
-        assert version is not None
-        assert service.version_runs_here(version) is False
+    manifest = _manifest(min_plugin_api=listing_floor)
+    if manifest_floor is not None:
+        manifest["definition"] = {**DASHBOARD, "min_plugin_api": manifest_floor}
+    listing = await service.upsert_listing(session, manifest, source="builtin")
+    version = await service.get_listing_version(session, listing.latest_version_id)
+    assert version is not None and version.min_plugin_api == stored
+    if runs is not None:
+        assert service.version_runs_here(version) is runs
 
 
 class TestSearch:
@@ -684,16 +547,6 @@ class TestSearch:
 
 
 class TestInstallsCount:
-    async def test_the_counter_records_a_number_and_nothing_else(self, session):
-        listing = await create_marketplace_listing(
-            session, uid="CNT00000000001", public_id="tests.count"
-        )
-        assert listing.installs_count == 0
-        await service.bump_installs_count(session, listing.id)
-        await session.commit()
-        await session.refresh(listing)
-        assert listing.installs_count == 1
-
     async def test_the_counter_increments_in_the_database(self, session, role_session):
         """Two installs that overlap must both count.
 

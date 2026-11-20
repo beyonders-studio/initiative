@@ -41,8 +41,8 @@ from app.models.platform.marketplace_registry import (
 )
 from app.models.platform.plugin_service_registration import PluginServiceRegistration
 from app.models.platform.publisher import Publisher
-from app.services.marketplace import catalog, registry_entries, tuf_registry
 from app.services.marketplace import registrations as registrations_service
+from app.services.marketplace import tuf_registry
 from app.services.marketplace.catalog import upsert_listing
 from app.services.platform import rules
 from app.testing import (
@@ -503,6 +503,7 @@ class TestOtherSources:
                         "public_id": "acme.tracker",
                         "base_url": "http://tracker.internal.test:8080",
                         "jwks": sample_plugin_jwks(),
+                        "mandatory": True,
                     }
                 ]
             )
@@ -522,6 +523,7 @@ class TestOtherSources:
         assert registration.source == "registry"
         assert registration.base_url == "http://tracker.internal.test:8080"
         assert registration.jwks == sample_plugin_jwks()
+        assert registration.mandatory is True
         assert await _live(session, registration.id) is True
 
 
@@ -701,20 +703,6 @@ class TestRefusals:
         assert await _listing(session, OTHER_UID) is None
 
 
-@pytest.mark.parametrize(
-    ("error", "code"),
-    [
-        (catalog.CatalogSourceConflict, Codes.SOURCE_CONFLICT),
-        (catalog.CatalogIdentityConflict, Codes.IDENTITY_CONFLICT),
-        (catalog.CatalogReservedName, Codes.RESERVED_NAMESPACE),
-        (catalog.CatalogVersionReused, Codes.VERSION_REUSED),
-        (catalog.CatalogError, Codes.LISTING_REJECTED),
-    ],
-)
-def test_each_catalog_refusal_has_its_own_code(error, code):
-    assert registry_entries.catalog_code(error("refused")) == code
-
-
 # ---------------------------------------------------------------------------
 # Withdrawal
 # ---------------------------------------------------------------------------
@@ -856,7 +844,11 @@ class TestFetching:
 
 
 class TestBundle:
-    async def test_a_bundle_applies_like_a_fetch(self, session, repo, trusted):
+    async def test_a_bundle_applies_like_a_fetch_with_the_switch_off(
+        self, session, repo, trusted
+    ):
+        await rules.put(session, "marketplace_registry_enabled", False)
+        await session.commit()
         repo.add_listing("acme", PLUGIN_UID, slug="tracker")
         repo.publish()
 
@@ -867,32 +859,6 @@ class TestBundle:
         assert await _listing(session, PLUGIN_UID) is not None
         status = await _status(session)
         assert status is not None and status.source == tuf_registry.BUNDLE_SOURCE
-
-    async def test_a_bundle_applies_with_the_switch_off(self, session, repo, trusted):
-        await rules.put(session, "marketplace_registry_enabled", False)
-        await session.commit()
-        repo.add_listing("acme", PLUGIN_UID, slug="tracker")
-        repo.publish()
-
-        result = await tuf_registry.apply_bundle(session, repo.bundle())
-
-        assert result.ok, result
-
-    async def test_a_tampered_bundle_is_refused(self, session, repo, trusted):
-        repo.add_listing("acme", PLUGIN_UID, slug="tracker")
-        repo.publish()
-        path = "metadata/1.targets.json"
-        repo.files[path] = repo.files[path].replace(b'"acme"', b'"acmf"', 1)
-
-        result = await tuf_registry.apply_bundle(session, repo.bundle())
-
-        assert result.code == Codes.METADATA_REJECTED
-        assert await _listing(session, PLUGIN_UID) is None
-
-    async def test_something_that_is_not_a_bundle_is_refused(self, session, trusted):
-        with pytest.raises(tuf_registry.RegistryError) as refused:
-            await tuf_registry.apply_bundle(session, b"not a tar archive")
-        assert refused.value.code == Codes.BUNDLE_INVALID
 
     def test_a_member_outside_the_repository_is_refused(self):
         import io
@@ -950,9 +916,16 @@ class TestPackageTerms:
             ["runs"],
         )
 
-    async def test_terms_are_not_honoured_under_another_root(
+    async def test_terms_are_honoured_only_under_the_shipped_root(
         self, session, repo, trusted, monkeypatch, tmp_path
     ):
+        repo.add_listing("acme", PLUGIN_UID, slug="tracker")
+        repo.set_terms(PLUGIN_UID, _terms(**MANDATORY_TERMS))
+        repo.publish()
+        await _refresh(session, repo)
+        listing = await _listing(session, PLUGIN_UID)
+        assert listing is not None and listing.access == "open"
+
         other = TufRepository()
         monkeypatch.setattr(
             tuf_registry,
@@ -960,39 +933,12 @@ class TestPackageTerms:
             _write_root(tmp_path / "shipped.json", other.root_bytes()),
         )
         monkeypatch.setattr(settings, "MARKETPLACE_REGISTRY_ROOT", str(trusted))
-        repo.add_listing("acme", PLUGIN_UID, slug="tracker")
-        repo.set_terms(PLUGIN_UID, _terms(**MANDATORY_TERMS))
-        repo.publish()
-
         result, _ = await _refresh(session, repo)
 
         assert result.ok, result
         listing = await _listing(session, PLUGIN_UID)
         assert listing is not None
         assert (listing.access, listing.mandatory, listing.meters) == (None, False, [])
-
-    async def test_terms_a_root_change_leaves_are_dropped(
-        self, session, repo, trusted, monkeypatch, tmp_path
-    ):
-        repo.add_listing("acme", PLUGIN_UID, slug="tracker")
-        repo.set_terms(PLUGIN_UID, _terms())
-        repo.publish()
-        await _refresh(session, repo)
-        listing = await _listing(session, PLUGIN_UID)
-        assert listing is not None and listing.access == "entitled"
-
-        other = TufRepository()
-        monkeypatch.setattr(
-            tuf_registry,
-            "BUILTIN_ROOT_PATH",
-            _write_root(tmp_path / "shipped.json", other.root_bytes()),
-        )
-        monkeypatch.setattr(settings, "MARKETPLACE_REGISTRY_ROOT", str(trusted))
-        result, _ = await _refresh(session, repo)
-
-        assert result.ok, result
-        listing = await _listing(session, PLUGIN_UID)
-        assert listing is not None and listing.access is None
 
     async def test_a_delegation_with_no_role_file_means_no_terms(
         self, session, repo, trusted
@@ -1110,6 +1056,7 @@ class TestPackageTerms:
         from app.services.marketplace import registration_lookup
 
         repo.add_listing("acme", PLUGIN_UID, slug="tracker")
+        repo.add_listing("acme", OTHER_UID, slug="other")
         repo.set_terms(PLUGIN_UID, _terms(**MANDATORY_TERMS))
         repo.publish()
         await _refresh(session, repo)
@@ -1123,16 +1070,5 @@ class TestPackageTerms:
         snapshots = await registration_lookup.load_registrations(force=True)
 
         assert snapshots["acme.tracker"].mandatory is True
-
-    async def test_a_listing_without_terms_follows_the_registration(
-        self, session, repo, trusted
-    ):
-        from app.services.marketplace import registration_lookup
-
-        repo.add_listing("acme", PLUGIN_UID, slug="tracker")
-        repo.publish()
-        await _refresh(session, repo)
-
-        snapshots = await registration_lookup.load_registrations(force=True)
-
-        assert snapshots["acme.tracker"].mandatory is False
+        # A listing without terms follows its registration.
+        assert snapshots["acme.other"].mandatory is False

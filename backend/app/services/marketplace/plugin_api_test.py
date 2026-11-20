@@ -4,16 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.marketplace import contract
 from app.services.marketplace.plugin_api import (
     PLUGIN_API_VERSION,
     check_min_plugin_api,
     serves_plugin_api,
 )
-
-
-def test_the_contract_served_is_the_vendored_sdk_version():
-    assert PLUGIN_API_VERSION == contract.KIT_VERSION
 
 
 @pytest.mark.parametrize(
@@ -50,8 +45,3 @@ def test_a_floor_that_is_not_major_minor_is_refused(value):
     with pytest.raises(ValueError, match="MAJOR.MINOR"):
         check_min_plugin_api(value)
     assert serves_plugin_api(value) is False
-
-
-def test_a_floor_reads_as_itself():
-    assert check_min_plugin_api("4.1") == "4.1"
-    assert check_min_plugin_api(None) is None

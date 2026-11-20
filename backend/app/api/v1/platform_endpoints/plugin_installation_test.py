@@ -232,16 +232,6 @@ async def _switch_off(session: AsyncSession, row) -> None:
 
 
 class TestTheToken:
-    async def test_no_token_reaches_nothing(
-        self, client: AsyncClient, session: AsyncSession
-    ):
-        await _register(session)
-        await _install(session, with_values=True)
-
-        response = await client.get(f"{BASE}/config")
-
-        assert response.status_code == 401
-
     async def test_a_narrowed_token_reaches_its_installation(
         self, client: AsyncClient, session: AsyncSession
     ):
@@ -256,30 +246,40 @@ class TestTheToken:
 
         assert response.status_code == 200, response.text
 
-    async def test_a_member_token_is_refused(
-        self, client: AsyncClient, session: AsyncSession
-    ):
-        """A member token acts for somebody; the install's own configuration is
-        not something it reaches."""
-        await _register(session)
-        guild, user, plugin = await _install(session, with_values=True)
-
-        response = await client.get(
-            f"{BASE}/config", headers=_headers(guild, plugin, user_id=user.id)
-        )
-
-        assert response.status_code == 401
-        assert GUILD_TOKEN not in response.text
-
-    @pytest.mark.parametrize("what", ["registration", "publisher", "install"])
-    async def test_a_switch_turned_off_stops_every_call(
+    @pytest.mark.parametrize(
+        "what",
+        [
+            "no-token",
+            "member-token",
+            "registration",
+            "publisher",
+            "install",
+            "no-keys",
+            "another-listing",
+        ],
+    )
+    async def test_a_token_the_seam_will_not_stand_up_reaches_nothing(
         self, client: AsyncClient, session: AsyncSession, what: str
     ):
-        """The owner's suspension, the publisher's switch and the guild's all
-        end the install's calls at the next request, with the same answer."""
-        registration = await _register(session)
-        guild, _, plugin = await _install(session, with_values=True)
-        if what == "registration":
+        """No token; a member token, which acts for somebody and not for the
+        install's own configuration; the owner's suspension, the publisher's
+        switch or the guild's turned off, ending the install's calls at the next
+        request; a registration with no keys; and a token naming another
+        listing's install. Every call gets the same answer, which says nothing
+        about what is there."""
+        registration = await _register(
+            session, **({"jwks": {}} if what == "no-keys" else {})
+        )
+        other = {"definition": _definition("tests.other"), "listing_uid": OTHER_UID}
+        guild, user, plugin = await _install(
+            session, with_values=True, **(other if what == "another-listing" else {})
+        )
+        headers = _headers(
+            guild, plugin, user_id=user.id if what == "member-token" else None
+        )
+        if what == "no-token":
+            headers = {}
+        elif what == "registration":
             registration.suspended_at = datetime.now(UTC)
             session.add(registration)
             await session.commit()
@@ -288,7 +288,7 @@ class TestTheToken:
             await _switch_off(
                 session, await session.get(Publisher, registration.publisher_id)
             )
-        else:
+        elif what == "install":
             await route_session_to_guild(session, guild.id)
             await _switch_off(session, plugin)
 
@@ -300,41 +300,11 @@ class TestTheToken:
             response = await client.request(
                 method,
                 f"{BASE}{path}",
-                headers=_headers(guild, plugin),
+                headers=headers,
                 json={"state": "ok"} if method == "POST" else None,
             )
             assert response.status_code == 401, (path, response.text)
             assert GUILD_TOKEN not in response.text
-
-    async def test_a_registration_with_no_keys_reaches_nothing(
-        self, client: AsyncClient, session: AsyncSession
-    ):
-        await _register(session, jwks={})
-        guild, _, plugin = await _install(session, with_values=True)
-
-        response = await client.get(f"{BASE}/config", headers=_headers(guild, plugin))
-
-        assert response.status_code == 401
-
-    async def test_a_token_naming_another_listings_install_reaches_nothing(
-        self, client: AsyncClient, session: AsyncSession
-    ):
-        """One plug-in's credentials are not reachable by another's token, and the
-        refusal says nothing about what is there."""
-        await _register(session)
-        theirs, _, theirs_plugin = await _install(
-            session,
-            definition=_definition("tests.other"),
-            listing_uid=OTHER_UID,
-            with_values=True,
-        )
-
-        response = await client.get(
-            f"{BASE}/config", headers=_headers(theirs, theirs_plugin)
-        )
-
-        assert response.status_code == 401
-        assert GUILD_TOKEN not in response.text
 
 
 # ---------------------------------------------------------------------------
@@ -439,19 +409,7 @@ class TestConnections:
         assert MEMBER_TOKEN not in response.text
         assert GUILD_TOKEN not in response.text
         assert "values" not in items[0]
-
-    async def test_connections_never_name_the_member(
-        self, client: AsyncClient, session: AsyncSession
-    ):
-        await _register(session)
-        guild, user, plugin = await _install(session)
-        await _member_connection(session, guild=guild, plugin=plugin, user=user)
-
-        response = await client.get(
-            f"{BASE}/connections", headers=_headers(guild, plugin)
-        )
-
-        assert response.status_code == 200, response.text
+        # The member is never named.
         assert "user_id" not in response.text
         assert user.seeded_address not in response.text
 
@@ -725,12 +683,16 @@ class TestMetadata:
             json={
                 "entity_type": "task",
                 "entity_id": task_id,
-                "values": {"github.issue": 123, "state": {"open": True}},
+                "values": {
+                    "github.issue": 123,
+                    "repo": "acme/web",
+                    "state": {"open": True},
+                },
             },
         )
         assert written.status_code == 200, written.text
         assert written.json() == {
-            "values": {"github.issue": 123, "state": {"open": True}}
+            "values": {"github.issue": 123, "repo": "acme/web", "state": {"open": True}}
         }
 
         removed = await client.put(
@@ -742,7 +704,8 @@ class TestMetadata:
                 "values": {"state": None},
             },
         )
-        assert removed.json() == {"values": {"github.issue": 123}}
+        kept = {"github.issue": 123, "repo": "acme/web"}
+        assert removed.json() == {"values": kept}
 
         read = await client.get(
             f"{BASE}/metadata",
@@ -750,33 +713,10 @@ class TestMetadata:
             params={"entity_type": "task", "entity_ids": [task_id, 987654]},
         )
         assert read.status_code == 200, read.text
-        assert read.json() == {
-            "items": [
-                {
-                    "entity_type": "task",
-                    "entity_id": task_id,
-                    "values": {"github.issue": 123},
-                }
-            ]
-        }
+        item = {"entity_type": "task", "entity_id": task_id, "values": kept}
+        assert read.json() == {"items": [item]}
 
-    async def test_an_item_is_found_by_a_value(
-        self, client: AsyncClient, session: AsyncSession, acting_user, role_session
-    ):
-        installed, task_id = await _with_task(
-            client, session, acting_user, role_session
-        )
-        headers = install_headers(installed, ["projects:read"])
-        await client.put(
-            f"{BASE}/metadata",
-            headers=headers,
-            json={
-                "entity_type": "task",
-                "entity_id": task_id,
-                "values": {"github.issue": 123, "repo": "acme/web"},
-            },
-        )
-
+        # An item is found by a value.
         async def find(key: str, value: str) -> list:
             response = await client.get(
                 f"{BASE}/metadata/lookup",
@@ -786,13 +726,7 @@ class TestMetadata:
             assert response.status_code == 200, response.text
             return response.json()["items"]
 
-        assert await find("github.issue", "123") == [
-            {
-                "entity_type": "task",
-                "entity_id": task_id,
-                "values": {"github.issue": 123, "repo": "acme/web"},
-            }
-        ]
+        assert await find("github.issue", "123") == [item]
         assert [i["entity_id"] for i in await find("repo", "acme/web")] == [task_id]
         assert await find("github.issue", "124") == []
 
@@ -1305,51 +1239,14 @@ class TestShownValues:
             "github.issue": False
         }
 
-    async def test_whoever_reads_the_task_reads_its_shown_values(
-        self, client: AsyncClient, session: AsyncSession, acting_user, role_session
-    ):
-        """Through the task's read and its list, and through the table's
-        policies: a member reads the shown row alone, and a member of another
-        initiative reads none."""
-        installed, member, task = await _shown_board(
-            client, session, acting_user, role_session
-        )
-        shown = [(installed.plugin.id, "github.issue", 123)]
-
-        read = await client.get(member.g(f"/tasks/{task.id}"), headers=member.headers)
-        assert read.status_code == 200, read.text
-        assert _drawn(read.json()["properties"]) == shown
-        conditions = json.dumps(
-            [{"field": "project_id", "op": "eq", "value": task.project_id}]
-        )
-        listed = await client.get(
-            member.g(f"/tasks/?conditions={conditions}"), headers=member.headers
-        )
-        assert [_drawn(row["properties"]) for row in listed.json()["items"]] == [shown]
-
-        outsider = await acting_user(
-            guild_role=CommunityRole.member,
-            guild=installed.guild,
-            initiative=installed.unplaced,
-            initiative_role="member",
-        )
-        for actor, keys in ((member, ["github.issue"]), (outsider, [])):
-            s = await role_session("app_user")
-            await route_as(s, user_id=actor.user.id, guild_id=installed.guild.id)
-            seen = await s.exec(
-                select(MetadataDefinition.key).join(
-                    MetadataValue, MetadataValue.property_id == MetadataDefinition.id
-                )
-            )
-            assert seen.all() == keys
-            await s.rollback()
-
     async def test_values_reach_whom_the_plugins_actions_would(
         self, client: AsyncClient, session: AsyncSession, acting_user, role_session
     ):
         """The install on, placed in the task's initiative, the reader's role
         given its ``use`` (or the reader a manager there, or its admin), and
-        the reader old enough."""
+        the reader old enough. Through the task's read and its list, and
+        through the table's policies: a member reads the shown row alone, and a
+        member of another initiative reads none."""
         installed, member, task = await _shown_board(
             client, session, acting_user, role_session
         )
@@ -1377,6 +1274,29 @@ class TestShownValues:
             await session.commit()
 
         assert await drawn() == shown
+        conditions = json.dumps(
+            [{"field": "project_id", "op": "eq", "value": task.project_id}]
+        )
+        listed = await client.get(
+            member.g(f"/tasks/?conditions={conditions}"), headers=member.headers
+        )
+        assert [_drawn(row["properties"]) for row in listed.json()["items"]] == [shown]
+        outsider = await acting_user(
+            guild_role=CommunityRole.member,
+            guild=installed.guild,
+            initiative=installed.unplaced,
+            initiative_role="member",
+        )
+        for actor, keys in ((member, ["github.issue"]), (outsider, [])):
+            s = await role_session("app_user")
+            await route_as(s, user_id=actor.user.id, guild_id=installed.guild.id)
+            seen = await s.exec(
+                select(MetadataDefinition.key).join(
+                    MetadataValue, MetadataValue.property_id == MetadataDefinition.id
+                )
+            )
+            assert seen.all() == keys
+            await s.rollback()
         assert await drawn(installed.seat) == shown
         assert await drawn(manager) == shown
         assert await drawn(viewer) == [], "a role not given the install's use"

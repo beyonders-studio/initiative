@@ -76,7 +76,6 @@ __all__ = [
     "get_listing_versions",
     "list_listings",
     "listing_avatars",
-    "listing_versions",
     "published_uids",
     "resolve_installable_version",
     "upsert_listing",
@@ -932,23 +931,6 @@ async def withdraw_listing(session: AsyncSession, uid: str) -> bool:
 
     await session.flush()
     return True
-
-
-async def listing_versions(
-    session: AsyncSession, listing_id: int
-) -> Sequence[MarketplaceListingVersion]:
-    """Every published version of a listing, newest first. A version still
-    waiting for review is not published yet, and is not among them."""
-    return (
-        await session.exec(
-            select(MarketplaceListingVersion)
-            .where(
-                MarketplaceListingVersion.listing_id == listing_id,
-                MarketplaceListingVersion.awaiting_review.is_(False),
-            )
-            .order_by(MarketplaceListingVersion.published_at.desc())
-        )
-    ).all()
 
 
 async def withdraw_builtins_except(

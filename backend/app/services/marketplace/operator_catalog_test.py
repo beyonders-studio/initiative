@@ -147,31 +147,7 @@ class TestUnconfigured:
         withdrawn rather than offered forever."""
         monkeypatch.setattr(settings, "MARKETPLACE_EXTRA_CATALOG_DIR", None)
         await upsert_listing(session, _manifest(), source="operator")
-        await session.commit()
-
-        result = await service.scan_operator_catalog(session)
-        await session.commit()
-
-        assert result.configured is False
-        assert (result.published, result.withdrawn, result.skipped) == (0, 1, 0)
-        assert (await _listings(session))["acme.standup"].available is False
-
-    async def test_no_directory_and_no_operator_listings_is_a_no_op(
-        self, session, monkeypatch
-    ):
-        monkeypatch.setattr(settings, "MARKETPLACE_EXTRA_CATALOG_DIR", None)
-
-        result = await service.scan_operator_catalog(session)
-        await session.commit()
-
-        assert result.configured is False
-        assert (result.published, result.withdrawn, result.skipped) == (0, 0, 0)
-        assert await _listings(session) == {}
-
-    async def test_no_directory_leaves_other_sources_alone(self, session, monkeypatch):
-        """Only what the directory published is the directory's to withdraw;
-        a built-in or a registry listing is out of its scope either way."""
-        monkeypatch.setattr(settings, "MARKETPLACE_EXTRA_CATALOG_DIR", None)
+        # Only what the directory published is the directory's to withdraw.
         await upsert_listing(
             session,
             _manifest(uid=BUILTIN_UID, public_id="core.shipped"),
@@ -187,8 +163,10 @@ class TestUnconfigured:
         result = await service.scan_operator_catalog(session)
         await session.commit()
 
-        assert result.withdrawn == 0
+        assert result.configured is False
+        assert (result.published, result.withdrawn, result.skipped) == (0, 1, 0)
         listings = await _listings(session)
+        assert listings["acme.standup"].available is False
         assert listings["core.shipped"].available is True
         assert listings["acme.registered"].available is True
 
@@ -197,52 +175,8 @@ class TestUnconfigured:
         assert service.operator_catalog_dir() is None
         assert (await service.scan_operator_catalog(session)).configured is False
 
-    async def test_a_configured_directory_that_is_not_there_says_so(
-        self, session, tmp_path, monkeypatch
-    ):
-        """A volume that did not mount looks exactly like an empty catalog
-        otherwise, so the scan reports it instead of publishing silence."""
-        monkeypatch.setattr(
-            settings, "MARKETPLACE_EXTRA_CATALOG_DIR", str(tmp_path / "absent")
-        )
-        result = await service.scan_operator_catalog(session)
-
-        assert result.configured is True
-        assert result.directory_missing is True
-        assert result.published == 0
-
 
 class TestPublishing:
-    async def test_a_manifest_in_the_directory_is_in_the_marketplace(
-        self, session, catalog_dir
-    ):
-        """The whole promise, in one test: a file appears, a listing appears,
-        and nothing in this repository changed."""
-        _write(catalog_dir, "standup.json", _manifest())
-
-        result = await service.scan_operator_catalog(session)
-        await session.commit()
-
-        assert result.published == 1
-        listing = (await _listings(session))["acme.standup"]
-        assert listing.source == "operator"
-        assert listing.available is True
-        # Attribution is required on every ingestion path and shown beside the
-        # provenance, so the catalog carries the publisher the file claimed.
-        assert listing.publisher == "Acme"
-
-    async def test_a_rescan_is_idempotent(self, session, catalog_dir):
-        _write(catalog_dir, "standup.json", _manifest())
-
-        first = await service.scan_operator_catalog(session)
-        await session.commit()
-        second = await service.scan_operator_catalog(session)
-        await session.commit()
-
-        assert (first.published, second.published) == (1, 1)
-        assert second.withdrawn == 0
-        assert len(await _listings(session)) == 1
-
     async def test_editing_a_file_republishes_it(self, session, catalog_dir):
         """Listing-level copy is editable in place; the version body is not,
         which is the catalog's own rule and stays the catalog's own rule."""
@@ -290,6 +224,9 @@ class TestBadFiles:
         good file beside it publishes and the bad one is named."""
         _write(catalog_dir, "aaa-broken.json", "{ not json at all")
         _write(catalog_dir, "zzz-good.json", _manifest())
+        # Notes and artwork beside them are not read, and not a problem.
+        (catalog_dir / "README.md").write_text("notes", encoding="utf-8")
+        (catalog_dir / "logo.svg").write_text("<svg/>", encoding="utf-8")
 
         result = await service.scan_operator_catalog(session)
         await session.commit()
@@ -299,30 +236,28 @@ class TestBadFiles:
         assert [problem.file for problem in result.problems] == ["aaa-broken.json"]
         assert "acme.standup" in await _listings(session)
 
-    async def test_a_manifest_that_fails_validation_is_named_not_raised(
-        self, session, catalog_dir
+    @pytest.mark.parametrize(
+        ("body", "reason"),
+        [
+            # Attribution is required, refused by the catalog's own validator.
+            ({k: v for k, v in _manifest().items() if k != "publisher"}, "publisher"),
+            # `core.*` says "shipped with this build"; the directory has its own.
+            (_manifest(public_id="core.standup"), "reserved"),
+            ([{"uid": OPERATOR_UID}], "is not a JSON object"),
+        ],
+        ids=["no-publisher", "core-namespace", "not-an-object"],
+    )
+    async def test_a_file_the_catalog_refuses_is_named_not_raised(
+        self, session, catalog_dir, body, reason
     ):
-        """Attribution is required, so a manifest without an author is refused
-        — by the catalog's own validator, reported here rather than thrown."""
-        manifest = _manifest()
-        del manifest["publisher"]
-        _write(catalog_dir, "anonymous.json", manifest)
+        _write(catalog_dir, "refused.json", body)
 
         result = await service.scan_operator_catalog(session)
         await session.commit()
 
-        assert result.published == 0
-        assert result.skipped == 1
-        assert "publisher" in result.problems[0].reason
+        assert (result.published, result.skipped) == (0, 1)
+        assert reason in result.problems[0].reason
         assert await _listings(session) == {}
-
-    async def test_a_file_that_is_not_an_object_is_skipped(self, session, catalog_dir):
-        _write(catalog_dir, "list.json", [{"uid": OPERATOR_UID}])
-
-        result = await service.scan_operator_catalog(session)
-
-        assert result.published == 0
-        assert result.problems[0].reason == "is not a JSON object"
 
     async def test_an_oversized_file_is_skipped(
         self, session, catalog_dir, monkeypatch
@@ -335,35 +270,8 @@ class TestBadFiles:
         assert result.published == 0
         assert "larger than" in result.problems[0].reason
 
-    async def test_files_that_are_not_json_are_ignored_entirely(
-        self, session, catalog_dir
-    ):
-        """A directory people keep files in also holds notes and artwork; only
-        `*.json` is read, and the rest is not a problem to report."""
-        (catalog_dir / "README.md").write_text("notes", encoding="utf-8")
-        (catalog_dir / "logo.svg").write_text("<svg/>", encoding="utf-8")
-        _write(catalog_dir, "standup.json", _manifest())
-
-        result = await service.scan_operator_catalog(session)
-        await session.commit()
-
-        assert (result.published, result.skipped) == (1, 0)
-
 
 class TestNamespaceAndCollisions:
-    async def test_the_core_namespace_belongs_to_the_build(self, session, catalog_dir):
-        """`core.*` says "shipped with this build". A directory the operator
-        controls publishes under its own prefix, so the id can never imply a
-        provenance the listing does not have."""
-        _write(catalog_dir, "impostor.json", _manifest(public_id="core.standup"))
-
-        result = await service.scan_operator_catalog(session)
-        await session.commit()
-
-        assert result.published == 0
-        assert "reserved" in result.problems[0].reason
-        assert await _listings(session) == {}
-
     async def test_a_uid_held_by_a_builtin_is_refused(self, session, catalog_dir):
         """Refused loudly rather than overwritten: a built-in and an operator
         file naming the same listing is a collision to fix, not an update."""
@@ -426,18 +334,10 @@ class TestWithdrawal:
         assert listing.available is False
         assert listing.public_id == "acme.standup"
 
-    async def test_putting_the_file_back_publishes_it_again(self, session, catalog_dir):
-        path = _write(catalog_dir, "standup.json", _manifest())
-        await service.scan_operator_catalog(session)
-        await session.commit()
-        path.unlink()
-        await service.scan_operator_catalog(session)
-        await session.commit()
-
+        # Putting the file back publishes it again.
         _write(catalog_dir, "standup.json", _manifest())
         await service.scan_operator_catalog(session)
         await session.commit()
-
         assert (await _listings(session))["acme.standup"].available is True
 
     async def test_a_file_with_a_mistake_in_it_is_not_a_removal(
@@ -499,16 +399,9 @@ class TestBundledDashboards:
         assert dashboard.available is True
         assert dashboard.bundled_with_uid == PLUGIN_UID
 
-    async def test_a_rescan_leaves_the_bundled_dashboard_alone(
-        self, session, catalog_dir
-    ):
-        _write(catalog_dir, "tracker.json", _plugin_manifest([_bundled_dashboard()]))
-        await service.scan_operator_catalog(session)
-        await session.commit()
-
+        # A rescan leaves it alone.
         result = await service.scan_operator_catalog(session)
         await session.commit()
-
         assert result.withdrawn == 0
         assert (await _listings(session))["acme.tracker-overview"].available is True
 

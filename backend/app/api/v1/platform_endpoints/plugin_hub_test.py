@@ -349,115 +349,102 @@ async def _connect(session: AsyncSession, installed, target, member) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_a_caller_without_the_scope_is_refused(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session, upstream
+@pytest.mark.parametrize(
+    ("hub", "endpoint", "params", "token", "status", "detail"),
+    [
+        pytest.param(
+            {},
+            ISSUES,
+            {},
+            {"scopes": ("files:read",)},
+            403,
+            PluginHubMessages.INSUFFICIENT_SCOPE,
+            id="token-without-the-scope",
+        ),
+        # The token still carries it; the grant no longer does.
+        pytest.param(
+            {"granted": ("files:read",)},
+            ISSUES,
+            {},
+            {},
+            403,
+            PluginHubMessages.INSUFFICIENT_SCOPE,
+            id="scope-the-seat-took-back",
+        ),
+        pytest.param(
+            {"install_target": False},
+            ISSUES,
+            {},
+            {},
+            404,
+            PluginHubMessages.TARGET_NOT_INSTALLED,
+            id="target-not-installed",
+        ),
+        pytest.param(
+            {},
+            PRIVATE,
+            {},
+            {},
+            403,
+            PluginHubMessages.ENDPOINT_NOT_PUBLIC,
+            id="endpoint-not-public",
+        ),
+        pytest.param(
+            {},
+            COMMENT,
+            {"body": "Done"},
+            {},
+            403,
+            PluginHubMessages.ACTOR_NOT_SUPPORTED,
+            id="member-only-endpoint",
+        ),
+        pytest.param(
+            {"place_target": False},
+            OPEN_ISSUE,
+            {},
+            {"narrowed": True},
+            403,
+            PluginHubMessages.TARGET_NOT_PLACED,
+            id="target-not-placed-in-the-narrowed-initiative",
+        ),
+        pytest.param(
+            {},
+            ISSUES,
+            {"nope": "x"},
+            {},
+            400,
+            PluginDataMessages.INVALID_PARAMS,
+            id="undeclared-parameter",
+        ),
+    ],
+)
+async def test_a_call_the_hub_will_not_make_is_refused(
+    client: AsyncClient,
+    session: AsyncSession,
+    acting_user,
+    role_session,
+    upstream,
+    hub,
+    endpoint,
+    params,
+    token,
+    status,
+    detail,
 ):
-    installed, _target = await _hub(session, acting_user, role_session)
+    installed, _target = await _hub(session, acting_user, role_session, **hub)
+    token = dict(token)
+    if token.pop("narrowed", False):
+        token["initiative_id"] = installed.placed.id
 
     response = await client.post(
-        _url(ISSUES),
-        json={"params": {}},
-        headers=_installation_headers(installed, scopes=("files:read",)),
+        _url(endpoint),
+        json={"params": params},
+        headers=_installation_headers(installed, **token),
     )
 
-    assert response.status_code == 403
-    assert response.json()["detail"] == PluginHubMessages.INSUFFICIENT_SCOPE
+    assert response.status_code == status
+    assert response.json()["detail"] == detail
     assert upstream.calls == []
-
-
-async def test_a_scope_the_seat_took_back_is_refused(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session, upstream
-):
-    """The token still carries it; the grant no longer does."""
-    installed, _target = await _hub(
-        session, acting_user, role_session, granted=("files:read",)
-    )
-
-    response = await client.post(
-        _url(ISSUES), json={}, headers=_installation_headers(installed)
-    )
-
-    assert response.status_code == 403
-    assert response.json()["detail"] == PluginHubMessages.INSUFFICIENT_SCOPE
-    assert upstream.calls == []
-
-
-async def test_a_target_not_installed_is_refused(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session, upstream
-):
-    installed, _target = await _hub(
-        session, acting_user, role_session, install_target=False
-    )
-
-    response = await client.post(
-        _url(ISSUES), json={}, headers=_installation_headers(installed)
-    )
-
-    assert response.status_code == 404
-    assert response.json()["detail"] == PluginHubMessages.TARGET_NOT_INSTALLED
-
-
-async def test_an_endpoint_that_is_not_public_is_refused(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session, upstream
-):
-    installed, _target = await _hub(session, acting_user, role_session)
-
-    response = await client.post(
-        _url(PRIVATE), json={}, headers=_installation_headers(installed)
-    )
-
-    assert response.status_code == 403
-    assert response.json()["detail"] == PluginHubMessages.ENDPOINT_NOT_PUBLIC
-    assert upstream.calls == []
-
-
-async def test_a_member_only_endpoint_refuses_an_installation_token(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session, upstream
-):
-    installed, _target = await _hub(session, acting_user, role_session)
-
-    response = await client.post(
-        _url(COMMENT),
-        json={"params": {"body": "Done"}},
-        headers=_installation_headers(installed),
-    )
-
-    assert response.status_code == 403
-    assert response.json()["detail"] == PluginHubMessages.ACTOR_NOT_SUPPORTED
-    assert upstream.calls == []
-
-
-async def test_a_target_not_placed_in_the_narrowed_initiative_is_refused(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session, upstream
-):
-    installed, _target = await _hub(
-        session, acting_user, role_session, place_target=False
-    )
-
-    response = await client.post(
-        _url(OPEN_ISSUE),
-        json={},
-        headers=_installation_headers(installed, initiative_id=installed.placed.id),
-    )
-
-    assert response.status_code == 403
-    assert response.json()["detail"] == PluginHubMessages.TARGET_NOT_PLACED
-    assert upstream.calls == []
-
-
-async def test_a_target_placed_in_the_narrowed_initiative_is_called(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session, upstream
-):
-    installed, _target = await _hub(session, acting_user, role_session)
-
-    response = await client.post(
-        _url(OPEN_ISSUE),
-        json={},
-        headers=_installation_headers(installed, initiative_id=installed.placed.id),
-    )
-
-    assert response.status_code == 200, response.text
-    assert upstream.claims()["initiative_id"] == installed.placed.id
 
 
 # ---------------------------------------------------------------------------
@@ -496,6 +483,14 @@ async def test_an_installation_call_names_the_caller_and_passes_the_answer_back(
     # The community's handle only.
     assert claims["connection_refs"] == {"workspace": "gcr_workspace"}
 
+    # Narrowed to the initiative the target is placed in; a write is not cached.
+    narrowed = _installation_headers(installed, initiative_id=installed.placed.id)
+    for _ in range(2):
+        written = await client.post(_url(OPEN_ISSUE), json={}, headers=narrowed)
+        assert written.status_code == 200, written.text
+    assert len(upstream.calls) == 3
+    assert upstream.claims()["initiative_id"] == installed.placed.id
+
 
 async def test_a_member_call_carries_the_targets_reference_never_the_callers(
     client: AsyncClient, session: AsyncSession, acting_user, role_session, upstream
@@ -528,22 +523,6 @@ async def test_a_member_call_carries_the_targets_reference_never_the_callers(
     assert target_ref != caller_ref
     assert caller_ref not in upstream.calls[0].headers["Authorization"]
     assert caller_ref.encode() not in upstream.calls[0].content
-
-
-async def test_a_member_call_hands_on_only_the_members_connections(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session, upstream
-):
-    installed, target = await _hub(session, acting_user, role_session)
-    assert target is not None
-    member = await _member(session, acting_user, installed)
-    await _connect(session, installed, target, member)
-
-    response = await client.post(
-        _url(ISSUES), json={}, headers=_member_headers(installed, member)
-    )
-
-    assert response.status_code == 200, response.text
-    assert upstream.claims()["connection_refs"] == {"account": "cr_member_account"}
 
 
 async def test_a_member_call_is_held_to_the_members_permission_in_the_target(
@@ -597,37 +576,9 @@ async def test_a_read_only_consent_does_not_write_as_the_member(
     assert upstream.calls == []
 
 
-async def test_a_parameter_the_endpoint_does_not_declare_is_refused(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session, upstream
-):
-    installed, _target = await _hub(session, acting_user, role_session)
-
-    response = await client.post(
-        _url(ISSUES),
-        json={"params": {"nope": "x"}},
-        headers=_installation_headers(installed),
-    )
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == PluginDataMessages.INVALID_PARAMS
-
-
 # ---------------------------------------------------------------------------
 # Caching
 # ---------------------------------------------------------------------------
-
-
-async def test_a_write_is_not_cached(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session, upstream
-):
-    installed, _target = await _hub(session, acting_user, role_session)
-    headers = _installation_headers(installed)
-
-    for _ in range(2):
-        response = await client.post(_url(OPEN_ISSUE), json={}, headers=headers)
-        assert response.status_code == 200, response.text
-
-    assert len(upstream.calls) == 2
 
 
 async def test_a_read_is_cached_per_actor(
@@ -651,6 +602,8 @@ async def test_a_read_is_cached_per_actor(
     )
     assert response.status_code == 200, response.text
     assert len(upstream.calls) == 2
+    # A member's call hands on only the member's connections.
+    assert upstream.claims()["connection_refs"] == {"account": "cr_member_account"}
 
 
 # ---------------------------------------------------------------------------

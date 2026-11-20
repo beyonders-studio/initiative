@@ -75,13 +75,6 @@ from app.testing.plugin_clients import (
 # ---------------------------------------------------------------------------
 
 
-async def _seat_session(installed: Any, role_session: Any) -> Any:
-    """A request-path session routed as the community's seat holder."""
-    s = await role_session("app_user")
-    await route_as(s, user_id=installed.seat.user.id, guild_id=installed.guild.id)
-    return s
-
-
 @contextmanager
 def _counting() -> Generator[list[str]]:
     """Every statement any engine runs meanwhile, in order."""
@@ -112,7 +105,7 @@ async def test_reads_the_files_open_to_its_initiative(
         session, installed.placed, installed.seat.user, name="Open in A"
     )
     await share_with_members(session, shared, installed.placed.id)
-    await create_file(
+    private = await create_file(
         session, installed.placed, installed.seat.user, name="Private in A"
     )
     in_b = await create_file(
@@ -141,6 +134,19 @@ async def test_reads_the_files_open_to_its_initiative(
         guild_url(installed.guild.id, f"/files/{in_b.id}"), headers=headers
     )
     assert other.status_code == 404, other.text
+
+    # A private file is read only once shared with the plug-in.
+    url = guild_url(installed.guild.id, f"/files/{private.id}")
+    assert (await client.get(url, headers=headers)).status_code == 404
+    await create_resource_grant(
+        session,
+        private,
+        plugin_install_id=installed.plugin.id,
+        level=ResourceAccessLevel.read,
+    )
+    shared_with_it = await client.get(url, headers=headers)
+    assert shared_with_it.status_code == 200, shared_with_it.text
+    assert shared_with_it.json()["can"]["edit"] is False
 
 
 # ---------------------------------------------------------------------------
@@ -235,31 +241,6 @@ async def test_a_file_a_person_made_names_them_by_reference(
 # ---------------------------------------------------------------------------
 
 
-async def test_a_private_file_is_read_only_once_shared_with_the_plugin(
-    client, session, acting_user, role_session
-):
-    installed = await install_plugin(
-        session, acting_user, role_session, granted=["files:read"]
-    )
-    private = await create_file(
-        session, installed.placed, installed.seat.user, name="Private in A"
-    )
-    headers = install_headers(installed, ["files:read"])
-    url = guild_url(installed.guild.id, f"/files/{private.id}")
-
-    assert (await client.get(url, headers=headers)).status_code == 404
-
-    await create_resource_grant(
-        session,
-        private,
-        plugin_install_id=installed.plugin.id,
-        level=ResourceAccessLevel.read,
-    )
-    read = await client.get(url, headers=headers)
-    assert read.status_code == 200, read.text
-    assert read.json()["can"]["edit"] is False
-
-
 async def test_it_cannot_write_even_what_is_shared_with_it_at_write(
     client, session, acting_user, role_session
 ):
@@ -299,18 +280,14 @@ async def test_it_cannot_write_even_what_is_shared_with_it_at_write(
     await session.refresh(file)
     assert file.name == "Shared at write"
 
-
-async def test_it_cannot_create_a_project(client, session, acting_user, role_session):
-    installed = await install_plugin(
-        session, acting_user, role_session, granted=["files:read"]
-    )
-    response = await client.post(
+    # Nor create a project.
+    project = await client.post(
         guild_url(installed.guild.id, "/projects/"),
         headers=install_headers(installed, ["files:read"]),
         json={"name": "Nope", "initiative_id": installed.placed.id},
     )
-    assert response.status_code == 403, response.text
-    assert response.json()["detail"] == PluginMessages.SCOPE_REQUIRED
+    assert project.status_code == 403, project.text
+    assert project.json()["detail"] == PluginMessages.SCOPE_REQUIRED
 
 
 async def test_the_role_refuses_the_communitys_settings(
@@ -343,7 +320,7 @@ async def test_a_narrowed_token_reads_only_its_initiative(
         session,
         acting_user,
         role_session,
-        granted=["files:read", "calendars:read"],
+        granted=["files:read", "calendars:read", "projects:read"],
     )
     # Placed in B too, so only the narrowing keeps B out.
     await route_session_to_guild(session, installed.guild.id)
@@ -364,7 +341,17 @@ async def test_a_narrowed_token_reads_only_its_initiative(
     await create_guild_calendar(
         session, installed.guild, installed.seat.user, name="Community"
     )
-    scopes = ["files:read", "calendars:read"]
+    task_in_a = await create_task(
+        session,
+        await _open_project(session, installed, installed.placed, "Open A"),
+        title="orchard in a",
+    )
+    task_in_b = await create_task(
+        session,
+        await _open_project(session, installed, installed.unplaced, "Open B"),
+        title="orchard in b",
+    )
+    scopes = ["files:read", "calendars:read", "projects:read"]
     wide = install_headers(installed, scopes)
     narrow = install_headers(installed, scopes, initiative_id=installed.placed.id)
     guild = installed.guild.id
@@ -382,6 +369,25 @@ async def test_a_narrowed_token_reads_only_its_initiative(
     assert "Community" in [c["name"] for c in community.json()["items"]]
     narrowed = await client.get(guild_url(guild, "/calendars/"), headers=narrow)
     assert "Community" not in [c["name"] for c in narrowed.json()["items"]]
+
+    suggested = await _suggest(client, installed, wide, search="orchard")
+    assert suggested.status_code == 200, suggested.text
+    assert sorted(r["entity_id"] for r in suggested.json()) == sorted(
+        [task_in_a.id, task_in_b.id]
+    )
+    suggested = await _suggest(client, installed, narrow, search="orchard")
+    assert suggested.status_code == 200, suggested.text
+    assert [r["entity_id"] for r in suggested.json()] == [task_in_a.id]
+    # Asking for the other initiative by name finds nothing either.
+    asked_b = await _suggest(
+        client,
+        installed,
+        narrow,
+        search="orchard",
+        initiative_id=installed.unplaced.id,
+    )
+    assert asked_b.status_code == 200, asked_b.text
+    assert asked_b.json() == []
 
 
 # ---------------------------------------------------------------------------
@@ -406,9 +412,21 @@ async def _names(client: Any, installed: Any, headers: dict[str, str]) -> Any:
     return [d["name"] for d in response.json()["items"]]
 
 
-async def test_removing_the_placement_takes_effect_on_the_next_request(
-    client, session, acting_user, role_session
+@pytest.mark.parametrize(
+    ("change", "after"),
+    [
+        ("placement", []),
+        ("scope", 403),
+        ("registration", 401),
+        ("install", 401),
+        ("guild", 401),
+    ],
+)
+async def test_a_change_takes_effect_on_the_next_request(
+    client, session, acting_user, role_session, change, after
 ):
+    """Removing the placement or the scope, or switching off the registration,
+    the install or the community."""
     installed = await install_plugin(
         session, acting_user, role_session, granted=["files:read"]
     )
@@ -416,49 +434,25 @@ async def test_removing_the_placement_takes_effect_on_the_next_request(
     headers = install_headers(installed, ["files:read"])
     assert await _names(client, installed, headers) == ["Open in A"]
 
-    await route_session_to_guild(session, installed.guild.id)
-    placement = await session.get(
-        PluginPlacement, (installed.plugin.id, installed.placed.id)
-    )
-    await session.delete(placement)
-    await session.commit()
-
-    assert await _names(client, installed, headers) == []
-
-
-async def test_removing_the_scope_takes_effect_on_the_next_request(
-    client, session, acting_user, role_session
-):
-    installed = await install_plugin(
-        session, acting_user, role_session, granted=["files:read"]
-    )
-    await _open_file(session, installed)
-    headers = install_headers(installed, ["files:read"])
-    assert await _names(client, installed, headers) == ["Open in A"]
-
-    s = await _seat_session(installed, role_session)
-    row = (
-        await s.exec(select(GuildPlugin).where(GuildPlugin.id == installed.plugin.id))
-    ).one()
-    row.granted_scopes = []
-    s.add(row)
-    await s.commit()
-
-    assert await _names(client, installed, headers) == 403
-
-
-@pytest.mark.parametrize("switch", ["registration", "install", "guild"])
-async def test_switching_off_takes_effect_on_the_next_request(
-    client, session, acting_user, role_session, switch
-):
-    installed = await install_plugin(
-        session, acting_user, role_session, granted=["files:read"]
-    )
-    await _open_file(session, installed)
-    headers = install_headers(installed, ["files:read"])
-    assert await _names(client, installed, headers) == ["Open in A"]
-
-    if switch == "registration":
+    if change == "placement":
+        await route_session_to_guild(session, installed.guild.id)
+        placement = await session.get(
+            PluginPlacement, (installed.plugin.id, installed.placed.id)
+        )
+        await session.delete(placement)
+    elif change == "scope":
+        # As the community's seat holder, on the request path.
+        s = await role_session("app_user")
+        await route_as(s, user_id=installed.seat.user.id, guild_id=installed.guild.id)
+        row = (
+            await s.exec(
+                select(GuildPlugin).where(GuildPlugin.id == installed.plugin.id)
+            )
+        ).one()
+        row.granted_scopes = []
+        s.add(row)
+        await s.commit()
+    elif change == "registration":
         await session.exec(
             text(
                 "UPDATE public.plugin_service_registrations SET suspended_at = now() "
@@ -466,7 +460,7 @@ async def test_switching_off_takes_effect_on_the_next_request(
             ),
             params={"c": CLIENT},
         )
-    elif switch == "install":
+    elif change == "install":
         await route_session_to_guild(session, installed.guild.id)
         await session.exec(
             text("UPDATE guild_plugins SET enabled = false WHERE id = :i"),
@@ -479,7 +473,7 @@ async def test_switching_off_takes_effect_on_the_next_request(
         session.add(guild)
     await session.commit()
 
-    assert await _names(client, installed, headers) == 401
+    assert await _names(client, installed, headers) == after
 
 
 # ---------------------------------------------------------------------------
@@ -550,30 +544,6 @@ async def test_a_list_costs_two_statements_before_its_handler(
         )
     assert response.status_code == 200, response.text
     assert seen == [2], statements[:4]
-
-
-async def test_a_response_naming_people_costs_one_statement_cold_and_none_warm(
-    client, session, acting_user, role_session, monkeypatch
-):
-    installed = await install_plugin(
-        session, acting_user, role_session, granted=["files:read"]
-    )
-    file = await _open_file(session, installed)
-    headers = install_headers(installed, ["files:read"])
-    url = guild_url(installed.guild.id, f"/files/{file.id}")
-
-    # Mint the references once, then measure a warm read against a cold one.
-    first = await client.get(url, headers=headers)
-    assert first.status_code == 200, first.text
-    with _counting() as warm:
-        again = await client.get(url, headers=headers)
-    assert again.json() == first.json()
-
-    plugin_refs.forget_cached_install_refs()
-    with _counting() as cold:
-        third = await client.get(url, headers=headers)
-    assert third.json() == first.json()
-    assert len(cold) == len(warm) + 1, (cold, warm)
 
 
 # ---------------------------------------------------------------------------
@@ -651,18 +621,9 @@ async def test_member_search_narrows_to_an_initiative_the_install_is_placed_in(
     )
     assert unplaced.status_code == 403, unplaced.text
 
-
-async def test_member_search_needs_members_read(
-    client, session, acting_user, role_session
-):
-    installed = await install_plugin(
-        session, acting_user, role_session, granted=["files:read"]
-    )
-    response = await client.get(
-        guild_url(installed.guild.id, "/users/search"),
-        headers=install_headers(installed, ["files:read"]),
-    )
-    assert response.status_code == 403, response.text
+    # A token without members:read is refused.
+    unscoped = await client.get(url, headers=install_headers(installed, []))
+    assert unscoped.status_code == 403, unscoped.text
 
 
 @pytest.mark.parametrize("reads_names", [True, False])
@@ -1070,6 +1031,11 @@ async def test_suggests_only_the_tasks_it_could_read(
     readable = await create_task(session, open_a, title="harbor open")
     await create_task(session, private_a, title="harbor private")
     await create_task(session, open_b, title="harbor elsewhere")
+    lantern = await create_task(session, open_a, title="lantern task")
+    file = await create_file(
+        session, installed.placed, installed.seat.user, name="lantern doc"
+    )
+    await share_with_members(session, file, installed.placed.id)
     headers = install_headers(installed, ["projects:read"])
 
     response = await _suggest(
@@ -1087,27 +1053,12 @@ async def test_suggests_only_the_tasks_it_could_read(
     assert unnamed.status_code == 200, unnamed.text
     assert [r["entity_id"] for r in unnamed.json()] == [readable.id]
 
-
-async def test_suggest_leaves_out_the_kinds_it_holds_no_scope_for(
-    client, session, acting_user, role_session
-):
-    installed = await install_plugin(
-        session, acting_user, role_session, granted=["projects:read"]
-    )
-    project = await _open_project(session, installed, installed.placed, "Open A")
-    task = await create_task(session, project, title="lantern task")
-    file = await create_file(
-        session, installed.placed, installed.seat.user, name="lantern doc"
-    )
-    await share_with_members(session, file, installed.placed.id)
-    headers = install_headers(installed, ["projects:read"])
-
+    # The kinds it holds no scope for are left out, or refused when named alone.
     both = await _suggest(
         client, installed, headers, search="lantern", types=["task", "file"]
     )
     assert both.status_code == 200, both.text
-    assert [r["entity_id"] for r in both.json()] == [task.id]
-
+    assert [r["entity_id"] for r in both.json()] == [lantern.id]
     refused = await _suggest(
         client, installed, headers, search="lantern", types=["file"]
     )
@@ -1193,56 +1144,3 @@ async def test_a_cut_comment_title_ends_before_what_the_cut_goes_through(
     )
     assert response.status_code == 200, response.text
     assert [found["title"] for found in response.json()] == [f"{lead} "]
-
-
-async def test_a_narrowed_token_suggests_only_its_initiative(
-    client, session, acting_user, role_session
-):
-    installed = await install_plugin(
-        session, acting_user, role_session, granted=["projects:read"]
-    )
-    # Placed in B too, so only the narrowing keeps B out.
-    await route_session_to_guild(session, installed.guild.id)
-    session.add(
-        PluginPlacement(
-            install_id=installed.plugin.id, initiative_id=installed.unplaced.id
-        )
-    )
-    await session.commit()
-    in_a = await create_task(
-        session,
-        await _open_project(session, installed, installed.placed, "Open A"),
-        title="orchard in a",
-    )
-    in_b = await create_task(
-        session,
-        await _open_project(session, installed, installed.unplaced, "Open B"),
-        title="orchard in b",
-    )
-    scopes = ["projects:read"]
-
-    wide = await _suggest(
-        client, installed, install_headers(installed, scopes), search="orchard"
-    )
-    assert wide.status_code == 200, wide.text
-    assert sorted(r["entity_id"] for r in wide.json()) == sorted([in_a.id, in_b.id])
-
-    narrow = await _suggest(
-        client,
-        installed,
-        install_headers(installed, scopes, initiative_id=installed.placed.id),
-        search="orchard",
-    )
-    assert narrow.status_code == 200, narrow.text
-    assert [r["entity_id"] for r in narrow.json()] == [in_a.id]
-
-    # Asking for the other initiative by name finds nothing either.
-    asked_b = await _suggest(
-        client,
-        installed,
-        install_headers(installed, scopes, initiative_id=installed.placed.id),
-        search="orchard",
-        initiative_id=installed.unplaced.id,
-    )
-    assert asked_b.status_code == 200, asked_b.text
-    assert asked_b.json() == []

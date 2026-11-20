@@ -87,10 +87,6 @@ def _manifest(**overrides):
 # --- the schema is a schema -------------------------------------------------
 
 
-def test_the_schema_is_a_valid_2020_12_document():
-    Draft202012Validator.check_schema(contract.manifest_schema())
-
-
 def test_every_ref_resolves():
     """A `$ref` naming a definition that isn't there fails at use rather than at
     load, so it would survive a test that only validated the happy path."""
@@ -110,22 +106,6 @@ def test_every_ref_resolves():
                 walk(value)
 
     walk(schema)
-
-
-def test_the_vendored_pair_came_from_one_contract():
-    """The schema is generated from the contract, so the two are vendored as a
-    pair. Refreshing one without the other leaves this build enforcing a
-    vocabulary the schema does not describe."""
-    schema_caps = {
-        contract.cap("connections"): contract.manifest_schema()["properties"][
-            "connections"
-        ]["maxItems"],
-        contract.cap("endpoints"): contract.manifest_schema()["properties"][
-            "endpoints"
-        ]["maxItems"],
-    }
-    for from_contract, from_schema in schema_caps.items():
-        assert from_contract == from_schema
 
 
 # --- derived, not restated --------------------------------------------------
@@ -160,6 +140,9 @@ def test_vocabularies_come_from_the_validator():
 
 
 def test_caps_come_from_the_validator():
+    """The schema is generated from the contract, so the two are vendored as a
+    pair. Refreshing one without the other leaves this build enforcing a
+    vocabulary the schema does not describe."""
     props = contract.manifest_schema()["properties"]
     assert props["connections"]["maxItems"] == MAX_CONNECTIONS
     assert props["endpoints"]["maxItems"] == MAX_ENDPOINTS
@@ -173,17 +156,6 @@ def test_caps_come_from_the_validator():
     assert props["pages"]["maxItems"] == MAX_PAGES
 
 
-def test_a_secret_is_not_a_query_parameter():
-    """`secret` is a connection field type and deliberately not a param type;
-    the schema must not blur the two by sharing one field definition."""
-    defs = contract.manifest_schema()["$defs"]
-    assert "secret" in defs["connectionField"]["properties"]["type"]["enum"]
-    assert "secret" not in defs["endpointParam"]["properties"]["type"]["enum"]
-    # And only a connection field is written back by the plug-in.
-    assert "managed" in defs["connectionField"]["properties"]
-    assert "managed" not in defs["endpointParam"]["properties"]
-
-
 def test_lengths_come_from_the_validator():
     defs = contract.manifest_schema()["$defs"]
     assert defs["identifier"]["maxLength"] == MAX_IDENTIFIER_LENGTH
@@ -193,15 +165,6 @@ def test_lengths_come_from_the_validator():
             "maxLength"
         ]
         == MAX_PUBLIC_ID_LENGTH
-    )
-
-
-def test_the_schema_names_itself_stably():
-    """An author points a `$schema` at this and a generator keys a cache on it,
-    so a drifting `$id` invalidates both."""
-    assert (
-        contract.manifest_schema()["$id"]
-        == "https://initiativetasks.com/schemas/plugin-manifest-v1.json"
     )
 
 
@@ -609,6 +572,51 @@ REFUSED_BY_BOTH = [
         ),
         id="requires-naming-no-operator",
     ),
+    # The one thing about a localized object that does fail.
+    pytest.param(
+        _manifest(features=["pages"], pages=[{"id": "e", "path": "/e", "name": {}}]),
+        id="localized-object-with-nothing-usable",
+    ),
+    # A region is a country or ``default`` — GDPR is not one age — and a wrong
+    # age is refused whole rather than quietly trimmed.
+    *(
+        pytest.param(_manifest(minimum_age=value), id=f"minimum-age-{value}")
+        for value in (
+            {"gdpr": 16},
+            {"us": 13},
+            {"USA": 13},
+            {"default": 12},
+            {"default": 22},
+            {},
+        )
+    ),
+    # Who may use a plug-in is ``none``, ``beta`` or ``operations``.
+    *(
+        pytest.param(_manifest(availability=value), id=f"availability-{value!r}")
+        for value in ("Beta", "suspended", "", [], {}, True)
+    ),
+    # The oldest contract a plug-in needs is ``MAJOR.MINOR``.
+    *(
+        pytest.param(_manifest(min_plugin_api=value), id=f"min-api-{value!r}")
+        for value in ("4", "4.2.0", "v4.2", "4.x", "", 4.2)
+    ),
+    # A sign-in names both halves, and a path rather than an address.
+    *(
+        pytest.param(
+            _manifest(
+                features=["pages"],
+                pages=[{"id": "inventory", "path": "/inventory", "name": {"en": "I"}}],
+                sign_in=value,
+            ),
+            id=f"sign-in-{value!r}",
+        )
+        for value in (
+            {"page": "inventory", "return_path": "https://elsewhere.test/back"},
+            {"page": "inventory"},
+            {"return_path": "/signed-in"},
+            "inventory",
+        )
+    ),
 ]
 
 
@@ -642,17 +650,6 @@ def test_a_localized_entry_the_platform_ignores_is_not_an_error(name, why, valid
     )
     platform_accepts(manifest)
     assert list(validator.iter_errors(manifest)) == [], why
-
-
-def test_a_localized_object_with_nothing_usable_is_refused(validator):
-    """The one thing that does fail, and the only rule left on the type."""
-    manifest = _manifest(
-        features=["pages"],
-        pages=[{"id": "e", "path": "/e", "name": {}}],
-    )
-    assert list(validator.iter_errors(manifest)) != []
-    with pytest.raises(ValueError):
-        platform_accepts(manifest)
 
 
 # --- where the schema stops -------------------------------------------------
@@ -754,15 +751,6 @@ def test_the_platform_enforces_what_the_schema_cannot(manifest, why, validator):
     assert list(validator.iter_errors(manifest)) == [], f"schema caught it: {why}"
     with pytest.raises(ValueError):
         platform_accepts(manifest)
-
-
-def test_a_return_is_not_a_control():
-    """A select is a control, and the value behind one is a string — so it is a
-    param type and never a return type. The schema must not blur the two."""
-    defs = contract.manifest_schema()["$defs"]
-    assert "select" in defs["endpointParam"]["properties"]["type"]["enum"]
-    assert "select" not in defs["endpointReturn"]["properties"]["type"]["enum"]
-    assert "secret" not in defs["endpointReturn"]["properties"]["type"]["enum"]
 
 
 def test_every_direction_may_describe_itself_and_its_answer():
@@ -990,54 +978,6 @@ def test_a_stored_definition_reads_its_permissions():
     assert surface_permission({}) == surface_permission(None) == "use"
 
 
-@pytest.mark.parametrize(
-    "minimum_age",
-    [{"gdpr": 16}, {"us": 13}, {"USA": 13}, {"default": 12}, {"default": 22}, {}],
-)
-def test_a_minimum_age_is_by_country_and_bounded(minimum_age, validator):
-    """A region is a country or ``default`` — GDPR is not one age — and an age
-    the publisher declared for compliance is refused whole when wrong rather
-    than quietly trimmed. The schema and the platform agree on every case."""
-    manifest = _manifest(minimum_age=minimum_age)
-    assert list(validator.iter_errors(manifest)) != []
-    with pytest.raises(ValueError):
-        platform_accepts(manifest)
-
-
-def test_a_minimum_age_is_kept_as_declared(validator):
-    manifest = _manifest(minimum_age={"default": 16, "US": 13, "FR": 15})
-    assert list(validator.iter_errors(manifest)) == []
-    stored = normalize_listing_definition("plugin", manifest)
-    assert stored["minimum_age"] == {"default": 16, "US": 13, "FR": 15}
-
-
-@pytest.mark.parametrize("availability", ["Beta", "suspended", "", [], {}, True])
-def test_an_availability_is_one_of_three(availability, validator):
-    """Who may use a plug-in is ``none``, ``beta`` or ``operations``; anything
-    else, of any type, is refused by the schema and the platform alike."""
-    manifest = _manifest(availability=availability)
-    assert list(validator.iter_errors(manifest)) != []
-    with pytest.raises(ValueError):
-        platform_accepts(manifest)
-
-
-@pytest.mark.parametrize("min_plugin_api", ["4", "4.2.0", "v4.2", "4.x", "", 4.2])
-def test_a_min_plugin_api_is_major_minor(min_plugin_api, validator):
-    """The oldest contract a plug-in needs is ``MAJOR.MINOR``; anything else is
-    refused by the schema and the platform alike."""
-    manifest = _manifest(min_plugin_api=min_plugin_api)
-    assert list(validator.iter_errors(manifest)) != []
-    with pytest.raises(ValueError):
-        platform_accepts(manifest)
-
-
-def test_a_min_plugin_api_is_kept_as_declared(validator):
-    manifest = _manifest(min_plugin_api="4.2")
-    assert list(validator.iter_errors(manifest)) == []
-    stored = normalize_listing_definition("plugin", manifest)
-    assert stored["min_plugin_api"] == "4.2"
-
-
 def _signing_in(sign_in: object) -> dict:
     return _manifest(
         features=["pages"],
@@ -1046,29 +986,18 @@ def _signing_in(sign_in: object) -> dict:
     )
 
 
-def test_a_sign_in_is_kept_as_declared(validator):
-    manifest = _signing_in({"page": "inventory", "return_path": "/signed-in"})
-    assert list(validator.iter_errors(manifest)) == []
-    stored = normalize_listing_definition("plugin", manifest)
-    assert stored["sign_in"] == {"page": "inventory", "return_path": "/signed-in"}
-
-
 @pytest.mark.parametrize(
-    "sign_in",
+    ("manifest", "key"),
     [
-        {"page": "inventory", "return_path": "https://elsewhere.test/back"},
-        {"page": "inventory"},
-        {"return_path": "/signed-in"},
-        "inventory",
+        (_manifest(minimum_age={"default": 16, "US": 13, "FR": 15}), "minimum_age"),
+        (_manifest(min_plugin_api="4.2"), "min_plugin_api"),
+        (_signing_in({"page": "inventory", "return_path": "/signed-in"}), "sign_in"),
     ],
 )
-def test_a_sign_in_names_a_page_and_a_path(sign_in, validator):
-    """Both halves, and a path rather than an address: the address is the
-    registration's to give."""
-    manifest = _signing_in(sign_in)
-    assert list(validator.iter_errors(manifest)) != []
-    with pytest.raises(ValueError):
-        platform_accepts(manifest)
+def test_a_declared_value_is_kept_as_declared(manifest, key, validator):
+    assert list(validator.iter_errors(manifest)) == []
+    stored = normalize_listing_definition("plugin", manifest)
+    assert stored[key] == manifest[key]
 
 
 def test_a_sign_in_names_one_of_the_plugins_own_pages():

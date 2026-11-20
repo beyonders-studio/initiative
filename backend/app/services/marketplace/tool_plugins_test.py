@@ -31,6 +31,8 @@ def test_counters_registers_as_declared():
     assert stored["features"] == ["tool"]
     assert stored["default_name"] == "Counters"
     assert stored["tool"] == counters_tool_manifest()["tool"]
+    # A republish stores the same document.
+    assert _normalize(stored) == stored
 
 
 def test_a_layout_names_the_table_s_fields_and_every_row_s():
@@ -44,20 +46,10 @@ def test_a_layout_names_the_table_s_fields_and_every_row_s():
         "displays": {"count": "clock", "mood": "stars"},
     }
     _detail(body)["main"].append(_required("color"))
+    # A masonry wall is a list a tool draws too.
+    _layouts(body)["lists"].append({**_list(body), "kind": "masonry"})
     stored = _normalize(body)
     assert _layouts(stored) == _layouts(body)
-
-
-def test_a_masonry_wall_is_a_list_a_tool_draws():
-    body = counters_tool_manifest()
-    _layouts(body)["lists"].append({**_list(body), "kind": "masonry"})
-    assert _layouts(_normalize(body))["lists"][2]["kind"] == "masonry"
-
-
-def test_a_republish_stores_the_same_document():
-    assert _normalize(_normalize(counters_tool_manifest())) == _normalize(
-        counters_tool_manifest()
-    )
 
 
 def test_its_kinds_are_its_keys_and_its_uid():
