@@ -34,6 +34,7 @@
   "/c/$communityId/i/$initiativeId/contacts/$contactId/settings/",
   "/c/$communityId/i/$initiativeId/contacts/$contactId/settings/access",
   "/c/$communityId/i/$initiativeId/contacts/$contactId/settings/advanced",
+  "/c/$communityId/i/$initiativeId/counter-groups/$",
   "/c/$communityId/i/$initiativeId/dashboards/",
   "/c/$communityId/i/$initiativeId/dashboards/$dashboardId/",
   "/c/$communityId/i/$initiativeId/dashboards/$dashboardId/settings",
