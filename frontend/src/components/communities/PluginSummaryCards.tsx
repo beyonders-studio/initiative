@@ -9,9 +9,9 @@ import type {
 import { useListPluginSummaries, useReadPluginSummary } from "@/api/generated/plugins/plugins";
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { localized } from "@/lib/widgets/widgetMeta";
 import { parseDateValue } from "@/ui/lib/formatDate";
 import { dateTimeFormat, numberFormat } from "@/ui/lib/intl";
+import { localized } from "@/ui/lib/localized";
 import { Progress } from "@/ui/progress";
 
 type Translate = TFunction<["communities", "common"]>;

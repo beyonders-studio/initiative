@@ -34,7 +34,7 @@ import { useWidgetMetas } from "@/hooks/useWidgetMeta";
 import { MAX_WIDGETS } from "@/lib/widgets/definition";
 import { sampleFor } from "@/lib/widgets/sampleData";
 import { resolveMapping } from "@/lib/widgets/shape";
-import { localized, type WidgetMeta, widgetDisplayName } from "@/lib/widgets/widgetMeta";
+import { type WidgetMeta, widgetDisplayName } from "@/lib/widgets/widgetMeta";
 import { Button } from "@/ui/button";
 import {
   Dialog,
@@ -46,6 +46,7 @@ import {
 } from "@/ui/dialog";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { localized } from "@/ui/lib/localized";
 import { cn } from "@/ui/lib/utils";
 
 export interface WidgetPickerProps {

@@ -9,6 +9,7 @@ import type { SortingState } from "@tanstack/react-table";
 
 import type { SortField } from "@/api/generated/initiativeAPI.schemas";
 import { collator } from "@/ui/lib/intl";
+import { localized } from "@/ui/lib/localized";
 import { slugify } from "@/ui/lib/slug";
 
 import { type FieldDef, plainValue } from "./fields";
@@ -76,14 +77,6 @@ export const presetsOf = <F>(
         };
       });
 
-/** Text written in several languages, in `language` (or its base language),
- *  else in English, else in the first it has. */
-export const inLanguage = (
-  text: Readonly<Record<string, string>>,
-  language: string
-): string | undefined =>
-  text[language] ?? text[language.split("-")[0]] ?? text.en ?? Object.values(text)[0];
-
 /** A preset's name, in the reader's words or `language` where it is
  *  shipped. */
 export const presetName = (
@@ -93,7 +86,7 @@ export const presetName = (
 ): string =>
   preset.nameKey
     ? t(preset.nameKey)
-    : ((preset.names && inLanguage(preset.names, language)) ?? preset.name);
+    : ((preset.names && localized(preset.names, language)) ?? preset.name);
 
 /** `preset` of `kind` as a layout keeps it: a shipped one by its slug alone
  *  (a tool plug-in's by its names), so each reader still reads its name in

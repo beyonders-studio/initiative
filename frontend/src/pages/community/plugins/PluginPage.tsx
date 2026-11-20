@@ -25,10 +25,10 @@ import { showsCuratedCatalogueOnly } from "@/lib/marketplaceCuration";
 import { pageAllow, pluginPages } from "@/lib/pluginSurfaces";
 import { getItem, setItem } from "@/lib/storage";
 import { DEFAULT_THEME } from "@/lib/themes";
-import { localized } from "@/lib/widgets/widgetMeta";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
 import { getClock, useTimeFormat, useWeekStart } from "@/ui/host";
+import { localized } from "@/ui/lib/localized";
 import { cn } from "@/ui/lib/utils";
 import { EditorSkeleton, SkeletonPillRow, SkeletonRegion } from "@/ui/page-skeletons";
 

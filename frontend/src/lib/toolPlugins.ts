@@ -28,8 +28,8 @@ import {
   type PropertySummary,
 } from "@/api/generated/initiativeAPI.schemas";
 import { initiativeRoute } from "@/lib/tools";
-import { type LocalizedText, localized } from "@/lib/widgets/widgetMeta";
 import type { ListLayoutDefinition } from "@/ui/layouts/layoutSet";
+import { type LocalizedText, localized } from "@/ui/lib/localized";
 
 /**
  * The icons a tool plug-in may name (the contract's `toolIcon`), each the

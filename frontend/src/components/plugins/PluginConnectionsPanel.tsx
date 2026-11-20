@@ -38,12 +38,12 @@ import {
 } from "@/hooks/useCommunityPluginDetail";
 import { toast } from "@/lib/mascotToast";
 import { openExternal } from "@/lib/openExternal";
-import { localized } from "@/lib/widgets/widgetMeta";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { localized } from "@/ui/lib/localized";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Switch } from "@/ui/switch";
 

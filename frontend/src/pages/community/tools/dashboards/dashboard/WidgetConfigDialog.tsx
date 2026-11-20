@@ -54,7 +54,6 @@ import { withParamAnswer } from "@/lib/widgets/pluginParams";
 import { canDraw, resolveMapping } from "@/lib/widgets/shape";
 import { shapeFor } from "@/lib/widgets/shapes";
 import { paramsFor } from "@/lib/widgets/sources";
-import { localized } from "@/lib/widgets/widgetMeta";
 import { Button } from "@/ui/button";
 import {
   Dialog,
@@ -67,6 +66,7 @@ import {
 } from "@/ui/dialog";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
+import { localized } from "@/ui/lib/localized";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";

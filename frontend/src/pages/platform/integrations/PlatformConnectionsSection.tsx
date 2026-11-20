@@ -10,10 +10,10 @@ import {
   useConnectForEveryCommunity,
   useDisconnectForEveryCommunity,
 } from "@/hooks/usePluginServices";
-import { localized } from "@/lib/widgets/widgetMeta";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { localized } from "@/ui/lib/localized";
 
 interface PlatformConnectionsSectionProps {
   registration: PluginServiceRegistrationRead;

@@ -8,9 +8,11 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { localized } from "@/ui/lib/localized";
+
 import { BUILTIN_WIDGET_TYPES, builtinWidgetSource } from "./registry";
 import { readMetaInSandbox } from "./runtime/sandbox";
-import { localized, META_LIMITS, validateWidgetMeta, widgetDisplayName } from "./widgetMeta";
+import { META_LIMITS, validateWidgetMeta, widgetDisplayName } from "./widgetMeta";
 
 const SHIPPED_LOCALES = ["de", "en", "es", "fr"];
 
