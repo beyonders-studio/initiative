@@ -104,6 +104,13 @@ describe("toast", () => {
     expect(openMessages()).toEqual(["Could not save"]);
   });
 
+  it("shows each toast that carries its own button, though the text matches", () => {
+    const onClick = () => {};
+    toast.success("Moved to Done", { action: { label: "Undo", onClick } });
+    toast.success("Moved to Done", { action: { label: "Undo", onClick } });
+    expect(openMessages()).toEqual(["Moved to Done", "Moved to Done"]);
+  });
+
   it("drops a waiting toast that is dismissed before its turn", () => {
     toast.info("One", { id: "one" });
     toast.info("Two");

@@ -153,14 +153,22 @@ const close = (key: string) => {
   showWaiting();
 };
 
+/** Keys for toasts that belong to one operation (see `fire`). */
+let ownKeys = 0;
+
 /**
  * Show a toast. A toast with an `id` replaces the one showing under that id
- * (Sonner's behaviour); one without is dropped while the same text of the
- * same type is already showing or waiting.
+ * (Sonner's behaviour). A plain notice without one is dropped while the same
+ * text of the same type is already showing or waiting; one carrying a button
+ * or a close hook acts on its own operation, so it always shows.
  */
 const fire = (message: string, type: MascotToastType, opts?: MascotToastOptions): string => {
   const input = buildInput(message, type, opts);
-  const key = opts?.id ?? `${type}:${input.message}`;
+  let key = opts?.id ?? `${type}:${input.message}`;
+  if (opts?.id === undefined && (opts?.action || opts?.onClose)) {
+    ownKeys += 1;
+    key = `own:${ownKeys}`;
+  }
   if (entries.has(key)) {
     if (opts?.id === undefined) return key;
     close(key);
