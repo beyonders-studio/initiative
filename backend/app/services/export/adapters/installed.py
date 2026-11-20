@@ -26,7 +26,7 @@ and its people and references are written as every tool's are.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
 from types import SimpleNamespace
@@ -38,6 +38,7 @@ from sqlalchemy import Table
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.identity_boundary import STORED_MENTION
 from app.core.messages import ExportMessages
 from app.core.tool_set import ToolRecord
 from app.core.user_display import display_name, handle_of
@@ -56,12 +57,13 @@ from app.services.export.adapters._common import (
 )
 from app.services.export.contract import RenderItem
 from app.services.export.engine import ExportError
-from app.services.export.i18n import export_locale
+from app.services.export.i18n import et, export_locale
 from app.services.export.property_values import exported_properties
 from app.services.import_engine.mentions import (
     detach_markdown_mentions,
     load_mention_handles,
     markdown_mention_ids,
+    mention_namer,
 )
 from app.services.import_engine.references import detach_markdown_references
 from app.services.marketplace.widget_meta import in_language
@@ -96,6 +98,9 @@ class Prepared:
     #: The layouts each item table keeps under a row, by the table's kind
     #: and the row's id.
     layouts: Mapping[tuple[str, int], list[dict[str, Any]]]
+    #: A text with each mention in it named as the person reads now
+    #: (``mention_namer``), for a table's cells.
+    named: Callable[[Any], Any]
 
 
 def envelope_type(tool: ToolRecord) -> str:
@@ -288,12 +293,14 @@ class InstalledToolAdapter(ToolExportAdapter):
             if people
             else ()
         )
-        mentioned = {
-            user_id
+        texts = [
+            row[column.name]
             for table, row in cells
             for column in _fields(table)
             if column.info["field"] == "text"
-            for user_id in markdown_mention_ids(row[column.name])
+        ]
+        mentioned = {
+            user_id for text in texts for user_id in markdown_mention_ids(text)
         }
         kinds = routed_tools(session).table_kinds
         ids: dict[str, list[int]] = {}
@@ -321,6 +328,11 @@ class InstalledToolAdapter(ToolExportAdapter):
             await load_mention_handles(session, mentioned),
             await _carried(session, ids),
             layouts,
+            await mention_namer(
+                session,
+                texts if ctx.format != "json" else [],
+                missing=et("fallback.formerMember", export_locale(ctx.user)),
+            ),
         )
 
     # -- writing ---------------------------------------------------------------
@@ -404,6 +416,9 @@ class InstalledToolAdapter(ToolExportAdapter):
             return _option_label(field, value, locale)
         if kind == "multi_select":
             return ", ".join(_option_label(field, each, locale) for each in value)
+        if kind == "text":
+            # A mention reads as ``@Name``, as a task's description does.
+            return STORED_MENTION.sub(lambda m: f"@{m.group(1)}", prepared.named(value))
         return values.text(value)
 
     def item(self, row: ToolRow, ctx: BuildContext, /) -> RenderItem:
