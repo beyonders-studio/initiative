@@ -130,6 +130,7 @@ async def _columns(session: AsyncSession, schema: str) -> dict[str, set[str]]:
         ("key", "a" * 18),
         ("field", "id"),
         ("field", "parent_id"),
+        ("field", "ctid"),
         ("field", "view mode"),
         ("uid", "tsjvtcm0s7gv2x"),
         ("uid", "TSJVTCM0S7GV2'"),

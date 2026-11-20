@@ -267,7 +267,13 @@
       "listing_version",
       "comments_enabled",
       "comments_locked_at",
-      "actions"
+      "actions",
+      "tableoid",
+      "xmin",
+      "cmin",
+      "xmax",
+      "cmax",
+      "ctid"
     ],
     "toolLayoutField": [
       "name",
