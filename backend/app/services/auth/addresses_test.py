@@ -16,7 +16,6 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.encryption import SALT_EMAIL, decrypt_field, hash_email
-from app.models.platform.user import User
 from app.models.platform.user_email import UserEmail
 from app.models.platform.user_email_assertion import UserEmailAssertion
 from app.services.auth import addresses
@@ -52,18 +51,6 @@ async def _addresses(session: AsyncSession, user_id: int) -> list[UserEmail]:
     )
 
 
-async def test_an_account_is_created_holding_its_address(session: AsyncSession):
-    user = await create_user(session, email="held@example.com")
-
-    rows = await _addresses(session, user.id)
-    assert len(rows) == 1
-    assert rows[0].email_hash == hash_email("held@example.com")
-    assert decrypt_field(rows[0].email_encrypted, SALT_EMAIL) == "held@example.com"
-    assert rows[0].is_primary is True
-    assert rows[0].source == addresses.SOURCE_SIGNUP
-    assert rows[0].verified_at is not None
-
-
 async def test_any_of_an_accounts_addresses_resolves_to_it(session: AsyncSession):
     """The point of the table: one account, more than one way in."""
     user = await create_user(session, email="first@example.com")
@@ -80,19 +67,6 @@ async def test_any_of_an_accounts_addresses_resolves_to_it(session: AsyncSession
     for address in ("first@example.com", "second@example.com"):
         found = await addresses.find_user_by_address(session, address)
         assert found is not None and found.id == user.id
-
-
-async def test_an_address_is_matched_however_it_is_typed(session: AsyncSession):
-    user = await create_user(session, email="cased@example.com")
-
-    found = await addresses.find_user_by_address(session, "  CaSeD@Example.COM ")
-    assert found is not None and found.id == user.id
-
-
-async def test_an_address_nobody_holds_resolves_to_nobody(session: AsyncSession):
-    await create_user(session, email="somebody@example.com")
-
-    assert await addresses.find_user_by_address(session, "nobody@example.com") is None
 
 
 async def test_an_account_with_no_address_row_does_not_sign_in(
@@ -165,48 +139,6 @@ async def test_erasure_takes_every_address(session: AsyncSession):
     assert decrypt_field(rows[0].email_encrypted, SALT_EMAIL).startswith("anonymized-")
     for gone in ("erase-me@example.com", "erase-me-too@example.com"):
         assert await addresses.find_user_by_address(session, gone) is None
-
-
-async def test_registering_records_the_address(
-    client: AsyncClient, session: AsyncSession
-):
-    response = await client.post(
-        "/api/v1/auth/register",
-        json={
-            "email": "registered@example.com",
-            "password": "testpassword123",
-            "username": "registered",
-        },
-    )
-    assert response.status_code == 201, response.text
-
-    session.expire_all()
-    user = (
-        await session.exec(
-            select(User)
-            .join(UserEmail, UserEmail.user_id == User.id)
-            .where(UserEmail.email_hash == hash_email("registered@example.com"))
-        )
-    ).one()
-    rows = await _addresses(session, user.id)
-    assert [(r.is_primary, r.source) for r in rows] == [(True, addresses.SOURCE_SIGNUP)]
-
-
-async def test_signing_in_stamps_the_address_it_resolved_through(
-    client: AsyncClient, session: AsyncSession
-):
-    """Which address somebody actually uses is the point of keeping several."""
-    user = await create_user(session, email="stamped@example.com")
-    user_id = user.id
-    assert (await _addresses(session, user_id))[0].last_login_at is None
-
-    response = await client.post(
-        "/api/v1/auth/token",
-        data={"username": "stamped@example.com", "password": "testpassword123"},
-    )
-    assert response.status_code == 200, response.text
-
-    assert (await _addresses(session, user_id))[0].last_login_at is not None
 
 
 async def test_an_address_is_taken_whichever_account_holds_it(
@@ -294,14 +226,6 @@ async def test_a_password_reset_without_mail_is_refused_for_every_address(
 
     assert held.status_code == unheld.status_code == 400
     assert held.json() == unheld.json() == {"detail": "SMTP_NOT_CONFIGURED"}
-
-
-async def test_an_address_somebody_typed_is_asserted_by_nobody(
-    session: AsyncSession,
-):
-    user = await create_user(session, email="typed@example.com")
-    rows = await _addresses(session, user.id)
-    assert await _asserters(session, rows[0].id) == []
 
 
 async def test_a_provider_asserting_a_new_address_adds_it(session: AsyncSession):

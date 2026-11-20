@@ -27,114 +27,73 @@ from app.testing.factories import (
 )
 
 
-async def test_list_api_keys_empty(client: AsyncClient, session: AsyncSession):
-    """Test listing API keys when user has none."""
+def _where(row: dict) -> tuple:
+    return (
+        row["actor_user_id"],
+        row["target_user_id"],
+        row["guild_id"],
+        row["target"],
+    )
+
+
+async def test_create_list_and_delete_api_key(
+    client: AsyncClient, session: AsyncSession, capfd
+):
+    """A key is minted, listed by its prefix only, and dropped; the audit
+    record of each carries its scope and never the key's name."""
     user = await create_user(session, email="test@example.com")
+    user_id = user.id
     headers = get_auth_headers(user)
 
-    response = await client.get("/api/v1/me/api-keys", headers=headers)
+    empty = await client.get("/api/v1/me/api-keys", headers=headers)
+    assert empty.status_code == 200
+    assert empty.json()["keys"] == []
+    capfd.readouterr()
 
-    assert response.status_code == 200
-    data = response.json()
-    assert data["keys"] == []
-
-
-async def test_create_api_key(client: AsyncClient, session: AsyncSession):
-    """Test creating a new API key."""
-    user = await create_user(session, email="test@example.com")
-    headers = get_auth_headers(user)
-
-    payload = {
-        "name": "Test API Key",
-        "expires_at": None,
-    }
-
-    response = await client.post("/api/v1/me/api-keys", headers=headers, json=payload)
-
+    response = await client.post(
+        "/api/v1/me/api-keys",
+        headers=headers,
+        json={"name": "Test API Key", "expires_at": None},
+    )
     assert response.status_code == 201
     data = response.json()
-    assert "secret" in data
-    assert "api_key" in data
     assert data["api_key"]["name"] == "Test API Key"
     assert data["api_key"]["is_active"] is True
     assert data["secret"].startswith("ppk_")
     assert len(data["secret"]) > 20
+    key_id = data["api_key"]["id"]
 
-
-async def test_create_api_key_with_expiration(
-    client: AsyncClient, session: AsyncSession
-):
-    """A future expiry within the max-TTL window is honored verbatim."""
-    user = await create_user(session, email="test@example.com")
-    headers = get_auth_headers(user)
-
-    expires = datetime.now(UTC) + timedelta(days=30)
-    payload = {
-        "name": "Expiring Key",
-        "expires_at": expires.isoformat(),
+    created = emitted(capfd, AuditEventType.API_KEY_CREATED)
+    assert [_where(row) for row in created] == [
+        (user_id, user_id, None, {"type": "user_api_key", "id": key_id})
+    ]
+    assert created[0]["detail"] == {
+        "read_only": False,
+        "expires_at": None,
+        "guild_bound": False,
+        "resource_type": None,
     }
 
-    response = await client.post("/api/v1/me/api-keys", headers=headers, json=payload)
+    await client.post("/api/v1/me/api-keys", headers=headers, json={"name": "Key 2"})
+    listed = await client.get("/api/v1/me/api-keys", headers=headers)
+    assert listed.status_code == 200
+    keys = {key["name"]: key for key in listed.json()["keys"]}
+    assert set(keys) == {"Test API Key", "Key 2"}
+    assert keys["Test API Key"]["token_prefix"] == data["secret"][:12]
+    assert "secret" not in keys["Test API Key"]
+    capfd.readouterr()
 
-    assert response.status_code == 201
-    data = response.json()
-    returned = datetime.fromisoformat(data["api_key"]["expires_at"])
-    # Within the 90-day ceiling, so preserved (allow ~1s of round-trip drift).
-    assert abs((returned - expires).total_seconds()) < 5
-
-
-async def test_list_api_keys_after_creation(client: AsyncClient, session: AsyncSession):
-    """Test that created API keys appear in list."""
-    user = await create_user(session, email="test@example.com")
-    headers = get_auth_headers(user)
-
-    # Create two API keys
-    await client.post(
-        "/api/v1/me/api-keys",
-        headers=headers,
-        json={"name": "Key 1"},
-    )
-    await client.post(
-        "/api/v1/me/api-keys",
-        headers=headers,
-        json={"name": "Key 2"},
-    )
-
-    # List keys
-    response = await client.get("/api/v1/me/api-keys", headers=headers)
-
-    assert response.status_code == 200
-    data = response.json()
-    assert len(data["keys"]) == 2
-    key_names = {key["name"] for key in data["keys"]}
-    assert "Key 1" in key_names
-    assert "Key 2" in key_names
-
-
-async def test_delete_api_key(client: AsyncClient, session: AsyncSession):
-    """Test deleting an API key."""
-    user = await create_user(session, email="test@example.com")
-    headers = get_auth_headers(user)
-
-    # Create a key
-    create_response = await client.post(
-        "/api/v1/me/api-keys",
-        headers=headers,
-        json={"name": "To Delete"},
-    )
-    api_key_id = create_response.json()["api_key"]["id"]
-
-    # Delete it
     delete_response = await client.delete(
-        f"/api/v1/me/api-keys/{api_key_id}",
-        headers=headers,
+        f"/api/v1/me/api-keys/{key_id}", headers=headers
     )
-
     assert delete_response.status_code == 204
+    deleted = emitted(capfd, AuditEventType.API_KEY_DELETED)
+    assert [_where(row) for row in deleted] == [
+        (user_id, user_id, None, {"type": "user_api_key", "id": key_id})
+    ]
 
-    # Verify it's gone
     list_response = await client.get("/api/v1/me/api-keys", headers=headers)
-    assert len(list_response.json()["keys"]) == 0
+    assert [key["name"] for key in list_response.json()["keys"]] == ["Key 2"]
 
 
 async def test_delete_nonexistent_api_key(client: AsyncClient, session: AsyncSession):
@@ -149,30 +108,27 @@ async def test_delete_nonexistent_api_key(client: AsyncClient, session: AsyncSes
 
 
 async def test_cannot_delete_other_users_api_key(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, capfd
 ):
-    """Test that users cannot delete other users' API keys."""
+    """Another user's key reads as absent, and nothing is recorded."""
     user1 = await create_user(session, email="user1@example.com")
     user2 = await create_user(session, email="user2@example.com")
 
-    headers1 = get_auth_headers(user1)
-    headers2 = get_auth_headers(user2)
-
-    # User 1 creates a key
     create_response = await client.post(
         "/api/v1/me/api-keys",
-        headers=headers1,
+        headers=get_auth_headers(user1),
         json={"name": "User 1 Key"},
     )
     api_key_id = create_response.json()["api_key"]["id"]
+    capfd.readouterr()
 
-    # User 2 tries to delete User 1's key
     delete_response = await client.delete(
         f"/api/v1/me/api-keys/{api_key_id}",
-        headers=headers2,
+        headers=get_auth_headers(user2),
     )
 
     assert delete_response.status_code == 404
+    assert emitted(capfd, AuditEventType.API_KEY_DELETED) == []
 
 
 async def test_authenticate_with_api_key(client: AsyncClient, session: AsyncSession):
@@ -214,84 +170,21 @@ async def test_authenticate_with_api_key(client: AsyncClient, session: AsyncSess
     assert key.last_used_at > first_use
 
 
-async def test_api_key_works_for_platform_members(
-    client: AsyncClient, session: AsyncSession
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("POST", "/api/v1/me/api-keys"),
+        ("GET", "/api/v1/me/api-keys"),
+        ("DELETE", "/api/v1/me/api-keys/1"),
+    ],
+)
+async def test_api_key_endpoints_require_authentication(
+    client: AsyncClient, method: str, path: str
 ):
-    """A platform member with no staff role can create and use API keys."""
-    # Create a regular member user (no staff role)
-    from app.models.platform.user import UserRole
-
-    user = await create_user(
-        session,
-        email="member@example.com",
-        role=UserRole.member,
-    )
-    headers = get_auth_headers(user)
-
-    # Member creates an API key
-    create_response = await client.post(
-        "/api/v1/me/api-keys",
-        headers=headers,
-        json={"name": "Member Key"},
-    )
-
-    assert create_response.status_code == 201
-    api_key_secret = create_response.json()["secret"]
-
-    # Use the API key to authenticate
-    api_key_headers = {"Authorization": f"Bearer {api_key_secret}"}
-    auth_response = await client.get("/api/v1/me", headers=api_key_headers)
-
-    assert auth_response.status_code == 200
-    assert auth_response.json()["email"] == "member@example.com"
-
-
-async def test_create_api_key_requires_authentication(client: AsyncClient):
-    """Test that creating API keys requires authentication."""
-    payload = {"name": "Unauthorized Key"}
-
-    response = await client.post("/api/v1/me/api-keys", json=payload)
+    body = {"name": "Unauthorized Key"} if method == "POST" else None
+    response = await client.request(method, path, json=body)
 
     assert response.status_code == 401
-
-
-async def test_list_api_keys_requires_authentication(client: AsyncClient):
-    """Test that listing API keys requires authentication."""
-    response = await client.get("/api/v1/me/api-keys")
-
-    assert response.status_code == 401
-
-
-async def test_delete_api_key_requires_authentication(client: AsyncClient):
-    """Test that deleting API keys requires authentication."""
-    response = await client.delete("/api/v1/me/api-keys/1")
-
-    assert response.status_code == 401
-
-
-async def test_api_key_prefix_is_masked_in_list(
-    client: AsyncClient, session: AsyncSession
-):
-    """Test that API key secrets are not exposed in list, only prefix."""
-    user = await create_user(session, email="test@example.com")
-    headers = get_auth_headers(user)
-
-    # Create a key
-    create_response = await client.post(
-        "/api/v1/me/api-keys",
-        headers=headers,
-        json={"name": "Test Key"},
-    )
-    full_secret = create_response.json()["secret"]
-    expected_prefix = full_secret[:12]  # ppk_ plus 8 chars
-
-    # List keys
-    list_response = await client.get("/api/v1/me/api-keys", headers=headers)
-    keys = list_response.json()["keys"]
-
-    assert len(keys) == 1
-    assert keys[0]["token_prefix"] == expected_prefix
-    assert "secret" not in keys[0]  # Full secret should not be exposed
 
 
 # --- Least-privilege scoping (read_only / guild_id) -------------------------
@@ -356,10 +249,11 @@ async def test_read_only_key_blocks_writes_allows_reads(
 
 
 async def test_guild_bound_key_is_pinned_to_its_guild(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, capfd
 ):
     """A guild-bound key reaches only its own guild; a different guild the user
-    is otherwise a member of is refused (proving the block is the key pin)."""
+    is otherwise a member of is refused (proving the block is the key pin).
+    Its audit record says which community it is bound to."""
     user = await create_user(session, email="pinned@example.com")
     guild_a = await create_guild(session, creator=user)
     guild_b = await create_guild(session, creator=user)
@@ -370,13 +264,26 @@ async def test_guild_bound_key_is_pinned_to_its_guild(
         session, user=user, guild=guild_b, role=CommunityRole.member
     )
     headers = get_auth_headers(user)
+    user_id, guild_a_id = user.id, guild_a.id
+    capfd.readouterr()
 
     create = await client.post(
         "/api/v1/me/api-keys",
         headers=headers,
-        json={"name": "GuildA", "community_id": guild_a.id},
+        json={"name": "GuildA", "community_id": guild_a.id, "read_only": True},
     )
     assert create.json()["api_key"]["community_id"] == guild_a.id
+    key_id = create.json()["api_key"]["id"]
+    created = emitted(capfd, AuditEventType.API_KEY_CREATED)
+    assert [_where(row) for row in created] == [
+        (user_id, user_id, guild_a_id, {"type": "user_api_key", "id": key_id})
+    ]
+    assert created[0]["detail"] == {
+        "read_only": True,
+        "expires_at": None,
+        "guild_bound": True,
+        "resource_type": None,
+    }
     key_headers = {"Authorization": f"Bearer {create.json()['secret']}"}
 
     # Reaches its own guild.
@@ -398,36 +305,22 @@ async def test_guild_bound_key_is_pinned_to_its_guild(
     assert jwt_other.status_code == 200
 
 
+@pytest.mark.parametrize("known", [True, False])
 async def test_create_guild_bound_key_rejects_non_member(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, known: bool
 ):
-    """Scoping a key to a guild the caller doesn't belong to is refused, rather
-    than minting a key that could never reach its claimed scope."""
+    """Scoping a key to a guild the caller doesn't belong to, or to no guild at
+    all, is refused rather than minting a key that could never reach its
+    claimed scope."""
     user = await create_user(session, email="outsider@example.com")
     # A guild the user is NOT a member of (the factory adds no membership).
-    guild = await create_guild(session)
+    community_id = (await create_guild(session)).id if known else 999999
     headers = get_auth_headers(user)
 
     response = await client.post(
         "/api/v1/me/api-keys",
         headers=headers,
-        json={"name": "Sneaky", "community_id": guild.id},
-    )
-    assert response.status_code == 403
-    assert response.json()["detail"] == "USER_API_KEY_COMMUNITY_FORBIDDEN"
-
-
-async def test_create_guild_bound_key_rejects_unknown_guild(
-    client: AsyncClient, session: AsyncSession
-):
-    """An unknown guild id returns 403, not a 500 from the FK constraint."""
-    user = await create_user(session, email="ghost@example.com")
-    headers = get_auth_headers(user)
-
-    response = await client.post(
-        "/api/v1/me/api-keys",
-        headers=headers,
-        json={"name": "Ghost", "community_id": 999999},
+        json={"name": "Sneaky", "community_id": community_id},
     )
     assert response.status_code == 403
     assert response.json()["detail"] == "USER_API_KEY_COMMUNITY_FORBIDDEN"

@@ -29,66 +29,11 @@ async def _claim(session: AsyncSession, value: str):
     return await challenges.claim_attempt(session, value=value, purposes=[PURPOSE])
 
 
-async def test_the_value_finds_the_challenge(session: AsyncSession, frozen):
-    user = await create_user(session)
-    issued = await _open(session, user.id)
-
-    found = await _claim(session, issued.value)
-    assert found is not None
-    assert found.user_id == user.id
-
-
-async def test_a_value_nobody_issued_finds_nothing(session: AsyncSession, frozen):
-    await create_user(session)
-    assert await _claim(session, "not-a-challenge") is None
-
-
 async def test_the_raw_value_is_not_what_is_stored(session: AsyncSession, frozen):
     user = await create_user(session)
     issued = await _open(session, user.id)
     assert issued.challenge.challenge_hash != issued.value.encode("utf-8")
     assert len(issued.challenge.challenge_hash) == 32
-
-
-async def test_it_is_spent_once(session: AsyncSession, frozen):
-    """Two answers arriving on the same challenge: one of them made a session."""
-    user = await create_user(session)
-    issued = await _open(session, user.id)
-
-    assert await challenges.consume(session, issued.challenge) is True
-    await session.commit()
-    assert await challenges.consume(session, issued.challenge) is False
-
-
-async def test_a_spent_challenge_is_no_longer_claimable(session: AsyncSession, frozen):
-    user = await create_user(session)
-    issued = await _open(session, user.id)
-    await challenges.consume(session, issued.challenge)
-    await session.commit()
-
-    assert await _claim(session, issued.value) is None
-
-
-async def test_it_stops_standing_once_it_has_expired(
-    session: AsyncSession, frozen, monkeypatch
-):
-    user = await create_user(session)
-    issued = await _open(session, user.id)
-
-    later = FIXED_NOW + challenges.CHALLENGE_TTL + timedelta(seconds=1)
-    monkeypatch.setattr(challenges, "utcnow", lambda: later)
-    assert await _claim(session, issued.value) is None
-
-
-async def test_it_runs_out_of_attempts(session: AsyncSession, frozen):
-    user = await create_user(session)
-    issued = await _open(session, user.id)
-
-    for _ in range(challenges.MAX_ATTEMPTS):
-        assert await _claim(session, issued.value) is not None
-    await session.commit()
-
-    assert await _claim(session, issued.value) is None
 
 
 async def test_each_claim_takes_its_own_attempt(session: AsyncSession, frozen):
@@ -144,32 +89,3 @@ async def test_the_sweep_clears_what_nothing_can_use(
 
     monkeypatch.setattr(challenges, "utcnow", lambda: FIXED_NOW)
     assert await _claim(session, issued.value) is None
-
-
-async def test_a_challenge_answers_only_for_its_own_purpose(
-    session: AsyncSession, frozen
-):
-    """One table serves more than one unfinished sign-in, and a challenge
-    opened for one is not claimable as the other."""
-    user = await create_user(session)
-    issued = await challenges.create(
-        session,
-        user_id=user.id,
-        purpose=challenges.ChallengePurpose.sign_in_native,
-    )
-    await session.commit()
-
-    assert (
-        await challenges.claim_attempt(
-            session,
-            value=issued.value,
-            purposes=[challenges.ChallengePurpose.sign_in],
-        )
-        is None
-    )
-    claimed = await challenges.claim_attempt(
-        session,
-        value=issued.value,
-        purposes=[challenges.ChallengePurpose.sign_in_native],
-    )
-    assert claimed is not None

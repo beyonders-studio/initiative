@@ -75,10 +75,17 @@ async def test_discover_reports_what_the_address_offers(
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["ok"] is True
+    assert body["error_code"] is None
     assert body["issuer"] == ISSUER
+    assert body["authorization_endpoint"] == f"{ISSUER}/authorize"
     assert body["token_endpoint"] == f"{ISSUER}/token"
+    assert body["jwks_uri"] == f"{ISSUER}/jwks"
+    assert body["signing_algs"] == ["RS256", "ES256"]
     assert body["scopes_supported"] == ["openid", "email", "groups"]
     assert body["claims_supported"] == ["sub", "groups"]
+    # Computed from the deployment's own APP_URL, because it has to match the
+    # finished provider's callback exactly at the far end.
+    assert body["callback_url_template"].endswith("/auth/{slug}/callback")
 
 
 async def test_discover_refuses_a_non_https_address(
@@ -139,6 +146,9 @@ async def test_test_uses_the_stored_issuer(
 
     assert response.status_code == 200, response.text
     assert response.json()["ok"] is True
+    # A provider listing nothing costs only the suggestions.
+    assert response.json()["scopes_supported"] == []
+    assert response.json()["claims_supported"] == []
     assert fake_idp.calls.count("/.well-known/openid-configuration") == 1
 
 

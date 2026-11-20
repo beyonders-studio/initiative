@@ -117,8 +117,8 @@ async def _seed(session: AsyncSession, user: User, count: int) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_an_account_with_none_is_told_what_it_would_take(
-    client: AsyncClient, session: AsyncSession
+async def test_the_list_says_what_it_would_take_and_reads_oldest_first(
+    client: AsyncClient, session: AsyncSession, ceremony
 ):
     user = await _account(session, "pk-empty@example.com")
     response = await client.get("/api/v1/auth/passkeys", headers=get_auth_headers(user))
@@ -128,21 +128,14 @@ async def test_an_account_with_none_is_told_what_it_would_take(
     assert body["password_required"] is True
     assert body["limit"] == passkey_service.MAX_PASSKEYS_PER_USER
     assert body["site_supported"] is True
+    assert body["offered"] is True
 
-
-async def test_the_list_says_when_this_address_cannot_carry_one(
-    client: AsyncClient, session: AsyncSession, monkeypatch
-):
-    """The deployment's own address decides this, so the server answers it
-    rather than leaving the browser to."""
-    from app.core.config import settings
-
-    monkeypatch.setattr(settings, "APP_URL", "http://intranet.local")
-    user = await _account(session, "pk-unsupported@example.com")
+    await _register(client, user, name="First", credential_id="credential-one")
+    await _register(client, user, name="Second", credential_id="credential-two")
 
     response = await client.get("/api/v1/auth/passkeys", headers=get_auth_headers(user))
     assert response.status_code == 200, response.text
-    assert response.json()["site_supported"] is False
+    assert [row["name"] for row in response.json()["passkeys"]] == ["First", "Second"]
 
 
 async def test_an_account_with_no_password_is_not_asked_for_one(
@@ -161,109 +154,77 @@ async def test_an_account_with_no_password_is_not_asked_for_one(
     assert response.json()["password_required"] is False
 
 
-async def test_the_list_reads_oldest_first(
-    client: AsyncClient, session: AsyncSession, ceremony
-):
-    user = await _account(session, "pk-order@example.com")
-    await _register(client, user, name="First", credential_id="credential-one")
-    await _register(client, user, name="Second", credential_id="credential-two")
-
-    response = await client.get("/api/v1/auth/passkeys", headers=get_auth_headers(user))
-    assert response.status_code == 200, response.text
-    assert [row["name"] for row in response.json()["passkeys"]] == ["First", "Second"]
-
-
 # ---------------------------------------------------------------------------
 # Beginning
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize(
+    ("password", "detail"),
+    [
+        (None, "USER_CURRENT_PASSWORD_REQUIRED"),
+        ("not-it", "USER_CURRENT_PASSWORD_INCORRECT"),
+    ],
+)
 async def test_beginning_asks_for_the_password(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, password: str | None, detail: str
 ):
     user = await _account(session, "pk-nopw@example.com")
-    response = await client.post(
-        BEGIN, json={"name": "Laptop"}, headers=get_auth_headers(user)
-    )
+    body = {"name": "Laptop"}
+    if password is not None:
+        body["current_password"] = password
+    response = await client.post(BEGIN, json=body, headers=get_auth_headers(user))
     assert response.status_code == 400
-    assert response.json()["detail"] == "USER_CURRENT_PASSWORD_REQUIRED"
+    assert response.json()["detail"] == detail
 
 
-async def test_beginning_refuses_the_wrong_password(
+async def test_a_plain_name_begins_a_ceremony_naming_this_deployment(
     client: AsyncClient, session: AsyncSession
 ):
-    user = await _account(session, "pk-wrongpw@example.com")
-    response = await client.post(
-        BEGIN,
-        json={"current_password": "not-it", "name": "Laptop"},
-        headers=get_auth_headers(user),
-    )
-    assert response.status_code == 400
-    assert response.json()["detail"] == "USER_CURRENT_PASSWORD_INCORRECT"
+    """The same name rule the finish route holds is applied before a ceremony
+    is begun, so nothing is issued for a name that will not be stored. A plain
+    name begins one: its options name this deployment, ask for the person and
+    not merely the device, and exclude what the account already holds, so an
+    authenticator that has one says so rather than quietly making a second."""
+    from app.core.config import settings
 
-
-async def test_a_name_this_deployment_will_not_keep_is_refused_here(
-    client: AsyncClient, session: AsyncSession
-):
-    """The same name rule the finish route holds, applied before a ceremony is
-    begun — so nothing is issued for a name that will not be stored."""
     user = await _account(session, "pk-sigil@example.com")
     user_id = user.id
+    headers = get_auth_headers(user)
+    await create_passkey(session, user)
 
     response = await client.post(
         BEGIN,
         json={"current_password": PASSWORD, "name": "Laptop #1"},
-        headers=get_auth_headers(user),
+        headers=headers,
     )
     assert response.status_code == 422, response.text
     assert "RESERVED_SIGIL_IN_NAME" in response.text
 
-    session.expire_all()
-    challenges = (
-        await session.exec(
-            select(AuthChallenge).where(AuthChallenge.user_id == user_id)
-        )
-    ).all()
-    assert challenges == []
+    async def challenges() -> list[AuthChallenge]:
+        session.expire_all()
+        return (
+            await session.exec(
+                select(AuthChallenge).where(AuthChallenge.user_id == user_id)
+            )
+        ).all()
 
-
-async def test_a_plain_name_begins_a_ceremony(
-    client: AsyncClient, session: AsyncSession
-):
-    user = await _account(session, "pk-plainname@example.com")
-    user_id = user.id
+    assert await challenges() == []
 
     response = await client.post(
         BEGIN,
         json={"current_password": PASSWORD, "name": "Laptop"},
-        headers=get_auth_headers(user),
+        headers=headers,
     )
     assert response.status_code == 200, response.text
-
-    session.expire_all()
-    challenges = (
-        await session.exec(
-            select(AuthChallenge).where(AuthChallenge.user_id == user_id)
-        )
-    ).all()
-    assert len(challenges) == 1
-
-
-async def test_the_options_name_this_deployment(
-    client: AsyncClient, session: AsyncSession
-):
-    from app.core.config import settings
-
-    user = await _account(session, "pk-options@example.com")
-    response = await client.post(
-        BEGIN,
-        json={"current_password": PASSWORD, "name": "Laptop"},
-        headers=get_auth_headers(user),
-    )
-    assert response.status_code == 200, response.text
+    assert len(await challenges()) == 1
     options = response.json()["options"]
     assert options["rp"]["id"] == urlsplit(settings.APP_URL).hostname
-    assert options["challenge"]
+    assert len(options["challenge"]) >= 16
+    assert options["authenticatorSelection"]["userVerification"] == "required"
+    assert [entry["id"] for entry in options["excludeCredentials"]] == [
+        bytes_to_base64url(b"credential-one")
+    ]
 
 
 async def test_a_deployment_on_plain_http_cannot_begin_one_or_sign_in(
@@ -271,11 +232,17 @@ async def test_a_deployment_on_plain_http_cannot_begin_one_or_sign_in(
 ):
     """A credential is bound to a named host reached over https, so a
     deployment addressed otherwise says so instead of sending options the
-    browser will not answer — for a sign-in as for a registration."""
+    browser will not answer — for a sign-in as for a registration. The
+    deployment's own address decides this, so the list answers it too rather
+    than leaving the browser to."""
     from app.core.config import settings
 
     monkeypatch.setattr(settings, "APP_URL", "http://intranet.local")
     user = await _account(session, "pk-http@example.com")
+
+    listed = await client.get("/api/v1/auth/passkeys", headers=get_auth_headers(user))
+    assert listed.status_code == 200, listed.text
+    assert listed.json()["site_supported"] is False
 
     response = await client.post(
         BEGIN,
@@ -324,10 +291,13 @@ async def test_a_challenge_nobody_issued_is_refused(
 
 
 async def test_finishing_keeps_the_credential(
-    client: AsyncClient, session: AsyncSession, ceremony
+    client: AsyncClient, session: AsyncSession, ceremony, capfd
 ):
+    """The row keeps the domain it was made under and what the ceremony
+    reported; the record of it never carries the credential or its key."""
     user = await _account(session, "pk-keep@example.com")
     user_id = user.id
+    capfd.readouterr()
     body = await _register(client, user, name="Work laptop")
 
     assert body["name"] == "Work laptop"
@@ -342,6 +312,15 @@ async def test_finishing_keeps_the_credential(
     assert len(rows) == 1
     assert rows[0].rp_id == passkey_service.relying_party_id()
     assert rows[0].name == "Work laptop"
+
+    events = emitted(capfd, AuditEventType.AUTH_PASSKEY_REGISTERED)
+    assert [row["actor_user_id"] for row in events] == [user_id]
+    detail = events[0]["detail"]
+    assert detail["passkey_id"] == body["id"]
+    assert detail["backed_up"] is True
+    assert detail["user_verified"] is True
+    assert "credential_id" not in detail
+    assert "public_key" not in detail
 
 
 async def test_only_the_transports_webauthn_names_are_kept(
@@ -361,29 +340,6 @@ async def test_only_the_transports_webauthn_names_are_kept(
     )
     assert response.status_code == 201, response.text
     assert response.json()["transports"] == ["usb"]
-
-
-async def test_registering_is_recorded(
-    client: AsyncClient, session: AsyncSession, ceremony, capfd
-):
-    user = await _account(session, "pk-audit@example.com")
-    user_id = user.id
-    capfd.readouterr()
-    body = await _register(client, user)
-
-    events = [
-        row
-        for row in emitted(capfd, AuditEventType.AUTH_PASSKEY_REGISTERED)
-        if row["actor_user_id"] == user_id
-    ]
-    assert len(events) == 1
-    detail = events[0]["detail"]
-    assert detail["passkey_id"] == body["id"]
-    assert detail["backed_up"] is True
-    assert detail["user_verified"] is True
-    # The credential and its key are never in the record.
-    assert "credential_id" not in detail
-    assert "public_key" not in detail
 
 
 async def test_a_challenge_answers_one_registration(
@@ -480,25 +436,33 @@ async def test_renaming_changes_only_the_name(
     assert response.json()["id"] == body["id"]
 
 
-async def test_another_accounts_passkey_cannot_be_renamed(
+async def test_another_accounts_passkey_cannot_be_renamed_or_removed(
     client: AsyncClient, session: AsyncSession, ceremony
 ):
     owner = await _account(session, "pk-owner@example.com")
     other = await _account(session, "pk-other@example.com")
     body = await _register(client, owner, name="Laptop")
 
-    response = await client.patch(
+    renamed = await client.patch(
         f"/api/v1/auth/passkeys/{body['id']}",
         json={"name": "Mine now"},
         headers=get_auth_headers(other),
     )
-    assert response.status_code == 404
-    assert response.json()["detail"] == "PASSKEY_NOT_FOUND"
+    removed = await client.post(
+        f"/api/v1/auth/passkeys/{body['id']}/remove",
+        json={"current_password": PASSWORD},
+        headers=get_auth_headers(other),
+    )
+    for response in (renamed, removed):
+        assert response.status_code == 404
+        assert response.json()["detail"] == "PASSKEY_NOT_FOUND"
 
 
-async def test_a_standing_credential_cannot_rename_one(
+async def test_a_standing_credential_cannot_register_or_rename_one(
     client: AsyncClient, session: AsyncSession, ceremony
 ):
+    """Adding or naming a way in is done while the person is here, not through
+    a credential running without them."""
     from app.services.platform import api_keys as api_keys_service
 
     user = await _account(session, "pk-renamekey@example.com")
@@ -507,14 +471,17 @@ async def test_a_standing_credential_cannot_rename_one(
         session, user=user, name="script"
     )
     await session.commit()
+    key = {"Authorization": f"Bearer {secret}"}
 
-    response = await client.patch(
-        f"/api/v1/auth/passkeys/{body['id']}",
-        json={"name": "Renamed"},
-        headers={"Authorization": f"Bearer {secret}"},
+    began = await client.post(
+        BEGIN, json={"current_password": PASSWORD, "name": "Laptop"}, headers=key
     )
-    assert response.status_code == 403
-    assert response.json()["detail"] == "SESSION_REQUIRED"
+    renamed = await client.patch(
+        f"/api/v1/auth/passkeys/{body['id']}", json={"name": "Renamed"}, headers=key
+    )
+    for response in (began, renamed):
+        assert response.status_code == 403
+        assert response.json()["detail"] == "SESSION_REQUIRED"
 
 
 async def test_removing_asks_for_the_password(
@@ -559,22 +526,6 @@ async def test_removing_forgets_the_credential(
     ]
     assert len(events) == 1
     assert events[0]["detail"]["passkey_id"] == body["id"]
-
-
-async def test_another_accounts_passkey_cannot_be_removed(
-    client: AsyncClient, session: AsyncSession, ceremony
-):
-    owner = await _account(session, "pk-keepmine@example.com")
-    other = await _account(session, "pk-taker@example.com")
-    body = await _register(client, owner)
-
-    response = await client.post(
-        f"/api/v1/auth/passkeys/{body['id']}/remove",
-        json={"current_password": PASSWORD},
-        headers=get_auth_headers(other),
-    )
-    assert response.status_code == 404
-    assert response.json()["detail"] == "PASSKEY_NOT_FOUND"
 
 
 # ---------------------------------------------------------------------------
@@ -633,28 +584,6 @@ async def test_a_letter_that_cannot_go_does_not_undo_the_change(
     assert str(rows[0].id) == body["id"]
 
 
-async def test_a_standing_credential_cannot_register_one(
-    client: AsyncClient, session: AsyncSession
-):
-    """Adding a way in is done while the person is here, not through a
-    credential running without them."""
-    from app.services.platform import api_keys as api_keys_service
-
-    user = await _account(session, "pk-apikey@example.com")
-    secret, _row = await api_keys_service.create_api_key(
-        session, user=user, name="script"
-    )
-    await session.commit()
-
-    response = await client.post(
-        BEGIN,
-        json={"current_password": PASSWORD, "name": "Laptop"},
-        headers={"Authorization": f"Bearer {secret}"},
-    )
-    assert response.status_code == 403
-    assert response.json()["detail"] == "SESSION_REQUIRED"
-
-
 # ---------------------------------------------------------------------------
 # Signing in with one
 # ---------------------------------------------------------------------------
@@ -698,6 +627,7 @@ async def test_beginning_names_the_deployment_and_nobody_else(
     options = response.json()["options"]
     assert options["rpId"] == urlsplit(settings.APP_URL).hostname
     assert not options.get("allowCredentials")
+    assert options["userVerification"] == "required"
 
     session.expire_all()
     rows = (
@@ -713,10 +643,12 @@ async def test_an_assertion_opens_a_session(
     client: AsyncClient, session: AsyncSession, assertion, capfd
 ):
     """A device-bound key records ``hwk``, and ``mfa`` beside it because the
-    ceremony proved the person as well as the device."""
+    ceremony proved the person as well as the device. The counter and the
+    last-used stamp land in the same commit as the session."""
     user = await _account(session, "pk-signin@example.com")
     user_id = user.id
-    await create_passkey(session, user)
+    row = await create_passkey(session, user)
+    row_id = row.id
     capfd.readouterr()
 
     challenge = await _begin_sign_in(client)
@@ -736,6 +668,9 @@ async def test_an_assertion_opens_a_session(
     ).all()
     assert len(sessions) == 1
     assert sessions[0].amr == ["hwk", "mfa"]
+    stored = await session.get(UserPasskey, row_id)
+    assert stored.sign_count == 1
+    assert stored.last_used_at is not None
 
     events = [
         row
@@ -766,27 +701,6 @@ async def test_a_synced_key_says_so(
         await session.exec(select(AuthSession).where(AuthSession.user_id == user_id))
     ).one()
     assert opened.amr == ["swk", "mfa"]
-
-
-async def test_the_credential_records_that_it_answered(
-    client: AsyncClient, session: AsyncSession, assertion
-):
-    """The counter and the last-used stamp land in the same commit as the
-    session."""
-    user = await _account(session, "pk-counter-signin@example.com")
-    row = await create_passkey(session, user)
-    row_id = row.id
-
-    challenge = await _begin_sign_in(client)
-    response = await client.post(
-        SIGN_IN_FINISH, json={"credential": assertion_for(challenge)}
-    )
-    assert response.status_code == 200, response.text
-
-    session.expire_all()
-    stored = await session.get(UserPasskey, row_id)
-    assert stored.sign_count == 1
-    assert stored.last_used_at is not None
 
 
 async def test_a_challenge_answers_one_sign_in(
@@ -936,10 +850,10 @@ async def test_an_inactive_account_is_refused(
     assert detail["reason"] == "inactive"
 
 
-async def test_a_registration_challenge_cannot_finish_a_sign_in(
+async def test_each_ceremony_answers_for_its_own_purpose(
     client: AsyncClient, session: AsyncSession, ceremony, assertion
 ):
-    """Each ceremony answers for its own purpose and no other."""
+    """A challenge is finished as the ceremony it was begun as, and no other."""
     user = await _account(session, "pk-crossed@example.com")
     await create_passkey(session, user)
 
@@ -949,12 +863,6 @@ async def test_a_registration_challenge_cannot_finish_a_sign_in(
     )
     assert refused.status_code == 400
     assert refused.json()["detail"] == "PASSKEY_SIGN_IN_INVALID"
-
-
-async def test_a_sign_in_challenge_cannot_finish_a_registration(
-    client: AsyncClient, session: AsyncSession, ceremony, assertion
-):
-    user = await _account(session, "pk-crossed-back@example.com")
 
     sign_in_challenge = await _begin_sign_in(client)
     refused = await client.post(
@@ -969,6 +877,16 @@ async def test_a_sign_in_challenge_cannot_finish_a_registration(
     )
     assert refused.status_code == 400
     assert refused.json()["detail"] == "PASSKEY_REGISTRATION_INVALID"
+
+    _id, headers = await _open_session(session, user)
+    sign_in_challenge = await _begin_sign_in(client)
+    refused = await client.post(
+        STEP_UP_FINISH,
+        json={"credential": assertion_for(sign_in_challenge)},
+        headers=headers,
+    )
+    assert refused.status_code == 400
+    assert refused.json()["detail"] == "PASSKEY_SIGN_IN_INVALID"
 
 
 async def test_the_app_finishes_the_sign_in_it_began(
@@ -1062,15 +980,6 @@ async def test_a_withdrawn_method_stops_new_registrations(
     assert listed.status_code == 200, listed.text
     assert listed.json()["offered"] is False
     assert len(listed.json()["passkeys"]) == 1
-
-
-async def test_a_deployment_that_offers_them_says_so(
-    client: AsyncClient, session: AsyncSession
-):
-    user = await _account(session, "pk-offered@example.com")
-    listed = await client.get("/api/v1/auth/passkeys", headers=get_auth_headers(user))
-    assert listed.status_code == 200, listed.text
-    assert listed.json()["offered"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -1185,11 +1094,20 @@ async def test_an_assertion_adds_the_passkey_to_the_session(
     assert retired.revoked_at is not None
 
 
-async def test_another_accounts_credential_does_not_step_up_this_session(
-    client: AsyncClient, session: AsyncSession, assertion, capfd
+@pytest.mark.parametrize(
+    ("credential_id", "reason"),
+    [("credential-two", "other_account"), ("credential-nobody", "unknown")],
+)
+async def test_a_step_up_with_a_credential_not_this_accounts_is_refused(
+    client: AsyncClient,
+    session: AsyncSession,
+    assertion,
+    capfd,
+    credential_id: str,
+    reason: str,
 ):
-    """The assertion has to name this account's own credential; a refusal is
-    recorded against the account that asked."""
+    """The assertion has to name this account's own credential; the refusal
+    is recorded against the account that asked, saying which it was."""
     user = await _account(session, "pk-stepup-mine@example.com")
     user_id = user.id
     await create_passkey(session, user)
@@ -1201,7 +1119,7 @@ async def test_another_accounts_credential_does_not_step_up_this_session(
     challenge = await _begin_step_up(client, headers)
     response = await client.post(
         STEP_UP_FINISH,
-        json={"credential": assertion_for(challenge, credential_id="credential-two")},
+        json={"credential": assertion_for(challenge, credential_id=credential_id)},
         headers=headers,
     )
     assert response.status_code == 400
@@ -1212,64 +1130,9 @@ async def test_another_accounts_credential_does_not_step_up_this_session(
         for row in emitted(capfd, AuditEventType.AUTH_SECOND_FACTOR_FAILED)
         if row["actor_user_id"] == user_id
     ]
-    assert len(events) == 1
-    assert events[0]["detail"] == {
-        "method": "passkey",
-        "during": "step_up",
-        "reason": "other_account",
-    }
-
-
-async def test_a_step_up_records_which_refusal_it_was(
-    client: AsyncClient, session: AsyncSession, assertion, capfd
-):
-    """A credential this deployment holds no row for proves nothing, and the
-    record says which of the refusals it was — the same account the sign-in
-    route writes down."""
-    user = await _account(session, "pk-stepup-unknown@example.com")
-    user_id = user.id
-    await create_passkey(session, user)
-    _id, headers = await _open_session(session, user)
-    capfd.readouterr()
-
-    challenge = await _begin_step_up(client, headers)
-    response = await client.post(
-        STEP_UP_FINISH,
-        json={
-            "credential": assertion_for(challenge, credential_id="credential-nobody")
-        },
-        headers=headers,
-    )
-    assert response.status_code == 400
-    assert response.json()["detail"] == "PASSKEY_SIGN_IN_INVALID"
-
-    events = [
-        row
-        for row in emitted(capfd, AuditEventType.AUTH_SECOND_FACTOR_FAILED)
-        if row["actor_user_id"] == user_id
+    assert [row["detail"] for row in events] == [
+        {"method": "passkey", "during": "step_up", "reason": reason}
     ]
-    assert len(events) == 1
-    assert events[0]["detail"] == {
-        "method": "passkey",
-        "during": "step_up",
-        "reason": "unknown",
-    }
-
-
-async def test_a_sign_in_challenge_cannot_step_up_a_session(
-    client: AsyncClient, session: AsyncSession, assertion
-):
-    """Each ceremony is finished as the one it was begun as."""
-    user = await _account(session, "pk-stepup-crossed@example.com")
-    await create_passkey(session, user)
-    _id, headers = await _open_session(session, user)
-
-    challenge = await _begin_sign_in(client)
-    response = await client.post(
-        STEP_UP_FINISH, json={"credential": assertion_for(challenge)}, headers=headers
-    )
-    assert response.status_code == 400
-    assert response.json()["detail"] == "PASSKEY_SIGN_IN_INVALID"
 
 
 async def test_a_step_up_challenge_answers_one_ceremony(
@@ -1362,32 +1225,18 @@ async def _passwordless(session: AsyncSession, email: str) -> User:
     )
 
 
+@pytest.mark.parametrize("withdrawn", [False, True])
 async def test_the_last_credential_of_a_passwordless_account_stays(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, withdrawn: bool
 ):
     """Nothing else opens a session for this account, so the credential is not
-    somebody's to remove."""
+    somebody's to remove — and a deployment that stopped accepting passkeys
+    leaves it with nothing that does either."""
     user = await _passwordless(session, "pk-last@example.com")
     row = await create_passkey(session, user, credential_id="last-one")
-
-    response = await client.post(
-        f"/api/v1/auth/passkeys/{row.id}/remove",
-        json={},
-        headers=await signed_in_headers(session, user, amr=["webauthn"]),
-    )
-    assert response.status_code == 409
-    assert response.json()["detail"] == "PASSKEY_IS_LAST_METHOD"
-
-
-async def test_a_withdrawn_method_does_not_free_the_last_credential(
-    client: AsyncClient, session: AsyncSession
-):
-    """A deployment that stopped accepting passkeys leaves such an account
-    with nothing that opens a session, so the credential stays."""
-    user = await _passwordless(session, "pk-last-withdrawn@example.com")
-    row = await create_passkey(session, user, credential_id="last-withdrawn")
     headers = await signed_in_headers(session, user, amr=["webauthn"])
-    await _withdraw_passkeys(session)
+    if withdrawn:
+        await _withdraw_passkeys(session)
 
     response = await client.post(
         f"/api/v1/auth/passkeys/{row.id}/remove", json={}, headers=headers

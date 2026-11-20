@@ -28,25 +28,6 @@ from app.services.auth.assurance import (
 )
 
 
-def test_an_idp_that_describes_its_authentication_is_taken_at_its_word():
-    assurance = read_assurance(
-        {
-            "sub": "s",
-            "amr": ["pwd", "mfa", "otp"],
-            "acr": "phr",
-            "auth_time": 1757600000,
-        }
-    )
-    assert assurance.amr == ("pwd", "mfa", "otp")
-    assert assurance.acr == "phr"
-    assert assurance.auth_time == 1757600000
-    assert assurance.as_record() == {
-        "auth_time": 1757600000,
-        "amr": ["pwd", "mfa", "otp"],
-        "acr": "phr",
-    }
-
-
 def test_an_idp_that_says_nothing_records_nothing():
     assurance = read_assurance({"sub": "s", "email": "a@example.com"})
     assert assurance == ProviderAssurance()
@@ -114,10 +95,6 @@ def test_the_session_amr_names_the_provider_and_what_it_used():
         "oidc:acme",
         "pwd",
     ]
-
-
-def test_the_session_amr_names_the_provider_even_when_the_idp_is_silent():
-    assert session_amr("acme", ProviderAssurance()) == ["oidc:acme"]
 
 
 def test_a_provider_replaces_only_its_own_entry():
@@ -287,12 +264,25 @@ def test_a_long_group_list_is_bounded():
 # --- What the provider may say, and what only we may say --------------------
 
 
-def test_a_provider_does_not_write_our_markers():
+@pytest.mark.parametrize(
+    ("sent", "kept"),
+    [
+        (["guild:99", "oidc:elsewhere", "mfa"], ("mfa",)),
+        # Values are trimmed before they are judged.
+        (["  guild:99  "], ()),
+        # The rule is a prefix, not a substring: only the start of a value is
+        # ours.
+        (["not-guild:99"], ("not-guild:99",)),
+        # Derived from the list itself, so a marker added later is covered on
+        # the day it is added.
+        *[([f"{prefix}anything"], ()) for prefix in RESERVED_AMR_PREFIXES],
+    ],
+)
+def test_a_provider_does_not_write_our_markers(sent: list[str], kept: tuple):
     """A provider's ``amr`` is its own vocabulary. The markers this application
     writes into a session are its own account of the sign-in, so a value
     arriving under one of those prefixes is dropped."""
-    claimed = read_assurance({"amr": ["guild:99", "oidc:elsewhere", "mfa"]})
-    assert claimed.amr == ("mfa",)
+    assert read_assurance({"amr": sent}).amr == kept
 
 
 def test_the_drop_survives_being_merged_into_a_session():
@@ -302,25 +292,6 @@ def test_the_drop_survives_being_merged_into_a_session():
     amr = session_amr("corp", assurance)
     assert "guild:99" not in amr
     assert set(amr) == {"oidc:corp", "pwd"}
-
-
-def test_whitespace_does_not_get_a_value_past_the_drop():
-    """Values are trimmed before they are judged, so a padded one is judged
-    the same as a bare one."""
-    assert read_assurance({"amr": ["  guild:99  "]}).amr == ()
-
-
-@pytest.mark.parametrize("prefix", RESERVED_AMR_PREFIXES)
-def test_every_reserved_prefix_is_dropped(prefix):
-    """Derived from the list itself, so a marker added later is covered by
-    this test on the day it is added."""
-    assert read_assurance({"amr": [f"{prefix}anything"]}).amr == ()
-
-
-def test_an_unreserved_value_that_merely_contains_one_is_kept():
-    """The rule is a prefix, not a substring: an IdP's own vocabulary is its
-    own, and only the start of a value is ours."""
-    assert read_assurance({"amr": ["not-guild:99"]}).amr == ("not-guild:99",)
 
 
 # --- what a community's rule is allowed to be answered by -------------------

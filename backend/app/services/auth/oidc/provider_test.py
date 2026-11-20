@@ -107,28 +107,29 @@ async def test_begin_appends_to_existing_query():
 
 
 async def test_complete_returns_verified_identity():
-    idp = FakeIdp()
-    provider = _provider(idp)
-
-    done = await _begin_and_complete(idp, provider)
-    assert done.subject == "idp-subject-1"
-    assert done.claims["email"] == "alice@example.com"
-    assert done.access_token == "at-123"
-    assert done.refresh_token == "rt-456"
-    assert done.mobile is False
-    assert done.app_challenge == ""
-
-
-async def test_complete_sends_code_exchange_form():
+    """The code exchange posts the verifier sealed in the state, and the
+    verified id_token's identity comes back with the tokens."""
     idp = FakeIdp()
     provider = _provider(idp)
 
     begun = await provider.begin()
     flow = decode_flow_state(begun.state)
     idp.token_response = httpx2.Response(
-        200, json={"id_token": _mint_id_token(nonce=flow.nonce)}
+        200,
+        json={
+            "access_token": "at-123",
+            "refresh_token": "rt-456",
+            "id_token": _mint_id_token(nonce=flow.nonce),
+            "token_type": "Bearer",
+        },
     )
-    await provider.complete(code="auth-code-1", state=begun.state)
+    done = await provider.complete(code="auth-code-1", state=begun.state)
+    assert done.subject == "idp-subject-1"
+    assert done.claims["email"] == "alice@example.com"
+    assert done.access_token == "at-123"
+    assert done.refresh_token == "rt-456"
+    assert done.mobile is False
+    assert done.app_challenge == ""
 
     form = idp.token_request_form
     assert form["grant_type"] == "authorization_code"

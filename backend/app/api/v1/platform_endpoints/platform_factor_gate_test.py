@@ -65,46 +65,34 @@ def _refused(response) -> None:
 # ── Who is asked ───────────────────────────────────────────────────────────
 
 
-async def test_a_deployment_that_asks_nothing_asks_nothing(
-    client: AsyncClient, session: AsyncSession
+@pytest.mark.parametrize(
+    ("level", "role", "asked"),
+    [
+        # The default, and what an upgrade finds.
+        (SecondFactorRequirement.nobody, UserRole.member, False),
+        (SecondFactorRequirement.everyone, UserRole.member, True),
+        # The narrower of the two forms: a member of the platform is not one
+        # of the people it is about.
+        (SecondFactorRequirement.platform_roles, UserRole.member, False),
+        (SecondFactorRequirement.platform_roles, UserRole.support, True),
+    ],
+)
+async def test_who_is_asked(
+    client: AsyncClient,
+    session: AsyncSession,
+    level: SecondFactorRequirement,
+    role: UserRole,
+    asked: bool,
 ):
-    """The default, and what an upgrade finds."""
-    user = await create_user(session)
+    user = await create_user(session, role=role)
+    await _ask(session, level)
 
     answered = await client.get(GUILDS_URL, headers=get_auth_headers(user))
 
-    assert answered.status_code == 200, answered.text
-
-
-async def test_asking_everyone_reaches_an_ordinary_account(
-    client: AsyncClient, session: AsyncSession
-):
-    user = await create_user(session)
-    await _ask(session, SecondFactorRequirement.everyone)
-
-    _refused(await client.get(GUILDS_URL, headers=get_auth_headers(user)))
-
-
-async def test_asking_the_platform_rungs_leaves_members_alone(
-    client: AsyncClient, session: AsyncSession
-):
-    """The narrower of the two forms: a member of the platform is not one of
-    the people it is about."""
-    user = await create_user(session)
-    await _ask(session, SecondFactorRequirement.platform_roles)
-
-    answered = await client.get(GUILDS_URL, headers=get_auth_headers(user))
-
-    assert answered.status_code == 200, answered.text
-
-
-async def test_asking_the_platform_rungs_reaches_support(
-    client: AsyncClient, session: AsyncSession
-):
-    staff = await create_user(session, role=UserRole.support)
-    await _ask(session, SecondFactorRequirement.platform_roles)
-
-    _refused(await client.get(GUILDS_URL, headers=get_auth_headers(staff)))
+    if asked:
+        _refused(answered)
+    else:
+        assert answered.status_code == 200, answered.text
 
 
 # ── What answers it ────────────────────────────────────────────────────────
@@ -114,28 +102,24 @@ async def test_an_account_holding_an_authenticator_is_admitted(
     client: AsyncClient, session: AsyncSession
 ):
     """Holding one answers the deployment, whatever this session presented:
-    the question is about the account."""
+    the question is about the account. A row appears when somebody starts
+    enrolling; until it is confirmed the authenticator is not known to produce
+    codes this account accepts, and sign-in does not ask for it — so neither
+    does this."""
     user = await create_user(session)
-    await _enrol(session, user)
-    await _ask(session, SecondFactorRequirement.everyone)
-
-    answered = await client.get(GUILDS_URL, headers=get_auth_headers(user))
-
-    assert answered.status_code == 200, answered.text
-
-
-async def test_an_unconfirmed_enrolment_answers_nothing(
-    client: AsyncClient, session: AsyncSession
-):
-    """A row appears when somebody starts enrolling. Until it is confirmed the
-    authenticator is not known to produce codes this account accepts, and
-    sign-in does not ask for it — so neither does this."""
-    user = await create_user(session)
-    session.add(UserTotp(user_id=user.id, confirmed_at=None))
+    factor = UserTotp(user_id=user.id, confirmed_at=None)
+    session.add(factor)
     await session.commit()
     await _ask(session, SecondFactorRequirement.everyone)
 
     _refused(await client.get(GUILDS_URL, headers=get_auth_headers(user)))
+
+    factor.confirmed_at = datetime.now(UTC)
+    session.add(factor)
+    await session.commit()
+    answered = await client.get(GUILDS_URL, headers=get_auth_headers(user))
+
+    assert answered.status_code == 200, answered.text
 
 
 async def test_an_account_holding_a_passkey_is_admitted(
@@ -203,22 +187,14 @@ async def test_a_personal_api_key_waits_for_its_owner(
     client: AsyncClient, session: AsyncSession
 ):
     """It carries nothing about a sign-in, so it answers by its owner holding
-    a factor — refused until they do."""
+    a factor — refused until they do, and working once they do."""
     user = await create_user(session)
     headers = await _api_key_headers(session, user, "ppk_waiting-for-a-factor")
     await _ask(session, SecondFactorRequirement.everyone)
 
     _refused(await client.get(GUILDS_URL, headers=headers))
 
-
-async def test_a_personal_api_key_works_once_its_owner_holds_one(
-    client: AsyncClient, session: AsyncSession
-):
-    user = await create_user(session)
-    headers = await _api_key_headers(session, user, "ppk_owner-holds-a-factor")
-    await _ask(session, SecondFactorRequirement.everyone)
     await _enrol(session, user)
-
     answered = await client.get(GUILDS_URL, headers=headers)
 
     assert answered.status_code == 200, answered.text

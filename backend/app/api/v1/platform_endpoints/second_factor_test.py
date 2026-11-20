@@ -3,6 +3,7 @@
 from datetime import UTC, datetime, timedelta
 
 import pyotp
+import pytest
 from httpx2 import AsyncClient, Response
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -75,6 +76,8 @@ async def _enrol(
 async def test_enrolling_hands_over_a_seed_and_a_uri(
     client: AsyncClient, session: AsyncSession
 ):
+    """The URI carries what an authenticator reads. Started and abandoned
+    costs the account nothing — the sign-in is unchanged."""
     user = await _account(session, "enrol@example.com")
     response = await client.post(
         "/api/v1/auth/totp/enroll",
@@ -84,8 +87,15 @@ async def test_enrolling_hands_over_a_seed_and_a_uri(
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["secret"]
-    assert body["otpauth_uri"].startswith("otpauth://totp/")
-    assert f"secret={body['secret']}" in body["otpauth_uri"]
+    uri = body["otpauth_uri"]
+    assert uri.startswith("otpauth://totp/")
+    assert f"secret={body['secret']}" in uri
+    for part in ("issuer=", "digits=6", "period=30"):
+        assert part in uri
+
+    signed_in = await _sign_in(client, "enrol@example.com")
+    assert signed_in.status_code == 200
+    assert "access_token" in signed_in.json()
 
 
 async def test_enrolling_re_checks_the_password(
@@ -101,33 +111,12 @@ async def test_enrolling_re_checks_the_password(
     assert response.json()["detail"] == "USER_CURRENT_PASSWORD_INCORRECT"
 
 
-async def test_an_unproved_enrolment_is_not_asked_for(
+async def test_confirming_returns_the_recovery_codes_and_status_reports_them(
     client: AsyncClient, session: AsyncSession
 ):
-    """Started and abandoned costs the account nothing — the sign-in is
-    unchanged."""
-    user = await _account(session, "abandoned@example.com")
-    await client.post(
-        "/api/v1/auth/totp/enroll",
-        json={"current_password": PASSWORD},
-        headers=get_auth_headers(user),
-    )
-    response = await _sign_in(client, "abandoned@example.com")
-    assert response.status_code == 200
-    assert "access_token" in response.json()
-
-
-async def test_confirming_returns_the_recovery_codes_once(
-    client: AsyncClient, session: AsyncSession
-):
-    _user, _secret, codes = await _enrol(client, session, "confirm@example.com")
+    user, _secret, codes = await _enrol(client, session, "status@example.com")
     assert len(codes) == totp_service.RECOVERY_CODE_COUNT
 
-
-async def test_status_reports_what_the_account_holds(
-    client: AsyncClient, session: AsyncSession
-):
-    user, _secret, _codes = await _enrol(client, session, "status@example.com")
     response = await client.get("/api/v1/auth/totp", headers=get_auth_headers(user))
     assert response.status_code == 200
     body = response.json()
@@ -137,7 +126,10 @@ async def test_status_reports_what_the_account_holds(
 
 
 async def test_signing_in_asks_for_the_code(client: AsyncClient, session: AsyncSession):
-    await _enrol(client, session, "signin@example.com")
+    """The password answers with a challenge rather than a session. A wrong
+    code leaves the challenge standing; the right one finishes the sign-in
+    and spends it."""
+    _user, secret, _codes = await _enrol(client, session, "signin@example.com")
     response = await _sign_in(client, "signin@example.com")
 
     assert response.status_code == 401
@@ -145,20 +137,26 @@ async def test_signing_in_asks_for_the_code(client: AsyncClient, session: AsyncS
     assert body["detail"] == "TOTP_REQUIRED"
     assert body["challenge"]
     assert "access_token" not in body
+    challenge = body["challenge"]
 
+    refused = await _wrong_code(client, challenge)
+    assert refused.status_code == 400
+    assert refused.json()["detail"] == "TOTP_INVALID"
 
-async def test_the_code_finishes_the_sign_in(
-    client: AsyncClient, session: AsyncSession
-):
-    _user, secret, _codes = await _enrol(client, session, "answer@example.com")
-    challenge = (await _sign_in(client, "answer@example.com")).json()["challenge"]
-
-    response = await client.post(
-        "/api/v1/auth/token/totp",
-        json={"challenge": challenge, "code": _next_code(secret)},
+    code = _next_code(secret)
+    accepted = await client.post(
+        "/api/v1/auth/token/totp", json={"challenge": challenge, "code": code}
     )
-    assert response.status_code == 200, response.text
-    assert response.json()["access_token"]
+    assert accepted.status_code == 200, accepted.text
+    assert accepted.json()["access_token"]
+    # A browser keeps its refresh token in a cookie, not the body.
+    assert accepted.json()["refresh_token"] is None
+
+    again = await client.post(
+        "/api/v1/auth/token/totp", json={"challenge": challenge, "code": code}
+    )
+    assert again.status_code == 400
+    assert again.json()["detail"] == "TOTP_CHALLENGE_INVALID"
 
 
 async def test_a_recovery_code_finishes_it_too(
@@ -173,25 +171,6 @@ async def test_a_recovery_code_finishes_it_too(
     )
     assert response.status_code == 200, response.text
     assert response.json()["access_token"]
-
-
-async def test_a_wrong_code_leaves_the_challenge_standing(
-    client: AsyncClient, session: AsyncSession
-):
-    _user, secret, _codes = await _enrol(client, session, "wrong@example.com")
-    challenge = (await _sign_in(client, "wrong@example.com")).json()["challenge"]
-
-    refused = await client.post(
-        "/api/v1/auth/token/totp", json={"challenge": challenge, "code": "000000"}
-    )
-    assert refused.status_code == 400
-    assert refused.json()["detail"] == "TOTP_INVALID"
-
-    accepted = await client.post(
-        "/api/v1/auth/token/totp",
-        json={"challenge": challenge, "code": _next_code(secret)},
-    )
-    assert accepted.status_code == 200, accepted.text
 
 
 async def _wrong_code(client: AsyncClient, challenge: str) -> Response:
@@ -231,25 +210,6 @@ async def test_the_right_password_does_not_start_the_count_over(
     )
     assert refused.status_code == 429
     assert refused.json() == {"detail": "SIGN_IN_LOCKED"}
-
-
-async def test_a_challenge_is_spent_by_the_session_it_bought(
-    client: AsyncClient, session: AsyncSession
-):
-    _user, secret, _codes = await _enrol(client, session, "spent@example.com")
-    challenge = (await _sign_in(client, "spent@example.com")).json()["challenge"]
-    code = _next_code(secret)
-
-    first = await client.post(
-        "/api/v1/auth/token/totp", json={"challenge": challenge, "code": code}
-    )
-    assert first.status_code == 200
-
-    again = await client.post(
-        "/api/v1/auth/token/totp", json={"challenge": challenge, "code": code}
-    )
-    assert again.status_code == 400
-    assert again.json()["detail"] == "TOTP_CHALLENGE_INVALID"
 
 
 async def test_a_challenge_nobody_issued_is_refused(client: AsyncClient):
@@ -321,15 +281,6 @@ async def test_regenerating_retires_the_previous_codes(
     )
     assert stale.status_code == 400
     assert stale.json()["detail"] == "RECOVERY_CODE_INVALID"
-
-
-async def test_an_account_without_a_factor_signs_in_unchanged(
-    client: AsyncClient, session: AsyncSession
-):
-    await _account(session, "plain@example.com")
-    response = await _sign_in(client, "plain@example.com")
-    assert response.status_code == 200
-    assert response.json()["access_token"]
 
 
 async def test_support_can_clear_a_lost_factor(
@@ -469,15 +420,17 @@ async def test_an_account_with_both_still_supplies_its_password(
     assert response.json()["detail"] == "USER_CURRENT_PASSWORD_REQUIRED"
 
 
+@pytest.mark.parametrize("hashed_password", [None, "!"], ids=["none", "marker"])
 async def test_an_account_with_no_password_is_not_asked_for_one(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, hashed_password: str | None
 ):
     """Provisioned through an identity provider: there is no hash to re-check,
-    so a sign-in just made answers instead."""
+    so a sign-in just made answers instead. A 0152 downgrade fills NULL hashes
+    with ``'!'``, which nothing can verify, so it is no password either."""
     user = await create_user(
         session,
         email="sso-only@example.com",
-        hashed_password=None,
+        hashed_password=hashed_password,
         status=UserStatus.active,
         email_verified=True,
     )
@@ -488,27 +441,6 @@ async def test_an_account_with_no_password_is_not_asked_for_one(
     )
     assert response.status_code == 200, response.text
     assert response.json()["secret"]
-
-
-async def test_a_hash_no_scheme_verifies_is_not_a_password(
-    client: AsyncClient, session: AsyncSession
-):
-    """A 0152 downgrade fills NULL hashes with ``'!'``, which is not NULL and
-    which nothing can verify. Asking such an account for its password would ask
-    for one nobody can supply."""
-    user = await create_user(
-        session,
-        email="marker@example.com",
-        hashed_password="!",
-        status=UserStatus.active,
-        email_verified=True,
-    )
-    response = await client.post(
-        "/api/v1/auth/totp/enroll",
-        json={},
-        headers=await _session_headers(session, user),
-    )
-    assert response.status_code == 200, response.text
 
 
 async def test_the_app_is_asked_for_the_code_and_keeps_its_refresh_token(
@@ -545,27 +477,12 @@ async def test_the_app_is_asked_for_the_code_and_keeps_its_refresh_token(
     assert answered.json()["refresh_token"]
 
 
-async def test_the_browser_is_not_handed_one_in_the_body(
-    client: AsyncClient, session: AsyncSession
-):
-    _user, secret, _codes = await _enrol(client, session, "web-only@example.com")
-    challenge = (await _sign_in(client, "web-only@example.com")).json()["challenge"]
-
-    answered = await client.post(
-        "/api/v1/auth/token/totp",
-        json={"challenge": challenge, "code": _next_code(secret)},
-    )
-    assert answered.status_code == 200, answered.text
-    assert answered.json()["access_token"]
-    assert answered.json()["refresh_token"] is None
-
-
 async def test_status_says_whether_a_password_will_be_asked_for(
     client: AsyncClient, session: AsyncSession
 ):
     """The form cannot work this out for itself: holding a federated identity
     is a different question from holding a password, and an account can have
-    both."""
+    both. The marker a 0152 downgrade writes is not a password."""
     with_password = await _account(session, "haspw@example.com")
     without = await create_user(
         session,
@@ -574,27 +491,18 @@ async def test_status_says_whether_a_password_will_be_asked_for(
         status=UserStatus.active,
         email_verified=True,
     )
-
-    for user, expected in ((with_password, True), (without, False)):
-        response = await client.get("/api/v1/auth/totp", headers=get_auth_headers(user))
-        assert response.status_code == 200, response.text
-        assert response.json()["password_required"] is expected
-
-
-async def test_a_hash_no_scheme_verifies_asks_for_no_password(
-    client: AsyncClient, session: AsyncSession
-):
-    """Same answer as no hash at all — the marker a 0152 downgrade writes is
-    not a password, and the form must not insist on one."""
-    user = await create_user(
+    marker = await create_user(
         session,
         email="marker-status@example.com",
         hashed_password="!",
         status=UserStatus.active,
         email_verified=True,
     )
-    response = await client.get("/api/v1/auth/totp", headers=get_auth_headers(user))
-    assert response.json()["password_required"] is False
+
+    for user, expected in ((with_password, True), (without, False), (marker, False)):
+        response = await client.get("/api/v1/auth/totp", headers=get_auth_headers(user))
+        assert response.status_code == 200, response.text
+        assert response.json()["password_required"] is expected
 
 
 async def _withdraw_totp(session: AsyncSession) -> None:
@@ -607,38 +515,14 @@ async def _withdraw_totp(session: AsyncSession) -> None:
     await session.commit()
 
 
-async def test_a_deployment_that_does_not_offer_it_refuses_enrolment(
-    client: AsyncClient, session: AsyncSession
-):
-    user = await _account(session, "notoffered@example.com")
-    await _withdraw_totp(session)
-
-    response = await client.post(
-        "/api/v1/auth/totp/enroll",
-        json={"current_password": PASSWORD},
-        headers=get_auth_headers(user),
-    )
-    assert response.status_code == 403
-    assert response.json()["detail"] == "TOTP_NOT_PERMITTED"
-
-
 async def test_withdrawing_it_stops_the_factor_being_asked_for(
     client: AsyncClient, session: AsyncSession
 ):
-    """The enrolment is left alone — re-offering it asks for the code again —
-    but while the deployment does not offer it, the sign-in does not ask."""
-    await _enrol(client, session, "stillenrolled@example.com")
-    await _withdraw_totp(session)
-
-    signed_in = await _sign_in(client, "stillenrolled@example.com")
-    assert signed_in.status_code == 200
-    assert signed_in.json()["access_token"]
-
-
-async def test_the_status_says_whether_it_is_offered(
-    client: AsyncClient, session: AsyncSession
-):
-    user = await _account(session, "offered@example.com")
+    """The status says whether it is offered. Withdrawn, enrolment is refused;
+    an enrolment already made is left alone — re-offering it asks for the
+    code again — but while the deployment does not offer it, the sign-in does
+    not ask."""
+    user, _secret, _codes = await _enrol(client, session, "stillenrolled@example.com")
     headers = get_auth_headers(user)
     assert (await client.get("/api/v1/auth/totp", headers=headers)).json()[
         "offered"
@@ -648,6 +532,17 @@ async def test_the_status_says_whether_it_is_offered(
     assert (await client.get("/api/v1/auth/totp", headers=headers)).json()[
         "offered"
     ] is False
+    response = await client.post(
+        "/api/v1/auth/totp/enroll",
+        json={"current_password": PASSWORD},
+        headers=headers,
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "TOTP_NOT_PERMITTED"
+
+    signed_in = await _sign_in(client, "stillenrolled@example.com")
+    assert signed_in.status_code == 200
+    assert signed_in.json()["access_token"]
 
 
 async def _session_headers(session: AsyncSession, user):
@@ -664,31 +559,13 @@ async def _session_headers(session: AsyncSession, user):
     }
 
 
-async def test_a_factor_can_be_added_to_the_session_already_open(
-    client: AsyncClient, session: AsyncSession
-):
-    """A community asking for a factor refuses a session that never presented
-    one, and signing out to sign back in would be a strange way to answer that.
-    The code goes against the live session instead."""
-    from app.core.security import decode_session_token
-
-    user, secret, _codes = await _enrol(client, session, "stepup@example.com")
-
-    response = await client.post(
-        "/api/v1/auth/step-up/totp",
-        json={"code": _next_code(secret)},
-        headers=await _session_headers(session, user),
-    )
-    assert response.status_code == 200, response.text
-    claims = decode_session_token(response.json()["access_token"])
-    assert "mfa" in claims["amr"]
-    assert "otp" in claims["amr"]
-
-
 async def test_stepping_up_keeps_what_the_session_already_proved(
     client: AsyncClient, session: AsyncSession
 ):
-    """Satisfying one community's requirement never un-satisfies another's."""
+    """A community asking for a factor refuses a session that never presented
+    one, so the code goes against the live session rather than a sign-out and
+    back in — and satisfying one community's requirement never un-satisfies
+    another's."""
     from app.core.security import decode_session_token
     from app.services.auth import sessions as session_service
 
@@ -743,17 +620,38 @@ async def test_a_recovery_code_can_step_up_a_session(
 async def test_a_wrong_code_does_not_upgrade_the_session(
     client: AsyncClient, session: AsyncSession
 ):
-    """Wrong codes count against the account as they do at sign-in, so enough
-    of them turn the right one away too."""
-    user, secret, _codes = await _enrol(client, session, "badstepup@example.com")
-    headers = await _session_headers(session, user)
-    for _ in range(5):
-        response = await client.post(
-            "/api/v1/auth/step-up/totp", json={"code": "000000"}, headers=headers
-        )
-        assert response.status_code == 400
-        assert response.json()["detail"] == "TOTP_INVALID"
+    """Wrong codes count against the account as they do at sign-in: a right
+    code starts the count over, and enough wrong ones turn the right one away
+    too."""
+    from app.models.platform.sign_in_lock import SignInLock
 
+    user, secret, _codes = await _enrol(client, session, "badstepup@example.com")
+    user_id = user.id
+    headers = await _session_headers(session, user)
+
+    async def wrong(times: int) -> None:
+        for _ in range(times):
+            response = await client.post(
+                "/api/v1/auth/step-up/totp", json={"code": "000000"}, headers=headers
+            )
+            assert response.status_code == 400
+            assert response.json()["detail"] == "TOTP_INVALID"
+
+    await wrong(4)
+    stepped = await client.post(
+        "/api/v1/auth/step-up/totp",
+        json={"code": _next_code(secret)},
+        headers=headers,
+    )
+    assert stepped.status_code == 200, stepped.text
+    session.expire_all()
+    row = await session.get(SignInLock, user_id)
+    assert row is None or row.failures == 0
+
+    headers = {
+        "Authorization": f"Bearer {stepped.json()['access_token']}",
+    }
+    await wrong(5)
     locked = await client.post(
         "/api/v1/auth/step-up/totp",
         json={"code": _next_code(secret)},
@@ -761,30 +659,6 @@ async def test_a_wrong_code_does_not_upgrade_the_session(
     )
     assert locked.status_code == 429
     assert locked.json() == {"detail": "SIGN_IN_LOCKED"}
-
-
-async def test_a_right_code_starts_the_count_over(
-    client: AsyncClient, session: AsyncSession
-):
-    from app.models.platform.sign_in_lock import SignInLock
-
-    user, secret, _codes = await _enrol(client, session, "recount@example.com")
-    user_id = user.id
-    headers = await _session_headers(session, user)
-    for _ in range(4):
-        await client.post(
-            "/api/v1/auth/step-up/totp", json={"code": "000000"}, headers=headers
-        )
-    stepped = await client.post(
-        "/api/v1/auth/step-up/totp",
-        json={"code": _next_code(secret)},
-        headers=headers,
-    )
-    assert stepped.status_code == 200, stepped.text
-
-    session.expire_all()
-    row = await session.get(SignInLock, user_id)
-    assert row is None or row.failures == 0
 
 
 async def test_an_account_with_no_factor_cannot_step_up(

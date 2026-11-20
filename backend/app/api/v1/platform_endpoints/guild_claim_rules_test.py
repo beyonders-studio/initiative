@@ -5,13 +5,16 @@ a provider the community already counts as its own, and it says where the
 people carrying one group land.
 """
 
+import json
+
 from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.audit_events import AuditEventType
 from app.core.messages import AuthProviderMessages, SettingsMessages
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
-from app.testing import guild_of
+from app.testing import emitted, guild_of
 from app.testing.factories import (
     create_auth_provider,
     create_guild,
@@ -65,13 +68,17 @@ async def _a_role(session: AsyncSession, initiative) -> tuple[int, str]:
 
 
 async def test_the_seat_writes_reads_changes_and_removes_a_rule(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, capfd
 ):
+    """The rule's creation and removal are recorded against the community, as
+    written from its own surface, never copying the group it reads."""
     admin, guild = await _seat(session)
     provider = await _connected(
         session, guild, slug="entra", display_name="Entra", role_claim_path="groups"
     )
     headers = get_auth_headers(admin)
+    admin_id, guild_id, provider_id = admin.id, guild.id, provider.id
+    capfd.readouterr()
 
     created = await client.post(
         _base(guild.id),
@@ -87,6 +94,17 @@ async def test_the_seat_writes_reads_changes_and_removes_a_rule(
     assert body["claim_value"] == "eng-platform"
     assert body["provider_display_name"] == "Entra"
     assert body["initiative_id"] is None
+    born = emitted(capfd, AuditEventType.CLAIM_RULE_CREATED)
+    target = {"type": "claim_rule", "id": body["id"]}
+    assert [(r["actor_user_id"], r["guild_id"], r["target"]) for r in born] == [
+        (admin_id, guild_id, target)
+    ]
+    assert born[0]["detail"]["via"] == "guild"
+    assert born[0]["detail"]["values"]["provider_id"] == {
+        "from": None,
+        "to": provider_id,
+    }
+    assert "eng-platform" not in json.dumps(born)
 
     listed = await client.get(_base(guild.id), headers=headers)
     assert listed.status_code == 200, listed.text
@@ -112,9 +130,15 @@ async def test_the_seat_writes_reads_changes_and_removes_a_rule(
         json={"community_role": "superadmin"},
     )
     assert seat_role.status_code == 400, seat_role.text
+    capfd.readouterr()
 
     removed = await client.delete(f"{_base(guild.id)}/{body['id']}", headers=headers)
     assert removed.status_code == 204, removed.text
+    gone = emitted(capfd, AuditEventType.CLAIM_RULE_DELETED)
+    assert [
+        (r["actor_user_id"], r["guild_id"], r["target"], r["detail"]["via"])
+        for r in gone
+    ] == [(admin_id, guild_id, target, "guild")]
     after = await client.get(_base(guild.id), headers=headers)
     assert after.json()["rules"] == []
 

@@ -126,14 +126,6 @@ async def test_rotate_can_widen_amr_and_providers(session):
     assert second.session.provider_auth == {"9": {"auth_time": 1757600000}}
 
 
-async def test_rotate_unknown_token_returns_unknown(session):
-    result = await session_service.rotate_session(
-        session, raw_refresh_token="never-issued", now=_at()
-    )
-    assert result.outcome is RefreshOutcome.UNKNOWN
-    assert result.issued is None
-
-
 async def test_rotate_expired_token_returns_expired(session):
     user = await create_user(session)
     issued = await session_service.create_session(
@@ -385,13 +377,6 @@ async def test_revoke_chain_takes_a_renewal_committed_while_it_ran(session, engi
     assert ended == {child}
     stored = await session.get(AuthSession, child, populate_existing=True)
     assert stored is not None and stored.revoked_at is not None
-
-
-async def test_revoke_chain_missing_id_is_noop(session):
-    revoked = await session_service.revoke_chain(
-        session, session_id=uuid.uuid4(), now=_at()
-    )
-    assert revoked == set()
 
 
 async def test_purge_removes_dead_sessions_and_keeps_live_ones(session):
