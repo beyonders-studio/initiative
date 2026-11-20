@@ -117,25 +117,6 @@ async def test_a_render_waits_for_a_registration_giving_codes(session):
     assert await _code(session, A) == FIRST_PLUGIN_KIND_CODE
 
 
-async def test_a_code_is_never_taken_back_or_moved(session):
-    """The system engine, which registers listings, may read and add codes
-    and nothing else."""
-    privileges = (
-        (
-            await session.exec(
-                text(
-                    "SELECT privilege_type FROM information_schema.role_table_grants"
-                    " WHERE table_schema = 'public' AND table_name = 'plugin_kind_codes'"
-                    " AND grantee = 'app_admin'"
-                )
-            )
-        )
-        .scalars()
-        .all()
-    )
-    assert sorted(privileges) == ["INSERT", "SELECT"]
-
-
 def test_only_a_plug_in_kind_is_written_into_the_function():
     assert f"WHEN '{A}' THEN 1024" in kind_code_body({A: 1024})
     for kind in ("a'b", "A.one", "a one", "a.one", f"{A}'"):

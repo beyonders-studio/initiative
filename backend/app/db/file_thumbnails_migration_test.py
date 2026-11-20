@@ -3,21 +3,12 @@ run on a guild the test builds: down to before it, then up again."""
 
 from __future__ import annotations
 
-import importlib.util
-from pathlib import Path
-
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import text
 
 from app.testing import create_file, create_guild, create_initiative, create_user
-
-_REVISION = (
-    Path(__file__).resolve().parents[2]
-    / "alembic"
-    / "versions"
-    / "20261027_0543_file_versions_have_thumbnails.py"
-)
+from app.testing.later_revisions import load_revision
 
 
 async def test_a_picture_uploaded_before_waits_for_its_thumbnail(session) -> None:
@@ -36,10 +27,7 @@ async def test_a_picture_uploaded_before_waits_for_its_thumbnail(session) -> Non
         session, initiative, user, file_url=f"/uploads/{guild.id}/b.pdf"
     )
     await session.commit()
-    spec = importlib.util.spec_from_file_location(_REVISION.stem, _REVISION)
-    assert spec and spec.loader
-    revision = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(revision)
+    revision = load_revision("20261027_0543_file_versions_have_thumbnails")
 
     def run(step):
         def apply(sync_session) -> None:

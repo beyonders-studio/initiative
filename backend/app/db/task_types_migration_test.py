@@ -6,10 +6,7 @@ people in different languages, with tasks in every lifecycle state and a task
 page the project had already changed.
 """
 
-import importlib.util
 from collections.abc import AsyncIterator, Callable
-from pathlib import Path
-from types import ModuleType
 
 import pytest
 from alembic.migration import MigrationContext
@@ -29,6 +26,7 @@ from app.testing import (
     create_user,
     make_operations_community,
 )
+from app.testing.later_revisions import load_revision
 
 #: The tables the revision changes in a community's schema.
 _TABLES = ("projects", "tasks", "tool_layouts", "task_types", "intake_bindings")
@@ -45,20 +43,6 @@ async def provisioner() -> AsyncIterator[AsyncEngine]:
         yield engine
     finally:
         await engine.dispose()
-
-
-def _migration() -> ModuleType:
-    path = (
-        Path(__file__).resolve().parents[2]
-        / "alembic"
-        / "versions"
-        / "20261020_0531_a_task_has_a_type.py"
-    )
-    spec = importlib.util.spec_from_file_location(path.stem, path)
-    assert spec is not None and spec.loader is not None
-    migration = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(migration)
-    return migration
 
 
 def _run(connection: Connection, step: Callable[[], None]) -> None:
@@ -109,7 +93,7 @@ async def test_every_project_gets_its_types_and_every_task_and_page_its_task_typ
     await session.commit()
 
     await _hand_to_provisioner(session, a.guild.id)
-    migration = _migration()
+    migration = load_revision("20261020_0531_a_task_has_a_type")
     page = {"main": [{"type": "comments"}]}
     async with provisioner.begin() as connection:
         await connection.execute(

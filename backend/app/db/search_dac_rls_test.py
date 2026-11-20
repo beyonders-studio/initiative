@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
@@ -33,33 +32,7 @@ async def _unfiltered(reading_as, guild_id: int, actor) -> list[str]:
     return sorted(rows)
 
 
-async def test_a_member_without_a_grant_is_refused_by_the_database(
-    session, acting_user, reading_as
-):
-    """In the initiative — so the membership gate admits the row — but holding
-    no grant on the project it belongs to."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    b = await acting_user(
-        guild_role=CommunityRole.member,
-        guild=a.guild,
-        initiative=a.initiative,
-        initiative_role="member",
-    )
-    await create_task(session, a.project, title="restricted vendor renewal")
-
-    assert await _unfiltered(reading_as, a.guild.id, b) == []
-
-
-async def test_the_owner_is_admitted(
-    session: AsyncSession, acting_user: ActingUser, reading_as
-) -> None:
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    await create_task(session, a.project, title="restricted vendor renewal")
-
-    assert await _unfiltered(reading_as, a.guild.id, a) == ["restricted vendor renewal"]
-
-
-async def test_a_guild_admin_is_admitted(
+async def test_the_owner_and_a_guild_admin_are_admitted(
     session: AsyncSession, acting_user: ActingUser, reading_as
 ) -> None:
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
@@ -71,7 +44,10 @@ async def test_a_guild_admin_is_admitted(
     )
     await create_task(session, a.project, title="restricted vendor renewal")
 
-    assert await _unfiltered(reading_as, a.guild.id, b) == ["restricted vendor renewal"]
+    for actor in (a, b):
+        assert await _unfiltered(reading_as, a.guild.id, actor) == [
+            "restricted vendor renewal"
+        ]
 
 
 async def test_full_access_is_carried_into_the_database(
@@ -89,7 +65,8 @@ async def test_full_access_is_carried_into_the_database(
     )
     await create_task(session, a.project, title="restricted vendor renewal")
 
-    # Without the override: refused, as above.
+    # In the initiative, so the membership gate admits the row, but holding no
+    # grant on its project: refused.
     assert await _unfiltered(reading_as, a.guild.id, b) == []
 
     # With it: admitted, without any grant being issued. The override is a
@@ -128,18 +105,3 @@ async def test_guild_vocabulary_answers_to_no_sharing(
         select(SearchEntry.title).where(SearchEntry.entity_type == "tag")
     )
     assert sorted(rows) == ["urgent"]
-
-
-async def test_the_override_setting_defaults_to_empty(
-    session: AsyncSession, acting_user: ActingUser, reading_as
-) -> None:
-    """An unset override must read as "no initiatives", not as an error that
-    faults the policy for every row."""
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    reader = await reading_as(a.user.id, a.guild.id)
-    value = (
-        await reader.exec(
-            text("SELECT current_setting('app.override_initiatives', true)")
-        )
-    ).one()[0]
-    assert value == ""

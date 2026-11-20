@@ -10,8 +10,6 @@ subscription is gone, and one that was replaced, do not come back.
 
 from __future__ import annotations
 
-import importlib.util
-from pathlib import Path
 from types import ModuleType
 from typing import Any
 
@@ -21,21 +19,7 @@ from sqlalchemy import text
 
 from app.services.tenant import webhook_refs
 from app.testing import create_guild, create_user, create_webhook_subscription
-
-_MIGRATION = (
-    Path(__file__).resolve().parents[2]
-    / "alembic"
-    / "versions"
-    / "20261031_0574_a_subscriptions_names_are_the_communitys.py"
-)
-
-
-def _load() -> ModuleType:
-    spec = importlib.util.spec_from_file_location(_MIGRATION.stem, _MIGRATION)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+from app.testing.later_revisions import load_revision
 
 
 async def _rows(session, sql: str, **params: Any) -> list[tuple]:
@@ -70,7 +54,7 @@ async def test_the_names_move_into_the_community_unchanged(session) -> None:
         " FROM public.identity_refs WHERE purpose = 'webhook'"
         " AND sector_guild_id = :g ORDER BY 1, 2, 3"
     )
-    migration = _load()
+    migration = load_revision("20261031_0574_a_subscriptions_names_are_the_communitys")
 
     try:
         names = await _rows(session, held)

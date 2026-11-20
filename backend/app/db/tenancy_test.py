@@ -26,9 +26,6 @@ from app.db.tenancy import (
     SEAT_SURFACES,
     SEAT_TABLES,
     SHARED_TABLES,
-    is_guild_scoped,
-    is_initiative_scoped,
-    is_shared,
 )
 
 pytestmark = pytest.mark.always
@@ -70,14 +67,6 @@ def test_manifest_has_no_phantom_tables():
     )
 
 
-def test_helpers_agree_with_sets():
-    assert is_guild_scoped("tasks") and not is_shared("tasks")
-    assert is_shared("users") and not is_guild_scoped("users")
-    # Unknown tables are neither (forces an explicit decision rather than a default).
-    assert not is_guild_scoped("does_not_exist")
-    assert not is_shared("does_not_exist")
-
-
 # --- Second-level: initiative-scoped vs guild-level -------------------------
 # INITIATIVE_SCOPED_TABLES derives from the app/db/initiative_rls path registry
 # and GUILD_SCOPED_TABLES derives from (initiative | guild-level), so the
@@ -98,14 +87,6 @@ def test_initiative_and_guild_level_are_disjoint():
         f"Tables in BOTH the initiative_rls registry and GUILD_LEVEL_TABLES: "
         f"{sorted(overlap)}. Pick one."
     )
-
-
-def test_initiative_scoped_helper():
-    assert is_initiative_scoped("projects") and not is_initiative_scoped(
-        "guild_settings"
-    )
-    assert not is_initiative_scoped("tags")  # guild-level
-    assert not is_initiative_scoped("users")  # shared, not even guild-scoped
 
 
 def test_managed_tables_are_guild_level():

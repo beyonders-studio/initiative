@@ -6,9 +6,7 @@ written as an older release wrote them, up, and down again."""
 
 from __future__ import annotations
 
-import importlib.util
 from datetime import UTC, datetime
-from pathlib import Path
 
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
@@ -22,17 +20,7 @@ from app.testing import (
     create_task,
     create_user,
 )
-
-_VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
-
-
-def _load(name: str):
-    path = _VERSIONS / f"{name}.py"
-    spec = importlib.util.spec_from_file_location(path.stem, path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+from app.testing.later_revisions import load_revision
 
 
 async def test_opens_stars_and_orders_merge_and_come_back(session) -> None:
@@ -48,7 +36,7 @@ async def test_opens_stars_and_orders_merge_and_come_back(session) -> None:
     lone = await create_project(session, initiative, user, name="Ordered only")
     calendar = await create_calendar(session, initiative, user)
     task = await create_task(session, project)
-    migration = _load("20261017_0517_personal_items")
+    migration = load_revision("20261017_0517_personal_items")
 
     def run(step):
         def apply(sync_session) -> None:

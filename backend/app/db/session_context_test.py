@@ -26,7 +26,6 @@ from app.db.session import (
     set_rls_context,
 )
 from app.testing import create_guild, create_guild_membership, create_user, route_as
-from app.testing.schema_harness import route_session_to_guild
 
 
 async def _scalar(session: AsyncSession, sql: str):
@@ -135,18 +134,6 @@ async def test_nested_transaction_inherits_context(session, role_session):
         assert f"guild_{guild.id}" in await _scalar(
             s, "SELECT current_setting('search_path')"
         )
-
-
-async def test_harness_pin_survives_commit(session):
-    """route_session_to_guild pins are transaction-local but replayed: a
-    factory-routed test session still resolves the guild schema after commit."""
-    user = await create_user(session)
-    guild = await create_guild(session, creator=user)
-
-    await route_session_to_guild(session, guild.id)
-    await session.commit()
-    sp = (await session.exec(text("SELECT current_setting('search_path')"))).scalar()
-    assert f"guild_{guild.id}" in sp
 
 
 # ---------------------------------------------------------------------------

@@ -47,27 +47,17 @@ async def _rows(engine):
         ).all()
 
 
-async def test_the_read_floor_reads_nothing_extra(engine):
-    """Nothing the writable floor cannot read is readable here."""
-    wider = [
-        r.name
-        for r in await _rows(engine)
-        if r.read_only_reads and not r.writable_reads
-    ]
-    assert wider == [], f"{READ_FLOOR} reads tables {WRITABLE_FLOOR} cannot: {wider}"
-
-
-async def test_the_read_floor_reads_everything_the_writable_one_does(engine):
-    """A guild read the full role can serve works here too.
+async def test_the_read_floor_reads_exactly_what_the_writable_one_does(engine):
+    """A guild read the full role can serve works here too, and nothing the
+    writable floor cannot read is readable here.
 
     A new shared table lands here first: grant it to ``app_guild_base_ro`` in
     the migration that adds it, or leave it out on purpose.
     """
-    narrower = [
-        r.name
-        for r in await _rows(engine)
-        if r.writable_reads and not r.read_only_reads
-    ]
+    rows = await _rows(engine)
+    wider = [r.name for r in rows if r.read_only_reads and not r.writable_reads]
+    narrower = [r.name for r in rows if r.writable_reads and not r.read_only_reads]
+    assert wider == [], f"{READ_FLOOR} reads tables {WRITABLE_FLOOR} cannot: {wider}"
     assert narrower == [], f"{READ_FLOOR} cannot read: {narrower}"
 
 

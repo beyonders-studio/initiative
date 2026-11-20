@@ -10,8 +10,6 @@ the operations community does not.
 
 from __future__ import annotations
 
-import importlib.util
-from pathlib import Path
 from types import ModuleType
 from typing import Any
 
@@ -28,21 +26,7 @@ from app.testing import (
     create_user,
     make_operations_community,
 )
-
-_MIGRATION = (
-    Path(__file__).resolve().parents[2]
-    / "alembic"
-    / "versions"
-    / "20261031_0577_a_grants_case_is_linked_where_the_case_is.py"
-)
-
-
-def _load() -> ModuleType:
-    spec = importlib.util.spec_from_file_location(_MIGRATION.stem, _MIGRATION)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+from app.testing.later_revisions import load_revision
 
 
 async def _rows(session, sql: str, **params: Any) -> list[tuple]:
@@ -84,7 +68,7 @@ async def test_the_links_move_into_the_operations_community(session) -> None:
         "SELECT id, case_task_id FROM public.access_grants"
         " WHERE case_task_id IS NOT NULL ORDER BY 1"
     )
-    migration = _load()
+    migration = load_revision("20261031_0577_a_grants_case_is_linked_where_the_case_is")
 
     try:
         links = await _rows(session, held)
