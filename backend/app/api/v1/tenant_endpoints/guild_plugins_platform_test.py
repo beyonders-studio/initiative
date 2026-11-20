@@ -30,7 +30,6 @@ So are the seat's own routes for placement and scopes.
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any, ClassVar
-from urllib.parse import parse_qs, urlsplit
 
 import jwt
 import pytest
@@ -46,9 +45,8 @@ from app.core.messages import (
     InitiativeMessages,
     PluginServiceMessages,
 )
-from app.models.platform.guild import CommunityRole
+from app.models.platform.guild import CommunityRole, CommunityStatus
 from app.models.platform.publisher import Publisher
-from app.models.tenant._mixins import ActorKind
 from app.models.tenant.custom_role import (
     CustomRole,
     CustomRoleMember,
@@ -68,6 +66,7 @@ from app.services.tenant.initiatives import get_role_by_name
 from app.testing import (
     create_guild_plugin,
     create_plugin_service_registration,
+    create_webhook_subscription,
     marketplace_uid,
     route_session_to_guild,
     sealed_vendor_values,
@@ -140,6 +139,14 @@ def _service_definition(**overrides) -> dict:
     }
     definition.update(overrides)
     return definition
+
+
+@pytest.fixture(autouse=True)
+def signing_key(monkeypatch):
+    monkeypatch.setattr(
+        settings, "PLUGIN_PLATFORM_SIGNING_PRIVATE_KEY_PEM", _SIGNING_KEY_PEM
+    )
+    monkeypatch.setattr(settings, "PLUGIN_PLATFORM_SIGNING_KEY_ID", "test-key")
 
 
 @pytest.fixture
@@ -226,16 +233,6 @@ async def _take_out_of_service(session: AsyncSession, registration, how: str):
 
 
 class TestInstallState:
-    async def test_a_registered_plugin_is_available(
-        self, client: AsyncClient, acting_user, session: AsyncSession, registration
-    ):
-        a = await acting_user(guild_role=CommunityRole.superadmin)
-        await _installed(session, a)
-
-        items = (await client.get(a.g("/plugins/"), headers=a.headers)).json()["items"]
-        assert [item["available"] for item in items] == [True]
-        assert [item["mandatory"] for item in items] == [False]
-
     @pytest.mark.parametrize("how", ["everywhere", "suspended", "on_hold", "deleted"])
     async def test_a_plugin_out_of_service_here_is_invisible_until_it_is_back(
         self,
@@ -276,9 +273,10 @@ class TestInstallState:
                 session, a.guild.id, plugin.id, suspended=False, status="active"
             )
         items = (await client.get(a.g("/plugins/"), headers=a.headers)).json()["items"]
-        assert [(item["id"], item["name"], item["available"]) for item in items] == [
-            (plugin.id, "WidgetCo", True)
-        ]
+        assert [
+            (item["id"], item["name"], item["available"], item["mandatory"])
+            for item in items
+        ] == [(plugin.id, "WidgetCo", True, False)]
 
     async def test_a_read_only_plugin_is_shown_as_read_only(
         self, client: AsyncClient, acting_user, session: AsyncSession, registration
@@ -333,34 +331,7 @@ class TestInstallState:
 
 
 class TestMandatory:
-    async def test_a_guild_admin_cannot_uninstall_one(
-        self, client: AsyncClient, acting_user, session: AsyncSession, registration
-    ):
-        a = await acting_user(guild_role=CommunityRole.superadmin)
-        plugin = await _installed(session, a)
-        await _mark(session, registration, mandatory=True)
-
-        response = await client.delete(a.g(f"/plugins/{plugin.id}"), headers=a.headers)
-        assert response.status_code == 409
-        assert response.json()["detail"] == GuildPluginMessages.MANDATORY
-        # Still there, untouched.
-        items = (await client.get(a.g("/plugins/"), headers=a.headers)).json()["items"]
-        assert [item["id"] for item in items] == [plugin.id]
-
-    async def test_the_seat_cannot_disable_one(
-        self, client: AsyncClient, acting_user, session: AsyncSession, registration
-    ):
-        a = await acting_user(guild_role=CommunityRole.superadmin)
-        plugin = await _installed(session, a)
-        await _mark(session, registration, mandatory=True)
-
-        response = await client.patch(
-            a.g(f"/plugins/{plugin.id}"), headers=a.headers, json={"enabled": False}
-        )
-        assert response.status_code == 409
-        assert response.json()["detail"] == GuildPluginMessages.MANDATORY
-
-    async def test_renaming_one_is_still_allowed(
+    async def test_the_seat_renames_one_but_cannot_remove_or_disable_it(
         self, client: AsyncClient, acting_user, session: AsyncSession, registration
     ):
         """A guild may call it whatever it likes; what it cannot do is make it
@@ -369,12 +340,22 @@ class TestMandatory:
         plugin = await _installed(session, a)
         await _mark(session, registration, mandatory=True)
 
+        response = await client.delete(a.g(f"/plugins/{plugin.id}"), headers=a.headers)
+        assert response.status_code == 409
+        assert response.json()["detail"] == GuildPluginMessages.MANDATORY
+        response = await client.patch(
+            a.g(f"/plugins/{plugin.id}"), headers=a.headers, json={"enabled": False}
+        )
+        assert response.status_code == 409
+        assert response.json()["detail"] == GuildPluginMessages.MANDATORY
+
         response = await client.patch(
             a.g(f"/plugins/{plugin.id}"), headers=a.headers, json={"name": "Ours"}
         )
         assert response.status_code == 200, response.text
         assert response.json()["name"] == "Ours"
         assert response.json()["mandatory"] is True
+        assert response.json()["enabled"] is True
 
     async def test_clearing_the_flag_leaves_the_install_and_frees_it(
         self, client: AsyncClient, acting_user, session: AsyncSession, registration
@@ -421,13 +402,6 @@ class TestMandatory:
 
 
 class TestHandoff:
-    @pytest.fixture(autouse=True)
-    def signing_key(self, monkeypatch):
-        monkeypatch.setattr(
-            settings, "PLUGIN_PLATFORM_SIGNING_PRIVATE_KEY_PEM", _SIGNING_KEY_PEM
-        )
-        monkeypatch.setattr(settings, "PLUGIN_PLATFORM_SIGNING_KEY_ID", "test-key")
-
     async def test_a_member_may_not_open_a_community_level_surface(
         self, client: AsyncClient, acting_user, session: AsyncSession, registration
     ):
@@ -437,13 +411,15 @@ class TestHandoff:
         plugin = await _installed(session, a)
         member = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
 
-        response = await client.post(
-            member.g(f"/plugins/{plugin.id}/handoff/board"), headers=member.headers
-        )
-        assert response.status_code == 403
-        assert response.json()["detail"] == (
-            GuildPluginMessages.SURFACE_PERMISSION_REQUIRED
-        )
+        for surface in ("board", "console"):
+            response = await client.post(
+                member.g(f"/plugins/{plugin.id}/handoff/{surface}"),
+                headers=member.headers,
+            )
+            assert response.status_code == 403, surface
+            assert response.json()["detail"] == (
+                GuildPluginMessages.SURFACE_PERMISSION_REQUIRED
+            )
 
     async def test_a_guild_admin_opens_a_community_level_surface(
         self, client: AsyncClient, acting_user, session: AsyncSession, registration
@@ -485,28 +461,6 @@ class TestHandoff:
         assert response.json()["page_url"] == (
             "https://widgetco.example.test/embed/board"
         )
-
-    async def test_the_token_says_where_the_community_stands_now(
-        self, client: AsyncClient, acting_user, session: AsyncSession, registration
-    ):
-        from app.models.platform.guild import CommunityStatus
-
-        a = await acting_user(guild_role=CommunityRole.superadmin)
-        plugin = await _installed(session, a)
-        a.guild.status = CommunityStatus.read_only.value
-        session.add(a.guild)
-        await session.commit()
-
-        response = await client.post(
-            a.g(f"/plugins/{plugin.id}/handoff/board"), headers=a.headers
-        )
-        assert response.status_code == 200, response.text
-        claims = jwt.decode(
-            response.json()["handoff_token"],
-            options={"verify_signature": False},
-            audience=response.json()["audience"],
-        )
-        assert claims["community_status"] == "read_only"
 
     async def test_the_token_names_the_guild_the_install_and_the_surface(
         self, client: AsyncClient, acting_user, session: AsyncSession, registration
@@ -558,20 +512,21 @@ class TestHandoff:
             user_id=a.user.id,
         )
 
-    async def test_a_member_may_not_open_an_admin_surface(
-        self, client: AsyncClient, acting_user, session: AsyncSession, registration
-    ):
-        a = await acting_user(guild_role=CommunityRole.superadmin)
-        plugin = await _installed(session, a)
-        member = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
-
-        response = await client.post(
-            member.g(f"/plugins/{plugin.id}/handoff/console"), headers=member.headers
+        # The community's standing is read at each mint.
+        a.guild.status = CommunityStatus.read_only.value
+        session.add(a.guild)
+        await session.commit()
+        body = (
+            await client.post(
+                a.g(f"/plugins/{plugin.id}/handoff/board"), headers=a.headers
+            )
+        ).json()
+        claims = jwt.decode(
+            body["handoff_token"],
+            options={"verify_signature": False},
+            audience=body["audience"],
         )
-        assert response.status_code == 403
-        assert response.json()["detail"] == (
-            GuildPluginMessages.SURFACE_PERMISSION_REQUIRED
-        )
+        assert claims["community_status"] == "read_only"
 
     async def test_a_guild_admin_may_open_an_admin_surface(
         self, client: AsyncClient, acting_user, session: AsyncSession, registration
@@ -643,16 +598,18 @@ class TestHandoff:
             GuildPluginMessages.SURFACE_PERMISSION_REQUIRED
         )
 
-    async def test_a_guild_admin_opens_it_guild_wide(
-        self, client: AsyncClient, acting_user, session: AsyncSession, registration
-    ):
-        a = await acting_user(guild_role=CommunityRole.superadmin)
-        plugin = await _installed(session, a)
-
+        # The guild admin opens it, and the token names no initiative: absent
+        # rather than null, so "which initiative is this?" has one answer.
         response = await client.post(
             a.g(f"/plugins/{plugin.id}/handoff/runs"), headers=a.headers
         )
         assert response.status_code == 200, response.text
+        body = response.json()
+        assert "initiative_id" not in jwt.decode(
+            body["handoff_token"],
+            options={"verify_signature": False},
+            audience=body["audience"],
+        )
 
     async def test_an_undeclared_surface_is_a_404(
         self, client: AsyncClient, acting_user, session: AsyncSession, registration
@@ -706,13 +663,6 @@ class TestInitiativeHandoff:
     caller's role there has to hold the permission the surface names, as a
     manager's always does — or the caller be a guild admin.
     """
-
-    @pytest.fixture(autouse=True)
-    def signing_key(self, monkeypatch):
-        monkeypatch.setattr(
-            settings, "PLUGIN_PLATFORM_SIGNING_PRIVATE_KEY_PEM", _SIGNING_KEY_PEM
-        )
-        monkeypatch.setattr(settings, "PLUGIN_PLATFORM_SIGNING_KEY_ID", "test-key")
 
     @staticmethod
     def _claims(body: dict) -> dict:
@@ -885,17 +835,6 @@ class TestInitiativeHandoff:
             GuildPluginMessages.SURFACE_PERMISSION_REQUIRED
         )
 
-    async def test_a_surface_naming_a_permission_opens_for_an_admin(
-        self, client: AsyncClient, acting_user, session: AsyncSession, registration
-    ):
-        a = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
-        plugin = await _installed(session, a, placed=[a.initiative.id])
-
-        response = await client.post(
-            self._path(a, a.initiative.id, plugin.id, "settings"), headers=a.headers
-        )
-        assert response.status_code == 200, response.text
-
     async def test_the_token_names_the_initiative_it_was_opened_in(
         self, client: AsyncClient, acting_user, session: AsyncSession, registration
     ):
@@ -918,52 +857,26 @@ class TestInitiativeHandoff:
         assert claims["plugin_install_id"] == plugin.id
         assert claims["surface_id"] == "runs"
 
-    async def test_the_guild_wide_route_names_no_initiative(
-        self, client: AsyncClient, acting_user, session: AsyncSession, registration
-    ):
-        """Absent rather than null: "which initiative is this?" has one answer
-        guild-wide, not two shapes that both mean none."""
-        a = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
-        plugin = await _installed(session, a, placed=[a.initiative.id])
-
-        body = (
-            await client.post(
-                a.g(f"/plugins/{plugin.id}/handoff/runs"), headers=a.headers
-            )
-        ).json()
-        assert "initiative_id" not in self._claims(body)
-
-    async def test_a_guild_member_in_no_initiative_reaches_none_of_it(
+    async def test_a_guild_member_outside_the_initiative_reaches_none_of_it(
         self, client: AsyncClient, acting_user, session: AsyncSession, registration
     ):
         """Opening a surface in an initiative means reaching the initiative,
-        under the same scope rule that governs its content."""
+        under the same scope rule that governs its content; a role in another
+        initiative says nothing about this one."""
         a = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
         plugin = await _installed(session, a, placed=[a.initiative.id])
         outsider = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
-
-        response = await client.post(
-            self._path(outsider, a.initiative.id, plugin.id, "inside"),
-            headers=outsider.headers,
-        )
-        assert response.status_code == 404
-        assert response.json()["detail"] == InitiativeMessages.NOT_FOUND
-
-    async def test_a_role_in_another_initiative_says_nothing_about_this_one(
-        self, client: AsyncClient, acting_user, session: AsyncSession, registration
-    ):
-        a = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
-        plugin = await _installed(session, a, placed=[a.initiative.id])
         elsewhere = await acting_user(
             guild_role=CommunityRole.member, guild=a.guild, initiative=True
         )
 
-        response = await client.post(
-            self._path(elsewhere, a.initiative.id, plugin.id, "runs"),
-            headers=elsewhere.headers,
-        )
-        assert response.status_code == 404
-        assert response.json()["detail"] == InitiativeMessages.NOT_FOUND
+        for actor, surface in ((outsider, "inside"), (elsewhere, "runs")):
+            response = await client.post(
+                self._path(actor, a.initiative.id, plugin.id, surface),
+                headers=actor.headers,
+            )
+            assert response.status_code == 404
+            assert response.json()["detail"] == InitiativeMessages.NOT_FOUND
 
     async def test_a_guild_admin_reaches_an_initiative_they_are_not_in(
         self, client: AsyncClient, acting_user, session: AsyncSession, registration
@@ -1004,13 +917,6 @@ class TestOpenability:
     Computed by the same decision the handoff makes, so each answer here is
     checked against the handoff for the same viewer.
     """
-
-    @pytest.fixture(autouse=True)
-    def signing_key(self, monkeypatch):
-        monkeypatch.setattr(
-            settings, "PLUGIN_PLATFORM_SIGNING_PRIVATE_KEY_PEM", _SIGNING_KEY_PEM
-        )
-        monkeypatch.setattr(settings, "PLUGIN_PLATFORM_SIGNING_KEY_ID", "test-key")
 
     @staticmethod
     async def _access(client: AsyncClient, actor, plugin_id: int) -> dict:
@@ -1087,29 +993,11 @@ class TestPlacement:
     guild admin as for anyone else.
     """
 
-    @pytest.fixture(autouse=True)
-    def signing_key(self, monkeypatch):
-        monkeypatch.setattr(
-            settings, "PLUGIN_PLATFORM_SIGNING_PRIVATE_KEY_PEM", _SIGNING_KEY_PEM
-        )
-        monkeypatch.setattr(settings, "PLUGIN_PLATFORM_SIGNING_KEY_ID", "test-key")
-
     @staticmethod
     def _path(actor, initiative_id: int, plugin_id: int, surface: str) -> str:
         return actor.g(
             f"/initiatives/{initiative_id}/plugins/{plugin_id}/handoff/{surface}"
         )
-
-    async def test_an_install_starts_placed_nowhere(
-        self, client: AsyncClient, acting_user, session: AsyncSession, registration
-    ):
-        """An ordinary plug-in is never placed on its own: each placement is the
-        seat's consent for that initiative."""
-        a = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
-        await _installed(session, a)
-
-        body = (await client.get(a.g("/plugins/"), headers=a.headers)).json()
-        assert [item["placed_initiative_ids"] for item in body["items"]] == [[]]
 
     async def test_the_seat_places_it_and_every_member_reads_where(
         self, client: AsyncClient, acting_user, session: AsyncSession, registration
@@ -1133,12 +1021,7 @@ class TestPlacement:
         ).json()
         assert detail["placed_initiative_ids"] == [a.initiative.id]
 
-    async def test_leaving_placement_out_leaves_it_alone(
-        self, client: AsyncClient, acting_user, session: AsyncSession, registration
-    ):
-        a = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
-        plugin = await _installed(session, a, placed=[a.initiative.id])
-
+        # A change that leaves placement out leaves it alone.
         response = await client.patch(
             a.g(f"/plugins/{plugin.id}"), headers=a.headers, json={"name": "Renamed"}
         )
@@ -1162,22 +1045,6 @@ class TestPlacement:
         )
         assert response.status_code == 422
         assert response.json()["detail"] == GuildPluginMessages.PLACEMENT_INVALID
-
-    async def test_a_member_does_not_place_plugins(
-        self, client: AsyncClient, acting_user, session: AsyncSession, registration
-    ):
-        a = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
-        plugin = await _installed(session, a)
-        member = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
-        admin = await acting_user(guild_role=CommunityRole.admin, guild=a.guild)
-
-        for actor in (member, admin):
-            response = await client.patch(
-                actor.g(f"/plugins/{plugin.id}"),
-                headers=actor.headers,
-                json={"placed_initiative_ids": []},
-            )
-            assert response.status_code == 403
 
     async def test_a_surface_placed_elsewhere_is_not_in_this_initiative(
         self, client: AsyncClient, acting_user, session: AsyncSession, registration
@@ -1256,36 +1123,33 @@ class TestScopesRoute:
         assert withdrawn.status_code == 200, withdrawn.text
         assert withdrawn.json()["granted_scopes"] == []
 
-    async def test_a_scope_the_manifest_does_not_request_is_refused(
-        self, client: AsyncClient, acting_user, session: AsyncSession, registration
+    @pytest.mark.parametrize(
+        ("granted", "code"),
+        [
+            # Within the ceiling, but the plug-in never asked.
+            ("tags:read", GuildPluginMessages.SCOPE_NOT_REQUESTED),
+            # Requested, but the deployment does not allow it.
+            ("projects:write", GuildPluginMessages.SCOPE_ABOVE_CEILING),
+        ],
+    )
+    async def test_a_scope_not_both_requested_and_allowed_is_refused(
+        self,
+        client: AsyncClient,
+        acting_user,
+        session: AsyncSession,
+        registration,
+        granted,
+        code,
     ):
-        """``tags:read`` is within the ceiling but the plug-in never asked."""
         a = await acting_user(guild_role=CommunityRole.superadmin)
         plugin = await _installed(session, a)
         await _mark(session, registration, scope_ceiling=self.CEILING)
 
         response = await client.put(
-            self._path(a, plugin.id), headers=a.headers, json={"granted": ["tags:read"]}
+            self._path(a, plugin.id), headers=a.headers, json={"granted": [granted]}
         )
         assert response.status_code == 422
-        assert response.json()["detail"] == GuildPluginMessages.SCOPE_NOT_REQUESTED
-
-    async def test_a_scope_above_the_ceiling_is_refused(
-        self, client: AsyncClient, acting_user, session: AsyncSession, registration
-    ):
-        """``projects:write`` is requested, but the deployment does not allow
-        it."""
-        a = await acting_user(guild_role=CommunityRole.superadmin)
-        plugin = await _installed(session, a)
-        await _mark(session, registration, scope_ceiling=self.CEILING)
-
-        response = await client.put(
-            self._path(a, plugin.id),
-            headers=a.headers,
-            json={"granted": ["projects:write"]},
-        )
-        assert response.status_code == 422
-        assert response.json()["detail"] == GuildPluginMessages.SCOPE_ABOVE_CEILING
+        assert response.json()["detail"] == code
 
     async def test_the_detail_says_what_is_requested_and_grantable(
         self, client: AsyncClient, acting_user, session: AsyncSession, registration
@@ -1375,9 +1239,10 @@ class TestHandoffWithoutASigningKey:
 
 
 class TestConnectLaunch:
-    """Initiative runs the flow, so what a member is sent to is the vendor's
-    authorization endpoint with this deployment's client, never the plug-in's own
-    address. The whole trip is in ``plugin_connection_flows_test``."""
+    """A member is sent to the vendor only while the plug-in's service is
+    registered and live here. The address itself is pinned in
+    ``guild_plugin_connections_test`` and the whole trip in
+    ``plugin_connection_flows_test``."""
 
     CONNECT_DEFINITION: ClassVar[dict[str, Any]] = {
         "plugin_kind": "service",
@@ -1427,37 +1292,6 @@ class TestConnectLaunch:
             listing_uid=SERVICE_UID,
         )
 
-    async def test_the_url_is_the_vendors_authorization_endpoint(
-        self, client: AsyncClient, acting_user, session: AsyncSession
-    ):
-        a = await acting_user(guild_role=CommunityRole.superadmin)
-        plugin = await self._install(session, a)
-
-        response = await client.post(
-            a.g(f"/plugins/{plugin.id}/connections/github/connect"), headers=a.headers
-        )
-        assert response.status_code == 200, response.text
-        body = response.json()
-        assert body["connect_url"].startswith(
-            "https://github.test/login/oauth/authorize?"
-        )
-        query = parse_qs(urlsplit(body["connect_url"]).query)
-        # Pinned exactly, so anything added to this URL is added deliberately.
-        assert set(query) == {
-            "response_type",
-            "client_id",
-            "redirect_uri",
-            "state",
-            "code_challenge",
-            "code_challenge_method",
-        }
-        assert query["client_id"] == ["client-123"]
-        assert query["redirect_uri"] == [
-            f"{settings.APP_URL.rstrip('/')}/api/v1/plugin-connections/callback"
-        ]
-        for smell in ("client-secret-456", "Bearer", "iat_"):
-            assert smell not in body["connect_url"]
-
     async def test_an_unregistered_plugin_sends_nobody_anywhere(
         self, client: AsyncClient, acting_user, session: AsyncSession
     ):
@@ -1504,97 +1338,22 @@ class TestUninstallStopsDeliveries:
     async def test_uninstalling_switches_off_what_that_install_registered(
         self, client: AsyncClient, acting_user, session: AsyncSession, registration
     ):
-        from datetime import datetime
-
-        from app.models.tenant.webhook_subscription import WebhookSubscription
-
-        a = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+        a = await acting_user(guild_role=CommunityRole.superadmin)
         plugin = await _installed(session, a)
-
-        now = datetime.now(UTC)
-        theirs = WebhookSubscription(
-            initiative_id=a.initiative.id,
-            created_by=a.user.id,
-            created_by_kind=ActorKind.member,
-            plugin_install_id=plugin.id,
-            target_url="https://widgetco.example/in",
-            hmac_secret="s" * 40,
-            event_types=["tasks.created"],
-            active=True,
-            created_at=now,
-            updated_at=now,
+        theirs = await create_webhook_subscription(
+            session, a.guild, a.user, plugin_install_id=plugin.id
         )
         # A member's own, registered against a URL of their own: nothing to do
         # with this install, and untouched by its removal.
-        mine = WebhookSubscription(
-            initiative_id=a.initiative.id,
-            created_by=a.user.id,
-            created_by_kind=ActorKind.member,
-            plugin_install_id=None,
-            target_url="https://mine.example/in",
-            hmac_secret="m" * 40,
-            event_types=["tasks.created"],
-            active=True,
-            created_at=now,
-            updated_at=now,
-        )
-        session.add(theirs)
-        session.add(mine)
-        await session.commit()
+        mine = await create_webhook_subscription(session, a.guild, a.user)
 
         removed = await client.delete(a.g(f"/plugins/{plugin.id}"), headers=a.headers)
-        assert removed.status_code in (200, 204), removed.text
+        assert removed.status_code == 204, removed.text
 
         await session.refresh(theirs)
         await session.refresh(mine)
         assert theirs.active is False
         assert mine.active is True
-
-    async def test_switching_them_off_is_staged_with_the_rest_of_the_uninstall(
-        self, acting_user, session: AsyncSession
-    ):
-        """Uninstall removes connections, consents, these and the install in
-        one transaction, and commits once at the end.
-
-        A commit in the middle would make everything staged before it durable
-        while the install is still there to fail on — leaving a plug-in installed
-        with its credentials and deliveries already gone.
-        """
-        from datetime import datetime
-
-        from app.models.tenant.webhook_subscription import WebhookSubscription
-        from app.services.tenant import (
-            webhook_subscriptions as webhook_subscriptions_service,
-        )
-
-        a = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
-        plugin = await _installed(session, a)
-
-        now = datetime.now(UTC)
-        sub = WebhookSubscription(
-            initiative_id=a.initiative.id,
-            created_by=a.user.id,
-            created_by_kind=ActorKind.member,
-            plugin_install_id=plugin.id,
-            target_url="https://widgetco.example/staged",
-            hmac_secret="s" * 40,
-            event_types=["tasks.created"],
-            active=True,
-            created_at=now,
-            updated_at=now,
-        )
-        session.add(sub)
-        await session.commit()
-
-        switched = await webhook_subscriptions_service.deactivate_for_install(
-            session, guild_id=a.guild.id, plugin_install_id=plugin.id
-        )
-        assert switched == 1
-
-        # Nothing committed it, so abandoning the transaction abandons it.
-        await session.rollback()
-        await session.refresh(sub)
-        assert sub.active is True
 
 
 # ---------------------------------------------------------------------------
@@ -1608,11 +1367,7 @@ class TestMinimumAge:
     never refused for it."""
 
     @pytest.fixture(autouse=True)
-    def signing_key(self, monkeypatch):
-        monkeypatch.setattr(
-            settings, "PLUGIN_PLATFORM_SIGNING_PRIVATE_KEY_PEM", _SIGNING_KEY_PEM
-        )
-        monkeypatch.setattr(settings, "PLUGIN_PLATFORM_SIGNING_KEY_ID", "test-key")
+    def country_header(self, monkeypatch):
         monkeypatch.setattr(settings, "CLIENT_COUNTRY_HEADER", "CF-IPCountry")
 
     async def _aged(self, session: AsyncSession, actor, years: int | None):

@@ -82,6 +82,11 @@ async def test_a_guild_member_may_register_a_subscription(client, acting_user):
     # The secret is returned exactly once, here.
     assert body["hmac_secret"]
 
+    listing = await client.get(_url(a.guild.id), headers=a.headers)
+    assert listing.status_code == 200
+    assert listing.json()
+    assert all("hmac_secret" not in row for row in listing.json())
+
 
 async def test_dead_letter_count_is_visible_on_every_read(client, acting_user, session):
     """The signal a broken target needs: a nonzero count where an endlessly
@@ -116,38 +121,6 @@ async def test_dead_letter_count_is_visible_on_every_read(client, acting_user, s
     assert listing.status_code == 200
     (row,) = [r for r in listing.json() if r["id"] == subscription_id]
     assert row["dead_letter_count"] == 1
-
-
-async def test_the_secret_is_never_returned_again(client, acting_user):
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    with _mock_public_dns():
-        await client.post(
-            _url(a.guild.id),
-            json=_body(initiative_id=a.initiative.id),
-            headers=a.headers,
-        )
-
-    listing = await client.get(_url(a.guild.id), headers=a.headers)
-
-    assert listing.status_code == 200
-    assert listing.json()
-    assert all("hmac_secret" not in row for row in listing.json())
-
-
-async def test_an_unknown_event_type_is_refused(client, acting_user):
-    """The failure this whole mechanism exists to remove: a subscription that
-    registers cleanly and can never fire."""
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-
-    with _mock_public_dns():
-        response = await client.post(
-            _url(a.guild.id),
-            json=_body(initiative_id=a.initiative.id, event_types=["taks.updated"]),
-            headers=a.headers,
-        )
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == "WEBHOOK_UNKNOWN_EVENT_TYPE"
 
 
 async def test_an_unknown_field_is_refused(client, acting_user):
@@ -188,11 +161,14 @@ async def test_a_junction_facet_is_a_nameable_field(client, acting_user):
     assert sorted(response.json()["fields"]) == ["tags", "task_status_id"]
 
 
-async def test_a_co_member_with_write_access_may_rewrite_it(client, acting_user):
+async def test_a_co_member_with_write_access_or_a_guild_admin_may_rewrite_it(
+    client, acting_user
+):
     """Authorship is not a gate in this app. Someone who can edit an
     initiative's tasks can edit its webhooks — the UPDATE policy is the same
-    initiative_access(..., need_write=true) that governs the content."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    initiative_access(..., need_write=true) that governs the content — and a
+    guild admin may rewrite any of them."""
+    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
     with _mock_public_dns():
         created = await client.post(
             _url(a.guild.id),
@@ -207,35 +183,15 @@ async def test_a_co_member_with_write_access_may_rewrite_it(client, acting_user)
         initiative=a.initiative,
         initiative_role="member",
     )
-    response = await client.patch(
-        _url(a.guild.id, f"/{subscription_id}"),
-        json={"active": False},
-        headers=b.headers,
-    )
-
-    assert response.status_code == 200, response.text
-    assert response.json()["active"] is False
-
-
-async def test_a_guild_admin_may_rewrite_any_of_them(client, acting_user):
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    with _mock_public_dns():
-        created = await client.post(
-            _url(a.guild.id),
-            json=_body(initiative_id=a.initiative.id),
-            headers=a.headers,
-        )
-    subscription_id = created.json()["id"]
-
     admin = await acting_user(guild_role=CommunityRole.admin, guild=a.guild)
-    response = await client.patch(
-        _url(a.guild.id, f"/{subscription_id}"),
-        json={"active": False},
-        headers=admin.headers,
-    )
-
-    assert response.status_code == 200
-    assert response.json()["active"] is False
+    for actor, active in ((b, False), (admin, True)):
+        response = await client.patch(
+            _url(a.guild.id, f"/{subscription_id}"),
+            json={"active": active},
+            headers=actor.headers,
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["active"] is active
 
 
 async def test_a_subscription_deleted_as_it_is_rewritten_is_not_found(
@@ -310,11 +266,12 @@ async def test_a_private_target_url_is_refused(client, acting_user):
     }
 
 
-async def test_an_initiative_subscription_is_visible_to_that_initiative(
+async def test_an_initiative_subscription_is_visible_to_that_initiative_alone(
     client, acting_user
 ):
     """It is that initiative's integration config, not the private note of
-    whoever typed the URL — a co-member reaches it like any other content."""
+    whoever typed the URL — a co-member reaches it like any other content, and
+    the hard isolation boundary keeps it from everyone else."""
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
     with _mock_public_dns():
         created = await client.post(
@@ -330,25 +287,12 @@ async def test_an_initiative_subscription_is_visible_to_that_initiative(
         initiative=a.initiative,
         initiative_role="member",
     )
+    outsider = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
     listing = await client.get(_url(a.guild.id), headers=mate.headers)
-
     assert listing.status_code == 200
     assert len(listing.json()) == 1
 
-
-async def test_a_non_member_of_the_initiative_does_not_see_it(client, acting_user):
-    """The hard isolation boundary applies here like anywhere else."""
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    with _mock_public_dns():
-        await client.post(
-            _url(a.guild.id),
-            json=_body(initiative_id=a.initiative.id),
-            headers=a.headers,
-        )
-
-    outsider = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
     listing = await client.get(_url(a.guild.id), headers=outsider.headers)
-
     assert listing.status_code == 200
     assert listing.json() == []
 
@@ -489,33 +433,14 @@ async def test_complementary_patches_cannot_commit_an_impossible_pair(
 # ── what a subscription is told the guild is called ──────────────────────────
 
 
-async def test_a_subscription_names_the_guild_by_reference(client, acting_user):
-    """A row id would be the same value everywhere, and every receiver would
-    hold it. The reference is this subscription's own."""
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-
-    with _mock_public_dns():
-        response = await client.post(
-            _url(a.guild.id),
-            json=_body(initiative_id=a.initiative.id),
-            headers=a.headers,
-        )
-
-    body = response.json()
-    assert response.status_code == 201, response.text
-    assert body["community_ref"].startswith("gweb_")
-    assert body["created_by_ref"].startswith("uweb_")
-    assert "guild_id" not in body
-    assert "created_by" not in body
-    assert str(a.guild.id) != body["community_ref"]
-
-
-async def test_two_subscriptions_hold_unrelated_names_for_one_guild(
+async def test_each_subscription_names_the_guild_by_a_reference_it_keeps(
     client, acting_user
 ):
-    """The property that makes the name worth minting: two receivers cannot put
-    their envelopes side by side and see the same guild — and the list, which
-    names every row at once, gives each its own."""
+    """A row id would be the same value everywhere, and every receiver would
+    hold it. The reference is this subscription's own: two receivers cannot
+    put their envelopes side by side and see the same guild, and the list, a
+    patch and the create all give it the same value, because a receiver
+    matching an envelope against what it stored has to find it."""
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
 
     with _mock_public_dns():
@@ -529,9 +454,22 @@ async def test_two_subscriptions_hold_unrelated_names_for_one_guild(
             json=_body(initiative_id=a.initiative.id),
             headers=a.headers,
         )
+        patched = await client.patch(
+            _url(a.guild.id, f"/{first.json()['id']}"),
+            json={"active": False},
+            headers=a.headers,
+        )
 
+    body = first.json()
+    assert first.status_code == 201, first.text
+    assert body["community_ref"].startswith("gweb_")
+    assert body["created_by_ref"].startswith("uweb_")
+    assert "guild_id" not in body
+    assert "created_by" not in body
+    assert str(a.guild.id) != body["community_ref"]
     assert first.json()["community_ref"] != second.json()["community_ref"]
     assert first.json()["created_by_ref"] != second.json()["created_by_ref"]
+    assert patched.json()["community_ref"] == body["community_ref"]
 
     listing = await client.get(_url(a.guild.id), headers=a.headers)
     listed = {
@@ -543,31 +481,3 @@ async def test_two_subscriptions_hold_unrelated_names_for_one_guild(
             created["community_ref"],
             created["created_by_ref"],
         )
-
-
-async def test_the_name_a_subscription_is_given_is_the_one_it_keeps(
-    client, acting_user
-):
-    """Read back on the list and on a patch, because a receiver matching an
-    envelope against what it stored has to find the same value."""
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-
-    with _mock_public_dns():
-        created = (
-            await client.post(
-                _url(a.guild.id),
-                json=_body(initiative_id=a.initiative.id),
-                headers=a.headers,
-            )
-        ).json()
-        patched = await client.patch(
-            _url(a.guild.id, f"/{created['id']}"),
-            json={"active": False},
-            headers=a.headers,
-        )
-
-    listing = await client.get(_url(a.guild.id), headers=a.headers)
-    (listed,) = [row for row in listing.json() if row["id"] == created["id"]]
-
-    assert listed["community_ref"] == created["community_ref"]
-    assert patched.json()["community_ref"] == created["community_ref"]

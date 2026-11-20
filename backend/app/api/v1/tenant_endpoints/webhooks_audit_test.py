@@ -96,7 +96,8 @@ async def test_registering_records_the_host_and_never_the_rest_of_the_url(
 async def test_a_refused_registration_records_nothing(
     client: AsyncClient, acting_user, capfd
 ):
-    """Nothing was registered, so there is nothing to write down."""
+    """An unknown event type is refused rather than registering a subscription
+    that can never fire, and nothing was registered to write down."""
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
     capfd.readouterr()
 
@@ -107,6 +108,7 @@ async def test_a_refused_registration_records_nothing(
             headers=a.headers,
         )
     assert response.status_code == 400
+    assert response.json()["detail"] == "WEBHOOK_UNKNOWN_EVENT_TYPE"
 
     assert emitted(capfd, AuditEventType.WEBHOOK_CREATED) == []
 

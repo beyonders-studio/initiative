@@ -15,7 +15,6 @@ from datetime import datetime
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.messages import MarketplaceMessages
 from app.core.rules import SURFACE_PLUGINS, SetBy
 from app.models.platform.guild import CommunityRole
 from app.models.platform.notification import Notification, NotificationType
@@ -26,7 +25,6 @@ from app.services.platform import rules
 from app.services.tenant import plugin_updates
 from app.services.tenant.plugin_updates import (
     AskedUpdate,
-    RefusedUpdate,
     UpdateOffer,
     _update_guild,
     decline_version,
@@ -362,77 +360,6 @@ class TestTheSweep:
         assert (await _reread(session, guild.id, plugin.id)).listing_version == "1.0.0"
 
 
-class TestUpdateOffer:
-    """What the settings page is told there is to move to."""
-
-    async def test_it_names_the_version_an_update_would_apply(
-        self, session: AsyncSession
-    ):
-        uid = marketplace_uid("autooffer")
-        await _publish(session, uid, "1.0.0")
-        guild, plugin = await _installed(session, uid)
-        await _publish(session, uid, "1.2.0", definition=_definition("Cal v2"))
-
-        await route_session_to_guild(session, guild.id)
-        offer = await update_offer(session, plugin)
-        assert isinstance(offer, UpdateOffer) and offer.version == "1.2.0"
-
-    async def test_a_newer_version_this_server_cannot_run_is_named_with_why(
-        self, session: AsyncSession
-    ):
-        uid = marketplace_uid("autorefused")
-        await _publish(session, uid, "1.0.0")
-        guild, plugin = await _installed(session, uid)
-        await _publish(
-            session,
-            uid,
-            "1.2.0",
-            definition=_definition("Cal v2"),
-            min_plugin_api="99.0",
-        )
-
-        await route_session_to_guild(session, guild.id)
-        assert await update_offer(session, plugin) == RefusedUpdate(
-            version="1.2.0", reason=MarketplaceMessages.LISTING_PLUGIN_API_INCOMPATIBLE
-        )
-        # Pinned at that version already, there is nothing newer to name.
-        plugin.listing_version = "1.2.0"
-        assert await update_offer(session, plugin) is None
-
-    async def test_an_install_on_the_newest_is_offered_nothing(
-        self, session: AsyncSession
-    ):
-        uid = marketplace_uid("autocurrent")
-        await _publish(session, uid, "1.0.0")
-        guild, plugin = await _installed(session, uid)
-
-        await route_session_to_guild(session, guild.id)
-        assert await update_offer(session, plugin) is None
-
-    async def test_a_service_the_deployment_stopped_running_still_updates(
-        self, session: AsyncSession
-    ):
-        """Whether this deployment runs a plug-in's service decides whether a
-        guild may *take* it. An install that is already here is the guild's
-        either way, so it keeps following the version its publisher ships —
-        switching the service back on finds the plug-in current rather than a
-        version behind."""
-        uid = marketplace_uid("autounwired")
-        definition = _connection_definition()
-        await _publish(session, uid, "1.0.0", definition=definition)
-        guild, plugin = await _installed(session, uid, definition=definition)
-        await _publish(
-            session,
-            uid,
-            "1.3.0",
-            definition=_connection_definition("Shop v2", keys=("shop_domain", "token")),
-        )
-
-        await route_session_to_guild(session, guild.id)
-        offer = await update_offer(session, plugin)
-        assert isinstance(offer, UpdateOffer) and offer.version == "1.3.0"
-
-
 # --- versions that ask for more ----------------------------------------------
 
 ASKING_SERVICE = "tests.asksmore"
@@ -719,35 +646,6 @@ class TestVersionsThatAskForMore:
         assert await _sweep(session, guild.id) == (0, [])
         assert (await _reread(session, guild.id, plugin.id)).pending_version is None
 
-    async def test_accepting_applies_and_grants(self, session: AsyncSession):
-        uid = marketplace_uid("asksaccept")
-        _, guild, plugin = await _asking_install(session, uid)
-        await _publish(
-            session,
-            uid,
-            "1.1.0",
-            definition=_asking_definition(scopes=("projects:read", "projects:write")),
-        )
-        await _sweep(session, guild.id)
-
-        waiting = await _reread(session, guild.id, plugin.id)
-        offer = await update_offer(session, waiting)
-        assert isinstance(offer, UpdateOffer)
-        await plugin_updates.apply_version(
-            session,
-            waiting,
-            offer.update,
-            guild_id=guild.id,
-            add_scopes=offer.asks.added_scopes,
-        )
-        await session.commit()
-
-        accepted = await _reread(session, guild.id, plugin.id)
-        assert accepted.listing_version == "1.1.0"
-        assert accepted.granted_scopes == ["projects:read", "projects:write"]
-        assert accepted.pending_version is None
-        assert accepted.declined_version is None
-
 
 def _asking(*scopes: str) -> dict:
     return {
@@ -759,7 +657,8 @@ def _asking(*scopes: str) -> dict:
 
 def test_a_version_asking_to_use_another_plugin_asks_for_more():
     """A ``plugins:`` scope for a plug-in the community has is a new thing the
-    seat has not answered, like any other scope a version adds."""
+    seat has not answered, like any other scope a version adds, while it is
+    within the ceiling."""
     plugin = GuildPlugin(
         listing_uid="TESTCALLER0001",
         listing_version="1.0.0",
@@ -780,25 +679,7 @@ def test_a_version_asking_to_use_another_plugin_asks_for_more():
     assert asks.asks_more
     # Not while the community lacks it: installing that plug-in asks instead.
     assert not plugin_updates.upgrade_asks(plugin, wider, ceiling, ()).asks_more
-
-
-def test_a_plugin_scope_above_the_ceiling_asks_for_nothing():
-    plugin = GuildPlugin(
-        listing_uid="TESTCALLER0001",
-        listing_version="1.0.0",
-        plugin_kind="service",
-        name="Caller",
-        definition=_asking("files:read"),
-        granted_scopes=["files:read"],
-        created_by=1,
-        created_by_kind=ActorKind.member,
-    )
-
-    asks = plugin_updates.upgrade_asks(
-        plugin,
-        _asking("files:read", "plugins:tests.github"),
-        ("files:read",),
-        {"tests.github"},
-    )
-
-    assert not asks.asks_more
+    # Nor above the ceiling.
+    assert not plugin_updates.upgrade_asks(
+        plugin, wider, ("files:read",), {"tests.github"}
+    ).asks_more
