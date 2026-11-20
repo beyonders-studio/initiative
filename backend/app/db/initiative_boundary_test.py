@@ -42,6 +42,11 @@ create permission, and not before. Through the universal routes and the tool
 plug-in routes (``tenant_endpoints/plugin_tools.py``), the tool plug-in's row
 and its item answer A's moderator and are not found by the other two.
 
+Its webhooks: a change to its rows in A is told by their kinds to an install
+holding the tool's read scope and placed in A, and to the community's own
+subscription; an install whose grant no longer holds the scope hears nothing,
+and nobody hears a change in A while the tool is not placed there.
+
 A table the seeder cannot fill fails here; it is never skipped.
 """
 
@@ -1304,7 +1309,8 @@ async def test_the_tool_plugin_routes_keep_its_rows_in_their_initiative(
     with a moderator of B and a member of no initiative, are read, listed,
     changed, added to, copied, acted on and watched through the tool plug-in
     routes by A's moderator, and by neither of the others: each of their
-    requests, A's list and a new row in A among them, is answered 404."""
+    requests, A's list, a new row in A and a step of the item's count among
+    them, is answered 404."""
     from app.api.content_socket import tool_authorizer
 
     admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
@@ -1345,6 +1351,7 @@ async def test_the_tool_plugin_routes_keep_its_rows_in_their_initiative(
             ("PATCH", at, {"name": "Moved"}),
             ("POST", f"{at}/duplicate", {}),
             ("POST", f"{at}/actions/reset_all", {}),
+            ("POST", f"{at}/step", {"field": "count"}),
         ]
 
     under = [
@@ -1386,6 +1393,8 @@ async def test_the_tool_plugin_routes_keep_its_rows_in_their_initiative(
     for kind, row_id in rows.items():
         for method, path, body in addressed(kind, row_id):
             if path.endswith("reset_all") and kind == item_kind:
+                continue
+            if path.endswith("step") and kind == tool.kind:
                 continue
             response = await client.request(
                 method, moderator_a.g(path), headers=moderator_a.headers, json=body
@@ -2092,3 +2101,147 @@ async def test_notices_and_marks_keep_a_tool_plugins_rows_in_their_initiative(
         if line["data"].get("comment_id") == answered.json()["id"]
     )
     assert line["data"]["entity_name"] == item_row["name"], line
+
+
+async def test_webhooks_tell_a_tool_plugins_changes_only_where_they_are_heard(
+    session: AsyncSession,
+    acting_user: Callable[..., Awaitable[Actor]],
+    role_session: Callable[[str], Awaitable[AsyncSession]],
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A change to a tool plug-in's row and its item in initiative A is told
+    by their kinds, as identifiers and changed field names, to an installed
+    plug-in holding the tool's read scope and placed in A, and to the
+    community's own subscription. Once the install's grant no longer holds
+    the scope, it hears nothing; while the tool is placed outside A alone,
+    nobody hears a change in A; placed in A again, its archive is told as
+    an update of its ``archived_at``, as a built-in tool's is."""
+    from app.models.tenant.guild_plugin import GuildPlugin
+    from app.models.tenant.webhook_subscription import WebhookSubscription
+    from app.services.tenant import outbox_poller as poller
+    from app.testing.plugin_clients import install_plugin
+
+    read = f"counter_group.{COUNTERS_UID.lower()}:read"
+    installed = await install_plugin(
+        session, acting_user, role_session, granted=[read], requested=[read]
+    )
+    seat, guild_id = installed.seat, installed.guild.id
+    initiative_a, initiative_b = installed.placed.id, installed.unplaced.id
+    install = await install_tool_plugin(client, session, seat)
+    tools = await provisioned_tools(guild_id)
+    (tool,) = tools.installed
+    (item,) = tool.children
+    events = [
+        f"{kind}.{action}"
+        for kind in (tool.kind, item.value)
+        for action in ("created", "updated", "deleted")
+    ]
+    to_install, to_community = "https://install.test/in", "https://community.test/in"
+    await route_session_to_guild(session, guild_id)
+    now = datetime.now(UTC)
+    for target, install_id in ((to_install, installed.plugin.id), (to_community, None)):
+        session.add(
+            WebhookSubscription(
+                initiative_id=None,
+                plugin_install_id=install_id,
+                created_by=install_id or seat.user.id,
+                created_by_kind=ActorKind.member
+                if install_id is None
+                else ActorKind.plugin,
+                target_url=target,
+                hmac_secret="secret",
+                event_types=events,
+                active=True,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+    await session.commit()
+
+    told: dict[str, list[tuple[str, int, list[Any], list[str]]]] = {}
+
+    async def accept(*, target_url: str, secret: str, envelope: dict[str, Any]) -> bool:
+        told.setdefault(target_url, []).extend(
+            (c["event_type"], c["resource"]["id"], c["parents"], c["changed"])
+            for c in envelope["changes"]
+        )
+        return True
+
+    monkeypatch.setattr(poller, "deliver", accept)
+    system = await role_session("app_admin")
+
+    async def heard() -> dict[str, list[tuple[str, int, list[Any], list[str]]]]:
+        told.clear()
+        await poller.drain_guild(system, guild_id, now=datetime.now(UTC))
+        return dict(told)
+
+    async def call(method: str, path: str, body: Any = None) -> Any:
+        response = await client.request(
+            method, seat.g(path), headers=seat.headers, json=body
+        )
+        assert response.status_code in (200, 201), (path, response.text)
+        return response.json()
+
+    group = (
+        await call(
+            "POST",
+            f"/plugin-tools/{tool.kind}/",
+            {"initiative_id": initiative_a, "name": "Scores"},
+        )
+    )["id"]
+    counter = (
+        await call(
+            "POST", f"/plugin-tools/{item.value}/", {"parent_id": group, "name": "Laps"}
+        )
+    )["id"]
+    under = [{"type": tool.kind, "id": group}]
+    made = await heard()
+    for target in (to_install, to_community):
+        changes = made[target]
+        assert (f"{tool.kind}.created", group, [], []) in changes, changes
+        assert (f"{item.value}.created", counter, under, []) in changes, changes
+        assert {event for event, *_ in changes} <= set(events), changes
+
+    stepped = f"/plugin-tools/{item.value}/{counter}/step"
+    step = (f"{item.value}.updated", counter, under, ["count"])
+    await call("POST", stepped, {"field": "count"})
+    assert await heard() == {to_install: [step], to_community: [step]}
+
+    async def grant(*scopes: str) -> None:
+        await route_session_to_guild(session, guild_id)
+        await session.exec(
+            sa.update(GuildPlugin)
+            .where(GuildPlugin.id == installed.plugin.id)
+            .values(granted_scopes=list(scopes))
+        )
+        await session.commit()
+
+    # The install's grant no longer holds the tool's read scope.
+    await grant()
+    await call("POST", stepped, {"field": "count"})
+    assert await heard() == {to_community: [step]}
+    await grant(read)
+
+    # The tool placed outside A alone: its rows in A change, and nobody hears.
+    plugin_path = f"/plugins/{install['id']}"
+    await call("PATCH", plugin_path, {"placed_initiative_ids": [initiative_b]})
+    await route_session_to_guild(session, guild_id)
+    counters = tools.tables[item.table]
+    await session.exec(
+        sa.update(counters).where(counters.c.id == counter).values(count=7)
+    )
+    await session.commit()
+    assert await heard() == {}
+
+    # Placed in A again: archiving its row is told as an update.
+    await call("PATCH", plugin_path, {"placed_initiative_ids": [initiative_a]})
+    await call("POST", f"/archive/{tool.kind}/{group}")
+    archived = await heard()
+    for target in (to_install, to_community):
+        assert any(
+            event == f"{tool.kind}.updated"
+            and row_id == group
+            and "archived_at" in changed
+            for event, row_id, _parents, changed in archived[target]
+        ), archived

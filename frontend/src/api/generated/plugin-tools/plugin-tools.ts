@@ -24,10 +24,12 @@ import type {
   HTTPValidationError,
   ListPluginToolRowsParams,
   PluginToolActionRun,
+  PluginToolRead,
   PluginToolRowCreate,
   PluginToolRowList,
   PluginToolRowRead,
   PluginToolRowUpdate,
+  PluginToolStep,
   ToolDuplicateRequest,
 } from "../initiativeAPI.schemas";
 
@@ -50,6 +52,139 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+/**
+ * A tool plug-in's tool as it declares it, by its kind or one of its
+ * items': its names, the fields of its rows and of each item with their
+ * kinds and options, which item sits under which, and its actions with the
+ * fields they ask for. Not found where it is on in no initiative the
+ * caller reaches.
+ * @summary Read Plugin Tool
+ */
+export const readPluginTool = (
+  communityId: number,
+  kind: string,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<PluginToolRead>(
+    { url: `/api/v1/c/${communityId}/plugin-tools/${kind}`, method: "GET", signal },
+    options
+  );
+};
+
+export const getReadPluginToolQueryKey = (communityId: number, kind: string) => {
+  return [`/api/v1/c/${communityId}/plugin-tools/${kind}`] as const;
+};
+
+export const getReadPluginToolQueryOptions = <
+  TData = Awaited<ReturnType<typeof readPluginTool>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  kind: string,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readPluginTool>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getReadPluginToolQueryKey(communityId, kind);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof readPluginTool>>> = ({ signal }) =>
+    readPluginTool(communityId, kind, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled:
+      communityId !== null && communityId !== undefined && kind !== null && kind !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof readPluginTool>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ReadPluginToolQueryResult = NonNullable<Awaited<ReturnType<typeof readPluginTool>>>;
+export type ReadPluginToolQueryError = ErrorType<HTTPValidationError>;
+
+export function useReadPluginTool<
+  TData = Awaited<ReturnType<typeof readPluginTool>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  kind: string,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof readPluginTool>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof readPluginTool>>,
+          TError,
+          Awaited<ReturnType<typeof readPluginTool>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useReadPluginTool<
+  TData = Awaited<ReturnType<typeof readPluginTool>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  kind: string,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readPluginTool>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof readPluginTool>>,
+          TError,
+          Awaited<ReturnType<typeof readPluginTool>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useReadPluginTool<
+  TData = Awaited<ReturnType<typeof readPluginTool>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  kind: string,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readPluginTool>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Read Plugin Tool
+ */
+
+export function useReadPluginTool<
+  TData = Awaited<ReturnType<typeof readPluginTool>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  kind: string,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readPluginTool>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getReadPluginToolQueryOptions(communityId, kind, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
 
 /**
  * A page of a tool plug-in's rows: its tool's in an initiative, or an
@@ -634,6 +769,104 @@ export const useDuplicatePluginToolRow = <
   TContext
 > => {
   return useMutation(getDuplicatePluginToolRowMutationOptions(options), queryClient);
+};
+/**
+ * Move one counter field of a row, named by its key: by ``by``, signed,
+ * or by the field's own step, up or ``down``, held within its bounds. Two
+ * steps landing together each count. Answers the row as it now stands.
+ * @summary Step Plugin Tool Row
+ */
+export const stepPluginToolRow = (
+  communityId: number,
+  kind: string,
+  rowId: number,
+  pluginToolStep: BodyType<PluginToolStep>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<PluginToolRowRead>(
+    {
+      url: `/api/v1/c/${communityId}/plugin-tools/${kind}/${rowId}/step`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: pluginToolStep,
+      signal,
+    },
+    options
+  );
+};
+
+export const getStepPluginToolRowMutationKey = () => ["stepPluginToolRow"] as const;
+
+export const getStepPluginToolRowMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof stepPluginToolRow>>,
+    TError,
+    StepPluginToolRowMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof stepPluginToolRow>>,
+  TError,
+  StepPluginToolRowMutationVariables,
+  TContext
+> => {
+  const mutationKey = getStepPluginToolRowMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof stepPluginToolRow>>,
+    StepPluginToolRowMutationVariables
+  > = (props) => {
+    const { communityId, kind, rowId, data } = props ?? {};
+
+    return stepPluginToolRow(communityId, kind, rowId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type StepPluginToolRowMutationResult = NonNullable<
+  Awaited<ReturnType<typeof stepPluginToolRow>>
+>;
+export type StepPluginToolRowMutationBody = BodyType<PluginToolStep>;
+export type StepPluginToolRowMutationError = ErrorType<HTTPValidationError>;
+export type StepPluginToolRowMutationVariables = {
+  communityId: number;
+  kind: string;
+  rowId: number;
+  data: BodyType<PluginToolStep>;
+};
+
+/**
+ * @summary Step Plugin Tool Row
+ */
+export const useStepPluginToolRow = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof stepPluginToolRow>>,
+      TError,
+      StepPluginToolRowMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof stepPluginToolRow>>,
+  TError,
+  StepPluginToolRowMutationVariables,
+  TContext
+> => {
+  return useMutation(getStepPluginToolRowMutationOptions(options), queryClient);
 };
 /**
  * Run one of the tool's actions on a row, with the answers to its

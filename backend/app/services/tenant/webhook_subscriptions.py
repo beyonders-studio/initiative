@@ -17,10 +17,11 @@ from app.core.config import settings
 from app.core.errors import CodedError
 from app.core.messages import WebhookSubscriptionMessages
 from app.core.plugin_scopes import plugin_scope
+from app.core.tool_set import ToolSet
 from app.db import cohorts
 from app.db.guild_standing import InstallContext
 from app.db.request_context import SystemGuild
-from app.db.session import set_rls_context
+from app.db.session import session_tools, set_rls_context
 from app.models.platform.guild import AdminSurface
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.webhook_delivery import WebhookDelivery
@@ -110,12 +111,15 @@ async def assert_vocabulary(
     fields: list[str] | None,
     *,
     guild_id: int,
+    tools: ToolSet,
     for_install: bool = False,
 ) -> dict[str, str]:
     """Reject event types and field names that could never fire.
 
     Callers pass the values the row will END UP with. The change vocabulary
-    derives from the capture registry; a plug-in event is one a plug-in installed
+    derives from the capture registry, read for the community's tools
+    (``tools``), so a tool plug-in installed here is named by its kinds; a
+    plug-in event is one a plug-in installed
     here declares it emits; the demo's events are a subscription an install
     (``for_install``) in the operations community holds on the demo
     deployment. This is what turns a typo
@@ -134,11 +138,11 @@ async def assert_vocabulary(
     ):
         demo = webhook_events.DEMO_EVENT_TYPES
     changes = [name for name in named if name not in emitters and name not in demo]
-    if changes and webhook_events.unknown_event_types(changes):
+    if changes and webhook_events.unknown_event_types(changes, tools):
         raise WebhookSubscriptionVocabularyError(
             WebhookSubscriptionMessages.UNKNOWN_EVENT_TYPE
         )
-    if fields and webhook_events.unknown_fields(fields, changes):
+    if fields and webhook_events.unknown_fields(fields, changes, tools):
         raise WebhookSubscriptionVocabularyError(
             WebhookSubscriptionMessages.UNKNOWN_FIELD
         )
@@ -167,7 +171,9 @@ def assert_install_may_subscribe(
     - Every change event type needs the read scope of the resource it reports
       on (``webhook_events.read_scope_for``), held now: the seat's grant and
       the token's scopes together, as the standing computed them. An event
-      type no scope reaches (a plug-in's own install changing) is never a plug-in's.
+      type no scope reaches (a plug-in's own install changing) is never a
+      plug-in's. A tool plug-in's, and its items', need its tool's,
+      ``<kind>:read``.
     - Every plug-in event needs ``plugins:<public_id>`` of the plug-in that emits it
       (``emitters``), among the token's scopes.
     - Every demo event needs the community-admin standing, held now: the
@@ -195,8 +201,8 @@ def assert_install_may_subscribe(
             if plugin_scope(emitter) not in context.token_scopes:
                 raise refused
             continue
-        resource = webhook_events.read_scope_for(event_type)
-        if resource is None or resource.value not in readable:
+        resource = webhook_events.read_scope_for(event_type, context.tools)
+        if resource is None or resource not in readable:
             raise refused
     narrowed = context.scope_initiative_id
     if initiative_id is None:
@@ -312,6 +318,7 @@ async def create_subscription(
         list(payload.event_types),
         payload.fields,
         guild_id=guild_id,
+        tools=await session_tools(session),
         for_install=plugin_install_id is not None,
     )
 
@@ -367,6 +374,7 @@ async def create_install_subscription(
         list(payload.event_types),
         payload.fields,
         guild_id=context.guild_id,
+        tools=context.tools,
         for_install=True,
     )
     assert_install_may_subscribe(
@@ -418,6 +426,7 @@ async def update_subscription(
         else subscription.event_types,
         payload.fields if payload.fields is not None else subscription.fields,
         guild_id=guild_id,
+        tools=await session_tools(session),
         for_install=subscription.plugin_install_id is not None,
     )
 

@@ -16,6 +16,11 @@ its grant holds the read scope of what changed. That is read with the roster,
 one statement per guild per pass (:class:`InstallReach`), so removing a
 placement or a scope stops delivery from the next pass on.
 
+A change under a tool plug-in's tool is heard only in an initiative that tool
+is on in now: switched on there, its install placed there, switched on and
+open, as the request standing reads it (:class:`CommunityTools`, read once per
+pass). Its tables are named by its kinds, the names its routes take.
+
 That is the right granularity because of what a delivery is. An envelope is
 identifiers and changed column **names**; a consumer reads current state back
 through the REST path, where every gate applies to the read. An installed plug-in
@@ -83,11 +88,12 @@ from app.core.plugin_scopes import (
     expand,
     plugin_scope_target,
 )
+from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.db import session as db_session
+from app.db.guild_standing import tools_on_sql
+from app.db.plugin_tools import is_plugin_kind
 from app.db.request_context import SystemGuild, SystemMaintenance
-from app.db.session import (
-    set_rls_context,
-)
+from app.db.session import session_tools, set_rls_context
 from app.models.platform.plugin_install import PluginInstall
 from app.models.tenant.event_outbox import EventOutbox
 from app.models.tenant.guild_plugin import GuildPlugin
@@ -123,8 +129,44 @@ def _event_id(subscription_id: int, txn_id: int) -> str:
     return str(uuid.uuid5(_EVENT_ID_NAMESPACE, f"{subscription_id}:{txn_id}"))
 
 
-def _event_type(row: EventOutbox) -> str:
-    return f"{row.resource_type}.{row.action}"
+@dataclass(frozen=True)
+class CommunityTools:
+    """The community's tools as a pass reads them: what a change to an
+    installed tool's table is named, and where each installed tool is on."""
+
+    tools: ToolSet = BUILTIN_TOOLS
+    #: ``"<initiative>:<tool>"`` where a tool is on, as ``app.enabled_tools``
+    #: holds it for a reader reaching every initiative.
+    on: frozenset[str] = frozenset()
+
+    def name(self, resource_type: str) -> str:
+        """The resource a change names, as its events name it."""
+        return webhook_events.resource_name(resource_type, self.tools)
+
+    def heard(self, row: EventOutbox) -> bool:
+        """Whether a change may be heard at all: one under a tool plug-in's
+        tool only in an initiative that tool is on in."""
+        if row.dac_tool is None or not is_plugin_kind(row.dac_tool):
+            return True
+        return f"{row.initiative_id}:{row.dac_tool}" in self.on
+
+
+#: A community with the built-in tools alone.
+BUILT_IN = CommunityTools()
+
+
+async def _community_tools(session: AsyncSession) -> CommunityTools:
+    """The community ``session`` is routed into's tools, and where each tool
+    plug-in's is on."""
+    tools = await session_tools(session)
+    if not tools.installed:
+        return CommunityTools(tools)
+    pairs = await session.scalar(text(tools_on_sql(tools)))
+    return CommunityTools(tools, frozenset((pairs or "").split(",")))
+
+
+def _event_type(row: EventOutbox, community: CommunityTools) -> str:
+    return f"{community.name(row.resource_type)}.{row.action}"
 
 
 @dataclass(frozen=True)
@@ -198,7 +240,9 @@ class InstallReach:
         )
 
 
-def _within_reach(row: EventOutbox, reach: InstallReach) -> bool:
+def _within_reach(
+    row: EventOutbox, reach: InstallReach, community: CommunityTools
+) -> bool:
     """Whether an installed plug-in may hear about this change now: it is live,
     placed in the change's initiative (or the change belongs to none), and
     holds the read scope of what changed. What happened while it was
@@ -207,14 +251,17 @@ def _within_reach(row: EventOutbox, reach: InstallReach) -> bool:
         return False
     if row.initiative_id is not None and row.initiative_id not in reach.placed:
         return False
-    resource = webhook_events.read_scope_for(_event_type(row))
-    return resource is not None and resource.value in reach.readable
+    resource = webhook_events.read_scope_for(
+        _event_type(row, community), community.tools
+    )
+    return resource is not None and resource in reach.readable
 
 
 def _matches(
     row: EventOutbox,
     subscription: WebhookSubscription,
     reach: InstallReach | None = None,
+    community: CommunityTools = BUILT_IN,
 ) -> bool:
     """Whether one change-item belongs in this subscription's batch.
 
@@ -225,12 +272,16 @@ def _matches(
     A subscription an installed plug-in registered also answers to the plug-in's
     reach (:class:`InstallReach`): its declared scope, capped by where the plug-in
     is placed and what it is granted now. ``reach`` is ``None`` only for a
-    subscription no plug-in registered.
+    subscription no plug-in registered. Every subscription hears a change under
+    a tool plug-in's tool only where that tool is on
+    (:meth:`CommunityTools.heard`).
     """
-    if _event_type(row) not in subscription.event_types:
+    if _event_type(row, community) not in subscription.event_types:
+        return False
+    if not community.heard(row):
         return False
     if subscription.plugin_install_id is not None and (
-        reach is None or not _within_reach(row, reach)
+        reach is None or not _within_reach(row, reach, community)
     ):
         return False
     if (
@@ -304,6 +355,7 @@ def _envelope(
     actor_ref: str | None,
     actor_plugin: str | None = None,
     plugin_events: Sequence[tuple[PluginEventOutbox, str | None]] = (),
+    community: CommunityTools = BUILT_IN,
 ) -> dict[str, Any]:
     """One transaction's matching rows as a single envelope.
 
@@ -326,6 +378,9 @@ def _envelope(
     payload, and the initiative it landed in for this subscription: its own,
     or for one about no initiative, the initiative the subscription is
     narrowed to (``None`` for the community's).
+
+    A tool plug-in's tables, the resource's and its parents', are named by
+    their kinds (``community``), as its routes address them.
     """
     first = rows[0] if rows else plugin_events[0][0]
     return {
@@ -337,13 +392,19 @@ def _envelope(
         "occurred_at": first.occurred_at.isoformat(),
         "changes": [
             {
-                "event_type": _event_type(row),
+                "event_type": _event_type(row, community),
                 "initiative_id": row.initiative_id,
-                "resource": {"type": row.resource_type, "id": row.resource_id},
+                "resource": {
+                    "type": community.name(row.resource_type),
+                    "id": row.resource_id,
+                },
                 # The addressable resources between that one and the
                 # initiative, innermost first. Identifiers only, read back
                 # through the routes that serve them.
-                "parents": list(row.parents),
+                "parents": [
+                    {**parent, "type": community.name(parent["type"])}
+                    for parent in row.parents
+                ],
                 "action": row.action,
                 "changed": list(row.changed),
             }
@@ -551,6 +612,7 @@ async def _drain_subscription(
     reach: InstallReach | None = None,
     plugin_ids: Mapping[str, str] | None = None,
     subscriber: str | None = None,
+    community: CommunityTools = BUILT_IN,
 ) -> None:
     """Deliver one subscription's pending transactions, within its own scope.
 
@@ -578,7 +640,8 @@ async def _drain_subscription(
     ``subscriber`` is the ``public_id`` of the plug-in that registered this
     subscription, whose sector its deliveries name the guild and people in.
     Transactions outside the reach are settled like any other non-match, so
-    they are not delivered later either.
+    they are not delivered later either. ``community`` is the community's
+    tools, read with the roster.
     """
     if subscription.plugin_install_id is not None and subscriber is None:
         # Its plug-in has no registration here to name anything for; what it
@@ -608,7 +671,7 @@ async def _drain_subscription(
         matched = [
             (row, listing_uid)
             for row, listing_uid in rows
-            if _matches(row, subscription, reach)
+            if _matches(row, subscription, reach, community)
         ]
         batch = [row for row, _listing_uid in matched]
         # An emitter is named by its install's listing, so an install that is
@@ -672,6 +735,7 @@ async def _drain_subscription(
                 actor_ref=None if actor_id is None else actor_refs[actor_id],
                 actor_plugin=actor_plugin,
                 plugin_events=plugin_events,
+                community=community,
             ),
         )
         dead_lettered, retry_at = await _settle(
@@ -805,10 +869,11 @@ async def drain_guild(
         )
         for row in await session.exec(_roster(live_listings))
     ]
-    if roster:
-        _subscribed.add(guild_id)
-    else:
+    if not roster:
         _subscribed.discard(guild_id)
+        return
+    _subscribed.add(guild_id)
+    community = await _community_tools(session)
     for subscription_id, reach, subscriber in roster:
         try:
             subscription = await session.get(WebhookSubscription, subscription_id)
@@ -822,6 +887,7 @@ async def drain_guild(
                 reach=reach,
                 plugin_ids=plugin_ids,
                 subscriber=subscriber,
+                community=community,
             )
         except Exception:
             logger.exception(

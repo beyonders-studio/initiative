@@ -304,6 +304,34 @@ async def test_an_installed_plugin_reaches_the_tool_by_its_scopes(
     )
     assert response.status_code == 200, response.text
 
+    # Its declaration is read with its read scope, and a step needs its write.
+    declared = guild_url(installed.guild.id, f"/plugin-tools/{COUNTER}")
+    response = await client.get(declared, headers=install_headers(installed, [read]))
+    assert response.status_code == 200, response.text
+    assert response.json()["kind"] == GROUP
+    response = await client.get(
+        declared, headers=install_headers(installed, ["projects:read"])
+    )
+    assert response.status_code == 403, response.text
+    counter = await client.post(
+        guild_url(installed.guild.id, f"/plugin-tools/{COUNTER}/"),
+        headers=install_headers(installed, [write]),
+        json={"parent_id": made["id"], "name": "Laps"},
+    )
+    assert counter.status_code == 201, counter.text
+    step = guild_url(
+        installed.guild.id, f"/plugin-tools/{COUNTER}/{counter.json()['id']}/step"
+    )
+    response = await client.post(
+        step, headers=install_headers(installed, [read]), json={"field": "count"}
+    )
+    assert response.status_code == 403, response.text
+    response = await client.post(
+        step, headers=install_headers(installed, [write]), json={"field": "count"}
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["fields"]["count"] == 1
+
     response = await client.post(
         url,
         headers=install_headers(installed, [write]),
@@ -398,3 +426,169 @@ async def test_an_admin_outside_the_initiative_is_refused_an_unplaced_tools_row(
     response = await comments()
     assert response.status_code == 403, response.text
     assert response.json()["detail"] == KindMessages.TOOL_NOT_ENABLED
+
+
+def _with_a_capped_count(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Counters, whose counts are never above 4, as a check of its table."""
+    (counter,) = manifest["tool"]["items"]
+    counter["checks"].append({"field": "count", "at_most": 4})
+    return manifest
+
+
+async def test_a_counter_field_steps_within_its_bounds_and_two_steps_both_count(
+    client, session, acting_user, reading_as
+):
+    a, _member = await _counters(
+        client, session, acting_user, _with_a_capped_count(counters_tool_manifest())
+    )
+
+    async def call(method: str, path: str, body: Any = None) -> Any:
+        response = await client.request(
+            method, a.g(f"/plugin-tools/{path}"), headers=a.headers, json=body
+        )
+        assert response.status_code in (200, 201), (path, response.text)
+        return response.json()
+
+    group = await call(
+        "POST", f"{GROUP}/", {"initiative_id": a.initiative.id, "name": "G"}
+    )
+    hp = await call(
+        "POST",
+        f"{COUNTER}/",
+        {
+            "parent_id": group["id"],
+            "name": "HP",
+            "fields": {"min": 0, "max": 3, "step": 2},
+        },
+    )
+    at = f"{COUNTER}/{hp['id']}/step"
+
+    async def count(body: dict[str, Any]) -> Any:
+        stepped = await call("POST", at, body)
+        assert stepped["id"] == hp["id"]
+        return stepped["fields"]["count"]
+
+    # By its own step, held to its own max and min; by a signed amount.
+    assert await count({"field": "count"}) == 2
+    assert await count({"field": "count"}) == 3
+    assert await count({"field": "count", "down": True}) == 1
+    assert await count({"field": "count", "by": -100}) == 0
+    assert await count({"field": "count", "by": 0.5}) == 0.5
+
+    async def refused(path: str, body: dict[str, Any]) -> tuple[int, Any]:
+        response = await client.post(
+            a.g(f"/plugin-tools/{path}"), headers=a.headers, json=body
+        )
+        return response.status_code, response.json().get("detail")
+
+    invalid = (422, ToolPluginMessages.FIELD_INVALID)
+    for body in (
+        {"field": "step"},
+        {"field": "nothing"},
+        {"field": "count", "by": 1e12},
+    ):
+        assert await refused(at, body) == invalid, body
+    assert await refused(f"{GROUP}/{group['id']}/step", {"field": "count"}) == invalid
+    status, _ = await refused(at, {"field": "count", "by": 1, "down": True})
+    assert status == 422
+
+    # A step past a check of the table is refused, and changes nothing.
+    mp = await call("POST", f"{COUNTER}/", {"parent_id": group["id"], "name": "MP"})
+    assert await refused(
+        f"{COUNTER}/{mp['id']}/step", {"field": "count", "by": 10}
+    ) == (invalid)
+    read = await call("GET", f"{COUNTER}/{mp['id']}")
+    assert read["fields"]["count"] == 0
+
+    async def stepped() -> None:
+        """One step, on a connection of its own, as two requests make them."""
+        own = await reading_as(a.user.id, a.guild.id)
+        context = require_guild_context(own)
+        located = rows_service.located_kind(context.tools, COUNTER)
+        await rows_service.step(own, located, mp["id"], "count")
+        await own.commit()
+
+    await asyncio.gather(stepped(), stepped())
+    read = await call("GET", f"{COUNTER}/{mp['id']}")
+    assert read["fields"]["count"] == 2
+
+
+async def test_a_tool_is_read_as_its_plugin_declares_it(client, session, acting_user):
+    a, _member = await _counters(client, session, acting_user)
+
+    response = await client.get(a.g(f"/plugin-tools/{GROUP}"), headers=a.headers)
+    assert response.status_code == 200, response.text
+    tool = response.json()
+    assert (tool["kind"], tool["key"], tool["icon"]) == (
+        GROUP,
+        "counter_group",
+        "gauge",
+    )
+    assert (tool["name"], tool["instance_name"]) == (
+        {"en": "Counters"},
+        {"en": "Counter group"},
+    )
+    assert [field["key"] for field in tool["fields"]] == ["description"]
+    (item,) = tool["items"]
+    assert (item["kind"], item["key"], item["parent"]) == (COUNTER, "counter", GROUP)
+    fields = {field["key"]: field for field in item["fields"]}
+    assert fields["count"]["kind"] == "counter"
+    assert fields["count"]["counter"] == {
+        "min": "min",
+        "max": "max",
+        "step": "step",
+        "initial": "initial_count",
+    }
+    look = fields["view_mode"]
+    assert (look["kind"], look["default"], look["required"]) == (
+        "select",
+        "number",
+        True,
+    )
+    assert [option["value"] for option in look["options"]] == ["number", "bar", "clock"]
+    (action,) = tool["actions"]
+    assert (action["id"], action["on"], action["params"]) == ("reset_all", GROUP, [])
+    assert action["confirm"]
+    # Neither its layouts nor what an action writes.
+    assert "layouts" not in tool and "layouts" not in item and "write" not in action
+
+    # By an item's kind, the tool it sits in.
+    by_item = await client.get(a.g(f"/plugin-tools/{COUNTER}"), headers=a.headers)
+    assert by_item.json() == tool
+
+    # A member of no initiative reaches it in none, and an unknown kind is no tool.
+    outsider = await acting_user(guild=a.guild)
+    response = await client.get(
+        outsider.g(f"/plugin-tools/{GROUP}"), headers=outsider.headers
+    )
+    assert response.status_code == 404, response.text
+    response = await client.get(
+        a.g(f"/plugin-tools/stranger.{'x' * 14}"), headers=a.headers
+    )
+    assert response.status_code == 404, response.text
+
+
+def test_reading_a_tool_leaves_its_declaration_as_declared():
+    """A read validates a copy, so the community's kept declaration keeps its
+    text as declared for every later row."""
+    import copy
+
+    from app.db.tool_rows import locate
+    from app.services.marketplace.tool_plugins import (
+        normalize_tool_plugin_definition,
+        tool_kinds,
+    )
+
+    manifest = counters_tool_manifest()
+    manifest["tool"]["fields"][0]["default"] = "<b>Ready</b> & set"
+    declared = normalize_tool_plugin_definition(manifest)
+    kinds = tool_kinds(declared, listing_uid=COUNTERS_UID)
+    tools = plugin_tools.community_tool_set(
+        [plugin_tools.InstalledTool(COUNTERS_UID, declared)],
+        {kind: 900 + i for i, kind in enumerate(kinds)},
+    )
+    located = locate(tools, GROUP)
+    assert located is not None
+    before = copy.deepcopy(dict(located.tool.declaration))
+    rows_service.declaration(located)
+    assert dict(located.tool.declaration) == before

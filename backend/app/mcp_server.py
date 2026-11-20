@@ -150,6 +150,9 @@ _WRITABLE_SEGMENTS = (
 #     the count itself moves through these two. Without them, writing a
 #     counter would mean renaming it. ``reset`` and ``reset-all`` are not here:
 #     they discard counts rather than record one.
+#   * A tool plug-in's counter field moves the same way, through its row's
+#     ``step``: its ``PATCH`` sets a count outright, and two of those landing
+#     together lose one, where two steps each count.
 #   * Ticking one checklist item. ``PATCH /tasks/{id}`` rewrites the list's
 #     lines but deliberately never its ``done`` flags, so without this an agent
 #     that finished a piece of a task could say so only in a comment. It names
@@ -171,6 +174,11 @@ _EXTRA_WRITE_ROUTE_MAPS = [
             mcp_type=MCPType.TOOL,
         )
         for verb in ("set", "step")
+    ),
+    RouteMap(
+        methods=["POST"],
+        pattern=r".*/plugin-tools/" + _ID + "/" + _ID + "/step$",
+        mcp_type=MCPType.TOOL,
     ),
 ]
 
