@@ -8038,8 +8038,6 @@ export interface ListLayoutRead {
  */
 export interface ToolPluginDetailLayoutRead {
   kind: string;
-  task_type_id: number | null;
-  task_type_name: string | null;
   definition: DetailLayoutDefinitionOutput;
   updated_at: string | null;
 }

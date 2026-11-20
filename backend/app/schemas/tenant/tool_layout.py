@@ -858,11 +858,16 @@ class DetailLayoutRead(SanitizedBaseModel):
     updated_at: datetime | None = None
 
 
-class ToolPluginDetailLayoutRead(DetailLayoutRead):
+class ToolPluginDetailLayoutRead(SanitizedBaseModel):
     """How a tool plug-in's table shows one of its rows, named by the table's
     kind: as its plug-in ships it until it is changed."""
 
-    kind: ToolPluginKind  # type: ignore[assignment]
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    kind: ToolPluginKind
+    definition: DetailLayoutDefinition
+    #: When it was last changed; None as shipped.
+    updated_at: datetime | None = None
 
 
 _LIST_KINDS = frozenset(get_args(ListLayoutKind))
