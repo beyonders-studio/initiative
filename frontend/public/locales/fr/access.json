@@ -109,7 +109,9 @@
     "resource_wiki_one": "wiki",
     "resource_wiki_other": "wikis",
     "resource_contact_one": "contact",
-    "resource_contact_other": "contacts"
+    "resource_contact_other": "contacts",
+    "resource_item_one": "élément",
+    "resource_item_other": "éléments"
   },
   "request": {
     "needAccess": "Vous avez besoin d'un accès",

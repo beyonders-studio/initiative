@@ -88,6 +88,10 @@ import {
   getListMyWikisQueryOptions,
 } from "@/api/generated/my-tools/my-tools";
 import {
+  deletePluginToolRow,
+  duplicatePluginToolRow,
+} from "@/api/generated/plugin-tools/plugin-tools";
+import {
   createPost,
   deletePost,
   duplicatePost,
@@ -119,7 +123,7 @@ import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { fetchAllPages } from "@/lib/fetchAllPages";
 import { askForStoreReview } from "@/lib/storeReview";
-import { toolCamelPlural } from "@/lib/tools";
+import { isBuiltInTool, toolCamelPlural } from "@/lib/tools";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
 
@@ -599,47 +603,60 @@ export const useDuplicateTool = (
     options
   );
 
+/** What a bulk change to `tool`'s rows makes stale: its lists, or for a
+ *  tool plug-in's kind every plug-in row list. */
+const listsOf = (tool: string) => (isBuiltInTool(tool) ? q.toolList(tool) : q.pluginToolRows());
+
 /**
  * Every request of a bulk action, run to the end. When some fail, the list is
  * refreshed anyway — the ones that landed are real — and the first failure is
  * what the action reports.
  */
-const settleAll = async <T>(tool: Tool, requests: Promise<T>[]): Promise<T[]> => {
+const settleAll = async <T>(tool: string, requests: Promise<T>[]): Promise<T[]> => {
   const results = await Promise.allSettled(requests);
   const failed = results.find((result) => result.status === "rejected");
   if (failed) {
-    void invalidate(q.toolList(tool));
+    void invalidate(listsOf(tool));
     throw failed.reason;
   }
   return results.map((result) => (result as PromiseFulfilledResult<T>).value);
 };
 
-/** A copy of each of `ids` beside its original, named as the server names one. */
-export const useDuplicateTools = (tool: Tool, options?: MutationOpts<Duplicated[], number[]>) =>
+/** A copy of each of `ids` beside its original, named as the server names
+ *  one: a built-in tool's, or a tool plug-in's row by its kind. */
+export const useDuplicateTools = (tool: string, options?: MutationOpts<Duplicated[], number[]>) =>
   useCommunityMutation<Duplicated[], number[]>(
     {
       mutationFn: (communityId, ids) =>
         settleAll(
           tool,
-          ids.map((id) => TOOL_HOOKS[tool].duplicate(communityId, id, {}))
+          ids.map((id) =>
+            isBuiltInTool(tool)
+              ? TOOL_HOOKS[tool].duplicate(communityId, id, {})
+              : duplicatePluginToolRow(communityId, tool, id, {})
+          )
         ),
-      invalidate: () => invalidate(q.toolList(tool)),
+      invalidate: () => invalidate(listsOf(tool)),
       errorKey: "common:bulkActions.duplicateError",
     },
     options
   );
 
 /** Delete every one of `ids`. */
-export const useDeleteTools = (tool: Tool, options?: MutationOpts<void, number[]>) =>
+export const useDeleteTools = (tool: string, options?: MutationOpts<void, number[]>) =>
   useCommunityMutation<void, number[]>(
     {
       mutationFn: async (communityId, ids) => {
         await settleAll(
           tool,
-          ids.map((id) => TOOL_HOOKS[tool].remove(communityId, id))
+          ids.map((id) =>
+            isBuiltInTool(tool)
+              ? TOOL_HOOKS[tool].remove(communityId, id)
+              : deletePluginToolRow(communityId, tool, id)
+          )
         );
       },
-      invalidate: () => invalidate(q.toolList(tool)),
+      invalidate: () => invalidate(listsOf(tool)),
       errorKey: "common:bulkActions.deleteError",
     },
     options

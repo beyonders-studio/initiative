@@ -358,6 +358,9 @@
     "loadError": "Diese konnten nicht geladen werden.",
     "installsLoadError": "Die Tools dieser Community konnten nicht geladen werden.",
     "empty": "Hier ist noch nichts.",
+    "emptyBody": "Füge den ersten Eintrag hinzu, um loszulegen.",
+    "createFirst": "Ersten Eintrag hinzufügen",
+    "noMatches": "Nichts hier entspricht deinen Filtern.",
     "notFound": "Das gibt es hier nicht",
     "notFoundBody": "Es wurde vielleicht entfernt, oder das Tool, zu dem es gehört, ist in dieser Community nicht installiert.",
     "backToTool": "Zurück zu {{name}}",
@@ -390,5 +393,9 @@
       }
     },
     "accessSettings": "Zugriffseinstellungen"
+  },
+  "filters": {
+    "searchLabel": "Name oder Text",
+    "search": "Nach Name oder Text suchen"
   }
 }

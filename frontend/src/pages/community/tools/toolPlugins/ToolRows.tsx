@@ -2,6 +2,7 @@ import type { SortingState } from "@tanstack/react-table";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
+import type { GridToggleOptions } from "@/hooks/useGridSelection";
 import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
 import { usePluginToolSteps } from "@/hooks/usePluginToolRows";
 import { useCommunityPath } from "@/lib/communityUrl";
@@ -21,6 +22,7 @@ import type { ListView } from "@/ui/layouts/layoutSet";
 import { sortedItems } from "@/ui/layouts/presets";
 import { type LayoutContext, type LayoutNode, LayoutTree } from "@/ui/layouts/tree";
 
+import { SelectableGridItem } from "../SelectableGridItem";
 import { toolFields } from "./toolFields";
 
 /** What a grid draws where its layout names no card: the row's name. */
@@ -40,7 +42,7 @@ export const NAME_CARD: LayoutNode = {
  * table's first list draws it. With `editing`, as the layout editor draws
  * them, each part of the card is marked and nothing steps.
  */
-export const ToolRows = ({
+export const ToolRows = <R extends ToolRow>({
   tool,
   table,
   list,
@@ -49,15 +51,22 @@ export const ToolRows = ({
   sorting,
   onSortingChange,
   editing = false,
+  selection,
 }: {
   tool: InstalledTool;
   table: ToolTable;
   list: ListView;
-  rows: ToolRow[];
+  rows: R[];
   initiativeId: number;
   sorting: SortingState;
   onSortingChange: (sorting: SortingState) => void;
   editing?: boolean;
+  /** Picking cards out of a grid or a wall, as a built-in tool's list does. */
+  selection?: {
+    active: boolean;
+    selectedIds: ReadonlySet<number>;
+    toggle: (row: R, options?: GridToggleOptions) => void;
+  };
 }) => {
   const { t, i18n } = useTranslation(["plugins", "common", ...LAYOUT_NAMESPACES]);
   const communityPath = useCommunityPath();
@@ -102,7 +111,7 @@ export const ToolRows = ({
     };
   }, [t, communityPath, initiativeId, tool, table, editing, steps, i18n.language]);
   const sorted = useMemo(
-    () => sortedItems(rows, sorting, fields, i18n.language),
+    () => sortedItems(rows, sorting, fields, i18n.language) as R[],
     [rows, sorting, fields, i18n.language]
   );
   const columns = useMemo(
@@ -133,13 +142,26 @@ export const ToolRows = ({
       />
     );
   }
-  const drawn = (row: ToolRow) => (
+  const cardOf = (row: R) => (
     <Card className="h-full">
       <CardContent className="space-y-2 p-4">
         <LayoutTree node={node} item={row} view={view} />
       </CardContent>
     </Card>
   );
+  const drawn = (row: R) =>
+    selection ? (
+      <SelectableGridItem
+        active={selection.active}
+        selected={selection.selectedIds.has(row.id)}
+        onToggle={(options) => selection.toggle(row, options)}
+        label={row.name}
+      >
+        {cardOf(row)}
+      </SelectableGridItem>
+    ) : (
+      cardOf(row)
+    );
   // A wall lets each card stand as tall as it is; a grid lines them up.
   return list.kind === "masonry" ? (
     <ul className="columns-2xs gap-3">

@@ -358,6 +358,9 @@
     "loadError": "These couldn't be loaded.",
     "installsLoadError": "This community's tools couldn't be loaded.",
     "empty": "Nothing here yet.",
+    "emptyBody": "Add the first one to get started.",
+    "createFirst": "Add the first one",
+    "noMatches": "Nothing here matches your filters.",
     "notFound": "This isn't here",
     "notFoundBody": "It may have been removed, or the tool it belongs to isn't installed in this community.",
     "backToTool": "Back to {{name}}",
@@ -390,5 +393,9 @@
       }
     },
     "accessSettings": "Access settings"
+  },
+  "filters": {
+    "searchLabel": "Name or text",
+    "search": "Search by name or text"
   }
 }

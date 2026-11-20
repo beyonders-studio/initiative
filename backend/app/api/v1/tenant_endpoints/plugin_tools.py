@@ -47,6 +47,7 @@ from app.db.query import build_paginated_response, paginated_query
 from app.db.session import routed_guild_id, routed_tools
 from app.db.tool_rows import Located, ToolRow, load_row, row_of
 from app.models.platform.user import User
+from app.schemas.query import SortDir
 from app.schemas.tenant.plugin_tool import (
     PluginToolActionRun,
     PluginToolRead,
@@ -143,6 +144,23 @@ async def list_plugin_tool_rows(
         default=None, description="The row whose items to list, for an item's kind"
     ),
     archived: bool = Query(default=False, description="List archived rows instead"),
+    search: str | None = Query(
+        default=None,
+        description=(
+            "Only rows whose text matches, read from the index the search page reads."
+        ),
+    ),
+    tag_ids: list[int] | None = Query(
+        default=None, description="Only rows carrying any of these tags"
+    ),
+    sort_by: str | None = Query(
+        default=None,
+        description=(
+            "A declared field, or name, created_at or updated_at, to list them "
+            "by in place of their own order"
+        ),
+    ),
+    sort_dir: SortDir = Query(default=SortDir.asc),
     include_preview: bool = Query(
         default=False,
         description=(
@@ -169,7 +187,17 @@ async def list_plugin_tool_rows(
         )
     found, total, page = await paginated_query(
         session,
-        *rows_service.listed(located, tools, under, archived=archived),
+        *rows_service.listed(
+            located,
+            tools,
+            under,
+            archived=archived,
+            context=context,
+            search=search,
+            tag_ids=tag_ids or (),
+            sort_by=sort_by,
+            descending=sort_dir is SortDir.desc,
+        ),
         page,
         page_size,
     )

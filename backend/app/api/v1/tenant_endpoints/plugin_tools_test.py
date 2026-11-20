@@ -309,6 +309,22 @@ async def test_rows_are_tagged_and_trashed_as_a_built_in_tools_are(
     changed = await call(a, "PATCH", f"{COUNTER}/{counter['id']}", {"tag_ids": []})
     assert changed.json()["tags"] == []
 
+    # A list narrows by a tag and by its text, and sorts by a field, as a
+    # built-in tool's does.
+    await call(
+        a, "POST", f"{GROUP}/", {"initiative_id": a.initiative.id, "name": "Alpha"}
+    )
+    where = f"{GROUP}/?initiative_id={a.initiative.id}"
+
+    async def names(query: str) -> list[str]:
+        listed = await call(a, "GET", f"{where}&{query}")
+        assert listed.status_code == 200, listed.text
+        return [row["name"] for row in listed.json()["items"]]
+
+    assert await names(f"tag_ids={tag.id}") == ["G"]
+    assert await names("search=alph") == ["Alpha"]
+    assert await names("sort_by=name&sort_dir=desc") == ["G", "Alpha"]
+
     for kind, row in ((COUNTER, counter), (GROUP, group)):
         said = await client.post(
             member.g("/comments/"),

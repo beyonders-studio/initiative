@@ -82,6 +82,7 @@ from app.services.permissions import (
     serialize_grants,
 )
 from app.services.tenant import content_references, descriptions
+from app.services.tenant import search as search_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant.descriptions import newly_mentioned
 from app.services.tenant.initiative_tools import tool_on_in, tool_on_sql
@@ -411,17 +412,54 @@ def _under(located: Located, under: int, *, archived: bool) -> list[Any]:
     ]
 
 
+#: The columns every row has that a list sorts by, beside its declared fields.
+_SORTED_COLUMNS = frozenset({"name", "created_at", "updated_at"})
+
+
 def listed(
-    located: Located, tools: ToolSet, under: int, *, archived: bool
+    located: Located,
+    tools: ToolSet,
+    under: int,
+    *,
+    archived: bool,
+    context: ActorContext,
+    search: str | None = None,
+    tag_ids: Sequence[int] = (),
+    sort_by: str | None = None,
+    descending: bool = False,
 ) -> tuple[sa.Select[Any], sa.Select[Any]]:
-    """What reads ``located``'s rows under ``under`` in their order, and what
-    counts them."""
+    """What reads ``located``'s rows under ``under``, and what counts them:
+    narrowed to those whose indexed text matches ``search`` and those
+    carrying any of ``tag_ids``, as a built-in tool's list narrows, and in
+    their own order, or by ``sort_by``, a declared field or one every row has,
+    where it names one."""
     table = located.table
     where = _under(located, under, archived=archived)
+    record = next(
+        (kind for kind in tools.child_kinds if kind.value == located.kind), located.tool
+    )
+    matched = search_service.tool_search_clause(record, table.c.id, search, context)
+    if matched is not None:
+        where.append(matched)
+    if tag_ids:
+        where.append(
+            table.c.id.in_(
+                tags_service.tagged_entity_ids(
+                    tags_service.tag_links(tools)[located.kind],
+                    tuple(tag_ids),
+                    guild_id=context.guild_id,
+                )
+            )
+        )
+    order = [table.c.position, table.c.id]
+    if sort_by in _SORTED_COLUMNS or sort_by in declared_fields(located):
+        column = table.c[sort_by]
+        order = [
+            (column.desc() if descending else column.asc()).nulls_last(),
+            table.c.id,
+        ]
     return (
-        select_rows(located, tools)
-        .where(*where)
-        .order_by(table.c.position, table.c.id),
+        select_rows(located, tools).where(*where).order_by(*order),
         select(sa.func.count()).select_from(table).where(*where),
     )
 

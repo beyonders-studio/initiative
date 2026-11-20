@@ -13,6 +13,7 @@ import {
   buildCommunity,
   buildInitiative,
   buildToolPlugin,
+  buildToolRowRead,
   TOOL_PLUGIN_UID,
 } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
@@ -157,6 +158,42 @@ describe("InitiativePage", () => {
         communityHttp.get(`/plugin-tools/${shelf}/`, page)
       );
     };
+
+    it("lists the tool's rows as the index page does: narrowed and paged by the server", async () => {
+      stubShelf(() => HttpResponse.json({ items: [buildToolPlugin()] }));
+      const asked: URLSearchParams[] = [];
+      server.use(
+        communityHttp.get(`/plugin-tools/${shelf}/`, ({ request }) => {
+          const params = new URL(request.url).searchParams;
+          asked.push(params);
+          return HttpResponse.json({
+            items: [
+              buildToolRowRead({
+                kind: shelf,
+                id: 4,
+                initiative_id: INITIATIVE_ID,
+                name: "Novels",
+              }),
+            ],
+            total_count: 30,
+            page: Number(params.get("page")),
+            page_size: 20,
+            has_next: params.get("page") === "1",
+            has_prev: params.get("page") !== "1",
+          });
+        })
+      );
+      renderAt(shelf);
+      const user = userEvent.setup();
+
+      expect(await screen.findByRole("link", { name: "Novels" })).toBeInTheDocument();
+      expect(asked.at(-1)?.get("page_size")).toBe("20");
+      await user.click(screen.getByRole("button", { name: /filters/i }));
+      await user.type(await screen.findByRole("textbox", { name: "Name or text" }), "nov");
+      await waitFor(() => expect(asked.at(-1)?.get("search")).toBe("nov"));
+      await user.click(screen.getByRole("button", { name: /next/i }));
+      await waitFor(() => expect(asked.at(-1)?.get("page")).toBe("2"));
+    });
 
     it("keeps an open add dialog and its draft when the initiative refreshes", async () => {
       stubShelf(() => HttpResponse.json({ items: [buildToolPlugin()] }));
