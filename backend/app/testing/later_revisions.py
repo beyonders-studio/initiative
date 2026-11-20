@@ -42,15 +42,16 @@ LATER: tuple[str, ...] = (
 #: The revisions that reshape tables every older revision writes, oldest
 #: first: who made a row and the triggers that stamp it, a plug-in's rows in
 #: ``initiative_rules``, each tool's switch leaving ``initiatives`` for
-#: ``initiative_rules``, and a comment naming its subject as a pair. A test
-#: running an older revision takes the ones after it off around it
-#: (:func:`step_newest`).
+#: ``initiative_rules``, a comment naming its subject as a pair, and Counters
+#: becoming a plug-in. A test running an older revision takes the ones after
+#: it off around it (:func:`step_newest`).
 NEWEST: tuple[str, ...] = (
     "20261109_0591_who_made_it.py",
     "20261109_0592_every_author_is_stamped.py",
     "20261110_0606_plug_ins_answer_to_the_communitys_roles.py",
     "20261118_0613_each_tools_switch_is_a_rule.py",
     "20261118_0614_comments_name_their_subject_as_a_pair.py",
+    "20261119_0619_counters_become_a_plug_in.py",
 )
 
 

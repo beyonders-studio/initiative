@@ -1,7 +1,8 @@
 """Migration 20261118_0613 moves each tool's switch from its column on
 ``initiatives`` to an ``initiative_rules`` row. Loaded by path and run on one
 guild the test builds: down, which puts the columns back from the rows, then
-up again, which writes the rows from the columns and drops them."""
+up again, which writes the rows from the columns and drops them. The later
+revisions that reshape what it writes are taken off around it."""
 
 from __future__ import annotations
 
@@ -14,8 +15,10 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import text
 
+from alembic import op
 from app.core.tools import Tool
 from app.testing import create_guild, create_initiative, create_user
+from app.testing.later_revisions import step_newest
 
 _MIGRATION = (
     Path(__file__).resolve().parents[2]
@@ -48,7 +51,18 @@ def _runner(schema: str, forward: bool):
             {"sp": f"{schema}, public"},
         )
         with Operations.context(MigrationContext.configure(bind)):
-            (migration._upgrade if forward else migration._downgrade)()
+            if forward:
+                migration._upgrade()
+                step_newest(forward=True, after=migration.revision)
+            else:
+                step_newest(forward=False, after=migration.revision)
+                # Today's admits no key of a tool that has left, such as
+                # Counters' switch, which this revision writes; a start
+                # renders it again.
+                op.drop_constraint(
+                    "ck_initiative_rules_key", "initiative_rules", if_exists=True
+                )
+                migration._downgrade()
 
     return apply
 

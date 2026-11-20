@@ -319,6 +319,16 @@ def upgrade() -> None:
     _run("DROP TYPE IF EXISTS public.counter_view_mode")
 
 
+def _apply_upgrade() -> None:
+    """The upgrade of the schema the search path leads with alone, and of its
+    rows in ``public``."""
+    converted: list[int] = []
+    _upgrade_schema(converted)
+    if converted:
+        _rewrite_public(converted, {old: new for old, (new, _) in KINDS.items()})
+    _run("DROP TYPE IF EXISTS public.counter_view_mode")
+
+
 def _upgrade_schema(converted: list[int]) -> None:
     schema = _scalar("SELECT current_schema()")
     guild_id = (
@@ -745,6 +755,22 @@ def downgrade() -> None:
             "ALTER TABLE public.plugin_kind_codes ADD CONSTRAINT"
             " ck_plugin_kind_codes_code CHECK (code >= 1024)",
         )
+
+
+def _apply_downgrade() -> None:
+    """The downgrade of the schema the search path leads with alone, and of
+    its rows in ``public``; the rest of ``public`` stays as the upgrade left
+    it."""
+    _run(
+        "DO $$ BEGIN CREATE TYPE public.counter_view_mode AS ENUM"
+        " ('number', 'progress_bar', 'segmented_clock');"
+        " EXCEPTION WHEN duplicate_object THEN NULL; END $$"
+    )
+    _add_kind_code_arms({old: code for old, (_, code) in KINDS.items()})
+    converted: list[int] = []
+    _downgrade_schema(converted)
+    if converted:
+        _rewrite_public(converted, {new: old for old, (new, _) in KINDS.items()})
 
 
 def _downgrade_schema(converted: list[int]) -> None:

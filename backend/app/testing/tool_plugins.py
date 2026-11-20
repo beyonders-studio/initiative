@@ -368,44 +368,27 @@ async def convert_counters(
     import sqlalchemy as sa
     from alembic.migration import MigrationContext
     from alembic.operations import Operations
+    from sqlmodel import select
 
     from app.db import session as db_session
     from app.db.kind_codes import ensure_kind_codes
     from app.db.schema_provisioning import provision_community_tools
+    from app.models.tenant.guild_plugin import GuildPlugin
+    from app.testing.schema_harness import route_session_to_guild
 
     migration = counters_conversion()
-    builtin = {old: code for old, (_, code) in migration.KINDS.items()}
-    adopted = {new: old for old, (new, _) in migration.KINDS.items()}
 
     def step(forward: bool) -> Any:
         def apply(bind: Any) -> None:
+            bind.execute(
+                sa.text("SELECT set_config('search_path', :sp, true)"),
+                {"sp": f"guild_{guild_id}, public"},
+            )
             with Operations.context(MigrationContext.configure(bind)):
-                if not forward:
-                    bind.exec_driver_sql(
-                        "DO $$ BEGIN CREATE TYPE public.counter_view_mode AS ENUM"
-                        " ('number', 'progress_bar', 'segmented_clock');"
-                        " EXCEPTION WHEN duplicate_object THEN NULL; END $$"
-                    )
-                    migration._add_kind_code_arms(builtin)
-                bind.execute(
-                    sa.text("SELECT set_config('search_path', :sp, true)"),
-                    {"sp": f"guild_{guild_id}, public"},
-                )
-                converted: list[int] = []
                 if forward:
-                    migration._upgrade_schema(converted)
+                    migration._apply_upgrade()
                 else:
-                    migration._downgrade_schema(converted)
-                bind.execute(
-                    sa.text("SELECT set_config('search_path', 'public', true)")
-                )
-                if converted:
-                    migration._rewrite_public(
-                        converted,
-                        {v: k for k, v in adopted.items()} if forward else adopted,
-                    )
-                if forward:
-                    bind.exec_driver_sql("DROP TYPE IF EXISTS public.counter_view_mode")
+                    migration._apply_downgrade()
 
         return apply
 
@@ -421,9 +404,8 @@ async def convert_counters(
         await conn.run_sync(step(forward=True))
     await ensure_kind_codes()
     await provision_community_tools(guild_id)
+    await route_session_to_guild(session, guild_id)
     found = await session.exec(
-        sa.text(
-            f'SELECT id FROM "guild_{guild_id}".guild_plugins WHERE listing_uid = :u'
-        ).bindparams(u=COUNTERS_UID)
+        select(GuildPlugin.id).where(GuildPlugin.listing_uid == COUNTERS_UID)
     )
-    return found.scalar()
+    return found.first()
