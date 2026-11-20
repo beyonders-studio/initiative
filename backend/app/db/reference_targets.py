@@ -52,6 +52,15 @@ def _table_for(entity_type: str, tools: ToolSet) -> str:
     return _tables_by_kind(tools)[entity_type]
 
 
+def referenceable(entity_type: str, tools: ToolSet) -> bool:
+    """Whether a reference may name this kind in a community with ``tools``:
+    a kind it has rows of, built in or a tool plug-in's, that is not one of
+    :data:`~app.core.references.NOT_REFERENCEABLE`."""
+    return (
+        entity_type in _tables_by_kind(tools) and entity_type not in NOT_REFERENCEABLE
+    )
+
+
 def referenceable_types() -> tuple[SearchEntityType, ...]:
     """Every kind a reference can name, sorted."""
     return tuple(
@@ -186,17 +195,19 @@ def visible_ids(
     )
 
 
-async def live_ids(session, entity_type: str, ids: Sequence[int]) -> set[int]:
+async def live_ids(
+    session, entity_type: str, ids: Sequence[int], *, tools: ToolSet
+) -> set[int]:
     """Which of these ids still exist and this session may read.
 
     Asked as the session itself, which is what a caller mid-save wants: the
     question is what the person writing this content can point at, and their
     connection answers it the same way it answers every other statement.
+    ``tools`` is the community's tool set; a kind it cannot reference has none.
     """
     wanted = [int(i) for i in dict.fromkeys(ids)]
-    if not wanted:
+    if not wanted or not referenceable(entity_type, tools):
         return set()
-    tools = routed_tools(session)
     table = tools.tables[_table_for(entity_type, tools)]
     statement = select(table.c["id"]).where(table.c["id"].in_(wanted))
     live = _live(table)
@@ -205,18 +216,20 @@ async def live_ids(session, entity_type: str, ids: Sequence[int]) -> set[int]:
     return {row[0] for row in (await session.exec(statement)).all()}
 
 
-async def unfrozen_ids(session, entity_type: str, ids: Sequence[int]) -> set[int]:
+async def unfrozen_ids(
+    session, entity_type: str, ids: Sequence[int], *, tools: ToolSet
+) -> set[int]:
     """Which of these are still taking writes — not archived or trashed, and
     not sitting under something that is.
 
     Asked through ``resource_frozen``, the same declaration the freeze
     policies are rendered from, so a caller checking before it writes and the
-    database deciding afterwards are reading one answer.
+    database deciding afterwards are reading one answer. ``tools`` is the
+    community's tool set; a kind it cannot reference has none.
     """
     wanted = [int(i) for i in dict.fromkeys(ids)]
-    if not wanted:
+    if not wanted or not referenceable(entity_type, tools):
         return set()
-    tools = routed_tools(session)
     table_name = _table_for(entity_type, tools)
     table = tools.tables[table_name]
     rows = await session.exec(

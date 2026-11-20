@@ -12,6 +12,7 @@
  */
 
 import { FileType, SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
+import { isToolPluginKind } from "@/lib/toolPlugins";
 
 /** People. A separate trigger because they are read from the roster, not the
  *  index — identity is shared across communities, content is not. */
@@ -41,8 +42,10 @@ export const MENTIONABLE_TYPES: SearchEntityType[] = Object.values(SearchEntityT
   (type) => type !== SearchEntityType.comment
 );
 
-/** The word after `#` that narrows to one type: the type's own name, kebabed. */
-export const typeTrigger = (type: SearchEntityType): string => type.replaceAll("_", "-");
+/** The word after `#` that narrows to one type: the type's own name, kebabed.
+ *  A tool plug-in's kind keeps its `.` and uid, `counter-group.tsjvtcm0s7gv2x`,
+ *  as a `/go` link spells it. */
+export const typeTrigger = (type: string): string => type.replaceAll("_", "-");
 
 /**
  * Trigger word -> type. Longest first, so `#calendar-event` is not read as
@@ -52,19 +55,30 @@ const TRIGGER_TYPES: [string, SearchEntityType][] = MENTIONABLE_TYPES.map(
   (type): [string, SearchEntityType] => [typeTrigger(type), type]
 ).sort((a, b) => b[0].length - a[0].length);
 
-/** The type a trigger word names, or `undefined` if it names none. */
-export const typeForTrigger = (word: string): SearchEntityType | undefined =>
-  TRIGGER_TYPES.find(([trigger]) => trigger === word)?.[1];
+/** The type a trigger word names, a built-in one or a tool plug-in's, or
+ *  `undefined` if it could name none. A key holds no `-` and a uid neither `-`
+ *  nor `_`, so each `-` of a plug-in's word is a `_` of its kind. */
+export const typeForTrigger = (word: string): string | undefined => {
+  const builtIn = TRIGGER_TYPES.find(([trigger]) => trigger === word)?.[1];
+  if (builtIn) return builtIn;
+  const kind = word.replaceAll("-", "_");
+  return isToolPluginKind(kind) ? kind : undefined;
+};
 
-/** Every trigger word, longest first — what a parser matches against. */
+/** Every built-in trigger word, longest first — what a parser matches against. */
 export const TRIGGER_WORDS: string[] = TRIGGER_TYPES.map(([trigger]) => trigger);
+
+/** The word after `#` in the stored form, as a pattern: a built-in kind's
+ *  (`task`, `wiki-page`) and for a tool plug-in's, `.` and its uid. Mirrors the
+ *  backend's `TRIGGER_WORD`. */
+export const TRIGGER_WORD = String.raw`[\w-]+(?:\.[a-z0-9]+)?`;
 
 /** A label is written into the text, so the characters the syntax is built
  *  from cannot appear inside it. */
 const mentionLabel = (label: string): string => label.replace(/[[\]()]/g, "");
 
 /** How a chosen suggestion is written into a comment. */
-export const entityMentionSyntax = (type: SearchEntityType, label: string, id: number): string =>
+export const entityMentionSyntax = (type: string, label: string, id: number): string =>
   `${ENTITY_TRIGGER}${typeTrigger(type)}[${mentionLabel(label)}](${id})`;
 
 /** How a chosen person is written into a comment. */
@@ -77,7 +91,7 @@ export const LINK_TRIGGER_OPEN = "[[";
 /** What the composer is being asked for right now. */
 export type MentionQuery = {
   /** `null` while typing after a bare `#` — every type is offered. */
-  types: SearchEntityType[] | null;
+  types: string[] | null;
   /** What has been typed after the trigger. */
   query: string;
   /** How many characters of the field the mention occupies, so replacing it

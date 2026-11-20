@@ -35,7 +35,6 @@ import {
 } from "lexical";
 import type { JSX } from "react";
 
-import type { SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
 import {
   $createEntityMentionNode,
   type EntityMentionNode,
@@ -46,7 +45,7 @@ import { storedEntityType } from "@/lib/smartChips";
 
 export type SerializedReferenceEmbedNode = Spread<
   {
-    entityType: SearchEntityType;
+    entityType: string;
     entityId: number;
     /** The name as it read when written — the export and index fallback. */
     text: string;
@@ -89,7 +88,7 @@ function $convertEmbedElement(domNode: HTMLElement): DOMConversionOutput | null 
 }
 
 export class ReferenceEmbedNode extends DecoratorNode<JSX.Element> {
-  __entityType: SearchEntityType;
+  __entityType: string;
   __entityId: number;
   __text: string;
   __collapsed: boolean;
@@ -125,7 +124,7 @@ export class ReferenceEmbedNode extends DecoratorNode<JSX.Element> {
   }
 
   constructor(
-    entityType: SearchEntityType,
+    entityType: string,
     entityId: number,
     text: string,
     key?: NodeKey,
@@ -156,7 +155,7 @@ export class ReferenceEmbedNode extends DecoratorNode<JSX.Element> {
     };
   }
 
-  getEntityType(): SearchEntityType {
+  getEntityType(): string {
     return this.__entityType;
   }
 
@@ -255,7 +254,7 @@ export class ReferenceEmbedNode extends DecoratorNode<JSX.Element> {
 }
 
 export function $createReferenceEmbedNode(
-  entityType: SearchEntityType,
+  entityType: string,
   entityId: number,
   text: string
 ): ReferenceEmbedNode {

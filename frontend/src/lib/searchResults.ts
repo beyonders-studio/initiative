@@ -134,7 +134,7 @@ export const hitIcon = (target: SearchTarget): LucideIcon => {
 };
 
 /** The mark for a kind of thing, where there is no search hit to read it from. */
-export const entityIcon = (entityType: SearchEntityType): LucideIcon =>
+export const entityIcon = (entityType: string): LucideIcon =>
   hitIcon({
     entity_type: entityType,
     entity_id: 0,

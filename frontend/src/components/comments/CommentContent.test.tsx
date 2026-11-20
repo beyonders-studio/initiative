@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { delay, HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 
-import { buildUserSummary } from "@/__tests__/factories";
+import { buildToolPlugin, buildUserSummary, TOOL_PLUGIN_UID } from "@/__tests__/factories";
+import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage, renderWithProviders } from "@/__tests__/helpers/render";
 
@@ -173,6 +174,17 @@ describe("CommentContent", () => {
     expect(await screen.findByRole("link", { name: /Fix login/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Runbook/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Apollo/ })).toBeInTheDocument();
+  });
+
+  it("links a tool plug-in's row by its kind, named as its tool names it", async () => {
+    server.use(
+      communityHttp.get("/plugins/", () => HttpResponse.json({ items: [buildToolPlugin()] }))
+    );
+    const kind = `book.${TOOL_PLUGIN_UID.toLowerCase()}`;
+    renderLinkedContent(`see #${kind}[Dune](3)`);
+
+    const link = await screen.findByRole("link", { name: /Book.*Dune/ });
+    expect(link.getAttribute("href")).toMatch(new RegExp(`/go/${kind}/3$`));
   });
 
   it("keeps a mention rendered beside its surrounding markdown", async () => {

@@ -22,7 +22,7 @@ export const EMBED: ElementTransformer = {
     const name = node.getTextContent().replace(/[|\]]/g, "");
     return `![[${node.getEntityType()}:${node.getEntityId()}|${name}]]`;
   },
-  regExp: /^!\[\[([a-z_]+):(\d+)(?:\|([^\]]*))?\]\]\s?$/,
+  regExp: /^!\[\[([a-z_][a-z0-9_]*(?:\.[a-z0-9]+)?):(\d+)(?:\|([^\]]*))?\]\]\s?$/,
   replace: (parentNode, _children, match) => {
     const [, entityType, entityId, name] = match;
     const kind = storedEntityType(entityType);

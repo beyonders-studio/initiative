@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { FileType, SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
+import { collectCommentReferences } from "@/lib/commentReferences";
 import {
   activeMention,
   entityMentionSyntax,
@@ -78,6 +79,25 @@ describe("what gets written into the comment", () => {
     expect(entityMentionSyntax(SearchEntityType.calendar_event, "Q1", 7)).toBe(
       "#calendar-event[Q1](7)"
     );
+  });
+
+  it("writes a tool plug-in's kind as /go spells it, and reads it back", () => {
+    const kind = "counter_group.tsjvtcm0s7gv2x";
+    expect(entityMentionSyntax(kind, "Q1", 7)).toBe("#counter-group.tsjvtcm0s7gv2x[Q1](7)");
+    expect(typeForTrigger(typeTrigger(kind))).toBe(kind);
+    expect(typeForTrigger("counter-group")).toBe(SearchEntityType.counter_group);
+    for (const word of ["counter.TSJV", "counter.a.b", "counter.", "1counter.abc"]) {
+      expect(typeForTrigger(word)).toBeUndefined();
+    }
+  });
+
+  it("finds every reference in a thread, a tool plug-in's included", () => {
+    expect(
+      collectCommentReferences([
+        "#task[Ship](3) #counter-group.tsjvtcm0s7gv2x[Q1](7)",
+        "#counter.tsjvtcm0s7gv2x[Laps](8) #counter.TSJV[No](9) #sandwich[No](1)",
+      ]).refs
+    ).toEqual(["counter.tsjvtcm0s7gv2x:8", "counter_group.tsjvtcm0s7gv2x:7", "task:3"]);
   });
 
   it("leaves out of a label the characters the syntax is built from", () => {

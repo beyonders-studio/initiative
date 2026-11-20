@@ -219,12 +219,13 @@ export const isSearchEntityType = (value: string): value is SearchEntityType =>
   Object.hasOwn(SearchEntityType, value);
 
 /**
- * The ref type addressing an entity of a given kind — its kebab singular — or
+ * The ref type addressing an entity of a given kind — its kebab singular, and
+ * for a tool plug-in's row, its kind kebabed (`counter-group.abc123`) — or
  * `null` for a kind that has no address of its own (a tag).
  */
-export const entityRefTypeFor = (type: SearchEntityType): string | null => {
+export const entityRefTypeFor = (type: string): string | null => {
   const kebab = type.replaceAll("_", "-");
-  return isEntityRefType(kebab) ? kebab : null;
+  return isEntityRefType(kebab) || isToolPluginKind(type) ? kebab : null;
 };
 
 /**

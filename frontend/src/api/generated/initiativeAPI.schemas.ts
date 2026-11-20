@@ -11170,7 +11170,7 @@ export type ReferenceEmbedBody = { [key: string]: unknown } | null;
  */
 export interface ReferenceEmbed {
   ref: string;
-  entity_type: SearchEntityType;
+  entity_type: string;
   title: string;
   description: string | null;
   body: ReferenceEmbedBody;
@@ -11695,7 +11695,7 @@ export const SmartChipTone = {
  */
 export interface SmartChipState {
   ref: string;
-  entity_type: SearchEntityType;
+  entity_type: string;
   aspect: SmartChipAspect | null;
   text: string;
   title: string | null;
