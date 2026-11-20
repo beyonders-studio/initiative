@@ -162,7 +162,8 @@ export const ToolRows = <R extends ToolRow>({
     ) : (
       cardOf(row)
     );
-  // A wall lets each card stand as tall as it is; a grid lines them up.
+  // A wall lets each card stand as tall as it is; a grid lines them up, each
+  // as wide as a built-in tool's card.
   return list.kind === "masonry" ? (
     <ul className="columns-2xs gap-3">
       {sorted.map((row) => (
@@ -172,7 +173,7 @@ export const ToolRows = <R extends ToolRow>({
       ))}
     </ul>
   ) : (
-    <ul className="grid grid-cols-fill-56/4 gap-3">
+    <ul className="grid grid-cols-fill-60/3 gap-3">
       {sorted.map((row) => (
         <li key={row.id}>{drawn(row)}</li>
       ))}

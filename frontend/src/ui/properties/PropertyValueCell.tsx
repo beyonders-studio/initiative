@@ -580,7 +580,15 @@ export const PropertyValueCell = ({
       >
         <Icon className="h-3 w-3 shrink-0" aria-hidden />
         <span className="truncate font-medium">{summary.name}:</span>
-        <span className="max-w-[14rem] truncate text-foreground">{body}</span>
+        {/* A counter's buttons and bar do not cut short: its name gives way. */}
+        <span
+          className={cn(
+            "max-w-[14rem] truncate text-foreground",
+            type === MetadataType.counter && "shrink-0"
+          )}
+        >
+          {body}
+        </span>
       </span>
     );
   }
