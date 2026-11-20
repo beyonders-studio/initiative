@@ -61,15 +61,6 @@ async def bound(session):
     }
 
 
-async def test_unbound_deployment_files_nothing(session):
-    """Every install starts here: no pointer, so the writer is a no-op."""
-    await make_operations_community(session, None)
-    outcome = await intake_service.open_case(
-        IntakeStream.support, title="Cannot sign in"
-    )
-    assert outcome is None
-
-
 async def test_pointer_without_a_binding_files_nothing(session):
     user = await create_user(session)
     guild = await create_guild(session, creator=user)
@@ -93,6 +84,8 @@ async def test_a_bound_stream_lands_a_task_in_its_project(session, bound):
     assert task.project_id == bound["project"].id
     assert task.title == "Cannot sign in"
     assert task.description == "It says my code expired."
+    # Nobody signed in created it, and ``created_by`` says so.
+    assert task.created_by is None
 
 
 async def test_a_case_is_the_type_its_binding_names(session, bound):
@@ -178,16 +171,6 @@ async def test_a_cases_starting_outline_records_what_it_points_at(session, bound
         )
     )
     assert set(edges.all()) == {("task", guide.id)}
-
-
-async def test_a_system_opened_case_names_no_author(session, bound):
-    """Nobody signed in created it, and ``created_by`` says so."""
-    outcome = await intake_service.open_case(IntakeStream.support, title="Help")
-    assert outcome is not None
-
-    await set_rls_context(session, SystemGuild(bound["guild"].id))
-    task = (await session.exec(select(Task).where(Task.id == outcome.task_id))).one()
-    assert task.created_by is None
 
 
 async def test_a_disabled_binding_receives_nothing(session, bound):

@@ -17,6 +17,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import _load_guild_context
+from app.core.audit_events import AuditEventType
 from app.core.messages import AccessGrantMessages, GuildMessages
 from app.models.platform.access_grant import (
     AccessGrant,
@@ -28,6 +29,7 @@ from app.models.platform.user import UserRole
 from app.testing import (
     create_guild,
     create_user,
+    emitted,
     get_auth_headers,
 )
 
@@ -265,21 +267,41 @@ async def test_guild_admin_cannot_assign_support_role(
 
 
 async def test_guild_admin_can_promote_member_to_admin(
-    client: AsyncClient, session: AsyncSession, acting_user
+    client: AsyncClient, session: AsyncSession, acting_user, capfd
 ):
     """A guild admin still promotes a member — the role write now runs on the
-    system engine (the guild role holds no UPDATE on guild_memberships)."""
+    system engine (the guild role holds no UPDATE on guild_memberships). A
+    role change short of the seat is its own record; restating the role
+    records nothing."""
     admin = await acting_user(guild_role=CommunityRole.admin)
     member = await acting_user(guild_role=CommunityRole.member, guild=admin.guild)
     guild_id = admin.guild.id
     member_user_id = member.user.id
+    url = f"/api/v1/communities/{guild_id}/members/{member_user_id}"
+    capfd.readouterr()
 
-    resp = await client.patch(
-        f"/api/v1/communities/{guild_id}/members/{member_user_id}",
-        headers=admin.headers,
-        json={"role": "admin"},
-    )
+    resp = await client.patch(url, headers=admin.headers, json={"role": "admin"})
     assert resp.status_code == 204
+
+    written = emitted(capfd)
+    changed = [
+        row
+        for row in written
+        if row["event_type"] == AuditEventType.GUILD_MEMBER_ROLE_CHANGED.value
+    ]
+    assert [
+        (r["actor_user_id"], r["target_user_id"], r["guild_id"], r["target"])
+        for r in changed
+    ] == [(admin.user.id, member_user_id, guild_id, {"type": "guild", "id": guild_id})]
+    assert changed[0]["detail"] == {"from": "member", "to": "admin"}
+    assert not any(
+        row["event_type"] == AuditEventType.GUILD_SUPERADMIN_CHANGED.value
+        for row in written
+    )
+
+    again = await client.patch(url, headers=admin.headers, json={"role": "admin"})
+    assert again.status_code == 204, again.text
+    assert emitted(capfd, AuditEventType.GUILD_MEMBER_ROLE_CHANGED) == []
 
     session.expire_all()
     updated = (

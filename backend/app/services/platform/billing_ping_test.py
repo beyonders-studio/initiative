@@ -79,10 +79,6 @@ def test_an_envelope_is_kept_spent_until_its_leeway_ends():
     assert seen.expires_at.timestamp() == exp + envelope.LEEWAY_SECONDS
 
 
-def test_disabled_by_default():
-    assert billing_ping.billing_ping_enabled() is False
-
-
 _REAL_ASYNC_CLIENT = httpx2.AsyncClient
 
 
@@ -138,9 +134,13 @@ async def test_payment_failed_is_the_plan_summary_flag(
     assert str(request.url) == "https://billing.internal/api/v1/plan-summary"
 
 
-async def test_plan_summary_unconfigured_makes_no_call(monkeypatch, known_ref):
+async def test_unconfigured_nothing_is_sent(monkeypatch, known_ref):
+    """The self-host default: no plan summary, no ping, no plug-in offer."""
+    assert billing_ping.billing_ping_enabled() is False
     seen = _answering(monkeypatch, lambda r: httpx2.Response(200, json=_SUMMARY))
     assert await billing_ping.guild_plan_summary(7) is None
+    await billing_ping.nudge()
+    assert await billing_ping.plugin_offer(7, listing_uid="hoard", locale="en") is None
     assert seen == []
 
 
@@ -252,12 +252,6 @@ async def test_the_ping_is_empty_and_signed(billing_configured, monkeypatch):
         _verify(request, audience=envelope.TO_BILLING_READS)
 
 
-async def test_the_ping_is_a_noop_unconfigured(monkeypatch):
-    seen = _answering(monkeypatch, lambda r: httpx2.Response(200))
-    await billing_ping.nudge()
-    assert seen == []
-
-
 async def test_a_failing_ping_never_raises(billing_configured, monkeypatch):
     def _down(request):
         raise httpx2.ConnectError("down")
@@ -293,12 +287,6 @@ async def test_plugin_offer_sends_the_ref_listing_and_locale_signed(
         "locale": "de",
     }
     _verify(request, audience=envelope.TO_BILLING_READS)
-
-
-async def test_plugin_offer_unconfigured_makes_no_call(monkeypatch, known_ref):
-    seen = _answering(monkeypatch, lambda r: httpx2.Response(200, json=_OFFER))
-    assert await billing_ping.plugin_offer(7, listing_uid="hoard", locale="en") is None
-    assert seen == []
 
 
 async def test_plugin_offer_without_a_ref_asks_nothing(

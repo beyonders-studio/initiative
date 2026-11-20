@@ -46,46 +46,45 @@ def _url(guild_id: int) -> str:
     return f"/api/v1/communities/{guild_id}/billing/payment-issue"
 
 
-async def test_only_the_seat_may_ask(client: AsyncClient, session: AsyncSession, asked):
-    guild, _, admin = await _guild_with_seat(session, CommunityStatus.read_only)
-    response = await client.get(_url(guild.id), headers=get_auth_headers(admin))
-    assert response.status_code == 403
-    assert asked == []
-
-
-async def test_the_seat_of_a_read_only_guild_gets_the_answer(
-    client: AsyncClient, session: AsyncSession, asked
+@pytest.mark.parametrize(
+    "status,caller,portal,expected,answer",
+    [
+        pytest.param(
+            CommunityStatus.read_only, "admin", True, 403, None, id="only the seat"
+        ),
+        pytest.param(
+            CommunityStatus.read_only, "seat", True, 200, True, id="read-only seat"
+        ),
+        pytest.param(
+            CommunityStatus.suspended, "seat", True, 403, None, id="suspended seat"
+        ),
+        pytest.param(
+            CommunityStatus.active, "seat", True, 200, False, id="active is not asked"
+        ),
+        pytest.param(
+            CommunityStatus.read_only, "seat", False, 200, False, id="no portal"
+        ),
+    ],
+)
+async def test_billing_is_asked_only_for_the_seat_of_a_read_only_guild(
+    client: AsyncClient,
+    session: AsyncSession,
+    asked,
+    monkeypatch,
+    status: CommunityStatus,
+    caller: str,
+    portal: bool,
+    expected: int,
+    answer: bool | None,
 ):
-    guild, seat, _ = await _guild_with_seat(session, CommunityStatus.read_only)
-    response = await client.get(_url(guild.id), headers=get_auth_headers(seat))
-    assert response.status_code == 200, response.text
-    assert response.json() == {"payment_failed": True}
-    assert asked == [guild.id]
+    if not portal:
+        monkeypatch.setattr(settings, "BILLING_URL", "")
+    guild, seat, admin = await _guild_with_seat(session, status)
+    headers = get_auth_headers(seat if caller == "seat" else admin)
 
+    response = await client.get(_url(guild.id), headers=headers)
 
-async def test_the_seat_of_a_suspended_guild_is_refused(
-    client: AsyncClient, session: AsyncSession, asked
-):
-    guild, seat, _ = await _guild_with_seat(session, CommunityStatus.suspended)
-    response = await client.get(_url(guild.id), headers=get_auth_headers(seat))
-    assert response.status_code == 403, response.text
-    assert asked == []
-
-
-async def test_an_active_guild_is_never_asked_about(
-    client: AsyncClient, session: AsyncSession, asked
-):
-    guild, seat, _ = await _guild_with_seat(session, CommunityStatus.active)
-    response = await client.get(_url(guild.id), headers=get_auth_headers(seat))
-    assert response.json() == {"payment_failed": False}
-    assert asked == []
-
-
-async def test_no_portal_is_never_asked_about(
-    client: AsyncClient, session: AsyncSession, asked, monkeypatch
-):
-    monkeypatch.setattr(settings, "BILLING_URL", "")
-    guild, seat, _ = await _guild_with_seat(session, CommunityStatus.read_only)
-    response = await client.get(_url(guild.id), headers=get_auth_headers(seat))
-    assert response.json() == {"payment_failed": False}
-    assert asked == []
+    assert response.status_code == expected, response.text
+    if answer is not None:
+        assert response.json() == {"payment_failed": answer}
+    assert asked == ([guild.id] if answer else [])

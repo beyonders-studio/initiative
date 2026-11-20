@@ -48,47 +48,6 @@ async def _guild_with_admin(
     return admin, guild
 
 
-# --- membership -------------------------------------------------------------
-
-
-async def test_a_role_change_short_of_the_seat_is_its_own_event(
-    client: AsyncClient, session: AsyncSession, capfd
-):
-    owner, guild = await _guild_with_admin(session, role=CommunityRole.superadmin)
-    owner_id, guild_id = owner.id, guild.id
-    member = await create_user(session)
-    member_id = member.id
-    await create_guild_membership(
-        session, user=member, guild=guild, role=CommunityRole.member
-    )
-    capfd.readouterr()
-
-    promoted = await client.patch(
-        f"/api/v1/communities/{guild_id}/members/{member_id}",
-        headers=get_auth_headers(owner),
-        json={"role": "admin"},
-    )
-    assert promoted.status_code == 204, promoted.text
-
-    written = emitted(capfd)
-    rows = _of_type(written, AuditEventType.GUILD_MEMBER_ROLE_CHANGED)
-    assert [_where(row) for row in rows] == [
-        (owner_id, member_id, guild_id, {"type": "guild", "id": guild_id})
-    ]
-    assert rows[0]["detail"] == {"from": "member", "to": "admin"}
-    # The seat moving is a different event, and this was not the seat.
-    assert _of_type(written, AuditEventType.GUILD_SUPERADMIN_CHANGED) == []
-
-    # Restating the role they already hold moved nothing.
-    again = await client.patch(
-        f"/api/v1/communities/{guild_id}/members/{member_id}",
-        headers=get_auth_headers(owner),
-        json={"role": "admin"},
-    )
-    assert again.status_code == 204, again.text
-    assert emitted(capfd, AuditEventType.GUILD_MEMBER_ROLE_CHANGED) == []
-
-
 # --- settings ---------------------------------------------------------------
 
 

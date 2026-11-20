@@ -233,5 +233,3 @@ async def test_caps_and_status_are_recorded_against_the_community(
     written = emitted(capfd)
     assert _of_type(written, AuditEventType.GUILD_SETTINGS_CHANGED) == []
     assert _of_type(written, AuditEventType.GUILD_STATUS_CHANGED) == []
-
-

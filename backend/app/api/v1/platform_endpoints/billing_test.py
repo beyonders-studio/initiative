@@ -103,18 +103,6 @@ async def _administration(session: AsyncSession, guild_id: int) -> GuildAdminist
 # --- the envelope --------------------------------------------------------------
 
 
-async def test_unconfigured_boundary_refuses_everything(
-    client: AsyncClient, session: AsyncSession, monkeypatch
-):
-    monkeypatch.setattr(config_module.settings, "BILLING_PUBLIC_KEY_PEM", None)
-    guild = await create_guild(session)
-    response = await _sync(client, (guild.id, 1, _fields()))
-    # 503, not 403: billing absent is the self-host default, not a caller
-    # fault (see billing_foss_test.py for the full unconfigured surface).
-    assert response.status_code == 503
-    assert response.json()["detail"] == "BILLING_NOT_CONFIGURED"
-
-
 async def test_an_unsigned_request_is_refused(client: AsyncClient):
     response = await client.post("/api/v1/billing/changes", json={})
     assert response.status_code == 403

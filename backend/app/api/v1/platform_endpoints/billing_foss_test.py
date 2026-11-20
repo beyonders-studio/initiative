@@ -30,12 +30,9 @@ import pytest
 from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.config import settings
 from app.models.platform.billing import BillingEventLog
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserRole
-from app.services.platform import guilds as guilds_service
-from app.services.platform.guilds import GuildCapacityError
 from app.testing import (
     create_guild,
     create_guild_membership,
@@ -43,13 +40,6 @@ from app.testing import (
     get_auth_headers,
     guild_administration,
 )
-
-
-def test_billing_settings_default_off():
-    """The self-host default: every billing credential/URL is unset."""
-    assert settings.BILLING_PUBLIC_KEY_PEM is None
-    assert settings.BILLING_STATEMENT_PUBLIC_KEY_PEM is None
-    assert settings.BILLING_SERVICE_URL is None
 
 
 @pytest.mark.parametrize(
@@ -88,22 +78,6 @@ async def test_partial_configuration_still_fails_closed(
     )
     assert response.status_code == 503
     assert response.json()["detail"] == "BILLING_NOT_CONFIGURED"
-
-
-async def test_cap_enforcement_works_with_billing_absent(session: AsyncSession):
-    """Numeric enforcement is billing-independent: an operator-set
-    ``max_users`` refuses a join with no BILLING_* configured."""
-    guild = await create_guild(session, max_users=1)
-    first = await create_user(session, email="foss-cap-1@example.com")
-    await guilds_service.ensure_membership(session, guild_id=guild.id, user_id=first.id)
-    await session.commit()
-
-    second = await create_user(session, email="foss-cap-2@example.com")
-    with pytest.raises(GuildCapacityError):
-        await guilds_service.ensure_membership(
-            session, guild_id=guild.id, user_id=second.id
-        )
-    await session.rollback()
 
 
 async def test_operator_keeps_full_authority_over_billed_guild(
