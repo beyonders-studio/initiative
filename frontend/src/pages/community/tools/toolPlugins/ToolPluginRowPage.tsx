@@ -6,7 +6,12 @@ import { useTranslation } from "react-i18next";
 import { ToolBreadcrumb } from "@/components/tools/ToolBreadcrumb";
 import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
 import { itemSaves } from "@/hooks/useFieldSave";
-import { pluginToolRowSaves, usePluginToolRow, usePluginToolRows } from "@/hooks/usePluginToolRows";
+import {
+  pluginToolRowSaves,
+  usePluginToolRow,
+  usePluginToolRows,
+  useSeedPluginToolRow,
+} from "@/hooks/usePluginToolRows";
 import { useRouteId } from "@/hooks/useRouteId";
 import { useToolLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
@@ -64,6 +69,8 @@ export function ToolPluginRowPage() {
       ? null
       : toolLayoutTarget(kind, initiativeId, parentId)
   );
+  // The row it is an item of, which its crumb names.
+  const above = usePluginToolRow(table?.parent ?? "", row?.parent_id ?? null).data;
   // The rows a counter full screen moves between, read once it is open: those
   // listed beside this one, in their own order.
   const siblings = usePluginToolRows(
@@ -74,6 +81,7 @@ export function ToolPluginRowPage() {
     },
     { enabled: focused !== null && row !== null }
   );
+  const seed = useSeedPluginToolRow(kind);
   const focus = useMemo<ToolRowContext["focus"]>(() => {
     if (!row) return undefined;
     const rows = siblings.data?.items ?? [];
@@ -95,11 +103,13 @@ export function ToolPluginRowPage() {
               total: rows.length,
               onMove: (by) => {
                 const next = rows[(index + by + rows.length) % rows.length];
-                if (next) open(field, next.id);
+                if (!next) return;
+                seed(next);
+                open(field, next.id);
               },
             },
     });
-  }, [row, siblings.data, focused, kind, gp, navigate]);
+  }, [row, siblings.data, focused, kind, gp, navigate, seed]);
 
   if (installs.isLoading || query.isLoading) {
     return (
@@ -129,11 +139,11 @@ export function ToolPluginRowPage() {
   }
 
   const { tool } = found;
-  // The row it is an item of, which its crumb leads back to.
+  // The row it is an item of, by its name, which its crumb leads back to.
   const parent =
     row.parent_id !== null && table.parent
       ? {
-          label: toolText(tool.tables.get(table.parent)?.name ?? {}, i18n.language),
+          label: above?.name || toolText(tool.tables.get(table.parent)?.name ?? {}, i18n.language),
           to: toolPluginRowRoute(row.initiative_id, table.parent, row.parent_id),
         }
       : null;
