@@ -8505,6 +8505,20 @@ export interface MarketplaceVersionRead {
 }
 
 /**
+ * How a plug-in shows up for the people using it, in one word: what its
+ * listing's tag says. Read off the definition, so no publisher states it.
+ */
+export type PluginTag = (typeof PluginTag)[keyof typeof PluginTag];
+
+export const PluginTag = {
+  tool: "tool",
+  community_tool: "community_tool",
+  page: "page",
+  connection: "connection",
+  add_on: "add_on",
+} as const;
+
+/**
  * A listing's full page, including what it would install.
  */
 export interface MarketplaceListingDetail {
@@ -8527,6 +8541,7 @@ export interface MarketplaceListingDetail {
   beta: boolean;
   paid: boolean;
   included: boolean;
+  plugin_tag: PluginTag | null;
   updated_at: string;
   long_description: string | null;
   definition: MarketplaceListingDetailDefinition;
@@ -8561,6 +8576,7 @@ export interface MarketplaceListingSummary {
   beta: boolean;
   paid: boolean;
   included: boolean;
+  plugin_tag: PluginTag | null;
   updated_at: string;
 }
 
@@ -8636,6 +8652,7 @@ export interface MarketplaceSharedListingRead {
   beta: boolean;
   paid: boolean;
   included: boolean;
+  plugin_tag: PluginTag | null;
   updated_at: string;
   pending_versions: string[];
 }

@@ -57,6 +57,7 @@ import { InstallListingDialog } from "./InstallListingDialog";
 import { InstallPluginDialog } from "./InstallPluginDialog";
 import { ListingDescription, ListingGallery } from "./ListingGallery";
 import { ListingProvenance } from "./ListingProvenance";
+import { PluginContents, PluginTagBadge } from "./PluginContents";
 import { ProjectListingPreview } from "./ProjectListingPreview";
 
 export function ListingPage() {
@@ -192,6 +193,7 @@ export function ListingPage() {
                     {t("card.version", { version: listing.latest_version.version })}
                   </Badge>
                 )}
+                <PluginTagBadge tag={listing.plugin_tag} />
                 <ListingTermsBadge listing={listing} />
                 {listing.beta && <Badge variant="secondary">{t("card.beta")}</Badge>}
                 {minimumAge != null && (
@@ -297,6 +299,8 @@ export function ListingPage() {
       ) : null}
 
       {listing?.long_description && <ListingDescription text={listing.long_description} />}
+
+      {isPlugin && listing.definition && <PluginContents definition={listing.definition} />}
 
       {/* Each tool previews its own way: a project as its board, a dashboard on
           its canvas. A plug-in mounts one of this build's tools and has nothing
