@@ -530,22 +530,29 @@ def _isolated_uploads_dir(monkeypatch, tmp_path):
 
 @pytest.fixture(autouse=True)
 def _reset_app_caches():
-    """Start and end every test with no cached plug-in service registrations and
-    no cached install references.
+    """Start and end every test with no cached plug-in service registrations, no
+    cached install references and no kept tool sets.
 
-    The request path reads both through in-process caches (see
-    ``registration_lookup`` and ``plugin_refs``). Test databases are rebuilt per
-    test while those caches are module state, so without this a row created in
-    one test would still be answering reads in the next.
+    The request path reads all three through in-process caches (see
+    ``registration_lookup``, ``plugin_refs`` and ``plugin_tools.kept_tool_set``).
+    Test databases are rebuilt per test while those caches are module state, so
+    without this a row created in one test would still be answering reads in
+    the next. A kept tool set carries its plug-in kinds' codes, which each test
+    gives afresh (``plugin_kind_codes`` is emptied with the rest of ``public``),
+    and a test may build one with codes of its own; a set kept by digest from
+    another test would pack node ids with codes the database does not hold.
     """
+    from app.db import plugin_tools
     from app.services.marketplace.plugin_refs import forget_cached_install_refs
     from app.services.marketplace.registration_lookup import invalidate_registrations
 
     invalidate_registrations()
     forget_cached_install_refs()
+    plugin_tools._SETS.clear()
     yield
     invalidate_registrations()
     forget_cached_install_refs()
+    plugin_tools._SETS.clear()
 
 
 @pytest.fixture(autouse=True)
