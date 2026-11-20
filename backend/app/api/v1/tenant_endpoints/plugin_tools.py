@@ -251,7 +251,7 @@ async def create_plugin_tool_row(
         await session.flush()
     if body.tag_ids:
         await _set_tags(session, context, kind, row_id, body.tag_ids)
-    await rows_service.tell_mentioned(
+    await rows_service.text_saved(
         session,
         located,
         row_id,

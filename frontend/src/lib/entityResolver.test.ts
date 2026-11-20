@@ -8,7 +8,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
-import { isEntityRefType, linkedCommentId, resolveEntityPath } from "@/lib/entityResolver";
+import {
+  entityRefTypeFor,
+  isEntityRefType,
+  linkedCommentId,
+  resolveEntityPath,
+} from "@/lib/entityResolver";
 
 const COMMUNITY = 1;
 let queryClient: QueryClient;
@@ -39,6 +44,12 @@ describe("resolveEntityPath", () => {
     await expect(
       resolveEntityPath(queryClient, COMMUNITY, "counter-group.abc123", 8)
     ).resolves.toBe("/i/6/t/counter_group.abc123/8");
+  });
+
+  it("addresses a reference to a tool plug-in's row as its /go link spells it", () => {
+    expect(entityRefTypeFor("counter_group.abc123")).toBe("counter-group.abc123");
+    expect(entityRefTypeFor("calendar_event")).toBe("calendar-event");
+    expect(entityRefTypeFor("counter_group.ABC")).toBeNull();
   });
 
   it("nests a task under the project that owns it", async () => {

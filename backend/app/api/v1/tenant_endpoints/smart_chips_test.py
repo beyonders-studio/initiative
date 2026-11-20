@@ -24,6 +24,7 @@ from app.schemas.tenant.smart_chip import MAX_EMBEDS, MAX_REFS
 from app.services.tenant.smart_chips import SMART_CHIP_SOURCES
 from app.testing import (
     Actor,
+    add_counter,
     create_calendar,
     create_calendar_event,
     create_comment,
@@ -35,6 +36,7 @@ from app.testing import (
     create_user,
     create_wiki,
     create_wiki_page,
+    install_tool_plugin,
     switch_tools,
 )
 
@@ -734,3 +736,48 @@ async def test_a_comment_is_not_something_you_point_at(
     comment = await create_comment(session, a.user, task=task)
 
     assert await _chips(client, a, f"comment:{comment.id}") == {}
+
+
+async def test_a_tool_plugins_row_reads_its_current_name(
+    client, session, acting_user: ActingUser
+) -> None:
+    """A reference to a tool plug-in's row or item answers with what it is
+    called now, and embeds with its name and its description, as a built-in
+    row does. A kind the community has not installed, and a fact asked of a
+    plug-in's row, are absent rather than an error."""
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    await install_tool_plugin(client, session, seat)
+    tools, group, counter = await add_counter(
+        session, seat.guild.id, seat.initiative.id
+    )
+    (tool,) = tools.installed
+    (item_kind,) = (child.value for child in tool.children)
+    group_ref, counter_ref = f"{tool.kind}:{group}", f"{item_kind}:{counter}"
+
+    body = await _chips(
+        client,
+        seat,
+        group_ref,
+        counter_ref,
+        f"{counter_ref}:value",
+        f"stranger.{'x' * 14}:{group}",
+    )
+    assert {ref: (s["entity_type"], s["text"]) for ref, s in body.items()} == {
+        group_ref: (tool.kind, "Scores"),
+        counter_ref: (item_kind, "Laps"),
+    }
+
+    response = await client.patch(
+        seat.g(f"/plugin-tools/{tool.kind}/{group}"),
+        headers=seat.headers,
+        json={"name": "Tallies", "fields": {"description": "Who ran how far"}},
+    )
+    assert response.status_code == 200, response.text
+    assert (await _chips(client, seat, group_ref))[group_ref]["text"] == "Tallies"
+
+    embeds = await _embeds(client, seat, group_ref, counter_ref)
+    assert (embeds[group_ref]["title"], embeds[group_ref]["description"]) == (
+        "Tallies",
+        "Who ran how far",
+    )
+    assert embeds[counter_ref]["title"] == "Laps"

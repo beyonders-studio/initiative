@@ -10,6 +10,7 @@ from __future__ import annotations
 from app.core.references import (
     MAX_ENTITY_ID,
     format_ref,
+    kind_for_trigger,
     parse_ref,
 )
 from app.core.search import SearchEntityType
@@ -57,3 +58,36 @@ def test_an_aspect_is_not_part_of_the_bare_form():
     """``task:12:status`` names a fact about a thing. That is the smart-chip
     shape, read by the parser that knows which facts exist."""
     assert parse_ref("task:12:status") is None
+
+
+def test_a_tool_plugins_kind_reads_back_as_written():
+    """A tool plug-in's kind is its key, ``.`` and its plug-in's uid in lower
+    case. Whether the community has it is asked where it is resolved."""
+    for kind in ("counter.tsjvtcm0s7gv2x", "counter_group.tsjvtcm0s7gv2x"):
+        assert parse_ref(format_ref(kind, 12)) == (kind, 12)
+    assert parse_ref("counter.tsjvtcm0s7gv2x:12:value") is None
+
+
+def test_only_a_kind_a_plugin_could_have_reads():
+    for ref in (
+        "counter.TSJVTCM0S7GV2X:1",
+        "Counter.abc:1",
+        "1counter.abc:1",
+        "counter.:1",
+        ".abc:1",
+        "counter.a.b:1",
+        "counter.a_b:1",
+        "counter-group.abc:1",
+    ):
+        assert parse_ref(ref) is None, ref
+
+
+def test_the_word_after_a_hash_is_the_kind_kebabed():
+    """``#counter-group.tsjvtcm0s7gv2x`` names ``counter_group.tsjvtcm0s7gv2x``:
+    a key holds no ``-`` and a uid neither ``-`` nor ``_``."""
+    assert kind_for_trigger("counter-group.tsjvtcm0s7gv2x") == (
+        "counter_group.tsjvtcm0s7gv2x"
+    )
+    assert kind_for_trigger("calendar-event") is SearchEntityType.calendar_event
+    assert kind_for_trigger("counter-group") is None
+    assert kind_for_trigger("wiki-page") is SearchEntityType.wiki_page

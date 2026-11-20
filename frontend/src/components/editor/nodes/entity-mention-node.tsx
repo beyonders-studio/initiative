@@ -24,13 +24,12 @@ import {
 } from "lexical";
 import type { JSX } from "react";
 
-import type { SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
 import { EditorEntityReference } from "@/components/editor/nodes/entity-reference";
 import { storedEntityType } from "@/lib/smartChips";
 
 export type SerializedEntityMentionNode = Spread<
   {
-    entityType: SearchEntityType;
+    entityType: string;
     entityId: number;
     /** The name as it read when written — the export and index fallback. */
     text: string;
@@ -51,7 +50,7 @@ function $convertEntityMentionElement(domNode: HTMLElement): DOMConversionOutput
 }
 
 export class EntityMentionNode extends DecoratorNode<JSX.Element> {
-  __entityType: SearchEntityType;
+  __entityType: string;
   __entityId: number;
   __text: string;
 
@@ -71,7 +70,7 @@ export class EntityMentionNode extends DecoratorNode<JSX.Element> {
     );
   }
 
-  constructor(entityType: SearchEntityType, entityId: number, text: string, key?: NodeKey) {
+  constructor(entityType: string, entityId: number, text: string, key?: NodeKey) {
     super(key);
     this.__entityType = entityType;
     this.__entityId = entityId;
@@ -89,7 +88,7 @@ export class EntityMentionNode extends DecoratorNode<JSX.Element> {
     };
   }
 
-  getEntityType(): SearchEntityType {
+  getEntityType(): string {
     return this.__entityType;
   }
 
@@ -150,7 +149,7 @@ export class EntityMentionNode extends DecoratorNode<JSX.Element> {
 }
 
 export function $createEntityMentionNode(
-  entityType: SearchEntityType,
+  entityType: string,
   entityId: number,
   text: string
 ): EntityMentionNode {

@@ -11,12 +11,11 @@
  * each comment asking for itself.
  */
 
-import type { SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
-import { typeForTrigger, userMentionSyntax } from "@/lib/mentions";
+import { TRIGGER_WORD, typeForTrigger, userMentionSyntax } from "@/lib/mentions";
 import { referenceRef } from "@/lib/smartChips";
 
 //: `#task[Label](12)` — the trigger word, then a label, then the id.
-const ENTITY_PATTERN = /#([\w-]+)\[[^\]]*\]\((\d+)\)/g;
+const ENTITY_PATTERN = new RegExp(String.raw`#(${TRIGGER_WORD})\[[^\]]*\]\((\d+)\)`, "g");
 //: `@[](4)`, or `@[Ada](4)` as it was written before names were left out — the
 //: label, then the id.
 export const USER_MENTION_PATTERN = /@\[([^\]]*)\]\((\d+)\)/g;
@@ -38,7 +37,7 @@ export const collectCommentReferences = (contents: string[]): CommentReferences 
       const entityType = typeForTrigger(trigger);
       // A trigger this build does not know is left alone: the comment still
       // renders, showing the words it was written with.
-      if (entityType) refs.add(referenceRef(entityType as SearchEntityType, Number(id)));
+      if (entityType) refs.add(referenceRef(entityType, Number(id)));
     }
     for (const [, , id] of content.matchAll(USER_MENTION_PATTERN)) {
       userIds.add(Number(id));

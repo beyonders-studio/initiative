@@ -10,14 +10,14 @@ import { type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
-import type { SearchEntityType, SearchSuggestion } from "@/api/generated/initiativeAPI.schemas";
+import type { SearchSuggestion } from "@/api/generated/initiativeAPI.schemas";
 import { $createEntityMentionNode } from "@/components/editor/nodes/entity-mention-node";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useReferenceKinds } from "@/hooks/useReferenceKinds";
 import { useCommunityPickerSuggestions } from "@/hooks/useSearch";
 import { communityPath } from "@/lib/communityUrl";
 import { entityRefTypeFor } from "@/lib/entityResolver";
-import { activeMention, ENTITY_TRIGGER, MENTIONABLE_TYPES } from "@/lib/mentions";
-import { hitIcon } from "@/lib/searchResults";
+import { activeMention, ENTITY_TRIGGER } from "@/lib/mentions";
 import { entityRefRoute } from "@/lib/tools";
 import { Command, CommandGroup, CommandItem, CommandList } from "@/ui/command";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
@@ -74,6 +74,7 @@ export function EntityMentionsPlugin({
   const { t } = useTranslation("editor");
   const navigate = useNavigate();
   const communityId = useActiveCommunityId();
+  const kinds = useReferenceKinds();
   const [queryString, setQueryString] = useState<string | null>(null);
   // Read back through the same parser the comment composer uses, so `#task:`
   // narrows here exactly as it does there.
@@ -88,7 +89,7 @@ export function EntityMentionsPlugin({
   // initiative's live work. A bare `#` names nothing yet, so it opens on what
   // was most recently worked on rather than on a menu with nothing in it.
   const { items, isFetching, stale } = useCommunityPickerSuggestions(debouncedQuery, {
-    types: active?.types ?? MENTIONABLE_TYPES,
+    types: active?.types ?? kinds.mentionable,
     initiative_id: initiativeId ?? undefined,
     is_template: false,
     subject,
@@ -104,9 +105,7 @@ export function EntityMentionsPlugin({
   const shown = useMemo(
     () =>
       items
-        .filter(
-          (suggestion) => !wanted || wanted.includes(suggestion.entity_type as SearchEntityType)
-        )
+        .filter((suggestion) => !wanted || wanted.includes(suggestion.entity_type))
         .map((suggestion) => new EntityOption(suggestion)),
     [items, wanted]
   );
@@ -120,7 +119,7 @@ export function EntityMentionsPlugin({
     (option: EntityOption, nodeToReplace: TextNode | null, closeMenu: () => void) => {
       editor.update(() => {
         const node = $createEntityMentionNode(
-          option.suggestion.entity_type as SearchEntityType,
+          option.suggestion.entity_type,
           option.suggestion.entity_id,
           option.suggestion.title
         );
@@ -145,7 +144,7 @@ export function EntityMentionsPlugin({
         const type = target?.getAttribute("data-lexical-entity-mention");
         const id = Number(target?.getAttribute("data-entity-id"));
         if (!type || !Number.isFinite(id)) return false;
-        const refType = entityRefTypeFor(type as SearchEntityType);
+        const refType = entityRefTypeFor(type);
         if (!refType) return false;
         event.preventDefault();
         void navigate({ to: communityPath(communityId, entityRefRoute(refType, id)) });
@@ -172,7 +171,7 @@ export function EntityMentionsPlugin({
                     {shown.length ? (
                       <CommandGroup>
                         {shown.map((option, index) => {
-                          const Icon = hitIcon(option.suggestion);
+                          const Icon = kinds.icon(option.suggestion.entity_type);
                           return (
                             <CommandItem
                               key={option.key}

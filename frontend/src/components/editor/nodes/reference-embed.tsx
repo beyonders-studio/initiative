@@ -6,7 +6,6 @@ import { Link2 } from "lucide-react";
 import { createContext, lazy, Suspense, useContext } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
 import { AskWhereUnavailable } from "@/components/access/RequestAccess";
 import { EmbedCallout, useEmbedFold } from "@/components/editor/nodes/embed-callout";
 import { $isReferenceEmbedNode, $showAsLink } from "@/components/editor/nodes/reference-embed-node";
@@ -14,12 +13,12 @@ import { SmartChip } from "@/components/editor/nodes/smart-chip";
 import { TaskQueryEmbed } from "@/components/editor/nodes/task-query-embed";
 import { TaskDescription } from "@/components/tasks/TaskDescription";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useReferenceKinds } from "@/hooks/useReferenceKinds";
 import { useReferenceEmbed } from "@/hooks/useSmartChips";
 import { communityPath } from "@/lib/communityUrl";
 import type { EmbedDisplay, TaskQuery } from "@/lib/embeds";
-import { entityRefTypeFor } from "@/lib/entityResolver";
+import { entityRefTypeFor, isSearchEntityType } from "@/lib/entityResolver";
 import { hasBody } from "@/lib/posts";
-import { entityIcon } from "@/lib/searchResults";
 import { entityRefRoute } from "@/lib/tools";
 import { Button } from "@/ui/button";
 import { cn } from "@/ui/lib/utils";
@@ -62,7 +61,8 @@ function EmbeddedBody({ body }: { body: Record<string, unknown> }) {
 }
 
 interface ReferenceEmbedProps {
-  entityType: SearchEntityType;
+  /** A built-in kind, or a tool plug-in's. */
+  entityType: string;
   entityId: number;
   /** The name as it read when written, shown when the thing cannot be read. */
   fallback: string;
@@ -111,7 +111,8 @@ function ItemEmbed({
   display,
   nodeKey,
 }: ReferenceEmbedProps) {
-  const { t } = useTranslation(["editor", "search"]);
+  const { t } = useTranslation("editor");
+  const kinds = useReferenceKinds();
   const [editor] = useLexicalComposerContext();
   const editable = useLexicalEditable();
   const navigate = useNavigate();
@@ -129,6 +130,10 @@ function ItemEmbed({
   const showDescription = card && Boolean(embed?.description);
   const foldable = facts.length > 0 || showBody || showDescription;
 
+  const unavailable = (
+    <p className="text-muted-foreground text-sm">{t("references.unavailable")}</p>
+  );
+
   const showAsLink = () =>
     editor.update(() => {
       const node = $getNodeByKey(nodeKey);
@@ -137,7 +142,7 @@ function ItemEmbed({
 
   return (
     <EmbedCallout
-      icon={entityIcon(entityType)}
+      icon={kinds.icon(entityType)}
       nodeKey={nodeKey}
       title={
         <button
@@ -156,7 +161,7 @@ function ItemEmbed({
           {embed?.title ?? fallback}
         </button>
       }
-      meta={t(`search:types.${entityType}` as never)}
+      meta={kinds.label(entityType)}
       actions={
         editable ? (
           <Button
@@ -185,9 +190,15 @@ function ItemEmbed({
       ) : showDescription && embed?.description ? (
         <TaskDescription content={embed.description} />
       ) : isFetched && !embed ? (
-        <AskWhereUnavailable kind={entityType} entityId={entityId}>
-          <p className="text-muted-foreground text-sm">{t("references.unavailable")}</p>
-        </AskWhereUnavailable>
+        // Asking for access is offered for a built-in kind; a tool plug-in's
+        // row says only that it is unavailable.
+        isSearchEntityType(entityType) ? (
+          <AskWhereUnavailable kind={entityType} entityId={entityId}>
+            {unavailable}
+          </AskWhereUnavailable>
+        ) : (
+          unavailable
+        )
       ) : null}
     </EmbedCallout>
   );

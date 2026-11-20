@@ -80,10 +80,11 @@ from app.services.permissions import (
     require_access,
     serialize_grants,
 )
-from app.services.tenant import descriptions
+from app.services.tenant import content_references, descriptions
 from app.services.tenant import tags as tags_service
 from app.services.tenant.descriptions import newly_mentioned
 from app.services.tenant.initiative_tools import tool_on
+from app.services.tenant.relationships import Endpoint
 
 #: The largest number a number or counter field's column holds.
 _NUMBER_LIMIT = Decimal(10) ** 10
@@ -607,15 +608,15 @@ async def write(
 ) -> None:
     """Change ``row`` of ``located``'s table to ``given`` (declared fields by
     key), and its ``name`` and ``position`` where given, held to the
-    declaration and made as the reader, and tell whoever its text now newly
-    mentions. The caller has authorized the edit and commits."""
+    declaration and made as the reader, and record what its text now points
+    at (:func:`text_saved`). The caller has authorized the edit and commits."""
     columns = column_values(located, given, current=dict(row.values))
     if name is not None:
         columns["name"] = name
     if position is not None:
         columns["position"] = Decimal(str(position))
     await update(session, located, row.id, columns)
-    await tell_mentioned(
+    await text_saved(
         session,
         located,
         row.id,
@@ -774,7 +775,7 @@ async def run_action(
             await write(session, child, item, values, author=author)
 
 
-async def tell_mentioned(
+async def text_saved(
     session: AsyncSession,
     located: Located,
     row_id: int,
@@ -784,15 +785,29 @@ async def tell_mentioned(
     after: Mapping[str, Any],
     author: User | None,
 ) -> None:
-    """Tell whoever ``after``'s text fields newly mention, as a description's
-    save does (``descriptions.tell_mentioned``). An installed plug-in's write
-    tells nobody, as its description's does not."""
+    """Where ``after`` writes a text field, make the row's ``references``
+    edges match its text fields and comments, and tell whoever they newly
+    mention, as a description's save does (``descriptions.description_saved``).
+    An installed plug-in's write tells nobody, as its description's does not."""
+    texts = [
+        key
+        for key, field in declared_fields(located).items()
+        if field["kind"] == "text" and key in after
+    ]
+    if not texts:
+        return
+    entity = Endpoint.of(routed_tools(session), located.kind, row_id)
+    await content_references.sync_for_entity(
+        session,
+        entity,
+        body=await content_references.own_body(session, entity),
+        author_id=author.id if author is not None else None,
+    )
     if author is None:
         return
     mentioned: set[int] = set()
-    for key, field in declared_fields(located).items():
-        if field["kind"] == "text" and key in after:
-            mentioned |= newly_mentioned(after[key], (before or {}).get(key))
+    for key in texts:
+        mentioned |= newly_mentioned(after[key], (before or {}).get(key))
     if mentioned:
         await descriptions.tell_mentioned(
             session, (located.kind, row_id), mentioned, title=name, author=author

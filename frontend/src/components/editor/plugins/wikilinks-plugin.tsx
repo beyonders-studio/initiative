@@ -24,8 +24,8 @@ import {
 } from "@/components/editor/nodes/reference-embed-node";
 import { CreateReferencedThingDialog } from "@/components/references/CreateReferencedThingDialog";
 import { useInitiative } from "@/hooks/useInitiatives";
+import { useReferenceKinds } from "@/hooks/useReferenceKinds";
 import { useCommunityPickerSuggestions } from "@/hooks/useSearch";
-import { MENTIONABLE_TYPES } from "@/lib/mentions";
 import { linkableToolTypes } from "@/lib/references";
 import { Command, CommandGroup, CommandItem, CommandList } from "@/ui/command";
 
@@ -99,15 +99,16 @@ class WikilinkTypeaheadOption extends MenuOption {
   title: string;
   fileId: number | null;
   isCreateNew: boolean;
-  /** What kind of thing this names. A row still to be created is a file:
-   *  it is the one tool a name and an initiative are enough to make. */
-  entityType: SearchEntityType;
+  /** What kind of thing this names, a built-in kind or a tool plug-in's. A
+   *  row still to be created is a file: it is the one tool a name and an
+   *  initiative are enough to make. */
+  entityType: string;
 
   constructor(
     title: string,
     fileId: number | null,
     isCreateNew = false,
-    entityType: SearchEntityType = SearchEntityType.file
+    entityType: string = SearchEntityType.file
   ) {
     super(`${entityType}-${fileId ?? "new"}-${title}`);
     this.title = title;
@@ -134,6 +135,7 @@ function useWikilinkSearch(
   // between the two triggers.
   const { data: initiative } = useInitiative(initiativeId);
   const linkable = useMemo(() => linkableToolTypes(initiative), [initiative]);
+  const { mentionable } = useReferenceKinds();
   // A bare `[[ ]]` names nothing yet, so the menu opens on this initiative's
   // most recent linkable things rather than waiting for a first letter.
   const { items: results, isFetching: isLoading } = useCommunityPickerSuggestions(
@@ -141,7 +143,7 @@ function useWikilinkSearch(
     {
       // An embed shows a thing in full, and a task is what most want shown, so
       // `![[` reaches everything `#` does rather than only the tools.
-      types: embed ? MENTIONABLE_TYPES : linkable,
+      types: embed ? mentionable : linkable,
       initiative_id: initiativeId ?? undefined,
       is_template: false,
       // A page does not link to itself: the page the link opens is the one the
@@ -154,13 +156,7 @@ function useWikilinkSearch(
 
   const options = useMemo(() => {
     const docOptions = results.map(
-      (hit) =>
-        new WikilinkTypeaheadOption(
-          hit.title,
-          hit.entity_id,
-          false,
-          hit.entity_type as SearchEntityType
-        )
+      (hit) => new WikilinkTypeaheadOption(hit.title, hit.entity_id, false, hit.entity_type)
     );
 
     // Add "Create new file" option if query doesn't exactly match any result
@@ -199,7 +195,7 @@ export function WikilinksPlugin({
   // into the sentence, so making something never costs the writer their place.
   const [creating, setCreating] = useState<{
     name: string;
-    onCreated: (entityType: SearchEntityType, entityId: number, name: string) => void;
+    onCreated: (entityType: string, entityId: number, name: string) => void;
   } | null>(null);
 
   const embed = queryString !== null && pendingEmbed;
@@ -219,7 +215,7 @@ export function WikilinksPlugin({
       /** What the trigger turns into: a link in the sentence, or an embed
        *  on a line of its own. */
       const $place = (
-        entityType: SearchEntityType,
+        entityType: string,
         entityId: number,
         name: string,
         target: TextNode | null
