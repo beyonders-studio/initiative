@@ -51,6 +51,7 @@ import string
 from collections import OrderedDict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 from types import EllipsisType
 from typing import Any
 
@@ -148,7 +149,9 @@ _DIALECT = postgresql.dialect()
 
 #: How a number or counter field and a row's position are stored: twenty
 #: digits, ten after the point, as every position is.
-_NUMBER = sa.Numeric(20, 10)
+NUMBER = sa.Numeric(20, 10)
+#: The largest number that fits, either side of zero.
+NUMBER_LIMIT = Decimal(10) ** 10 - Decimal(10) ** -10
 
 #: The ``info`` key marking a select field's CHECK of its options, which a
 #: later version of the tool may widen.
@@ -317,8 +320,8 @@ _FIELD_TYPES: dict[str, Any] = {
     "url": sa.Text,
     "color": sa.Text,
     "select": sa.Text,
-    "number": lambda: _NUMBER,
-    "counter": lambda: _NUMBER,
+    "number": lambda: NUMBER,
+    "counter": lambda: NUMBER,
     "currency": sa.Numeric,
     "scale": sa.Integer,
     "user_reference": sa.Integer,
@@ -475,7 +478,7 @@ def _table(
         sa.Column("id", sa.Integer, primary_key=True),
         anchor,
         sa.Column("name", sa.String(255), nullable=False),
-        sa.Column("position", _NUMBER, nullable=False, server_default="0"),
+        sa.Column("position", NUMBER, nullable=False, server_default="0"),
         *columns,
         *universal,
         sa.Column(
