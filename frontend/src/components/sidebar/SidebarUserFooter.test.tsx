@@ -143,6 +143,30 @@ describe("SidebarUserFooter", () => {
     expect(paused).toEqual({ pause_until: status.clear_at });
   });
 
+  it("holds Save for an end it cannot keep, and not for an erased draft", async () => {
+    const user = userEvent.setup();
+    const far = new Date(Date.now() + 200 * 86_400_000).toISOString();
+    const { unmount } = renderFooter({
+      custom_status: { emoji: "🌴", text: "Away", clear_at: far },
+    });
+
+    await user.click(await screen.findByRole("button", { name: "Your status" }));
+    const pause = await screen.findByRole("switch", { name: /Pause notifications/ });
+    expect(await screen.findByText(/A pause runs at most 90 days/)).toBeInTheDocument();
+    expect(pause).toBeDisabled();
+    unmount();
+
+    renderFooter();
+    await user.click(await screen.findByRole("button", { name: "Your status" }));
+    await user.type(await screen.findByLabelText("What are you up to?"), "Out");
+    await user.click(screen.getByRole("combobox"));
+    await user.click(await screen.findByRole("option", { name: "Choose a date and time" }));
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Erase" }));
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+  });
+
   it("sets how you appear from the dot on the picture", async () => {
     const user = userEvent.setup();
     renderFooter();
