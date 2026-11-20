@@ -339,7 +339,7 @@ def test_the_frozen_version_is_the_bundled_one() -> None:
 
     migration = counters_conversion()
     bundled = json.loads(
-        (CATALOG_DIR / "beyonders-studio.counters.json").read_text(encoding="utf-8")
+        (CATALOG_DIR / "core.counters.json").read_text(encoding="utf-8")
     )
     if bundled["version"] == migration._FROZEN["version"]:
         assert bundled["definition"] == migration._FROZEN["definition"]

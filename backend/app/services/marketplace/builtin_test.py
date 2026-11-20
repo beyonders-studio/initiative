@@ -35,6 +35,7 @@ from app.services.marketplace import catalog as catalog_service
 from app.services.marketplace.builtin import (
     load_builtin_manifests,
     seed_builtin_listings,
+    shipped_tools,
 )
 from app.services.marketplace.definitions import (
     RESERVED_PUBLIC_ID_PREFIX,
@@ -240,7 +241,7 @@ class TestShippedManifests:
                     f"{public_id}/{widget['id']} binds to {binding.get('source')!r}, "
                     "which no shipped dashboard should"
                 )
-                resolve(binding["sql"])
+                resolve(binding["sql"], tools=shipped_tools())
 
     async def test_every_shipped_dashboard_fills_the_slots_it_draws(self):
         """A tile that returns fewer columns than its widget requires draws
@@ -252,7 +253,9 @@ class TestShippedManifests:
             for widget in manifest["definition"]["widgets"]:
                 spec = WIDGET_SPECS[widget["type"]]
                 required = [slot for slot in spec.shape if slot.required]
-                columns = resolve(widget["binding"]["sql"]).column_types
+                columns = resolve(
+                    widget["binding"]["sql"], tools=shipped_tools()
+                ).column_types
                 assert len(columns) >= len(required), (
                     f"{manifest['public_id']}/{widget['id']}: {widget['type']} "
                     f"needs {len(required)} columns, the statement returns "

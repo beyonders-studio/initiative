@@ -21,7 +21,7 @@ from seed.guilds import COMMUNITIES
 from seed.plugins import install
 
 #: The Counters plug-in's listing.
-COUNTERS = "beyonders-studio.counters"
+COUNTERS = "core.counters"
 
 #: Each group, shared the way ``share`` reads it. A counter is ``(name, colour,
 #: count, min, max, step, initial count, view mode)``, in position order.
