@@ -12,7 +12,7 @@ Counters live in **counter groups**, because they almost always come in sets: on
 
 ## Add Counters to your community
 
-Counters is a free [plug-in](plugins-and-marketplace.md) that ships with Initiative. A community admin adds it from the community's marketplace and picks the initiatives it goes in. After that it works like any other tool there: each initiative switches it on or off, and each role says who can see and create counter groups.
+Counters is a free [plug-in](plugins-and-marketplace.md) that ships with Initiative. Your community's [superadmin](running-a-community.md#why-superadmin-is-separate) adds it from the community's marketplace and picks the initiatives it goes in. After that it works like any other tool there: each initiative switches it on or off, and each role says who can see and create counter groups.
 
 A community that used counters before they became a plug-in already has it, in the initiatives that used them, with every group and counter where it was.
 
