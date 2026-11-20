@@ -43,11 +43,8 @@ def _catalogued() -> dict[str, Any]:
 
 def counters_tool_manifest() -> dict[str, Any]:
     """A fresh copy of the Counters tool plug-in's definition, as this build's
-    catalogue ships it (``core.counters``), less the plug-in API it needs: a
-    test lists it as a version of its own, for the API this build serves."""
-    definition = copy.deepcopy(_catalogued())
-    definition.pop("min_plugin_api", None)
-    return definition
+    catalogue ships it (``core.counters``)."""
+    return copy.deepcopy(_catalogued())
 
 
 async def install_tool_plugin(
