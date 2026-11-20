@@ -5,21 +5,21 @@ import { $getNodeByKey, type NodeKey } from "lexical";
 import { PanelTop } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import type { SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
 import { $isEntityMentionNode } from "@/components/editor/nodes/entity-mention-node";
 import { $showAsEmbed } from "@/components/editor/nodes/reference-embed-node";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useReferenceKinds } from "@/hooks/useReferenceKinds";
 import { useReferenceTitle } from "@/hooks/useSmartChips";
 import { communityPath } from "@/lib/communityUrl";
 import { entityRefTypeFor } from "@/lib/entityResolver";
-import { entityIcon } from "@/lib/searchResults";
 import { entityRefRoute } from "@/lib/tools";
 import { Button } from "@/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hover-card";
 import { cn } from "@/ui/lib/utils";
 
 interface EntityReferenceProps {
-  entityType: SearchEntityType;
+  /** A built-in kind, or a tool plug-in's. */
+  entityType: string;
   entityId: number;
   /** The name as it read when written. What an export shows, and what stands
    *  in when the thing can no longer be read. */
@@ -48,11 +48,12 @@ export function EntityReference({
   const navigate = useNavigate();
   const communityId = useActiveCommunityId();
   const live = useReferenceTitle(entityType, entityId);
+  const kinds = useReferenceKinds();
 
   const refType = entityRefTypeFor(entityType);
   const reachable = live !== undefined && refType !== null;
   const label = live ?? fallback ?? t("references.gone");
-  const Icon = entityIcon(entityType);
+  const Icon = kinds.icon(entityType);
 
   const shared = "mx-0.5 inline-flex items-baseline gap-1 rounded px-1 align-baseline";
 

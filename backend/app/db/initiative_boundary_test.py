@@ -95,8 +95,10 @@ from app.testing import (
     add_counter,
     convert_counters,
     create_initiative,
+    create_project,
     create_property_definition,
     create_tag,
+    create_task,
     drain_notices,
     install_tool_plugin,
     make_operations_community,
@@ -1618,6 +1620,100 @@ async def test_tags_and_links_keep_a_tool_plugins_rows_in_their_initiative(
         ),
     ):
         assert response.status_code == 404, response.text
+
+
+async def test_references_keep_a_tool_plugins_rows_in_their_initiative(
+    session: AsyncSession,
+    acting_user: Callable[..., Awaitable[Actor]],
+    client: AsyncClient,
+) -> None:
+    """A reference to a tool plug-in's row or its item in initiative A, shared
+    by name with a moderator of B and a member of no initiative, resolves to
+    its name, embeds and becomes a ``references`` edge for A's moderator, and
+    for neither of the others: their chips and embeds of it are absent, and a
+    comment B's moderator writes naming it records nothing."""
+    from app.models.tenant.relationship import EntityRelationship
+    from app.services.tenant.relationships import Endpoint
+
+    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    guild = admin.guild
+    initiative_b = await create_initiative(session, guild, admin.user)
+    moderator_a = await acting_user(
+        guild=guild, initiative=admin.initiative, initiative_role="moderator"
+    )
+    moderator_b = await acting_user(
+        guild=guild, initiative=initiative_b, initiative_role="moderator"
+    )
+    outsider = await acting_user(guild=guild)
+    await session.commit()
+    seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
+    await install_tool_plugin(client, session, seat)
+    tools = await provisioned_tools(guild.id)
+    tool = tools.installed[0]
+    (item_kind,) = (child.value for child in tool.children)
+    await route_session_to_guild(session, guild.id)
+    seeder = _Seeder(
+        session,
+        await _Catalog.read(session),
+        admin.initiative.id,
+        grantor=moderator_a.user.id,
+        grantees=(moderator_b.user.id, outsider.user.id),
+        tools=tools,
+    )
+    item_row = await seeder.make(tool.items[0].name, moderator_a.user.id)
+    rows = {
+        tool.kind: item_row[f"{tool.kind.split('.')[0]}_id"],
+        item_kind: item_row["id"],
+    }
+    refs = [f"{kind}:{row_id}" for kind, row_id in rows.items()]
+    written = " ".join(
+        f"#{kind.replace('_', '-')}[It]({row_id})" for kind, row_id in rows.items()
+    )
+    task_a, task_b = [
+        await create_task(
+            session, await create_project(session, initiative, admin.user)
+        )
+        for initiative in (admin.initiative, initiative_b)
+    ]
+    await session.commit()
+
+    async def resolved(actor: Actor) -> tuple[set[str], set[str]]:
+        """The refs ``actor``'s chips and embeds answer for."""
+        answers = []
+        for path in ("/smart-chips/", "/smart-chips/embeds"):
+            response = await client.post(
+                actor.g(path), headers=actor.headers, json={"refs": refs}
+            )
+            assert response.status_code == 200, (path, response.text)
+            answers.append({item["ref"] for item in response.json()["items"]})
+        return answers[0], answers[1]
+
+    async def recorded(task_id: int) -> set[tuple[str, int]]:
+        """The ``references`` edges the task holds, read past every gate."""
+        edges = await session.exec(
+            sa.select(
+                EntityRelationship.target_type, EntityRelationship.target_id
+            ).where(
+                EntityRelationship.source_node == Endpoint("task", task_id).node,
+                EntityRelationship.relationship_type == "references",
+                EntityRelationship.removed_at.is_(None),
+            )
+        )
+        return set(edges.all())
+
+    for actor in (moderator_b, outsider):
+        assert await resolved(actor) == (set(), set()), actor
+    assert await resolved(moderator_a) == (set(refs), set(refs))
+
+    for actor, task in ((moderator_a, task_a), (moderator_b, task_b)):
+        response = await client.post(
+            actor.g("/comments/"),
+            headers=actor.headers,
+            json={"subject_type": "task", "subject_id": task.id, "content": written},
+        )
+        assert response.status_code == 201, response.text
+    assert await recorded(task_b.id) == set()
+    assert await recorded(task_a.id) == set(rows.items())
 
 
 async def test_exports_and_counts_keep_a_tool_plugins_rows_in_their_initiative(

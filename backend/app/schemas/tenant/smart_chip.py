@@ -8,7 +8,6 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.core.search import SearchEntityType
 from app.core.smart_chips import SmartChipAspect, SmartChipKind, SmartChipTone
 
 #: Ceiling on one chips request, so the cost of answering one is bounded.
@@ -70,8 +69,9 @@ class SmartChipState(BaseModel):
     #: The ``kind:id:aspect`` this answers, echoed back so a client can match
     #: it to the chip that asked without relying on order.
     ref: str
-    #: What the reference names.
-    entity_type: SearchEntityType
+    #: What the reference names: a built-in kind, or a tool plug-in's
+    #: (``counter.tsjvtcm0s7gv2x``).
+    entity_type: str
     #: Which fact about it, or absent where this is simply what it is called.
     aspect: SmartChipAspect | None = None
     text: str
@@ -103,7 +103,8 @@ class ReferenceEmbed(BaseModel):
 
     #: The bare ``kind:id`` this answers.
     ref: str
-    entity_type: SearchEntityType
+    #: A built-in kind, or a tool plug-in's.
+    entity_type: str
     #: What the thing is called right now.
     title: str
     #: Its description, where the kind has one and it is filled in.

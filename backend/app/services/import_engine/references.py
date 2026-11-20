@@ -43,6 +43,7 @@ from app.core.references import (
     REFERENCE_NODES,
     SOURCE_REF,
     TEXT_REFERENCE,
+    TRIGGER_WORD,
     format_ref,
     kind_for_trigger,
     parse_ref,
@@ -58,7 +59,9 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from app.services.import_engine.context import ImportContext
 
 #: An exported reference in markdown: the id's place holds the ref instead.
-_EXPORTED_TEXT_REFERENCE = re.compile(r"#([\w-]+)\[([^\]]*)\]\(([a-z_]+:\d+)\)")
+_EXPORTED_TEXT_REFERENCE = re.compile(
+    rf"#({TRIGGER_WORD})\[([^\]]*)\]\(([a-z_][a-z0-9_]*(?:\.[a-z0-9]+)?:\d+)\)"
+)
 
 
 def _is_id(value: Any) -> bool:

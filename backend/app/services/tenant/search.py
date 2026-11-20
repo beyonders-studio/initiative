@@ -34,7 +34,6 @@ from sqlalchemy.sql.elements import ColumnElement
 from app.core.errors import CodedError
 from app.core.messages import KindMessages, PluginMessages
 from app.core.plugin_scopes import tool_resource
-from app.core.search import SearchEntityType
 from app.core.tool_set import BUILTIN_TOOLS, ToolRecord, ToolSet
 from app.core.tools import Tool, kind_refusal
 from app.db.authorization import standing_arg
@@ -337,7 +336,7 @@ class Filters:
     template: bool | None = None
     #: The thing being written in, which a reference may not name — see
     #: :meth:`clause`. A results page has no subject and leaves this unset.
-    subject: tuple[SearchEntityType, int] | None = None
+    subject: tuple[str, int] | None = None
     #: The community's tools, whose kinds are what it indexes.
     tools: ToolSet = BUILTIN_TOOLS
 

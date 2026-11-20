@@ -2,7 +2,8 @@
  * Remark plugins for rendering comment bodies.
  *
  * Comments are markdown, but they also carry the mention syntax the composer
- * writes — `@[](12)`, `#task[Title](3)`, `#file[…](3)`, `#project[…](3)`.
+ * writes — `@[](12)`, `#task[Title](3)`, `#file[…](3)`, `#project[…](3)`, and
+ * for a tool plug-in's row `#counter-group.tsjvtcm0s7gv2x[…](3)`.
  * That syntax is shaped like a markdown link, so remark parses it before any
  * text-level pass can see it: the result is a text node ending in the trigger
  * followed by a link whose url is the entity id. `remarkMentions` recognises
@@ -13,11 +14,18 @@
  * into a link there.
  */
 
-import type { SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
-import { ENTITY_TRIGGER, TRIGGER_WORDS, typeForTrigger, USER_TRIGGER } from "@/lib/mentions";
+import {
+  ENTITY_TRIGGER,
+  TRIGGER_WORD,
+  TRIGGER_WORDS,
+  typeForTrigger,
+  USER_TRIGGER,
+} from "@/lib/mentions";
 import { type MdastNode, visitParents } from "@/lib/remarkProse";
+import { isToolPluginKind } from "@/lib/toolPlugins";
 
-export type MentionType = "user" | SearchEntityType;
+/** `user`, or the kind a `#` names: a built-in one, or a tool plug-in's. */
+export type MentionType = string;
 
 /** Trigger text preceding the link, longest first so `#counter` can't shadow
  *  a longer trigger that happens to share its prefix.
@@ -44,9 +52,22 @@ function textOf(node: MdastNode): string {
   return (node.children ?? []).map(textOf).join("");
 }
 
+/** A trigger word ending the text, which for a tool plug-in's kind is read by
+ *  its shape rather than from the built-in list. */
+const TRIGGER_AT_END = new RegExp(`${ENTITY_TRIGGER}(${TRIGGER_WORD})$`);
+
+/** The trigger the text ends in: a tool plug-in's kind, or one of
+ *  {@link TRIGGERS}. */
+function triggersAt(text: string): { trigger: string; type: MentionType }[] {
+  const word = TRIGGER_AT_END.exec(text)?.[1];
+  const kind = word?.replaceAll("-", "_");
+  if (!word || !kind || !isToolPluginKind(kind)) return TRIGGERS;
+  return [{ trigger: `${ENTITY_TRIGGER}${word}`, type: kind }];
+}
+
 /** A trigger only counts at a word boundary, so `email@[x](1)` stays a link. */
 function triggerAt(text: string): { trigger: string; type: MentionType } | null {
-  for (const candidate of TRIGGERS) {
+  for (const candidate of triggersAt(text)) {
     if (!text.endsWith(candidate.trigger)) continue;
     const before = text[text.length - candidate.trigger.length - 1];
     if (before === undefined || /[\s([{]/.test(before)) return candidate;

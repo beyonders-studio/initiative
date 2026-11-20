@@ -18,7 +18,14 @@ from app.models.platform.guild import CommunityRole
 from app.models.tenant.relationship import EntityRelationship
 from app.services.tenant import content_references
 from app.services.tenant.relationships import Endpoint
-from app.testing import create_comment, create_file, create_project, create_task
+from app.testing import (
+    add_counter,
+    create_comment,
+    create_file,
+    create_project,
+    create_task,
+    install_tool_plugin,
+)
 
 
 def _doc(*nodes: dict[str, Any]) -> dict[str, Any]:
@@ -107,6 +114,34 @@ def test_a_hash_reads_every_spelling_the_composer_writes():
 
 def test_a_hash_naming_no_known_kind_is_not_a_reference():
     assert references_in_text("#widget[Nope](3)") == set()
+
+
+def test_a_hash_names_a_tool_plugins_kind_as_go_spells_it():
+    """A tool plug-in's kind is its key kebabed, ``.`` and its uid, as a
+    ``/go`` link spells it, and an editor node names it as it is."""
+    group, counter = "counter_group.tsjvtcm0s7gv2x", "counter.tsjvtcm0s7gv2x"
+    assert references_in_text(
+        "#counter-group.tsjvtcm0s7gv2x[Tally](4) and #counter.tsjvtcm0s7gv2x[Laps](5)"
+    ) == {(group, 4), (counter, 5)}
+    assert references_in_body(_doc(_reference(group, 4), _reference(counter, 5))) == {
+        (group, 4),
+        (counter, 5),
+    }
+
+
+def test_a_hash_a_tool_plugins_kind_could_not_be_is_not_a_reference():
+    """Only the shape of a kind is read here; one that is not the shape (a
+    capital, a second ``.``, an empty side) is the words it was written with."""
+    for written in (
+        "#counter.TSJV[A](1)",
+        "#counter.a.b[A](1)",
+        "#counter.[A](1)",
+        "#.abc[A](1)",
+        "#Counter.abc[A](1)",
+        "#1counter.abc[A](1)",
+        "#counter.a-b[A](1)",
+    ):
+        assert references_in_text(written) == set(), written
 
 
 def test_a_user_mention_is_not_a_hash_reference():
@@ -432,3 +467,83 @@ async def test_a_comment_on_a_task_keeps_what_its_description_says(
         ("file", doc.id),
         ("task", other.id),
     }
+
+
+async def _referenced(client, actor, entity: str) -> set[tuple[str, int]]:
+    """What the API lists ``entity`` as referring to, for ``actor``."""
+    response = await client.get(
+        actor.g("/relationships/"),
+        headers=actor.headers,
+        params={"entity": entity, "relationship_type": "references"},
+    )
+    assert response.status_code == 200, response.text
+    return {
+        (edge["other"]["type"], edge["other"]["id"])
+        for edge in response.json()
+        if edge["direction"] == "outbound"
+    }
+
+
+async def test_a_tool_plugins_rows_are_referenced_as_a_built_in_tools_are(
+    client, session, acting_user
+):
+    """A ``#`` naming a tool plug-in's row or item in a comment is recorded
+    against what the comment is on, and a ``#`` in the row's own text field
+    is recorded against the row, as a task's description is. Taking the
+    sentence out takes the edge with it, and the system's own resync keeps
+    what the comment says."""
+    seat = await acting_user(
+        guild_role=CommunityRole.superadmin, initiative=True, project=True
+    )
+    await install_tool_plugin(client, session, seat)
+    tools, group, counter = await add_counter(
+        session, seat.guild.id, seat.initiative.id
+    )
+    (tool,) = tools.installed
+    (item_kind,) = (child.value for child in tool.children)
+    task = await create_task(session, seat.project)
+    group_word = tool.kind.replace("_", "-")
+    item_word = item_kind.replace("_", "-")
+
+    response = await client.post(
+        seat.g("/comments/"),
+        headers=seat.headers,
+        json={
+            "subject_type": "task",
+            "subject_id": task.id,
+            "content": f"see #{group_word}[Scores]({group}) "
+            f"and #{item_word}[Laps]({counter})",
+        },
+    )
+    assert response.status_code == 201, response.text
+    assert await _referenced(client, seat, f"task:{task.id}") == {
+        (tool.kind, group),
+        (item_kind, counter),
+    }
+    # The system's own resync (a comment trashed and restored) reads the
+    # community's installs, so it keeps them.
+    await content_references.sync_for_entity(session, Endpoint(TASK, task.id))
+    await session.commit()
+    assert await _referenced(client, seat, f"task:{task.id}") == {
+        (tool.kind, group),
+        (item_kind, counter),
+    }
+
+    written = f"/plugin-tools/{tool.kind}/{group}"
+    response = await client.patch(
+        seat.g(written),
+        headers=seat.headers,
+        json={"fields": {"description": f"for #task[Do it]({task.id})"}},
+    )
+    assert response.status_code == 200, response.text
+    assert await _referenced(client, seat, f"{tool.kind}:{group}") == {
+        ("task", task.id)
+    }
+
+    response = await client.patch(
+        seat.g(written),
+        headers=seat.headers,
+        json={"fields": {"description": "for nothing"}},
+    )
+    assert response.status_code == 200, response.text
+    assert await _referenced(client, seat, f"{tool.kind}:{group}") == set()

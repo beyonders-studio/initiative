@@ -246,8 +246,12 @@ export interface InstalledTool {
 export const toolPluginKind = (key: string, listingUid: string): string =>
   `${key}.${listingUid.toLowerCase()}`;
 
-/** Whether a kind is a plug-in's: built-in kinds never hold a `.`. */
-export const isToolPluginKind = (kind: string): boolean => kind.includes(".");
+/** How a plug-in table's kind is written: a key (a lower-case letter, then
+ *  lower-case letters, digits and `_`), `.`, and a uid in lower case. */
+const TOOL_PLUGIN_KIND = /^[a-z][a-z0-9_]*\.[a-z0-9]+$/;
+
+/** Whether a kind is written as a plug-in's: built-in kinds never hold a `.`. */
+export const isToolPluginKind = (kind: string): boolean => TOOL_PLUGIN_KIND.test(kind);
 
 const isToolDecl = (definition: Record<string, unknown>): boolean =>
   definition.plugin_kind === "tool" &&

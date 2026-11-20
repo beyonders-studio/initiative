@@ -127,6 +127,30 @@ describe("references in markdown", () => {
     });
   });
 
+  it("name a tool plug-in's row by its kind, there and back", () => {
+    const editor = makeEditor();
+    update(editor, () => {
+      $getRoot()
+        .clear()
+        .append(
+          $createParagraphNode().append(
+            $createEntityMentionNode("counter_group.tsjvtcm0s7gv2x", 4, "Tally")
+          )
+        );
+    });
+    const markdown = toMarkdown(editor);
+    expect(markdown).toBe("[[counter_group.tsjvtcm0s7gv2x:4|Tally]]");
+    expect(inline(fromMarkdown(markdown))).toEqual(["link counter_group.tsjvtcm0s7gv2x:4 Tally"]);
+    expect(inline(fromMarkdown("[[counter.TSJV:4|Tally]]"))).toEqual([
+      "text [[counter.TSJV:4|Tally]]",
+    ]);
+    fromMarkdown("![[counter.tsjvtcm0s7gv2x:5|Laps]]")
+      .getEditorState()
+      .read(() => {
+        expect($isReferenceEmbedNode($getRoot().getFirstChild())).toBe(true);
+      });
+  });
+
   it("come back from inside a table cell, the pipe escaped as a table needs", () => {
     const row = "| [[task:12\\|Roll call]] | [[task:12:status\\|Roll call]] |";
     const editor = fromMarkdown(["| Task | State |", "| --- | --- |", row].join("\n"));

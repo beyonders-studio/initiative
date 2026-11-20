@@ -1,10 +1,6 @@
 import { useQueries, useQuery } from "@tanstack/react-query";
 
-import type {
-  ReferenceEmbed,
-  SearchEntityType,
-  SmartChipState,
-} from "@/api/generated/initiativeAPI.schemas";
+import type { ReferenceEmbed, SmartChipState } from "@/api/generated/initiativeAPI.schemas";
 import { readReferenceEmbeds, readSmartChips } from "@/api/generated/smart-chips/smart-chips";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { batchedReader } from "@/lib/batchedReader";
@@ -107,17 +103,15 @@ export const useChipStates = (refs: string[], enabled = true, communityId?: numb
 
 /** What a referenced thing is called right now, or `undefined` where it cannot
  *  be read — deleted, or never shared with this reader. */
-export const useReferenceTitle = (
-  entityType: SearchEntityType,
-  entityId: number
-): string | undefined => useChipState(referenceRef(entityType, entityId))?.text || undefined;
+export const useReferenceTitle = (entityType: string, entityId: number): string | undefined =>
+  useChipState(referenceRef(entityType, entityId))?.text || undefined;
 
 /**
  * What an embedded reference shows — the thing's name and its description —
  * or `null` where it cannot be read. Kept current the way a chip is: a change
  * to the thing marks it stale.
  */
-export const useReferenceEmbed = (entityType: SearchEntityType, entityId: number) => {
+export const useReferenceEmbed = (entityType: string, entityId: number) => {
   const communityId = useActiveCommunityId();
   const ref = referenceRef(entityType, entityId);
   return useQuery<ReferenceEmbed | null>({
