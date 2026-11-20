@@ -28,9 +28,12 @@ describe("widget error messages", () => {
     expect(Object.keys(english).sort()).toEqual([...WIDGET_ERROR_CODES, "default"].sort());
   });
 
-  it.each(locales.filter(({ locale }) => locale !== "en"))(
-    "$locale is actually translated, not copied from en",
+  it.each(locales)(
+    "$locale has a message for every error code, translated rather than copied from en",
     ({ locale, widgetError }) => {
+      const blank = [...WIDGET_ERROR_CODES, "default"].filter((key) => !widgetError[key]?.trim());
+      expect(blank, `${locale} has no message for: ${blank.join(", ")}`).toHaveLength(0);
+      if (locale === "en") return;
       const english = locales.find((entry) => entry.locale === "en")?.widgetError ?? {};
       const identical = Object.keys(widgetError).filter((key) => widgetError[key] === english[key]);
       expect(identical, `${locale} left untranslated: ${identical.join(", ")}`).toHaveLength(0);

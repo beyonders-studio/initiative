@@ -42,6 +42,15 @@ describe("useYjsHistory (React lifecycle)", () => {
 
     act(() => result.current.redo());
     expect(cells.get("0:0")).toBe("a");
+
+    // Two quick edits with the same origin stay separate undo steps.
+    act(() => {
+      doc.transact(() => cells.set("0:1", "b"), "spreadsheet-edit");
+      doc.transact(() => cells.set("0:2", "c"), "spreadsheet-edit");
+    });
+    act(() => result.current.undo());
+    expect(cells.has("0:2")).toBe(false);
+    expect(cells.get("0:1")).toBe("b");
   });
 });
 

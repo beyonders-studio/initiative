@@ -130,19 +130,6 @@ describe("shardOfQueryKey", () => {
   });
 });
 
-describe("shardOfQueryKey", () => {
-  it("files a community's content under that community", () => {
-    expect(shardOfQueryKey(["/api/v1/c/3/tasks/2866"])).toBe("g3");
-    expect(shardOfQueryKey(["/api/v1/c/12/files"])).toBe("g12");
-  });
-
-  it("files everything else under the platform shard", () => {
-    expect(shardOfQueryKey(["/api/v1/me"])).toBe("platform");
-    expect(shardOfQueryKey(["/api/v1/me/tasks", { page: 1 }])).toBe("platform");
-    expect(shardOfQueryKey([{ scope: "community-plugin" }])).toBe("platform");
-  });
-});
-
 describe("offlineCacheBuster", () => {
   it("differs per server, so pointing at another deployment discards the cache", () => {
     expect(offlineCacheBuster("https://a.example")).not.toBe(

@@ -70,6 +70,32 @@ describe("PropertyFilter", () => {
     expect(onChange).toHaveBeenCalledWith([row], []);
   });
 
+  const COMPARISONS = ["is", "<", "≤", ">", "≥", "is empty"];
+  it.each([
+    [MetadataType.text, ["contains", "is", "is empty"]],
+    [MetadataType.url, ["contains", "is", "is empty"]],
+    [MetadataType.number, COMPARISONS],
+    [MetadataType.date, COMPARISONS],
+    [MetadataType.datetime, COMPARISONS],
+    [MetadataType.checkbox, ["is", "is empty"]],
+    [MetadataType.select, ["is", "in", "is empty"]],
+    [MetadataType.multi_select, ["is"]],
+    [MetadataType.user_reference, ["is", "in", "is empty"]],
+  ])("offers a %s property its own operators", async (type, labels) => {
+    const definition = buildPropertyDefinition({ id: 20, name: "Field", type });
+    renderWithProviders(
+      <PropertyFilter
+        {...INPUT}
+        definitions={[definition]}
+        value={[{ property_id: 20, op: "eq", value: null }]}
+        onChange={vi.fn()}
+      />
+    );
+    await userEvent.click(await screen.findByRole("combobox", { name: "Op" }));
+    const options = await screen.findAllByRole("option");
+    expect(options.map((option) => option.textContent)).toEqual(labels);
+  });
+
   it("caps the number of filters at the configured max (default 5)", async () => {
     const definitions = [
       textDef,
