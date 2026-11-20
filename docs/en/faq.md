@@ -34,7 +34,7 @@ The [plug-in SDK](https://github.com/beyonders-studio/initiative-plugin-sdk) and
 
 Yes. The **Marketplace** has ready-made dashboards, projects and plug-ins, and adding one takes a couple of clicks and no code. It holds what ships with Initiative plus what the person running your server lets in, so if something's missing, they're who to ask.
 
-A dashboard or a project goes into an initiative like anything else you make. A plug-in is added to the whole community, by its superadmin. A few plug-ins connect to another service and need setting up on the server first; see [Plug-ins that need something running behind them](self-host-or-hosted.md#plug-ins-that-need-something-running-behind-them). More in [Plug-ins & the marketplace](guides/plugins-and-marketplace.md).
+A dashboard or a project goes into an initiative like anything else you make. A plug-in is added to the whole community, by its superadmin, and some plug-ins are whole tools: [Counters](guides/counters.md) is one, and works in an initiative like the tools built in. A few plug-ins connect to another service and need setting up on the server first; see [Plug-ins that need something running behind them](self-host-or-hosted.md#plug-ins-that-need-something-running-behind-them). More in [Plug-ins & the marketplace](guides/plugins-and-marketplace.md).
 
 ## Getting in
 

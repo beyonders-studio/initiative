@@ -89,7 +89,7 @@ Each initiative switches its tools on and off, and projects and files are the on
 
 ## Plug-ins: what other groups already built
 
-The **marketplace** has ready-made dashboards, projects and plug-ins, built by people who had your problem first. A dashboard or a project lands in an initiative like any other tool. A plug-in adds something the whole community shares, so the community's superadmin adds it. See [Plug-ins & the marketplace](../guides/plugins-and-marketplace.md).
+The **marketplace** has ready-made dashboards, projects and plug-ins, built by people who had your problem first. A dashboard or a project lands in an initiative like any other tool. A plug-in adds something the whole community shares, sometimes a whole new tool, so the community's superadmin adds it. See [Plug-ins & the marketplace](../guides/plugins-and-marketplace.md).
 
 ## Who can see what
 
