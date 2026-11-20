@@ -16,6 +16,7 @@ def test_an_unresolved_status_counts_as_incomplete():
     task = Task(
         project_id=1,
         task_status_id=1,
+        task_type_id=1,
         title="t",
         completed_at=datetime(2026, 8, 7, 12, 0, tzinfo=UTC),
     )
