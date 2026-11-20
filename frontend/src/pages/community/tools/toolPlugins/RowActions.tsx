@@ -249,10 +249,12 @@ export const RowActions = ({
           <div className="space-y-4">
             {params.map((field) => {
               const label = toolText(field.name, language);
+              const id = `action-param-${field.key}`;
               return (
                 <div key={field.key} className="space-y-1.5">
-                  <Label>{label}</Label>
+                  <Label htmlFor={id}>{label}</Label>
                   <ToolFieldInput
+                    id={id}
                     field={field}
                     row={answers}
                     label={label}

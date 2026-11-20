@@ -13,17 +13,20 @@ from typing import Self
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tool_set import BUILTIN_TOOLS
 from app.db.request_context import SystemGuild
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.event_outbox import EventOutbox
 from app.services.content_sockets import RoomKey, guild_room, initiative_room, sockets
 from app.services.tenant import room_sink
 from app.testing import (
+    add_counter,
     create_comment,
     create_file,
     create_initiative_member,
     create_tag,
     create_task,
+    install_tool_plugin,
 )
 from app.testing.sockets import FakeWebSocket, settle, watch_events_bus
 
@@ -124,6 +127,28 @@ async def test_a_comment_names_its_thread_and_the_project(session, acting_user):
             {"type": "tasks", "id": task.id},
             {"type": "projects", "id": a.project.id},
         ]
+
+
+async def test_a_tool_plugins_rows_are_named_by_their_kinds(
+    client, session, acting_user
+):
+    """A tool plug-in's tables, the row's and the one it sits under, are named
+    by their kinds, as its routes address them."""
+    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    seat = await acting_user(guild=a.guild, guild_role=CommunityRole.superadmin)
+    await install_tool_plugin(client, session, seat)
+
+    async with _Watcher(a.guild.id, a.initiative.id) as watcher:
+        tools, group, counter = await add_counter(session, a.guild.id, a.initiative.id)
+        await watcher.catch_up()
+        (tool,) = tools.installed
+        (item,) = tool.children
+
+        counters = watcher.named(item.value)
+        assert counters, f"no counter change; got {watcher.changes}"
+        assert counters[-1]["resource"] == {"type": item.value, "id": counter}
+        assert counters[-1]["parents"] == [{"type": tool.kind, "id": group}]
+        assert watcher.named(tool.kind)[-1]["resource"]["id"] == group
 
 
 async def test_another_initiatives_room_hears_nothing(session, acting_user):
@@ -343,7 +368,7 @@ def test_a_transaction_too_large_to_name_says_so_instead() -> None:
         )
         for i in range(room_sink.MAX_CHANGES + 1)
     ]
-    frame = room_sink._frame(rows)
+    frame = room_sink._frame(rows, BUILTIN_TOOLS)
 
     assert frame == {"changes": [], "more": True}
 
@@ -365,7 +390,7 @@ def test_one_row_written_repeatedly_is_one_change() -> None:
         for i, changed in enumerate((["title"], ["status_id"], ["title"]), start=1)
     ]
 
-    frame = room_sink._frame(rows)
+    frame = room_sink._frame(rows, BUILTIN_TOOLS)
 
     assert frame["changes"] == [
         {

@@ -689,6 +689,8 @@ async def test_a_tool_is_read_as_its_plugin_declares_it(client, session, acting_
     assert (reset["id"], reset["on"], reset["params"]) == ("reset", COUNTER, [])
     assert (reset_all["id"], reset_all["on"]) == ("reset_all", GROUP)
     assert reset_all["confirm"]
+    # Its envelope, and with one item table a table of a group's counters.
+    assert tool["export_formats"] == ["json", "csv", "xlsx"]
     # Neither its layouts nor what an action writes.
     assert "layouts" not in tool and "layouts" not in item
     assert "write" not in reset and "write" not in reset_all

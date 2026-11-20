@@ -4,10 +4,9 @@
  * initiative's properties, and the parts every tool's page has.
  */
 
-import type { ComponentType, ReactNode } from "react";
+import { type ComponentType, type ReactNode, useContext } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { PluginToolRowUpdate } from "@/api/generated/initiativeAPI.schemas";
 import { ToolCommentsPanel } from "@/components/comments/ToolCommentsPanel";
 import { TagsField } from "@/components/tags/TagsField";
 import { useSearchMembers } from "@/hooks/useUsers";
@@ -18,6 +17,7 @@ import {
   fieldValue,
   type ToolFieldDecl,
   type ToolRow,
+  type ToolRowChange,
   type ToolTable,
   toolText,
   withChange,
@@ -25,13 +25,25 @@ import {
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import { type ItemHome, useItemContext, useItemHome } from "@/ui/layouts/DetailLayoutView";
 import { at, detailLayoutSpec, type Region } from "@/ui/layouts/detailLayout";
-import { FieldFrame, ReadField, sameJson, useFieldDraft } from "@/ui/layouts/editing";
+import {
+  FieldFrame,
+  ItemDraftContext,
+  ReadField,
+  sameJson,
+  useFieldDraft,
+} from "@/ui/layouts/editing";
 import { type ItemSaves, TitleField } from "@/ui/layouts/fieldEditors";
+import { type FieldDef, withDisplays } from "@/ui/layouts/fields";
 import type { LayoutNode } from "@/ui/layouts/tree";
 import { formatDateTime } from "@/ui/lib/formatDate";
+import type { CounterFocusHost } from "@/ui/properties/CounterFocus";
 import { PropertyInput } from "@/ui/properties/PropertyInput";
 import { PropertyValueCell } from "@/ui/properties/PropertyValueCell";
-import { isEmptyPropertyValue } from "@/ui/properties/propertyHelpers";
+import {
+  type FieldDisplay,
+  isEmptyPropertyValue,
+  steppedCount,
+} from "@/ui/properties/propertyHelpers";
 
 import { toolFields } from "./toolFields";
 
@@ -41,14 +53,18 @@ export interface ToolRowContext {
   readOnly: boolean;
   initiativeId: number;
   /** How its fields are saved, each on its own. */
-  saves: ItemSaves<ToolRow, PluginToolRowUpdate>;
+  saves: ItemSaves<ToolRow, ToolRowChange>;
   /** The menu of what else can be done with it. */
   actions: ReactNode;
+  /** A counter field's full screen on the row's own page, by the field's
+   *  key: whether it is open, and the rows it moves between. Elsewhere it
+   *  opens on its own. */
+  focus?: (field: string) => CounterFocusHost;
 }
 
 type EditorProps = { item: ToolRow; label: string };
 
-const useRowHome = () => useItemHome() as ItemHome<ToolRow, PluginToolRowUpdate>;
+const useRowHome = () => useItemHome() as ItemHome<ToolRow, ToolRowChange>;
 
 const NameEditor = ({ item, label }: EditorProps) => {
   const { t } = useTranslation("plugins");
@@ -83,15 +99,33 @@ const TagsEditor = ({ item, label }: EditorProps) => {
 
 /**
  * One declared field, saved on its own: a colour with the colour picker, any
- * other kind with the editor a property of its kind has. Its options are the
- * declaration's, so none is made from what is typed. A reader sees its value,
- * and nothing where it holds none.
+ * other kind with the editor a property of its kind has, a scale or a counter
+ * in the look its table's lists draw it in (`look`). Its options are the
+ * declaration's, so none is made from what is typed. A counter steps through
+ * the step route, so two people stepping it at once both count, and opens
+ * full screen under the row's name, on the colour its `tint` field holds. A
+ * reader sees its value, and nothing where it holds none; a counter's they
+ * watch full screen too.
  */
-const DeclaredFieldEditor = ({ field, item, label }: EditorProps & { field: ToolFieldDecl }) => {
+const DeclaredFieldEditor = ({
+  field,
+  look,
+  tint,
+  item,
+  label,
+}: EditorProps & {
+  field: ToolFieldDecl;
+  look: FieldDef<ToolRow> | undefined;
+  tint: ToolFieldDecl | undefined;
+}) => {
   const { i18n } = useTranslation();
   const home = useRowHome();
+  const { focus } = useItemContext<ToolRowContext>();
+  // An item being added has no counter to step yet.
+  const adding = useContext(ItemDraftContext) !== null;
   const save = home.saves.useSave(label);
   const saved = fieldValue(item, field);
+  const display = look?.displayOf?.(item) ?? look?.display;
   const draft = useFieldDraft<unknown>(
     saved,
     (value) => {
@@ -102,11 +136,41 @@ const DeclaredFieldEditor = ({ field, item, label }: EditorProps & { field: Tool
     sameJson
   );
   const summary = fieldSummary(field, item, i18n.language);
+  // A step is taken from what the counter holds when it lands, and shows at
+  // once as it reads from here.
+  const step = (up: boolean) => {
+    draft.restore();
+    void save.save({
+      patch: { step: { field: field.key, ...(up ? {} : { down: true }) } },
+      shows: {
+        fields: { ...item.fields, [field.key]: steppedCount(summary.counter, saved, up) },
+      },
+    });
+  };
+  const counterFocus: CounterFocusHost | undefined =
+    field.kind === "counter"
+      ? {
+          name: item.name || label,
+          color: tint ? ((fieldValue(item, tint) as string | null) ?? null) : null,
+          ...focus?.(field.key),
+        }
+      : undefined;
   if (home.readOnly) {
     if (isEmptyPropertyValue(saved)) return null;
     return (
       <ReadField label={label}>
-        {field.kind === "color" ? (
+        {field.kind === "counter" ? (
+          <ToolFieldInput
+            field={field}
+            row={item}
+            label={label}
+            value={saved}
+            onChange={() => {}}
+            display={display}
+            focus={counterFocus}
+            disabled
+          />
+        ) : field.kind === "color" ? (
           <span
             className="block h-5 w-5 rounded-full border"
             style={{ backgroundColor: String(saved) }}
@@ -114,7 +178,7 @@ const DeclaredFieldEditor = ({ field, item, label }: EditorProps & { field: Tool
             <span className="sr-only">{String(saved)}</span>
           </span>
         ) : (
-          <PropertyValueCell summary={summary} variant="cell" />
+          <PropertyValueCell summary={summary} variant="cell" display={display} />
         )}
       </ReadField>
     );
@@ -129,13 +193,18 @@ const DeclaredFieldEditor = ({ field, item, label }: EditorProps & { field: Tool
         onChange={draft.edit}
         initiativeId={home.initiativeId}
         canOpen={home.canOpen}
+        display={display}
+        focus={counterFocus}
+        onStep={adding ? undefined : step}
       />
     </FieldFrame>
   );
 };
 
 /** A declared field's editor: the colour picker for a colour, the editor a
- *  property of its kind has for any other. `row` gives a counter its bounds. */
+ *  property of its kind has for any other, drawn as `display` says. `row`
+ *  gives a counter its bounds, `onStep` its steps and `focus` its full
+ *  screen; `id` is its text box's or checkbox's, for a label to name. */
 export const ToolFieldInput = ({
   field,
   row,
@@ -144,6 +213,11 @@ export const ToolFieldInput = ({
   onChange,
   initiativeId,
   canOpen,
+  display,
+  focus,
+  onStep,
+  disabled,
+  id,
 }: {
   field: ToolFieldDecl;
   row: ToolRow;
@@ -152,6 +226,11 @@ export const ToolFieldInput = ({
   onChange: (value: unknown) => void;
   initiativeId?: number | null;
   canOpen?: { tool: string; id: number };
+  display?: FieldDisplay | null;
+  focus?: CounterFocusHost;
+  onStep?: (up: boolean) => void;
+  disabled?: boolean;
+  id?: string;
 }) => {
   const { i18n } = useTranslation();
   const searchMembers = useSearchMembers();
@@ -169,6 +248,11 @@ export const ToolFieldInput = ({
       initiativeId={initiativeId}
       canOpen={canOpen}
       searchMembers={searchMembers}
+      display={display}
+      focus={focus}
+      onStep={onStep}
+      disabled={disabled}
+      id={id}
     />
   );
 };
@@ -216,6 +300,11 @@ const regionsOf = (table: ToolTable): Record<Region, LayoutNode[]> => {
   };
 };
 
+/** How a table's lists draw its scales and counters, the first list that
+ *  says so for a field winning: what its rows' page draws them as. */
+const listDisplays = (table: ToolTable) =>
+  Object.assign({}, ...table.layouts.lists.map((list) => list.displays ?? {}).reverse());
+
 /**
  * One table's rows' detail: the layout it declared, as shipped, with an
  * editor for its name and each field it declares. Its rows' links, its
@@ -224,42 +313,51 @@ const regionsOf = (table: ToolTable): Record<Region, LayoutNode[]> => {
 export const toolDetail = (
   table: ToolTable,
   language: string
-): InitiativeDetail<ToolRow, ToolRowContext, PluginToolRowUpdate> => ({
-  spec: detailLayoutSpec({
-    kind: table.kind,
-    shipped: regionsOf(table),
-    fieldParts: ["field", "properties"],
-  }),
-  fields: (_definitions, added) =>
-    new Map([...toolFields(table, language), ...added.map((field) => [field.id, field] as const)]),
-  namespaces: ["plugins", "common", "tags"],
-  editors: {
-    name: NameEditor,
-    tags: TagsEditor,
-    ...Object.fromEntries(
-      table.fields.map((field): [string, ComponentType<EditorProps>] => [
-        field.key,
-        (props) => <DeclaredFieldEditor {...props} field={field} />,
-      ])
-    ),
-  },
-  parts: {
-    byline: (_node, row) => <Byline row={row} />,
-    notice: () => <Notice />,
-    comments: (_node, row) => <Comments row={row} kind={table.kind} />,
-    // Its rows hold none of the initiative's properties.
-    properties: () => null,
-  },
-  home: (row, context) => ({
-    saves: context.saves,
-    readOnly: context.readOnly,
-    initiativeId: context.initiativeId,
-    canOpen: { tool: table.kind, id: row.id },
-    links: {
-      entity: { id: row.id, initiative_id: context.initiativeId },
-      title: row.name || toolText(table.name, language),
+): InitiativeDetail<ToolRow, ToolRowContext, ToolRowChange> => {
+  const looks = withDisplays(toolFields(table, language), listDisplays(table));
+  const tint = table.fields.find((field) => field.kind === "color");
+  return {
+    spec: detailLayoutSpec({
+      kind: table.kind,
+      shipped: regionsOf(table),
+      fieldParts: ["field", "properties"],
+    }),
+    fields: (_definitions, added) =>
+      new Map([
+        ...toolFields(table, language),
+        ...added.map((field) => [field.id, field] as const),
+      ]),
+    namespaces: ["plugins", "common", "tags"],
+    editors: {
+      name: NameEditor,
+      tags: TagsEditor,
+      ...Object.fromEntries(
+        table.fields.map((field): [string, ComponentType<EditorProps>] => [
+          field.key,
+          (props) => (
+            <DeclaredFieldEditor {...props} field={field} look={looks.get(field.key)} tint={tint} />
+          ),
+        ])
+      ),
     },
-    actions: context.actions,
-  }),
-  useExtension: useInitiativeExtension,
-});
+    parts: {
+      byline: (_node, row) => <Byline row={row} />,
+      notice: () => <Notice />,
+      comments: (_node, row) => <Comments row={row} kind={table.kind} />,
+      // Its rows hold none of the initiative's properties.
+      properties: () => null,
+    },
+    home: (row, context) => ({
+      saves: context.saves,
+      readOnly: context.readOnly,
+      initiativeId: context.initiativeId,
+      canOpen: { tool: table.kind, id: row.id },
+      links: {
+        entity: { id: row.id, initiative_id: context.initiativeId },
+        title: row.name || toolText(table.name, language),
+      },
+      actions: context.actions,
+    }),
+    useExtension: useInitiativeExtension,
+  };
+};
