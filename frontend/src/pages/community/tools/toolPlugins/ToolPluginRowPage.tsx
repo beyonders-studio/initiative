@@ -69,7 +69,8 @@ export function ToolPluginRowPage() {
       </SkeletonRegion>
     );
   }
-  if (installs.isError) {
+  // A refresh that fails keeps the installs it had.
+  if (installs.isError && !installs.data) {
     return (
       <StatusMessage title={t("tool.installsLoadError")} onRetry={() => void installs.refetch()} />
     );

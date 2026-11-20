@@ -159,8 +159,9 @@ export const InitiativePage = ({ tool }: InitiativeDetailPageProps = {}) => {
   }
 
   // A tab the built-in tools do not name is a tool plug-in's, which is not
-  // given up for another while the installs could not be read.
-  if (installs.isError && tool && !TOOL_TAB_VIEWS.has(tool as Tool)) {
+  // given up for another while the installs could not be read; a refresh
+  // that fails keeps the installs it had.
+  if (installs.isError && !installs.data && tool && !TOOL_TAB_VIEWS.has(tool as Tool)) {
     return (
       <StatusMessage
         title={t("plugins:tool.installsLoadError")}

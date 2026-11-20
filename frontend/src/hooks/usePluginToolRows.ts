@@ -56,23 +56,25 @@ export const usePluginToolRow = (kind: string, rowId: number | null) =>
     query: { enabled: rowId !== null },
   });
 
+/** Adds a row. A row over it previews its items, so every tool plug-in row
+ *  is read again, as after every write here. */
 export const useCreatePluginToolRow = (kind: string) =>
   useCommunityMutation<PluginToolRowRead, PluginToolRowCreate>({
     mutationFn: (communityId, data) => createPluginToolRow(communityId, kind, data),
-    invalidate: () => invalidate(q.pluginToolRows(kind)),
+    invalidate: () => invalidate(q.pluginToolRows()),
     errorKey: "plugins:error",
   });
 
 /** Runs one of a table's actions on a row. What it writes may reach the rows
- *  under it, so every read of the tool is read again. */
-export const useRunPluginToolAction = (kind: string, itemKinds: readonly string[]) =>
+ *  under it and over it. */
+export const useRunPluginToolAction = (kind: string) =>
   useCommunityMutation<
     PluginToolRowRead,
     { rowId: number; actionId: string } & PluginToolActionRun
   >({
     mutationFn: (communityId, { rowId, actionId, ...run }) =>
       runPluginToolAction(communityId, kind, rowId, actionId, run),
-    invalidate: () => invalidate(q.pluginToolRows(kind), ...itemKinds.map(q.pluginToolRows)),
+    invalidate: () => invalidate(q.pluginToolRows()),
     errorKey: "plugins:error",
   });
 
@@ -141,11 +143,12 @@ export const useSetPluginToolRowGrants = (kind: string, rowId: number) =>
   });
 
 /** How a row of `kind` is saved field by field. Its rows hold none of the
- *  initiative's properties. */
+ *  initiative's properties; a row over it previews it, so every list of a
+ *  tool plug-in's rows is read again. */
 export const pluginToolRowSaves = (kind: string): FieldSaveKind<ToolRow, PluginToolRowUpdate> => ({
   name: `plugin-tool-${kind}`,
   readKey: (communityId, id) => getReadPluginToolRowQueryKey(communityId, kind, id),
   patch: (communityId, id, patch) => updatePluginToolRow(communityId, kind, id, patch),
-  lists: () => q.pluginToolRows(kind),
+  lists: () => q.pluginToolRows(),
   itself: () => q.pluginToolRows(kind),
 });

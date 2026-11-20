@@ -93,7 +93,7 @@ export const RowActions = ({
   const { t } = useTranslation(["plugins", "common"]);
   const navigate = useNavigate();
   const gp = useCommunityPath();
-  const run = useRunPluginToolAction(table.kind, table.items);
+  const run = useRunPluginToolAction(table.kind);
   const [asking, setAsking] = useState<ToolActionDecl | null>(null);
   // The answers to its params, as the row would hold them.
   const [answers, setAnswers] = useState<ToolRow>(row);

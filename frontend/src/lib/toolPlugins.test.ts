@@ -1,4 +1,6 @@
-import { Puzzle } from "lucide-react";
+import { render, waitFor } from "@testing-library/react";
+import { type LucideIcon, Puzzle } from "lucide-react";
+import { createElement } from "react";
 import { describe, expect, it } from "vitest";
 
 import { buildToolPlugin, buildToolRow, TOOL_PLUGIN_UID } from "@/__tests__/factories";
@@ -19,6 +21,18 @@ const uid = TOOL_PLUGIN_UID.toLowerCase();
 describe("tool plug-in icons", () => {
   it("draws every icon the contract lets a tool name, and nothing else", () => {
     expect(Object.keys(TOOL_PLUGIN_ICONS).sort()).toEqual([...contract.enums.toolIcon].sort());
+  });
+
+  it("draws an icon that fails to load as a puzzle piece", async () => {
+    const icons = TOOL_PLUGIN_ICONS as Record<string, () => Promise<never>>;
+    icons.trophy = () => Promise.reject(new Error("offline"));
+    const plugin = buildToolPlugin();
+    (plugin.definition.tool as { icon: string }).icon = "trophy";
+    const Icon = installedTool(plugin)?.icon as LucideIcon;
+
+    const { container } = render(createElement(Icon));
+
+    await waitFor(() => expect(container.querySelector(".lucide-puzzle")).not.toBeNull());
   });
 });
 

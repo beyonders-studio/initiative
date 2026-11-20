@@ -97,7 +97,7 @@ const toolIcons = new Map<string, LucideIcon>();
 
 /** A tool's icon by the name it declares, drawn once it has loaded (taking
  *  its room until then), or the puzzle piece for a name the app does not
- *  have. One component per name, so a redraw keeps it. */
+ *  have or an icon that does not load. One component per name, so a redraw keeps it. */
 const toolPluginIcon = (name: string): LucideIcon => {
   const load = TOOL_PLUGIN_ICONS[name];
   if (!load) return Puzzle;
@@ -108,10 +108,14 @@ const toolPluginIcon = (name: string): LucideIcon => {
     useEffect(() => {
       if (Loaded) return;
       let live = true;
-      void load().then(({ default: drawn }) => {
-        loadedIcons.set(name, drawn);
-        if (live) setLoaded(() => drawn);
-      });
+      // One that fails to load is drawn as the puzzle piece.
+      void load()
+        .then(({ default: drawn }) => drawn)
+        .catch(() => Puzzle)
+        .then((drawn) => {
+          loadedIcons.set(name, drawn);
+          if (live) setLoaded(() => drawn);
+        });
       return () => {
         live = false;
       };
