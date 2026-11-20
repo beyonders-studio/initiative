@@ -6,6 +6,7 @@ import type {
   ProfileDecorationsOutput,
 } from "@/api/generated/initiativeAPI.schemas";
 import { PresenceDot } from "@/components/user/PresenceDot";
+import { PresenceMenu } from "@/components/user/PresenceMenu";
 import { ProfileJoined } from "@/components/user/ProfileJoined";
 import { ProfileStatus } from "@/components/user/ProfileStatus";
 import { ProfileTrophies } from "@/components/user/ProfileTrophies";
@@ -15,7 +16,6 @@ import { decorationSrc, resolveDecoration } from "@/lib/profileDecorations";
 import type { AvatarSourceUser, DisplayableUser } from "@/lib/userDisplay";
 import { Card, CardContent } from "@/ui/card";
 
-import { PresenceMenu } from "./PresenceMenu";
 import { ProfilePicture } from "./ProfilePicture";
 
 interface ProfilePreviewProps {

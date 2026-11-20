@@ -8,6 +8,7 @@ import type {
   SearchSuggestion,
   UserSummary,
 } from "@/api/generated/initiativeAPI.schemas";
+import { StatusLine } from "@/components/user/ProfileStatus";
 import { useInitiative } from "@/hooks/useInitiatives";
 import { useCommunityPickerSuggestions } from "@/hooks/useSearch";
 import { type MemberSearchScope, useMemberSearch } from "@/hooks/useUsers";
@@ -54,6 +55,8 @@ interface Row {
   subtitle: string | null;
   leading: React.ReactNode;
   choose: MentionChoice;
+  /** A person's status, beside their name. */
+  status?: UserSummary["custom_status"];
 }
 
 const memberRow = (member: UserSummary): Row => {
@@ -73,6 +76,7 @@ const memberRow = (member: UserSummary): Row => {
       </Avatar>
     ),
     choose: { user: true, id: member.id, label, member },
+    status: member.custom_status,
   };
 };
 
@@ -266,7 +270,10 @@ export const MentionPopover = ({
           >
             {row.leading}
             <div className="min-w-0 flex-1">
-              <p className="truncate font-medium">{row.label}</p>
+              <div className="flex min-w-0 items-center gap-2">
+                <p className="truncate font-medium">{row.label}</p>
+                <StatusLine status={row.status} className="text-xs" />
+              </div>
               {row.subtitle && (
                 <p className="truncate text-muted-foreground text-xs">{row.subtitle}</p>
               )}

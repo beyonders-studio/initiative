@@ -15,7 +15,7 @@ const profile = (overrides: Partial<UserProfile> = {}): UserProfile => ({
   discriminator: 7,
   avatar_url: null,
   status: "active",
-  custom_status: { emoji: "📐", text: "Writing the note" },
+  custom_status: { emoji: "📐", text: "Writing the note", clear_at: null },
   profile_decorations: {
     banner: "core.aurora",
     frame: null,
@@ -78,7 +78,7 @@ describe("the card a mention opens", () => {
   });
 
   it("leaves out a status nobody set", async () => {
-    answerWithProfile(profile({ custom_status: { emoji: null, text: null } }));
+    answerWithProfile(profile({ custom_status: { emoji: null, text: null, clear_at: null } }));
 
     renderWithProviders(<UserMiniProfile handle="ada0007" />);
 
