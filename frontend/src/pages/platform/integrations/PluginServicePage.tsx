@@ -16,7 +16,7 @@ import {
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
-import { vendorCheckRefusalIn } from "@/lib/pluginServices";
+import { runsAService, vendorCheckRefusalIn } from "@/lib/pluginServices";
 import { localized } from "@/lib/widgets/widgetMeta";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
@@ -89,12 +89,11 @@ export const PluginServicePage = () => {
   }
 
   const registration = query.data;
-  const declarative = registration.kind === "declarative";
+  const service = runsAService(registration);
 
   const handleSubmit = (values: PluginServiceFormValues) => {
-    // A declarative plug-in runs nowhere and signs nothing: it has no address,
-    // origins or keys to send.
-    const placement = declarative
+    // Only a container has an address, origins and keys to send.
+    const placement = !service
       ? {}
       : {
           base_url: values.baseUrl,
@@ -173,8 +172,8 @@ export const PluginServicePage = () => {
       text: t("pluginServices.publisherDisabledHelp", { name: registration.publisher_name }),
       destructive: true,
     },
-    !declarative && !registration.base_url && { text: t("pluginServices.needsAddress") },
-    !declarative && !hasKeys(registration) && { text: t("pluginServices.noKeysHelp") },
+    service && !registration.base_url && { text: t("pluginServices.needsAddress") },
+    service && !hasKeys(registration) && { text: t("pluginServices.noKeysHelp") },
     !registration.vendor_ready && { text: t("pluginServices.vendorMissingHelp") },
     registration.availability === PluginAvailability.operations && {
       text: registration.mandatory

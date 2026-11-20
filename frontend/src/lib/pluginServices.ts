@@ -2,7 +2,17 @@
 
 import { isAxiosError } from "axios";
 
+import type { PluginServiceRegistrationRead } from "@/api/generated/initiativeAPI.schemas";
 import { getErrorCode } from "@/lib/errorMessage";
+
+/**
+ * Whether Initiative calls the registration's plug-in: a container, the one
+ * kind with an address, origins and a key set. A declarative plug-in's calls
+ * are Initiative's own and a tool plug-in runs no code, so either is live
+ * with none of them set.
+ */
+export const runsAService = (registration: Pick<PluginServiceRegistrationRead, "kind">): boolean =>
+  registration.kind === "container";
 
 /**
  * What a plug-in's vendor check refused a save for: the vendor fields it

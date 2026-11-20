@@ -11,7 +11,7 @@ import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useConnectPluginService, usePluginServiceKeys } from "@/hooks/usePluginServices";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
-import { parseAllowedOrigins } from "@/lib/pluginServices";
+import { parseAllowedOrigins, runsAService } from "@/lib/pluginServices";
 import { Button } from "@/ui/button";
 import { CopyButton } from "@/ui/copy-button";
 import { Field } from "@/ui/field";
@@ -201,7 +201,8 @@ export const PluginServiceForm = ({
     });
   };
 
-  const declarative = editing?.kind === "declarative";
+  // A new registration is a container's until its listing says otherwise.
+  const service = !editing || runsAService(editing);
 
   return (
     <form className="space-y-6" onSubmit={handleSubmit}>
@@ -220,9 +221,9 @@ export const PluginServiceForm = ({
         </Field>
       )}
 
-      {/* A declarative plug-in runs nowhere and signs nothing: only its
-          vendor values and its reach apply. */}
-      {!declarative && (
+      {/* Only a container runs somewhere and signs: for a declarative or a
+          tool plug-in, only its vendor values and its reach apply. */}
+      {service && (
         <>
           <SettingsSection plain={plain} title={t("pluginServices.placementTitle")}>
             {editing?.compose_service && (
