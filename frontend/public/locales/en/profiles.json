@@ -299,6 +299,13 @@
       "today": "Today",
       "week": "This week",
       "custom": "Choose a date and time"
+    },
+    "pause": {
+      "label": "Pause notifications",
+      "help": "Until your status clears. The bell keeps collecting, and you get one summary when it ends.",
+      "running": "Paused until {{time}}.",
+      "needsEnd": "Pick when your status clears to pause until then.",
+      "failed": "Notifications could not be paused."
     }
   },
   "communities": {

@@ -107,13 +107,18 @@ describe("SidebarUserFooter", () => {
     );
   });
 
-  it("sets a suggestion with the time it usually ends", async () => {
+  it("sets a suggestion with the time it usually ends, paused until then", async () => {
     const user = userEvent.setup();
     let sent: Record<string, unknown> | undefined;
+    let paused: Record<string, unknown> | undefined;
     server.use(
       http.patch("*/api/v1/me", async ({ request }) => {
         sent = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(buildUser());
+      }),
+      http.put("*/api/v1/me/notification-preferences", async ({ request }) => {
+        paused = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({});
       })
     );
     renderFooter();
@@ -121,6 +126,7 @@ describe("SidebarUserFooter", () => {
     await user.click(await screen.findByRole("button", { name: "Your status" }));
     await user.click(await screen.findByRole("button", { name: /In a meeting/ }));
     expect(screen.getByRole("combobox")).toHaveTextContent("1 hour");
+    await user.click(screen.getByRole("switch", { name: /Pause notifications/ }));
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(sent).toBeDefined());
@@ -129,6 +135,7 @@ describe("SidebarUserFooter", () => {
     const hour = Date.parse(status.clear_at) - Date.now();
     expect(hour).toBeGreaterThan(59 * 60_000);
     expect(hour).toBeLessThanOrEqual(60 * 60_000);
+    expect(paused).toEqual({ pause_until: status.clear_at });
   });
 
   it("sets how you appear from the dot on the picture", async () => {

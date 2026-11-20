@@ -473,7 +473,7 @@
       "respectPresenceHelp": "If you're already here, the bell has told you. Email waits a few minutes and mobile stays quiet.",
       "pause": {
         "title": "Pause notifications",
-        "description": "Email, mobile and desktop stand down for the days you pick. The bell keeps collecting, and you get one summary of everything when you're back.",
+        "description": "Email, mobile and desktop stand down for the days you pick. You can also pause until your status clears, when you set one. The bell keeps collecting, and you get one summary of everything when you're back.",
         "active": "Paused until {{until}}",
         "scheduled": "Pausing {{from}} to {{until}}",
         "resume": "Resume",

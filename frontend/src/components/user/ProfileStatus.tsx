@@ -8,7 +8,11 @@ import type {
   CustomStatusOutput,
   UserSelfUpdate,
 } from "@/api/generated/initiativeAPI.schemas";
+import { useReadMyNotificationPreferences } from "@/api/generated/notifications/notifications";
+import { useUpdateNotificationPreferences } from "@/hooks/useNotificationPreferences";
 import { useUpdateCurrentUser } from "@/hooks/useUsers";
+import { getErrorMessage } from "@/lib/errorMessage";
+import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
 import { DateTimePicker } from "@/ui/date-time-picker";
 import {
@@ -34,6 +38,7 @@ import { fromPickerValue, toPickerValue } from "@/ui/lib/localDateTime";
 import { cn } from "@/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
 
 /** Mirrors ``STATUS_TEXT_MAX_LENGTH`` on the server. */
 const STATUS_MAX_LENGTH = 40;
@@ -147,7 +152,9 @@ const SUGGESTIONS = [
  * One dialog, opened from wherever your status shows: the line under your name
  * in the sidebar, the account menu, and the bubble on your own profile. With
  * nothing typed it offers the common answers; once something is, it asks when
- * the status should come off by itself.
+ * the status should come off by itself, and whether to pause notifications
+ * until then. The pause is the one My Settings books by the day, so either
+ * place shows and ends the same pause.
  */
 export const StatusDialog = ({
   open,
@@ -168,6 +175,14 @@ export const StatusDialog = ({
   const [clearAfter, setClearAfter] = useState<ClearAfter>("today");
   const [custom, setCustom] = useState("");
   const [picking, setPicking] = useState(false);
+  // Null until the switch is moved: a pause booked elsewhere is shown, and is
+  // only written over when somebody asks for that here.
+  const [pauseChoice, setPauseChoice] = useState<boolean | null>(null);
+  const preferences = useReadMyNotificationPreferences({ query: { enabled: open } });
+  const booked = preferences.data?.pause;
+  const pauseRunning = !!booked && Date.parse(booked.since) <= Date.now();
+  const paused = pauseChoice ?? pauseRunning;
+  const writePause = useUpdateNotificationPreferences();
 
   // Every opening starts from the status as it stands.
   const [wasOpen, setWasOpen] = useState(false);
@@ -178,6 +193,7 @@ export const StatusDialog = ({
       setText(current?.text ?? "");
       setClearAfter(current ? (current.clear_at ? "custom" : "never") : "today");
       setCustom(toPickerValue(current?.clear_at));
+      setPauseChoice(null);
     }
   }
 
@@ -204,9 +220,25 @@ export const StatusDialog = ({
   const blank = !emoji && !text.trim();
   const endPassed = clearAt !== null && Date.parse(clearAt) <= now.getTime();
   const customMissing = clearAfter === "custom" && (clearAt === null || endPassed);
+  // A pause always ends, so it needs a status that does.
+  const pauseNeedsEnd = pauseChoice === true && clearAt === null;
 
   const commit = (next: CustomStatusInput | null) =>
     save.mutate({ custom_status: next } as UserSelfUpdate);
+
+  const submit = async () => {
+    if (pauseChoice !== null && (pauseChoice || pauseRunning)) {
+      try {
+        await writePause.mutateAsync(
+          pauseChoice ? { pause_until: clearAt } : { clear_pause: true }
+        );
+      } catch (error) {
+        toast.error(getErrorMessage(error, "profiles:status.pause.failed"));
+        return;
+      }
+    }
+    commit(blank ? null : { emoji, text: text.trim() || null, clear_at: clearAt });
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -330,17 +362,37 @@ export const StatusDialog = ({
                   calendarProps={{ disabled: { before: now } }}
                 />
               ) : null}
+              <div className="flex items-start justify-between gap-4 pt-2">
+                <span className="space-y-0.5">
+                  <label htmlFor="status-pause" className="block font-medium text-sm">
+                    {t("profiles:status.pause.label")}
+                  </label>
+                  <span className="block text-muted-foreground text-xs">
+                    {pauseChoice === null && pauseRunning && booked
+                      ? t("profiles:status.pause.running", {
+                          time: formatDateTime(booked.until),
+                        })
+                      : clearAt === null
+                        ? t("profiles:status.pause.needsEnd")
+                        : t("profiles:status.pause.help")}
+                  </span>
+                </span>
+                <Switch
+                  id="status-pause"
+                  checked={paused}
+                  onCheckedChange={setPauseChoice}
+                  disabled={!paused && clearAt === null}
+                />
+              </div>
             </div>
           )}
         </DialogBody>
         <DialogFooter
           submitLabel={t("profiles:status.save")}
           pendingLabel={t("common:submitting")}
-          onSubmit={() =>
-            commit(blank ? null : { emoji, text: text.trim() || null, clear_at: clearAt })
-          }
-          pending={save.isPending}
-          disabled={customMissing}
+          onSubmit={submit}
+          pending={save.isPending || writePause.isPending}
+          disabled={customMissing || pauseNeedsEnd}
         >
           {current ? (
             <Button
