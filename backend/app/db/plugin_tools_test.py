@@ -6,14 +6,16 @@ from __future__ import annotations
 import copy
 import re
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 import sqlalchemy as sa
 from httpx import AsyncClient
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from alembic import op
 from app.core.messages import GuildPluginMessages
 from app.core.palette import COLOR_PALETTE
 from app.core.tool_set import BUILTIN_TOOLS
@@ -23,7 +25,9 @@ from app.db.kind_codes import assign_plugin_kind_codes
 from app.db.plugin_tools import (
     InstalledTool,
     PluginToolError,
+    _required,
     community_tool_set,
+    drop_ddl,
     provisioned_tools,
     structure_ddl,
 )
@@ -62,6 +66,7 @@ from app.testing import (
     route_as,
     route_session_to_guild,
 )
+from app.testing.tool_plugins import run_as_a_revision
 
 #: A second plug-in declaring the same key as Counters (owner ruling: both
 #: install side by side).
@@ -973,6 +978,49 @@ async def test_a_major_drops_what_the_seat_confirms_and_keeps_the_rest(
         )
     )
     assert refused.scalar_one() is True
+
+
+async def test_a_held_row_keeps_its_values_on_the_provisioning_login(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """What a new version does to the cells already there, run as provisioning
+    runs it (on the login that owns the tables, neither a superuser nor exempt
+    from row security), refuses to drop an option or a field a held row has a
+    value in, or to fill a cell a held row leaves empty."""
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    await install_tool_plugin(client, session, seat)
+    await route_session_to_guild(session, seat.guild.id)
+    await session.exec(
+        sa.text(
+            f"WITH g AS (INSERT INTO {_GROUP} (initiative_id, name)"
+            " VALUES (:i, 'Group') RETURNING id)"
+            f" INSERT INTO {_COUNTER} (counter_group_id, name, view_mode, color, min)"
+            " SELECT id, 'Held', 'clock', '#112233', NULL FROM g"
+        ),
+        params={"i": seat.initiative.id},
+    )
+    await session.commit()
+    await _hold(session, seat.guild.id, _COUNTER, "Held", datetime.now(UTC))
+
+    def dropping(options: list[str], fields: list[str]) -> str:
+        changes = SimpleNamespace(dropped_options=options, dropped_fields=fields)
+        return drop_ddl(COUNTERS_UID, _counters(), changes)
+
+    for ddl in (
+        dropping(["counter.view_mode.clock"], []),
+        dropping([], ["counter.color"]),
+        _required(_COUNTER, "min"),
+    ):
+
+        def step(ddl: str = ddl) -> None:
+            for statement in filter(str.strip, ddl.split(";\n")):
+                op.get_bind().exec_driver_sql(statement)
+
+        with pytest.raises(DBAPIError, match="a held row has"):
+            await run_as_a_revision(session, seat.guild.id, step)
+    await route_session_to_guild(session, seat.guild.id)
+    kept = await session.exec(sa.text(f"SELECT view_mode, color, min FROM {_COUNTER}"))
+    assert tuple(kept.one()) == ("clock", "#112233", None)
 
 
 async def test_boot_brings_an_older_item_table_up_to_its_shape(

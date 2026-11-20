@@ -744,7 +744,8 @@ def _has_column(table: str, column: str, *, nullable: bool = False) -> str:
 
 def _refuse_held(table: str, holding: str, what: str) -> str:
     """A plpgsql statement refusing the version where a row of ``table`` the
-    platform holds is ``holding``: a held row keeps every value it has."""
+    platform holds is ``holding``: a held row keeps every value it has. Run
+    with the table's row security lifted, so the check reads every row."""
     return (
         f"IF EXISTS (SELECT 1 FROM {table} WHERE held_at IS NOT NULL AND {holding})"
         f" THEN RAISE EXCEPTION 'a held row has {what}'; END IF;"
@@ -758,8 +759,8 @@ def _required(table: str, column: str) -> str:
     cell empty refuses the version instead."""
     return (
         f"DO $$ BEGIN IF {_has_column(table, column, nullable=True)} THEN"
-        f" {_refuse_held(table, f'{column} IS NULL', 'no value for a required field')}"
         f" ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY;"
+        f" {_refuse_held(table, f'{column} IS NULL', 'no value for a required field')}"
         f" ALTER TABLE {table} DISABLE TRIGGER USER;"
         f" UPDATE {table} SET {column} = DEFAULT WHERE {column} IS NULL;"
         f" ALTER TABLE {table} ENABLE TRIGGER USER;"
@@ -854,8 +855,8 @@ def drop_ddl(listing_uid: str, before: Mapping[str, Any], changes: Any) -> str:
                 f"ARRAY(SELECT v FROM unnest({column}) AS v WHERE v NOT IN ({listed}))"
             )
         statements += [
-            f"DO $$ BEGIN {_refuse_held(table, holding, 'a dropped option')} END $$",
             f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY",
+            f"DO $$ BEGIN {_refuse_held(table, holding, 'a dropped option')} END $$",
             f"ALTER TABLE {table} DISABLE TRIGGER USER",
             # A required select's emptied cells take the version's default
             # as the structure rendered after this brings it back to NOT NULL.
@@ -872,8 +873,10 @@ def drop_ddl(listing_uid: str, before: Mapping[str, Any], changes: Any) -> str:
         # What reads the column goes with it, and the parts rendered after
         # this put back what the version still has.
         statements += [
+            f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY",
             f"DO $$ BEGIN IF {_has_column(table, column)} THEN {held} END IF; END $$",
             f"ALTER TABLE {table} DROP COLUMN IF EXISTS {column} CASCADE",
+            f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY",
         ]
     return "".join(f"{statement};\n" for statement in statements)
 
