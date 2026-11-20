@@ -267,7 +267,9 @@ const tinted = (color: string) => ({
 });
 
 /** The first items of one of an item's item tables, each a line of the
- *  fields the part names, drawn in its own colour where the part says. */
+ *  fields the part names, drawn in its own colour where the part says. Each
+ *  field keeps its own width, spread across the line; where they do not fit
+ *  side by side, the next drops beneath the one before. */
 const ItemsPreview = <I,>({
   props,
   item,
@@ -293,7 +295,7 @@ const ItemsPreview = <I,>({
           <li
             // Keyed by place: the items keep their own order.
             key={index}
-            className="flex min-w-0 items-center gap-2 rounded-sm bg-muted px-1.5 py-0.5 text-xs"
+            className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-0.5 rounded-sm bg-muted px-1.5 py-0.5 text-xs *:w-auto"
             style={color ? tinted(color) : undefined}
           >
             {props.fields.map((id) => {
@@ -312,12 +314,16 @@ const ItemsPreview = <I,>({
 const PARTS = {
   ...LAYOUT_PARTS,
   // The board draws the card's frame, which carries the drag and the measuring;
-  // the card lays out what is inside it, in the colour its `tint` field holds.
+  // the card lays out what is inside it, in the colour its `tint` field holds,
+  // each part on a line of its own.
   card: <I,>(node: LayoutNode, item: I, view: LayoutContext<I>, parts: Parts<I>) => {
     const color = tintOf(node.props?.tint, item, view.fields);
     const children = renderChildren(node, item, view, parts);
     return color ? (
-      <div className="w-full min-w-0 space-y-1 rounded-md p-2" style={tinted(color)}>
+      <div
+        className="flex w-full min-w-0 flex-col items-start gap-1 rounded-md p-2"
+        style={tinted(color)}
+      >
         {children}
       </div>
     ) : (
