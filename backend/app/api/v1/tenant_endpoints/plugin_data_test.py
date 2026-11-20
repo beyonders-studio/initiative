@@ -414,20 +414,6 @@ class TestGates:
     async def test_a_member_reads_a_source_their_dashboard_displays(
         self, client, acting_user, session, upstream
     ):
-        a, plugin, dashboard = await _workspace(session, acting_user)
-
-        response = await client.get(
-            _url(a, plugin, ORDERS_SUMMARY, dashboard), headers=a.headers
-        )
-        assert response.status_code == 200, response.text
-        body = response.json()
-        assert body["rows"] == [{"id": 1}]
-        assert body["cached"] is False
-        assert datetime.fromisoformat(body["fetched_at"]).tzinfo is not None
-
-    async def test_both_halves_of_an_answer_reach_the_viewer(
-        self, client, acting_user, session, upstream
-    ):
         """An endpoint's ``list`` returns become rows and its single ones stay
         whole, and the route carries both."""
         a, plugin, dashboard = await _workspace(session, acting_user)
@@ -441,6 +427,8 @@ class TestGates:
         body = response.json()
         assert body["rows"] == [{"days": "mon", "totals": 4}]
         assert body["values"] == {"total": 4}
+        assert body["cached"] is False
+        assert datetime.fromisoformat(body["fetched_at"]).tzinfo is not None
 
     async def test_a_guild_member_outside_the_initiative_reaches_nothing(
         self, client, acting_user, session, upstream
@@ -506,17 +494,7 @@ class TestGates:
 
 
 class TestPermission:
-    async def test_a_source_naming_a_permission_is_open_to_who_holds_it(
-        self, client, acting_user, session, upstream
-    ):
-        a, plugin, dashboard = await _workspace(session, acting_user, REVENUE)
-
-        response = await client.get(
-            _url(a, plugin, REVENUE, dashboard), headers=a.headers
-        )
-        assert response.status_code == 200, response.text
-
-    async def test_it_is_refused_to_a_member_whose_role_does_not(
+    async def test_a_source_naming_a_permission_is_open_only_to_who_holds_it(
         self, client, acting_user, session, upstream
     ):
         """Checked against the caller's role in the dashboard's initiative, on
@@ -530,6 +508,11 @@ class TestPermission:
         assert response.status_code == 403
         assert response.json()["detail"] == PluginDataMessages.PERMISSION_REQUIRED
         assert upstream.count == 0
+
+        response = await client.get(
+            _url(a, plugin, REVENUE, dashboard), headers=a.headers
+        )
+        assert response.status_code == 200, response.text
 
 
 class TestKillSwitches:
@@ -847,17 +830,11 @@ class TestCache:
         assert upstream.count == 2
         assert bob.json()["cached"] is False
 
-    async def test_one_members_repeated_reads_still_collapse(
-        self, client, acting_user, session, upstream
-    ):
-        a, plugin, dashboard = await _workspace(session, acting_user, MY_PRS)
-        await _connect(session, plugin=plugin, user=a.user, ref="cr_alice")
-
-        await client.get(_url(a, plugin, MY_PRS, dashboard), headers=a.headers)
+        # One member's repeated reads still collapse.
         again = await client.get(_url(a, plugin, MY_PRS, dashboard), headers=a.headers)
-
+        assert again.json()["rows"] == [{"pr": "alice"}]
         assert again.json()["cached"] is True
-        assert upstream.count == 1
+        assert upstream.count == 2
 
     async def test_a_rotated_credential_retires_the_answers_it_produced(
         self, client, acting_user, session, upstream
@@ -1257,46 +1234,58 @@ class TestListParams:
     async def test_several_values_reach_the_plugin_as_several(
         self, client, acting_user, session, upstream
     ):
+        """`list` says how many, never what kind: each entry is held to the
+        parameter's own declared type, and rendered for the wire the same way a
+        single one is, which keeps one encoding for one type."""
         a, plugin, dashboard = await _workspace(session, acting_user)
 
         response = await client.get(
             _url(
-                a, plugin, ORDERS_SUMMARY, dashboard, params='{"tags":["red","blue"]}'
+                a,
+                plugin,
+                ORDERS_SUMMARY,
+                dashboard,
+                params='{"tags":["red","blue"],"floors":[1,2]}',
             ),
             headers=a.headers,
         )
         assert response.status_code == 200, response.text
         assert json.loads(upstream.calls[0].content)["params"] == {
-            "tags": ["red", "blue"]
+            "tags": ["red", "blue"],
+            "floors": ["1", "2"],
         }
-
-    async def test_one_value_for_a_list_parameter_is_still_an_array(
-        self, client, acting_user, session, upstream
-    ):
-        """Cardinality is the declaration's, not the caller's. A single value
-        sent bare would be a second encoding of the same thing."""
-        a, plugin, dashboard = await _workspace(session, acting_user)
-
-        response = await client.get(
-            _url(a, plugin, ORDERS_SUMMARY, dashboard, params='{"tags":"red"}'),
-            headers=a.headers,
-        )
-        assert response.status_code == 400
-        assert response.json()["detail"] == PluginDataMessages.INVALID_PARAMS
 
     @pytest.mark.parametrize(
         "params",
         [
             '{"shop":["north"]}',
+            # Cardinality is the declaration's, not the caller's: a single value
+            # sent bare would be a second encoding of the same thing.
+            '{"tags":"red"}',
             # "None of them" is a parameter that is absent. An array with
             # nothing in it is a request nobody meant to make.
             '{"tags":[]}',
             '{"tags":["red",7]}',
+            json.dumps(
+                {
+                    "tags": [
+                        str(index)
+                        for index in range(plugin_data_service.MAX_PARAM_VALUES + 1)
+                    ]
+                }
+            ),
+            # The strings a form's controls read, where integers were declared.
+            '{"floors":["1"]}',
+            '{"floors":[true]}',
         ],
         ids=[
             "an array for a single parameter",
+            "a bare value for a list parameter",
             "an empty array",
             "an entry of the wrong type",
+            "more values than a request may carry",
+            "a string where an integer was declared",
+            "a bool where an integer was declared",
         ],
     )
     async def test_a_value_the_declaration_does_not_describe_never_reaches_the_plugin(
@@ -1311,25 +1300,7 @@ class TestListParams:
             headers=a.headers,
         )
         assert response.status_code == 400
-        assert upstream.count == 0
-
-    async def test_more_values_than_a_request_may_carry_are_refused(
-        self, client, acting_user, session, upstream
-    ):
-        a, plugin, dashboard = await _workspace(session, acting_user)
-        many = json.dumps(
-            {
-                "tags": [
-                    str(index)
-                    for index in range(plugin_data_service.MAX_PARAM_VALUES + 1)
-                ]
-            }
-        )
-
-        response = await client.get(
-            _url(a, plugin, ORDERS_SUMMARY, dashboard, params=many), headers=a.headers
-        )
-        assert response.status_code == 400
+        assert response.json()["detail"] == PluginDataMessages.INVALID_PARAMS
         assert upstream.count == 0
 
     async def test_a_list_parameter_fills_its_menu_the_same_way(
@@ -1356,52 +1327,6 @@ class TestListParams:
             headers=a.headers,
         )
         assert response.json()["unavailable"] == "needs-sibling"
-        assert upstream.count == 0
-
-    async def test_several_integers_are_accepted_as_integers(
-        self, client, acting_user, session, upstream
-    ):
-        """`list` says how many, never what kind.
-
-        Each entry is held to the parameter's own declared type, so a caller
-        that sent the strings a form's controls read would be refused here —
-        which is exactly the failure a configured widget would hit on its first
-        draw rather than on save.
-        """
-        a, plugin, dashboard = await _workspace(session, acting_user)
-
-        response = await client.get(
-            _url(a, plugin, ORDERS_SUMMARY, dashboard, params='{"floors":[1,2]}'),
-            headers=a.headers,
-        )
-        assert response.status_code == 200, response.text
-        # Rendered for the wire the same way a single int is, which is what
-        # keeps one encoding for one type.
-        assert json.loads(upstream.calls[0].content)["params"] == {"floors": ["1", "2"]}
-
-    async def test_a_string_where_an_integer_was_declared_is_refused(
-        self, client, acting_user, session, upstream
-    ):
-        a, plugin, dashboard = await _workspace(session, acting_user)
-
-        response = await client.get(
-            _url(a, plugin, ORDERS_SUMMARY, dashboard, params='{"floors":["1"]}'),
-            headers=a.headers,
-        )
-        assert response.status_code == 400
-        assert response.json()["detail"] == PluginDataMessages.INVALID_PARAMS
-        assert upstream.count == 0
-
-    async def test_a_bool_is_not_an_integer_inside_a_list_either(
-        self, client, acting_user, session, upstream
-    ):
-        a, plugin, dashboard = await _workspace(session, acting_user)
-
-        response = await client.get(
-            _url(a, plugin, ORDERS_SUMMARY, dashboard, params='{"floors":[true]}'),
-            headers=a.headers,
-        )
-        assert response.status_code == 400
         assert upstream.count == 0
 
 
@@ -1649,7 +1574,7 @@ class TestSummary:
         (request,) = upstream.calls
         assert json.loads(request.content)["endpoint"] == REVENUE
 
-    async def test_a_member_reads_no_summary(
+    async def test_a_member_lists_and_reads_no_summary(
         self, client, acting_user, session, upstream
     ):
         a, plugin = await self._summarised(session, acting_user)
@@ -1658,8 +1583,12 @@ class TestSummary:
         response = await client.get(
             member.g(f"/plugins/{plugin.id}/summary"), headers=member.headers
         )
+        listed = await client.get(
+            member.g("/plugins/summaries"), headers=member.headers
+        )
 
         assert response.status_code == 403
+        assert listed.status_code == 403
         assert upstream.count == 0
 
     async def test_an_install_naming_no_summary_has_nothing_to_draw(
@@ -1738,18 +1667,6 @@ class TestSummary:
         assert listed.status_code == 200, listed.text
         assert [item["plugin_id"] for item in listed.json()["items"]] == [plugin.id]
         assert read.status_code == 200, read.text
-
-    async def test_a_member_lists_no_summaries(
-        self, client, acting_user, session, upstream
-    ):
-        a, _ = await self._summarised(session, acting_user)
-        member = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
-
-        response = await client.get(
-            member.g("/plugins/summaries"), headers=member.headers
-        )
-
-        assert response.status_code == 403
 
     async def test_an_operator_lists_and_reads_summaries_without_joining(
         self, client, acting_user, session, upstream

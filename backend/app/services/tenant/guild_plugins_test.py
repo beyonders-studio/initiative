@@ -10,13 +10,8 @@ from app.services.marketplace.definitions import MOUNTABLE_TOOLS
 from app.services.tenant.guild_plugins import ARTIFACT_HANDLERS
 
 
-class TestHandlerCoverage:
-    def test_every_mountable_tool_can_be_unmade(self):
-        """A tool a plug-in may mount must have a handler, or uninstalling it would
-        leave the row it created behind with nothing pointing at it."""
-        assert MOUNTABLE_TOOLS <= set(ARTIFACT_HANDLERS)
-
-    def test_no_handler_without_a_mountable_tool(self):
-        """The other direction: a handler for something no manifest can name is
-        dead code that reads as support."""
-        assert set(ARTIFACT_HANDLERS) <= MOUNTABLE_TOOLS
+def test_every_mountable_tool_has_exactly_one_handler():
+    """A tool a plug-in may mount must have a handler, or uninstalling it would
+    leave the row it created behind; a handler for something no manifest can
+    name is dead code that reads as support."""
+    assert set(ARTIFACT_HANDLERS) == MOUNTABLE_TOOLS

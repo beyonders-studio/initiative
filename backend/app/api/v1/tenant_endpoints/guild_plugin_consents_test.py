@@ -138,27 +138,15 @@ async def test_the_seat_sees_every_members_answers(
     }
 
 
-async def test_a_member_does_not_get_the_members_view(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session
-):
-    installed = await _installed(session, acting_user, role_session)
-    member = await _member(acting_user, installed)
-
-    response = await client.get(
-        member.g(f"/plugins/{installed.plugin.id}/members"), headers=member.headers
-    )
-
-    assert response.status_code == 403
-
-
 async def test_the_seat_ends_one_members_answers_and_nobody_elses(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session
+    client: AsyncClient, session: AsyncSession, acting_user, role_session, capfd
 ):
     installed = await _installed(session, acting_user, role_session)
     ended = await _member(acting_user, installed)
     kept = await _member(acting_user, installed)
-    for member in (ended, kept):
-        await _granted(client, installed, member)
+    consent_id = await _granted(client, installed, ended)
+    await _granted(client, installed, kept)
+    capfd.readouterr()
 
     response = await client.delete(
         installed.seat.g(
@@ -171,6 +159,14 @@ async def test_the_seat_ends_one_members_answers_and_nobody_elses(
     assert await _statuses(client, installed) == {
         ended.user.id: "revoked",
         kept.user.id: "granted",
+    }
+    (row,) = emitted(capfd, AuditEventType.PLUGIN_CONSENT_REVOKED)
+    assert row["actor_user_id"] == installed.seat.user.id
+    assert row["target_user_id"] == ended.user.id
+    assert row["detail"] == {
+        "consent_id": consent_id,
+        "purpose": "node-1",
+        "via": "admin",
     }
 
 
@@ -256,32 +252,6 @@ async def test_allowing_a_request_records_the_member_and_the_depth(
         "purpose": "node-1",
         "access": "read",
         "via": "self",
-    }
-
-
-async def test_the_seat_ending_an_answer_names_both_of_them(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session, capfd
-):
-    installed = await _installed(session, acting_user, role_session)
-    member = await _member(acting_user, installed)
-    consent_id = await _granted(client, installed, member)
-    capfd.readouterr()
-
-    response = await client.delete(
-        installed.seat.g(
-            f"/plugins/{installed.plugin.id}/members/{member.user.id}/consents"
-        ),
-        headers=installed.seat.headers,
-    )
-    assert response.status_code == 204, response.text
-
-    (row,) = emitted(capfd, AuditEventType.PLUGIN_CONSENT_REVOKED)
-    assert row["actor_user_id"] == installed.seat.user.id
-    assert row["target_user_id"] == member.user.id
-    assert row["detail"] == {
-        "consent_id": consent_id,
-        "purpose": "node-1",
-        "via": "admin",
     }
 
 

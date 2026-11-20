@@ -32,6 +32,7 @@ from app.testing import (
     create_marketplace_listing,
     create_plugin_service_registration,
     create_user,
+    create_webhook_subscription,
     get_auth_headers,
     marketplace_uid,
 )
@@ -148,9 +149,18 @@ class TestTheNamesStay:
 
 
 class TestErasing:
-    async def test_an_admin_erases_with_the_uninstall(
-        self, client: AsyncClient, acting_user, session: AsyncSession, registration
+    @pytest.mark.parametrize("settled", ["delivered", "gave_up"])
+    async def test_it_cannot_come_back_until_the_erase_is_done(
+        self,
+        client: AsyncClient,
+        acting_user,
+        session: AsyncSession,
+        registration,
+        settled,
     ):
+        """The plug-in is told to erase, and its names are kept until it
+        answers. An install while the erase is unfinished would be handed the
+        names it is about to drop. Answered or given up on, the erase is done."""
         a = await acting_user(guild_role=CommunityRole.superadmin)
         plugin_id = await _install(client, a)
         community = await plugin_refs.ensure_plugin_guild_ref(
@@ -164,28 +174,12 @@ class TestErasing:
             ("uninstalled", plugin_id),
             ("erase", plugin_id),
         ]
-        # Kept until the plug-in answers the erase.
         assert (
             await plugin_refs.existing_plugin_guild_ref(
                 guild_id=a.guild.id, public_id=SERVICE_ID
             )
             == community
         )
-
-    @pytest.mark.parametrize("settled", ["delivered", "gave_up"])
-    async def test_it_cannot_come_back_until_the_erase_is_done(
-        self,
-        client: AsyncClient,
-        acting_user,
-        session: AsyncSession,
-        registration,
-        settled,
-    ):
-        """An install while the erase is unfinished would be handed the names
-        it is about to drop. Answered or given up on, the erase is done."""
-        a = await acting_user(guild_role=CommunityRole.superadmin)
-        plugin_id = await _install(client, a)
-        await _uninstall(client, a, plugin_id, erase="true")
 
         refused = await client.post(
             a.g("/plugins/"), headers=a.headers, json={"listing_uid": SERVICE_UID}
@@ -208,14 +202,21 @@ class TestErasing:
     async def test_the_removal_and_its_hooks_land_together(
         self, client: AsyncClient, acting_user, session: AsyncSession, registration
     ):
-        """Removing the install and writing ``uninstalled`` and ``erase`` are one
-        transaction: rolled back, the install stays and nothing is told."""
+        """Removing the install, switching off its webhook subscriptions and
+        writing ``uninstalled`` and ``erase`` are one transaction: rolled back,
+        the install and its deliveries stay and nothing is told."""
         from app.models.tenant.guild_plugin import GuildPlugin
+        from app.models.tenant.webhook_subscription import WebhookSubscription
         from app.services.tenant import guild_plugins as guild_plugins_service
 
         a = await acting_user(guild_role=CommunityRole.superadmin)
         guild_id, user_id = a.guild.id, a.user.id
         plugin_id = await _install(client, a)
+        subscription_id = (
+            await create_webhook_subscription(
+                session, a.guild, a.user, plugin_install_id=plugin_id
+            )
+        ).id
 
         await set_rls_context(session, SystemGuild(guild_id))
         plugin = await session.get(GuildPlugin, plugin_id)
@@ -227,6 +228,8 @@ class TestErasing:
         assert await _told(session, guild_id) == [("installed", plugin_id)]
         await set_rls_context(session, SystemGuild(guild_id))
         assert await session.get(GuildPlugin, plugin_id) is not None
+        subscription = await session.get(WebhookSubscription, subscription_id)
+        assert subscription is not None and subscription.active is True
 
     async def test_a_plugin_the_deployment_provides_is_never_erased(
         self, client: AsyncClient, acting_user, session: AsyncSession, registration

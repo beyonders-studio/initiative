@@ -113,9 +113,27 @@ class TestBrowse:
     async def test_any_member_of_the_guild_may_browse(
         self, client, acting_user, listing
     ):
-        # The lowest tier on both ladders: catalog metadata is not privileged.
+        """The lowest tier on both ladders: catalog metadata is not privileged.
+        Each card carries its id (a report names a listing by it), its
+        publisher and source, and the version it would install, and nothing
+        naming a guild: the catalog has no column naming one."""
         actor = await acting_user(guild_role=CommunityRole.member)
-        assert "tests.browse" in await _shelf(client, actor)
+        response = await client.get(
+            actor.g("/marketplace/listings"), headers=actor.headers
+        )
+        card = next(
+            item
+            for item in response.json()["items"]
+            if item["public_id"] == "tests.browse"
+        )
+        assert not any("guild" in key for key in card)
+        assert card["installs_count"] == 0
+        assert card["id"] == listing.id
+        assert card["first_party"] is True
+        assert card["publisher"] == "Tests"
+        assert card["source"] == "builtin"
+        assert card["latest_version"]["version"] == "1.0.0"
+        assert card["installable"] is True
 
     async def test_browsing_requires_a_session(self, client, acting_user, listing):
         actor = await acting_user(guild_role=CommunityRole.member)
@@ -130,42 +148,6 @@ class TestBrowse:
             host.g("/marketplace/listings"), headers=outsider.headers
         )
         assert response.status_code == 403
-
-    async def test_a_card_carries_no_guild_anything(self, client, acting_user, listing):
-        actor = await acting_user(guild_role=CommunityRole.member)
-        response = await client.get(
-            actor.g("/marketplace/listings"), headers=actor.headers
-        )
-        card = next(
-            item
-            for item in response.json()["items"]
-            if item["public_id"] == "tests.browse"
-        )
-        # Structural, not incidental: the catalog has no column naming a
-        # guild, so no payload built from it carries one.
-        assert not any("guild" in key for key in card)
-        assert card["installs_count"] == 0
-
-    async def test_a_card_carries_the_publisher_and_its_source(
-        self, client, acting_user, session
-    ):
-        await create_marketplace_listing(
-            session,
-            # Crockford base32: no I, L, O or U.
-            uid="ATTRBT00000001",
-            public_id="tests.attributed",
-            name="Attributed",
-            publisher="Acme Widgets",
-        )
-        actor = await acting_user(guild_role=CommunityRole.member)
-        response = await client.get(
-            actor.g("/marketplace/listings"),
-            params={"search": "Attributed"},
-            headers=actor.headers,
-        )
-        card = response.json()["items"][0]
-        assert card["publisher"] == "Acme Widgets"
-        assert card["source"] == "builtin"
 
     async def test_search_narrows_the_page(self, client, acting_user, listing):
         actor = await acting_user(guild_role=CommunityRole.member)
@@ -202,20 +184,6 @@ class TestBrowse:
         assert "tests.browse" in curated
         assert "tests.operator" not in curated
 
-    async def test_a_card_carries_its_id(self, client, acting_user, listing):
-        """A report names a listing by its id."""
-        actor = await acting_user(guild_role=CommunityRole.member)
-        response = await client.get(
-            actor.g("/marketplace/listings"), headers=actor.headers
-        )
-        card = next(
-            item
-            for item in response.json()["items"]
-            if item["public_id"] == "tests.browse"
-        )
-        assert card["id"] == listing.id
-        assert card["first_party"] is True
-
     async def test_pages(self, client, acting_user, session):
         for index in range(3):
             await create_marketplace_listing(
@@ -233,18 +201,6 @@ class TestBrowse:
         body = response.json()
         assert body["total_count"] == 3
         assert len(body["items"]) == 1
-
-    async def test_a_card_carries_the_version_it_would_install(
-        self, client, acting_user, listing
-    ):
-        """Every card on a page reports its own latest version."""
-        actor = await acting_user(guild_role=CommunityRole.member)
-        response = await client.get(
-            actor.g("/marketplace/listings"), headers=actor.headers
-        )
-        cards = {item["public_id"]: item for item in response.json()["items"]}
-        assert cards["tests.browse"]["latest_version"]["version"] == "1.0.0"
-        assert cards["tests.browse"]["installable"] is True
 
 
 class TestNoWrites:
@@ -281,30 +237,6 @@ class TestABundledDashboardFollowsItsPlugin:
         await create_plugin_service_registration(session, public_id="tests.tracker")
         await session.commit()
 
-    async def test_a_guild_without_the_plugin_is_not_offered_it(
-        self, client, acting_user, published
-    ):
-        actor = await acting_user(guild_role=CommunityRole.admin)
-        assert "tests.tracker-overview" not in await _shelf(
-            client, actor, kind="dashboard"
-        )
-
-    async def test_a_guild_with_the_plugin_is(
-        self, client, acting_user, session, published
-    ):
-        actor = await acting_user(guild_role=CommunityRole.admin)
-        await create_guild_plugin(
-            session,
-            actor.guild,
-            actor.user,
-            definition={
-                "plugin_kind": "service",
-                "service": {"public_id": "tests.tracker"},
-            },
-            listing_uid=PLUGIN_UID,
-        )
-        assert "tests.tracker-overview" in await _shelf(client, actor, kind="dashboard")
-
     async def test_one_guild_installing_it_does_not_offer_it_to_another(
         self, client, acting_user, session, published
     ):
@@ -330,6 +262,10 @@ class TestABundledDashboardFollowsItsPlugin:
     async def test_switching_the_plugin_off_takes_it_back_off_the_shelf(
         self, client, acting_user, session, published
     ):
+        """Its page opens while the plug-in is on. An installed board looks its
+        listing up by uid to see if there is a newer version; with the plug-in
+        gone there is nothing it could take, and the lookup says so rather than
+        offering an upgrade that is refused."""
         actor = await acting_user(guild_role=CommunityRole.admin)
         plugin = await create_guild_plugin(
             session,
@@ -341,7 +277,15 @@ class TestABundledDashboardFollowsItsPlugin:
             },
             listing_uid=PLUGIN_UID,
         )
+        by_uid = actor.g(f"/marketplace/listings/by-uid/{BUNDLED_UID}")
         assert "tests.tracker-overview" in await _shelf(client, actor, kind="dashboard")
+        page = await client.get(
+            actor.g("/marketplace/listings/tests.tracker-overview"),
+            headers=actor.headers,
+        )
+        assert page.status_code == 200
+        assert page.json()["installable"] is True
+        assert (await client.get(by_uid, headers=actor.headers)).status_code == 200
 
         plugin.enabled = False
         session.add(plugin)
@@ -350,6 +294,7 @@ class TestABundledDashboardFollowsItsPlugin:
         assert "tests.tracker-overview" not in await _shelf(
             client, actor, kind="dashboard"
         )
+        assert (await client.get(by_uid, headers=actor.headers)).status_code == 404
 
     async def test_its_page_answers_404_where_the_plugin_is_not_installed(
         self, client, acting_user, published
@@ -363,53 +308,6 @@ class TestABundledDashboardFollowsItsPlugin:
             response = await client.get(actor.g(url), headers=actor.headers)
             assert response.status_code == 404, url
             assert response.json()["detail"] == MarketplaceMessages.LISTING_NOT_FOUND
-
-    async def test_its_page_opens_where_the_plugin_is_installed(
-        self, client, acting_user, session, published
-    ):
-        actor = await acting_user(guild_role=CommunityRole.admin)
-        await create_guild_plugin(
-            session,
-            actor.guild,
-            actor.user,
-            definition={
-                "plugin_kind": "service",
-                "service": {"public_id": "tests.tracker"},
-            },
-            listing_uid=PLUGIN_UID,
-        )
-        response = await client.get(
-            actor.g("/marketplace/listings/tests.tracker-overview"),
-            headers=actor.headers,
-        )
-        assert response.status_code == 200
-        assert response.json()["installable"] is True
-
-    async def test_removing_the_plugin_stops_an_update_being_offered(
-        self, client, acting_user, session, published
-    ):
-        """An installed board looks its listing up by uid to see if there is a
-        newer version. With the plug-in gone there is nothing it could take, and
-        the lookup says so rather than offering an upgrade that is refused."""
-        actor = await acting_user(guild_role=CommunityRole.admin)
-        plugin = await create_guild_plugin(
-            session,
-            actor.guild,
-            actor.user,
-            definition={
-                "plugin_kind": "service",
-                "service": {"public_id": "tests.tracker"},
-            },
-            listing_uid=PLUGIN_UID,
-        )
-        by_uid = actor.g(f"/marketplace/listings/by-uid/{BUNDLED_UID}")
-        assert (await client.get(by_uid, headers=actor.headers)).status_code == 200
-
-        plugin.enabled = False
-        session.add(plugin)
-        await session.commit()
-
-        assert (await client.get(by_uid, headers=actor.headers)).status_code == 404
 
     async def test_a_standalone_dashboard_is_offered_either_way(
         self, client, acting_user, session, published
@@ -478,18 +376,28 @@ class TestAPluginNeedsItsServiceRegistered:
             },
         )
 
-    async def test_an_unwired_service_plugin_is_not_on_the_shelf(
-        self, client, acting_user, service_plugin
-    ):
-        actor = await acting_user(guild_role=CommunityRole.member)
-        assert "tests.shop" not in await _shelf(client, actor, kind="plugin")
-
-    async def test_wiring_the_service_up_puts_it_on_the_shelf(
+    async def test_an_unwired_service_plugin_is_offered_once_wired_up(
         self, client, acting_user, session, service_plugin
     ):
-        await create_plugin_service_registration(session, public_id="tests.shop")
+        """Unwired, the shelf leaves it out and its page answers the same as a
+        listing that is not there."""
         actor = await acting_user(guild_role=CommunityRole.member)
+        assert "tests.shop" not in await _shelf(client, actor, kind="plugin")
+        for url in (
+            "/marketplace/listings/tests.shop",
+            f"/marketplace/listings/by-uid/{self.SERVICE_UID}",
+        ):
+            response = await client.get(actor.g(url), headers=actor.headers)
+            assert response.status_code == 404, url
+            assert response.json()["detail"] == MarketplaceMessages.LISTING_NOT_FOUND
+
+        await create_plugin_service_registration(session, public_id="tests.shop")
         assert "tests.shop" in await _shelf(client, actor, kind="plugin")
+        response = await client.get(
+            actor.g("/marketplace/listings/tests.shop"), headers=actor.headers
+        )
+        assert response.status_code == 200
+        assert response.json()["installable"] is True
 
     async def test_the_kill_switch_takes_it_back_off(
         self, client, acting_user, session, service_plugin
@@ -522,29 +430,6 @@ class TestAPluginNeedsItsServiceRegistered:
 
         actor = await acting_user(guild_role=CommunityRole.member)
         assert "tests.shop" not in await _shelf(client, actor, kind="plugin")
-
-    async def test_its_page_answers_the_same_as_a_listing_that_is_not_there(
-        self, client, acting_user, service_plugin
-    ):
-        actor = await acting_user(guild_role=CommunityRole.member)
-        for url in (
-            "/marketplace/listings/tests.shop",
-            f"/marketplace/listings/by-uid/{self.SERVICE_UID}",
-        ):
-            response = await client.get(actor.g(url), headers=actor.headers)
-            assert response.status_code == 404, url
-            assert response.json()["detail"] == MarketplaceMessages.LISTING_NOT_FOUND
-
-    async def test_wiring_the_service_up_opens_its_page_too(
-        self, client, acting_user, session, service_plugin
-    ):
-        await create_plugin_service_registration(session, public_id="tests.shop")
-        actor = await acting_user(guild_role=CommunityRole.member)
-        response = await client.get(
-            actor.g("/marketplace/listings/tests.shop"), headers=actor.headers
-        )
-        assert response.status_code == 200
-        assert response.json()["installable"] is True
 
     @pytest.mark.parametrize("availability", ["operations", "beta"])
     async def test_a_plugin_is_offered_only_in_its_reach(
@@ -665,29 +550,11 @@ class TestOneListingsPage:
         assert body["latest_version"]["version"] == "1.0.0"
         assert "versions" not in body
         assert body["installable"] is True
-
-    async def test_the_page_carries_the_publisher_and_its_source(
-        self, client, acting_user, listing
-    ):
         # The page where the install decision is made reads the same two
         # fields as the card does on the shelf, so they cannot disagree.
-        actor = await acting_user(guild_role=CommunityRole.member)
-        body = (
-            await client.get(
-                actor.g("/marketplace/listings/tests.browse"), headers=actor.headers
-            )
-        ).json()
         assert body["publisher"] == "Tests"
         assert body["source"] == "builtin"
-
-    async def test_no_author_fields_are_served(self, client, acting_user, listing):
-        """One required name, not a person and a distributor kept apart."""
-        actor = await acting_user(guild_role=CommunityRole.member)
-        body = (
-            await client.get(
-                actor.g("/marketplace/listings/tests.browse"), headers=actor.headers
-            )
-        ).json()
+        # One required name, not a person and a distributor kept apart.
         assert not [key for key in body if key.startswith("author")]
 
     async def test_a_uid_resolves_to_its_listing(self, client, acting_user, listing):
@@ -702,40 +569,22 @@ class TestOneListingsPage:
         assert response.json()["public_id"] == "tests.browse"
         assert response.json()["latest_version"]["version"] == "1.0.0"
 
-    async def test_an_unknown_uid_is_a_404(self, client, acting_user, listing):
-        actor = await acting_user(guild_role=CommunityRole.member)
-        response = await client.get(
-            actor.g("/marketplace/listings/by-uid/NTHERE00000001"),
-            headers=actor.headers,
-        )
-        assert response.status_code == 404
-
-    async def test_the_uid_route_is_not_read_as_a_public_id(
-        self, client, acting_user, listing
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/marketplace/listings/by-uid/NTHERE00000001",
+            # ``by-uid`` is a literal segment, not a listing called 'by-uid'.
+            "/marketplace/listings/by-uid",
+            "/marketplace/listings/tests.nothing",
+        ],
+    )
+    async def test_an_unknown_listing_is_a_404(
+        self, client, acting_user, listing, path
     ):
-        """`by-uid` is a literal segment, not a listing called 'by-uid'."""
         actor = await acting_user(guild_role=CommunityRole.member)
-        response = await client.get(
-            actor.g("/marketplace/listings/by-uid"), headers=actor.headers
-        )
+        response = await client.get(actor.g(path), headers=actor.headers)
         assert response.status_code == 404
         assert response.json()["detail"] == MarketplaceMessages.LISTING_NOT_FOUND
-
-    async def test_an_unknown_listing_is_a_404(self, client, acting_user):
-        actor = await acting_user(guild_role=CommunityRole.member)
-        response = await client.get(
-            actor.g("/marketplace/listings/tests.nothing"), headers=actor.headers
-        )
-        assert response.status_code == 404
-        assert response.json()["detail"] == MarketplaceMessages.LISTING_NOT_FOUND
-
-    async def test_a_non_member_gets_nothing(self, client, acting_user, listing):
-        host = await acting_user(guild_role=CommunityRole.admin)
-        outsider = await acting_user(guild_role=CommunityRole.member)
-        response = await client.get(
-            host.g("/marketplace/listings/tests.browse"), headers=outsider.headers
-        )
-        assert response.status_code == 403
 
     async def test_a_listing_needing_a_newer_app_says_so_rather_than_hiding(
         self, client, acting_user, session

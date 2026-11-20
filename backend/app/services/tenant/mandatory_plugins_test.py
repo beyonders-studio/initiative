@@ -23,6 +23,7 @@ from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.audit_events import AuditEventType
 from app.db.request_context import SystemGuild
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.guild_plugin import GuildPlugin
@@ -39,6 +40,7 @@ from app.testing import (
     create_marketplace_listing,
     create_plugin_service_registration,
     create_user,
+    emitted,
     get_auth_headers,
     marketplace_uid,
     route_session_to_guild,
@@ -52,6 +54,15 @@ PROVIDED_DEFINITION = {
     "service": {"public_id": PROVIDED_ID, "protocol": 1},
     "features": [],
     "default_name": "Provided plug-in",
+}
+
+
+#: What the audit log records of a provided install.
+PROVIDED_RECORD = {
+    "listing_uid": PROVIDED_UID,
+    "version": "1.0.0",
+    "via": "mandatory",
+    "granted_scopes": [],
 }
 
 
@@ -91,11 +102,14 @@ async def _installed_plugins(session: AsyncSession, guild_id: int) -> list[Guild
 
 class TestAtGuildCreation:
     async def test_a_new_guild_gets_the_plugin(
-        self, client: AsyncClient, session: AsyncSession, mandatory_registration
+        self, client: AsyncClient, session: AsyncSession, mandatory_registration, capfd
     ):
         """Through the real creation path: nobody installs it, and nobody was
-        offered a choice."""
+        offered a choice. The audit record says it was provided (``via``) and
+        names the new owner the creation ran as."""
         user = await create_user(session, email="founder@example.com")
+        user_id = user.id
+        capfd.readouterr()
         response = await client.post(
             "/api/v1/communities/",
             headers=get_auth_headers(user),
@@ -108,6 +122,12 @@ class TestAtGuildCreation:
         assert [plugin.listing_uid for plugin in plugins] == [PROVIDED_UID]
         assert plugins[0].name == "Provided plug-in"
         assert plugins[0].plugin_kind == "service"
+
+        (row,) = emitted(capfd, AuditEventType.PLUGIN_INSTALLED)
+        assert row["actor_user_id"] == user_id
+        assert row["guild_id"] == guild_id
+        assert row["target"] == {"type": "plugin", "id": plugins[0].id}
+        assert row["detail"] == PROVIDED_RECORD
 
     async def test_a_registration_suspended_installs_nowhere(
         self, client: AsyncClient, session: AsyncSession, mandatory_registration
@@ -173,19 +193,29 @@ class TestAtGuildCreation:
 
 
 class TestBackfill:
-    async def test_a_guild_that_predates_the_flag_gets_it(
-        self, session: AsyncSession, mandatory_registration
+    async def test_a_guild_that_predates_the_flag_gets_it_once(
+        self, session: AsyncSession, mandatory_registration, capfd
     ):
-        """The only way a decision made today reaches a guild made last year."""
+        """The only way a decision made today reaches a guild made last year.
+        The sweep routes into each guild without an account behind it, so the
+        audit record names none; and a second run visits nothing, because the
+        install index says every community is settled."""
         creator = await create_user(session, email="old@example.com")
         guild = await create_guild(session, creator=creator, name="Existing guild")
+        guild_id = guild.id
         await create_guild_membership(
             session, user=creator, guild=guild, role=CommunityRole.admin
         )
+        capfd.readouterr()
 
         result = await backfill_mandatory_plugins()
         assert result.installed == 1
         assert result.failed == 0
+        (row,) = emitted(capfd, AuditEventType.PLUGIN_INSTALLED)
+        assert row["actor_user_id"] is None
+        assert row["guild_id"] == guild_id
+        assert row["detail"] == PROVIDED_RECORD
+        assert (await backfill_mandatory_plugins()).guilds == 0
 
         plugins = await _installed_plugins(session, guild.id)
         assert [plugin.listing_uid for plugin in plugins] == [PROVIDED_UID]
@@ -283,23 +313,6 @@ class TestBackfill:
         plugins = await _installed_plugins(session, operations.id)
         assert [plugin.listing_uid for plugin in plugins] == [PROVIDED_UID]
         assert await _installed_plugins(session, other.id) == []
-
-    async def test_running_it_twice_installs_once(
-        self, session: AsyncSession, mandatory_registration
-    ):
-        """And the second run visits nothing: the install index says every
-        community is settled."""
-        creator = await create_user(session, email="twice@example.com")
-        guild = await create_guild(session, creator=creator, name="Twice guild")
-        await create_guild_membership(
-            session, user=creator, guild=guild, role=CommunityRole.admin
-        )
-
-        await backfill_mandatory_plugins()
-        second = await backfill_mandatory_plugins()
-
-        assert second.guilds == 0
-        assert len(await _installed_plugins(session, guild.id)) == 1
 
     async def test_a_guild_whose_install_rolled_back_is_visited_again(
         self, session: AsyncSession, mandatory_registration, monkeypatch
