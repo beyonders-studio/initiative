@@ -77,6 +77,7 @@
   "INITIATIVE_AUTO_JOIN_ADMIN_ONLY": "Nur Community-Admins können den automatischen Beitritt ändern",
   "INITIATIVE_SET_BY_COMMUNITY": "Deine Community legt das für jede Initiative fest.",
   "INITIATIVE_CUSTOM_ROLES_OFF": "Deine Community beschränkt Initiativen auf ihre eingebauten Rollen.",
+  "INITIATIVE_TOOL_UNKNOWN": "Dieses Werkzeug gibt es in dieser Community nicht.",
   "INITIATIVE_DEFAULTS_ADMIN_ONLY": "Nur Community-Admins können festlegen, womit jede Initiative startet.",
   "INITIATIVE_GRANT_CANNOT_MANAGE_MEMBERS": "Mit temporärem Zugriff kann man keiner Initiative beitreten",
   "INITIATIVE_NOT_REQUESTABLE": "Diese Initiative nimmt keine Beitrittsanfragen an",

@@ -7528,6 +7528,8 @@ export interface InitiativeCan {
   create: string[];
 }
 
+export type InitiativeCreateTools = { [key: string]: boolean };
+
 /**
  * How a guild member may come to hold a membership row in an initiative.
  *
@@ -7557,31 +7559,17 @@ export interface InitiativeCreate {
   name: string;
   description?: string | null;
   color?: string | null;
-  tools?: Partial<Record<Tool, boolean>>;
+  tools?: InitiativeCreateTools;
   join_policy?: InitiativeJoinPolicy;
 }
 
-export type PermissionKey = (typeof PermissionKey)[keyof typeof PermissionKey];
+export type InitiativeDefaultsReadTools = { [key: string]: boolean };
 
-export const PermissionKey = {
-  projects_enabled: "projects_enabled",
-  create_projects: "create_projects",
-  files_enabled: "files_enabled",
-  create_files: "create_files",
-  counter_groups_enabled: "counter_groups_enabled",
-  create_counter_groups: "create_counter_groups",
-  calendars_enabled: "calendars_enabled",
-  create_calendars: "create_calendars",
-  dashboards_enabled: "dashboards_enabled",
-  create_dashboards: "create_dashboards",
-  posts_enabled: "posts_enabled",
-  create_posts: "create_posts",
-  wikis_enabled: "wikis_enabled",
-  create_wikis: "create_wikis",
-  contacts_enabled: "contacts_enabled",
-  create_contacts: "create_contacts",
-  dashboards_run_as_initiative: "dashboards_run_as_initiative",
-} as const;
+export type InitiativeDefaultsReadMemberPermissions = { [key: string]: boolean };
+
+export type InitiativeDefaultsReadOwnTools = { [key: string]: number[] };
+
+export type InitiativeDefaultsReadOwnMemberPermissions = { [key: string]: number[] };
 
 /**
  * An answer for one installed plug-in's initiative permission: a role's,
@@ -7611,14 +7599,18 @@ export interface PluginPermissionInitiatives {
  * permission absent here is each initiative's own to set.
  */
 export interface InitiativeDefaultsRead {
-  tools: Partial<Record<Tool, boolean>>;
-  member_permissions: Partial<Record<PermissionKey, boolean>>;
+  tools: InitiativeDefaultsReadTools;
+  member_permissions: InitiativeDefaultsReadMemberPermissions;
   plugin_member_permissions: PluginPermissionRule[];
   custom_roles: boolean;
-  own_tools: Partial<Record<Tool, number[]>>;
-  own_member_permissions: Partial<Record<PermissionKey, number[]>>;
+  own_tools: InitiativeDefaultsReadOwnTools;
+  own_member_permissions: InitiativeDefaultsReadOwnMemberPermissions;
   own_plugin_member_permissions: PluginPermissionInitiatives[];
 }
+
+export type InitiativeDefaultsUpdateTools = { [key: string]: boolean | null };
+
+export type InitiativeDefaultsUpdateMemberPermissions = { [key: string]: boolean | null };
 
 /**
  * What members hold of one plug-in's initiative permission in every
@@ -7639,8 +7631,8 @@ export interface PluginPermissionDefault {
  * to each initiative; an omitted one is left as it is.
  */
 export interface InitiativeDefaultsUpdate {
-  tools?: Partial<Record<Tool, boolean | null>>;
-  member_permissions?: Partial<Record<PermissionKey, boolean | null>>;
+  tools?: InitiativeDefaultsUpdateTools;
+  member_permissions?: InitiativeDefaultsUpdateMemberPermissions;
   /** @maxItems 1000 */
   plugin_member_permissions?: PluginPermissionDefault[];
   custom_roles?: boolean | null;
@@ -7766,6 +7758,8 @@ export interface InitiativeMemberUpdate {
   role_id: number;
 }
 
+export type InitiativeReadTools = { [key: string]: boolean };
+
 /**
  * An initiative: the row, its headcount, what the caller may do in it and
  * the role they hold there. Its roster is read a page at a time from
@@ -7783,11 +7777,13 @@ export interface InitiativeRead {
   keep_content_in: boolean;
   created_at: string;
   updated_at: string;
-  tools: Partial<Record<Tool, boolean>>;
+  tools: InitiativeReadTools;
   can: InitiativeCan;
   member_count: number;
   role_display_name: string | null;
 }
+
+export type InitiativeRoleCreatePermissions = { [key: string]: boolean } | null;
 
 /**
  * Create a new custom role.
@@ -7804,8 +7800,10 @@ export interface InitiativeRoleCreate {
    */
   display_name: string;
   is_manager?: boolean;
-  permissions?: Partial<Record<PermissionKey, boolean>> | null;
+  permissions?: InitiativeRoleCreatePermissions;
 }
+
+export type InitiativeRoleReadPermissions = { [key: string]: boolean };
 
 /**
  * Role definition with permissions.
@@ -7818,10 +7816,12 @@ export interface InitiativeRoleRead {
   is_manager: boolean;
   override_share_restrictions: boolean;
   position: number;
-  permissions: Partial<Record<PermissionKey, boolean>>;
+  permissions: InitiativeRoleReadPermissions;
   plugin_permissions: PluginPermissionRule[];
   member_count: number;
 }
+
+export type InitiativeRoleUpdatePermissions = { [key: string]: boolean } | null;
 
 /**
  * Update a role's display name and/or permissions.
@@ -7829,7 +7829,7 @@ export interface InitiativeRoleRead {
 export interface InitiativeRoleUpdate {
   display_name?: string | null;
   is_manager?: boolean | null;
-  permissions?: Partial<Record<PermissionKey, boolean>> | null;
+  permissions?: InitiativeRoleUpdatePermissions;
   plugin_permissions?: PluginPermissionRule[] | null;
 }
 
@@ -8043,6 +8043,8 @@ export interface InitiativeToolLayoutsRead {
   name: string;
 }
 
+export type InitiativeUpdateTools = { [key: string]: boolean };
+
 export interface InitiativeUpdate {
   name?: string | null;
   description?: string | null;
@@ -8050,7 +8052,7 @@ export interface InitiativeUpdate {
   join_policy?: InitiativeJoinPolicy | null;
   auto_join?: boolean | null;
   keep_content_in?: boolean | null;
-  tools?: Partial<Record<Tool, boolean>>;
+  tools?: InitiativeUpdateTools;
 }
 
 /**

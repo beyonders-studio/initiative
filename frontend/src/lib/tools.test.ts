@@ -9,7 +9,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { ContentKind, PermissionKey, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { ContentKind, Tool } from "@/api/generated/initiativeAPI.schemas";
+import records from "@/api/generated/tools.json";
 import { TOOL_SKETCHES } from "@/components/initiatives/ToolSkeletons";
 import { EXTRA_PERMISSION_KEYS } from "@/hooks/useInitiativeRoles";
 
@@ -101,12 +102,12 @@ describe("tool registry", () => {
     expect([...SIDEBAR_TOOLS].sort()).toEqual([...TOOLS].sort());
   });
 
-  it("derives the exact permission keys the API exposes", () => {
+  it("derives the exact permission keys the backend names", () => {
     const derived = [
       ...TOOLS.flatMap((tool) => [toolViewPermission(tool), toolCreatePermission(tool)]),
       ...EXTRA_PERMISSION_KEYS,
     ];
-    expect(derived.sort()).toEqual(Object.values(PermissionKey).sort());
+    expect(derived.sort()).toEqual([...records.permission_keys].sort());
   });
 
   it("every tool has a trash label", () => {

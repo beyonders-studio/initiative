@@ -150,6 +150,7 @@
     "rolesDescription": "Ce que chaque rôle peut voir, et ce qu'il peut créer. Les gestionnaires ont tout.",
     "addCustomRole": "Ajouter un rôle personnalisé",
     "setByCommunity": "Ta communauté définit ce réglage pour toutes les initiatives.",
+    "pluginToolDescription": "Un outil du plug-in {{plugin}}.",
     "customRolesOff": "Ta communauté limite les initiatives à leurs rôles intégrés.",
     "builtIn": "Intégré",
     "manager": "Responsable",
@@ -224,6 +225,8 @@
       "createWikis": "Créer des wikis",
       "viewContacts": "Voir les contacts",
       "createContacts": "Créer des contacts",
+      "viewTool": "Voir {{tool}}",
+      "createTool": "Créer dans {{tool}}",
       "dashboards_run_as_initiative": "Exécuter les tableaux de bord en tant qu'Initiative"
     },
     "handleColumn": "Identifiant",

@@ -17,11 +17,10 @@ import type {
   CommunityPluginRead,
   InitiativeDefaultsRead,
   InitiativeRead,
-  PermissionKey,
-  Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
 import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
+import { useCommunityTools } from "@/hooks/useCommunityTools";
 import {
   EXTRA_PERMISSION_KEYS,
   useInitiativeDefaults,
@@ -29,8 +28,7 @@ import {
 } from "@/hooks/useInitiativeRoles";
 import { permissionName } from "@/lib/pluginSurfaces";
 import {
-  SIDEBAR_TOOLS,
-  TOOL_ICONS,
+  isBuiltInTool,
   toolCamelPlural,
   toolCreatePermission,
   toolPlural,
@@ -58,9 +56,11 @@ const ANSWERS: readonly Answer[] = ["each", "on", "off"];
 /** One rule: a tool's switch and each Member permission that is the tool's,
  *  or what members hold of each of a plug-in's initiative permissions, by id. */
 type Rule = { tool: Answer; perms: Partial<Record<string, Answer>> };
-type RuleKey = "tool" | PermissionKey;
-/** What a rule is about: a tool, or an installed plug-in. */
-type Subject = Tool | CommunityPluginRead;
+/** A tool's switch ("tool"), or one of its role keys. */
+type RuleKey = string;
+/** What a rule is about: a tool, by kind (a built-in tool's or a tool
+ *  plug-in's), or an installed plug-in. */
+type Subject = string | CommunityPluginRead;
 
 const answerOf = (value: boolean | undefined): Answer =>
   value === undefined ? "each" : value ? "on" : "off";
@@ -68,15 +68,17 @@ const stored = (answer: Answer | undefined): boolean | null =>
   answer === undefined || answer === "each" ? null : answer === "on";
 
 /** The tool's Member permissions: viewing it, creating in it, and any extra
- *  one named for it (`dashboards_run_as_initiative`). */
-const keysOf = (tool: Tool): PermissionKey[] => [
+ *  one named for a built-in tool (`dashboards_run_as_initiative`). */
+const keysOf = (tool: string): string[] => [
   toolViewPermission(tool),
   toolCreatePermission(tool),
-  ...EXTRA_PERMISSION_KEYS.filter((key) => key.startsWith(`${toolPlural(tool)}_`)),
+  ...(isBuiltInTool(tool)
+    ? EXTRA_PERMISSION_KEYS.filter((key) => key.startsWith(`${toolPlural(tool)}_`))
+    : []),
 ];
 
 /** Which strings a key's question and changes read from. */
-const kindOf = (tool: Tool, key: RuleKey): string =>
+const kindOf = (tool: string, key: RuleKey): string =>
   key === "tool"
     ? "tool"
     : key === toolViewPermission(tool)
@@ -126,15 +128,25 @@ export const CommunityInitiativeDefaultsCard = ({
   const defaults = useInitiativeDefaults().data;
   const update = useSetInitiativeDefaults();
   const plugins = useCommunityPlugins().data?.items ?? [];
+  const tools = useCommunityTools();
   const [open, setOpen] = useState<{ subject: Subject; adding: boolean; draft: Rule } | null>(null);
 
   if (!defaults) return null;
 
-  const toolName = (tool: Tool) => t(`${toolCamelPlural(tool)}Feature` as never);
+  const toolOf = (kind: string) => tools.find((tool) => tool.kind === kind);
+  const toolName = (kind: string) => toolOf(kind)?.name ?? kind;
   const nameOf = (subject: Subject) =>
     typeof subject === "string" ? toolName(subject) : subject.name;
-  const items = (tool: Tool) => t(`communityDefaults.items.${toolCamelPlural(tool)}` as never);
-  const subjects: Subject[] = [...SIDEBAR_TOOLS, ...plugins];
+  /** What a tool holds, as a sentence names it: a tool plug-in's by its
+   *  name. */
+  const items = (kind: string) =>
+    isBuiltInTool(kind)
+      ? t(`communityDefaults.items.${toolCamelPlural(kind)}` as never)
+      : toolName(kind);
+  /** Where a tool can be used: everywhere for a built-in tool, where its
+   *  install is placed for a tool plug-in's. */
+  const placed = (kind: string, id: number) => toolOf(kind)?.placedIn?.includes(id) ?? true;
+  const subjects: Subject[] = [...tools.map((tool) => tool.kind), ...plugins];
   const ruled = subjects.filter((subject) => hasRule(ruleOf(defaults, subject)));
   const free = subjects.filter((subject) => !ruled.includes(subject));
 
@@ -200,11 +212,13 @@ export const CommunityInitiativeDefaultsCard = ({
           )?.initiative_ids
         : isSwitch(key)
           ? defaults.own_tools[tool]
-          : defaults.own_member_permissions[key as PermissionKey];
+          : defaults.own_member_permissions[key];
       return own?.includes(id) ?? false;
     };
     const reaches = (rule: Rule, id: number) =>
-      tool ? value(rule, "tool", id) : Boolean(install?.placed_initiative_ids.includes(id));
+      tool
+        ? placed(tool, id) && value(rule, "tool", id)
+        : Boolean(install?.placed_initiative_ids.includes(id));
     const holds = (rule: Rule, key: string, id: number) =>
       reaches(rule, id) && (isSwitch(key) || value(rule, key, id));
     const names = (ids: number[]) =>
@@ -216,7 +230,9 @@ export const CommunityInitiativeDefaultsCard = ({
     for (const key of keys) {
       const reached = initiatives
         .map((initiative) => initiative.id)
-        .filter((id) => isSwitch(key) || reaches(draft, id))
+        .filter(
+          (id) => (tool === null || placed(tool, id)) && (isSwitch(key) || reaches(draft, id))
+        )
         .filter((id) => holds(current, key, id) !== holds(draft, key, id));
       for (const direction of ["on", "off"] as const) {
         const ids = reached.filter((id) => holds(draft, key, id) === (direction === "on"));
@@ -453,7 +469,7 @@ export const CommunityInitiativeDefaultsCard = ({
         {ruled.length > 0 ? (
           <ul className="divide-y rounded-md border">
             {ruled.map((subject) => {
-              const Icon = typeof subject === "string" ? TOOL_ICONS[subject] : Blocks;
+              const Icon = (typeof subject === "string" && toolOf(subject)?.icon) || Blocks;
               const name = nameOf(subject);
               return (
                 <li key={subjectValue(subject)} className="flex items-center gap-3 px-4 py-3">

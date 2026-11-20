@@ -34,7 +34,7 @@ For each tool, a role has two switches:
 | **View** | See the tool in the initiative, and the things in it that are shared with them. |
 | **Create** | Make new things in the tool. |
 
-The tools are **Projects**, **Files**, **Events** (the calendar), **Counters**, **Dashboards**, **Posts**, **Wikis** and **Contacts**. Turning on **Create** turns on **View** too, and turning off **View** turns off **Create**, since making something you can't see isn't a state worth having.
+The tools are **Projects**, **Files**, **Events** (the calendar), **Counters**, **Dashboards**, **Posts**, **Wikis** and **Contacts**, then any [tool a plug-in added](../guides/plugins-and-marketplace.md#use-a-tool-a-plug-in-added) that works in the initiative. Turning on **Create** turns on **View** too, and turning off **View** turns off **Create**, since making something you can't see isn't a state worth having.
 
 Each role also has **Run dashboards as Initiative**, which lets its holders set a dashboard to show every row in the initiative to everyone who opens it, whatever each viewer could open on their own. It starts off for everyone but managers.
 

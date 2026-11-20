@@ -75,6 +75,7 @@
   "INITIATIVE_AUTO_JOIN_ADMIN_ONLY": "Only community admins can change auto-join",
   "INITIATIVE_SET_BY_COMMUNITY": "Your community sets this for every initiative.",
   "INITIATIVE_CUSTOM_ROLES_OFF": "Your community keeps initiatives to their built-in roles.",
+  "INITIATIVE_TOOL_UNKNOWN": "That tool isn't in this community.",
   "INITIATIVE_DEFAULTS_ADMIN_ONLY": "Only community admins can set what every initiative starts with.",
   "INITIATIVE_GRANT_CANNOT_MANAGE_MEMBERS": "Temporary access can't be used to join an initiative",
   "INITIATIVE_NOT_REQUESTABLE": "This initiative isn't accepting join requests",

@@ -2,14 +2,10 @@ import { Lock, Pencil, Plus, Trash2 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type {
-  InitiativeRead,
-  InitiativeRoleRead,
-  PermissionKey,
-  Tool,
-} from "@/api/generated/initiativeAPI.schemas";
+import type { InitiativeRead, InitiativeRoleRead } from "@/api/generated/initiativeAPI.schemas";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
+import { type CommunityTool, useCommunityTools } from "@/hooks/useCommunityTools";
 import {
   EXTRA_PERMISSION_KEYS,
   PERMISSION_LABEL_KEYS,
@@ -22,8 +18,6 @@ import { useInitiativeSettings } from "@/hooks/useInitiativeSettings";
 import { permissionName } from "@/lib/pluginSurfaces";
 import {
   isToolEnabled,
-  SIDEBAR_TOOLS,
-  TOOL_ICONS,
   toolCamelPlural,
   toolCreatePermission,
   toolViewPermission,
@@ -44,15 +38,17 @@ import { InitiativeRoleDialogs } from "./InitiativeRoleDialogs";
  * the tools that are on are the ones worth reading. The rest are still worth
  * setting — turning the tool back on should not mean redoing the roles — but
  * they belong below a line, under one explanation rather than eight copies of
- * it. Ordered like the sidebar and the tool grid, so the three screens agree.
+ * it. Ordered like the sidebar and the tool grid, so the three screens agree,
+ * the tool plug-ins placed here after the built-in tools.
  */
 const splitToolsForRoleEditing = (
-  initiative: InitiativeRead | null
-): { on: Tool[]; off: Tool[] } => {
-  if (!initiative) return { on: [...SIDEBAR_TOOLS], off: [] };
+  initiative: InitiativeRead | null,
+  tools: CommunityTool[]
+): { on: CommunityTool[]; off: CommunityTool[] } => {
+  if (!initiative) return { on: tools, off: [] };
   return {
-    on: SIDEBAR_TOOLS.filter((tool) => isToolEnabled(tool, initiative)),
-    off: SIDEBAR_TOOLS.filter((tool) => !isToolEnabled(tool, initiative)),
+    on: tools.filter((tool) => isToolEnabled(tool.kind, initiative)),
+    off: tools.filter((tool) => !isToolEnabled(tool.kind, initiative)),
   };
 };
 
@@ -106,7 +102,7 @@ const ToolPermissionRow = ({
   onToggle,
   t,
 }: {
-  tool: Tool;
+  tool: CommunityTool;
   role: InitiativeRoleRead;
   canManageMembers: boolean;
   isPending: boolean;
@@ -114,15 +110,15 @@ const ToolPermissionRow = ({
   locked: ReadonlySet<string>;
   onToggle: (
     role: InitiativeRoleRead,
-    tool: Tool,
+    tool: string,
     permission: "view" | "create",
     on: boolean
   ) => void;
-  t: (key: never) => string;
+  t: (key: never, opts?: Record<string, unknown>) => string;
 }) => {
-  const Icon = TOOL_ICONS[tool];
-  const viewKey = toolViewPermission(tool) as PermissionKey;
-  const createKey = toolCreatePermission(tool) as PermissionKey;
+  const { icon: Icon, builtIn, name } = tool;
+  const viewKey = toolViewPermission(tool.kind);
+  const createKey = toolCreatePermission(tool.kind);
   const canView = role.permissions[viewKey] ?? false;
   const canCreate = role.permissions[createKey] ?? false;
   const disabled = !canManageMembers || isPending;
@@ -137,7 +133,7 @@ const ToolPermissionRow = ({
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
       <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       <span className="min-w-0 flex-1 font-medium text-sm">
-        {t(`settings.permissionGroups.${toolCamelPlural(tool)}` as never)}
+        {builtIn ? t(`settings.permissionGroups.${toolCamelPlural(builtIn)}` as never) : name}
       </span>
       <div className="flex items-center gap-4">
         {(
@@ -158,8 +154,12 @@ const ToolPermissionRow = ({
               <Switch
                 checked={checked}
                 disabled={disabled || held[permission]}
-                aria-label={t(PERMISSION_LABEL_KEYS[key] as never)}
-                onCheckedChange={(next) => onToggle(role, tool, permission, next)}
+                aria-label={
+                  builtIn
+                    ? t(PERMISSION_LABEL_KEYS[key] as never)
+                    : t(`settings.permissions.${permission}Tool` as never, { tool: name })
+                }
+                onCheckedChange={(next) => onToggle(role, tool.kind, permission, next)}
               />
             )}
           </span>
@@ -272,7 +272,7 @@ const InitiativeSettingsRolesTab = ({
   const deleteRoleMutation = useDeleteRole(initiativeId);
   const plugins = useCommunityPlugins().data?.items ?? [];
 
-  const tools = splitToolsForRoleEditing(initiative);
+  const tools = splitToolsForRoleEditing(initiative, useCommunityTools(initiativeId));
 
   /** Each plug-in placed here, its initiative permissions named as it
    *  declares them, with the role's answer to each. */
@@ -297,10 +297,10 @@ const InitiativeSettingsRolesTab = ({
   const configurableRoles = (rolesQuery.data ?? []).filter((role) => !role.is_manager);
 
   const handleTogglePermission = useCallback(
-    (role: InitiativeRoleRead, tool: Tool, permission: "view" | "create", on: boolean) => {
+    (role: InitiativeRoleRead, tool: string, permission: "view" | "create", on: boolean) => {
       if (role.is_manager) return;
-      const viewKey = toolViewPermission(tool) as PermissionKey;
-      const createKey = toolCreatePermission(tool) as PermissionKey;
+      const viewKey = toolViewPermission(tool);
+      const createKey = toolCreatePermission(tool);
       // The pair moves together where the other answer would be incoherent:
       // making something you cannot see is not a state worth being able to
       // express, so granting create grants view, and revoking view revokes
@@ -402,7 +402,7 @@ const InitiativeSettingsRolesTab = ({
                       tools like the other six. */}
                   {tools.on.map((tool) => (
                     <ToolPermissionRow
-                      key={tool}
+                      key={tool.kind}
                       tool={tool}
                       role={role}
                       canManageMembers={canManageMembers}
@@ -496,7 +496,7 @@ const InitiativeSettingsRolesTab = ({
                       <div className="space-y-3 opacity-60">
                         {tools.off.map((tool) => (
                           <ToolPermissionRow
-                            key={tool}
+                            key={tool.kind}
                             tool={tool}
                             role={role}
                             canManageMembers={canManageMembers}

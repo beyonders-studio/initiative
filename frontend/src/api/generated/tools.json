@@ -158,6 +158,25 @@
       "archivable": true
     }
   },
+  "permission_keys": [
+    "projects_enabled",
+    "create_projects",
+    "files_enabled",
+    "create_files",
+    "counter_groups_enabled",
+    "create_counter_groups",
+    "calendars_enabled",
+    "create_calendars",
+    "dashboards_enabled",
+    "create_dashboards",
+    "posts_enabled",
+    "create_posts",
+    "wikis_enabled",
+    "create_wikis",
+    "contacts_enabled",
+    "create_contacts",
+    "dashboards_run_as_initiative"
+  ],
   "file_types": {
     "lexical": {
       "export_formats": ["pdf", "md", "docx", "json"]

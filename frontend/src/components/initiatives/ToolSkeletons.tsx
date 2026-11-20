@@ -18,7 +18,7 @@
  * sketch, the same way it catches one without an icon.
  */
 
-import { Minus, Plus } from "lucide-react";
+import { type LucideIcon, Minus, Plus } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
@@ -394,22 +394,25 @@ export const ToolSketch = ({ tool, active }: ToolSketchProps) => {
   return <Sketch active={active} />;
 };
 
+/** An icon in a tile, lit when its tool is picked: a tool plug-in's, which
+ *  has no sketch. */
+export const IconTile = ({ icon: Icon, active }: SketchProps & { icon: LucideIcon }) => (
+  <span
+    aria-hidden="true"
+    className={cn(
+      "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors",
+      active
+        ? "bg-primary/15 text-primary shadow-[inset_0_0_0_1px] shadow-primary/40"
+        : "bg-muted text-muted-foreground"
+    )}
+  >
+    <Icon className="h-5 w-5" />
+  </span>
+);
+
 /** The tool's icon in a tile, lit when the tool is picked. Kept beside the
  *  sketch rather than replaced by it: the icon is what the sidebar will show,
  *  so seeing them together is what teaches the association. */
-export const ToolIconTile = ({ tool, active }: ToolSketchProps) => {
-  const Icon = TOOL_ICONS[tool];
-  return (
-    <span
-      aria-hidden="true"
-      className={cn(
-        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors",
-        active
-          ? "bg-primary/15 text-primary shadow-[inset_0_0_0_1px] shadow-primary/40"
-          : "bg-muted text-muted-foreground"
-      )}
-    >
-      <Icon className="h-5 w-5" />
-    </span>
-  );
-};
+export const ToolIconTile = ({ tool, active }: ToolSketchProps) => (
+  <IconTile icon={TOOL_ICONS[tool]} active={active} />
+);

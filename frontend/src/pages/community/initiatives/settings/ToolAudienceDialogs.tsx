@@ -15,8 +15,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { toolCamelPlural } from "@/lib/tools";
+import type { CommunityTool } from "@/hooks/useCommunityTools";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import {
   Dialog,
@@ -34,9 +33,9 @@ export type ToolAudience = "everyone" | "managers";
 
 export interface ToolEnableDialogProps {
   /** The tool being turned on, or null when the dialog is closed. */
-  tool: Tool | null;
+  tool: CommunityTool | null;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (tool: Tool, audience: ToolAudience) => void;
+  onConfirm: (tool: CommunityTool, audience: ToolAudience) => void;
   isSaving: boolean;
 }
 
@@ -56,7 +55,7 @@ export const ToolEnableDialog = ({
     if (tool) setAudience("everyone");
   }
 
-  const toolName = tool ? t(`${toolCamelPlural(tool)}Feature` as never) : "";
+  const toolName = tool?.name ?? "";
 
   return (
     <Dialog open={tool !== null} onOpenChange={onOpenChange}>
@@ -104,9 +103,9 @@ export const ToolEnableDialog = ({
 };
 
 export interface ToolDisableDialogProps {
-  tool: Tool | null;
+  tool: CommunityTool | null;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (tool: Tool) => void;
+  onConfirm: (tool: CommunityTool) => void;
   isSaving: boolean;
 }
 
@@ -117,7 +116,7 @@ export const ToolDisableDialog = ({
   isSaving,
 }: ToolDisableDialogProps) => {
   const { t } = useTranslation(["initiatives", "common"]);
-  const toolName = tool ? t(`${toolCamelPlural(tool)}Feature` as never) : "";
+  const toolName = tool?.name ?? "";
 
   return (
     <ConfirmDialog

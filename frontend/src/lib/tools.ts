@@ -47,11 +47,7 @@ import {
   Megaphone,
 } from "lucide-react";
 
-import type {
-  FileType,
-  InitiativeRead,
-  PermissionKey,
-} from "@/api/generated/initiativeAPI.schemas";
+import type { FileType, InitiativeRead } from "@/api/generated/initiativeAPI.schemas";
 import { ListingKind, Tool } from "@/api/generated/initiativeAPI.schemas";
 import records from "@/api/generated/tools.json";
 
@@ -72,6 +68,9 @@ export const TOOL_ICONS: Record<Tool, LucideIcon> = {
 
 /** Every tool, in canonical enum order. */
 export const TOOLS = Object.values(Tool) as Tool[];
+
+/** Whether a kind is a built-in tool's, rather than a tool plug-in's. */
+export const isBuiltInTool = (kind: string): kind is Tool => (TOOLS as string[]).includes(kind);
 
 /** A tool's record, as the backend's `ToolSpec` declares it. */
 interface ToolRecord {
@@ -466,13 +465,15 @@ export const kindNames = (
   kinds: t(`common:kinds.${kind}.plural`),
 });
 
-/** Role permission key gating viewing, e.g. "counter_groups_enabled". */
-export const toolViewPermission = (tool: Tool): PermissionKey =>
-  `${toolPlural(tool)}_enabled` as PermissionKey;
+/** Role permission key gating viewing a tool, by kind: a built-in tool's,
+ *  e.g. "counter_groups_enabled", or a tool plug-in's, "<kind>:enabled". */
+export const toolViewPermission = (kind: string): string =>
+  isBuiltInTool(kind) ? `${toolPlural(kind)}_enabled` : `${kind}:enabled`;
 
-/** Role permission key gating creation, e.g. "create_counter_groups". */
-export const toolCreatePermission = (tool: Tool): PermissionKey =>
-  `create_${toolPlural(tool)}` as PermissionKey;
+/** Role permission key gating creating in a tool, by kind: a built-in tool's,
+ *  e.g. "create_counter_groups", or a tool plug-in's, "<kind>:create". */
+export const toolCreatePermission = (kind: string): string =>
+  isBuiltInTool(kind) ? `create_${toolPlural(kind)}` : `${kind}:create`;
 
 /**
  * The shape every tool's read schema shares where comments are concerned: the
@@ -538,9 +539,10 @@ export const NO_ACTIVITY_DRAWER: ReadonlySet<Tool> = new Set<Tool>([
 /** Whether this tool's pages carry the activity drawer. */
 export const showsActivity = (tool: Tool): boolean => !NO_ACTIVITY_DRAWER.has(tool);
 
-/** Whether the initiative has this tool switched on. Every tool has a switch. */
-export const isToolEnabled = (tool: Tool, initiative: InitiativeRead): boolean =>
-  Boolean(initiative.tools[tool]);
+/** Whether the initiative has this tool switched on, by kind. Every tool has
+ *  a switch, a tool plug-in's too. */
+export const isToolEnabled = (kind: string, initiative: InitiativeRead): boolean =>
+  Boolean(initiative.tools[kind]);
 
 /** Community-relative create target for a tool inside an initiative: the tool's
  *  own tab, with its create dialog open (`?create=true`). Callers prepend the

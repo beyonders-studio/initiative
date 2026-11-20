@@ -150,6 +150,7 @@
     "rolesDescription": "Was jede Rolle sehen und was sie erstellen darf. Manager haben alles.",
     "addCustomRole": "Benutzerdefinierte Rolle hinzufügen",
     "setByCommunity": "Deine Community legt das für jede Initiative fest.",
+    "pluginToolDescription": "Ein Werkzeug aus dem Plug-in {{plugin}}.",
     "customRolesOff": "Deine Community beschränkt Initiativen auf ihre eingebauten Rollen.",
     "builtIn": "Integriert",
     "manager": "Manager",
@@ -224,6 +225,8 @@
       "createWikis": "Wikis erstellen",
       "viewContacts": "Kontakte ansehen",
       "createContacts": "Kontakte erstellen",
+      "viewTool": "{{tool}} anzeigen",
+      "createTool": "In {{tool}} erstellen",
       "dashboards_run_as_initiative": "Dashboards als Initiative ausführen"
     },
     "handleColumn": "Handle",
