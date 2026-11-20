@@ -566,3 +566,29 @@ async def test_a_tool_is_read_as_its_plugin_declares_it(client, session, acting_
         a.g(f"/plugin-tools/stranger.{'x' * 14}"), headers=a.headers
     )
     assert response.status_code == 404, response.text
+
+
+def test_reading_a_tool_leaves_its_declaration_as_declared():
+    """A read validates a copy, so the community's kept declaration keeps its
+    text as declared for every later row."""
+    import copy
+
+    from app.db.tool_rows import locate
+    from app.services.marketplace.tool_plugins import (
+        normalize_tool_plugin_definition,
+        tool_kinds,
+    )
+
+    manifest = counters_tool_manifest()
+    manifest["tool"]["fields"][0]["default"] = "<b>Ready</b> & set"
+    declared = normalize_tool_plugin_definition(manifest)
+    kinds = tool_kinds(declared, listing_uid=COUNTERS_UID)
+    tools = plugin_tools.community_tool_set(
+        [plugin_tools.InstalledTool(COUNTERS_UID, declared)],
+        {kind: 900 + i for i, kind in enumerate(kinds)},
+    )
+    located = locate(tools, GROUP)
+    assert located is not None
+    before = copy.deepcopy(dict(located.tool.declaration))
+    rows_service.declaration(located)
+    assert dict(located.tool.declaration) == before

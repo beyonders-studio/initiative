@@ -10486,6 +10486,7 @@ export type PluginToolOptionReadLabel = { [key: string]: string };
 export interface PluginToolOptionRead {
   value: string;
   label: PluginToolOptionReadLabel;
+  color?: string | null;
 }
 
 /**

@@ -119,6 +119,8 @@ class PluginToolOptionRead(SanitizedBaseModel):
 
     value: str
     label: LocalizedText
+    #: Its colour, a hex ``#rrggbb``, where it declares one.
+    color: str | None = None
 
 
 class PluginToolCounterRead(SanitizedBaseModel):

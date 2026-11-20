@@ -28,6 +28,7 @@ Every tool plug-in's tool and each of its items is one kind
 
 from __future__ import annotations
 
+import copy
 from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from decimal import Decimal
@@ -131,7 +132,12 @@ def children(located: Located, tools: ToolSet) -> list[Located]:
 
 
 def _fields_read(block: Mapping[str, Any]) -> list[PluginToolFieldRead]:
-    return [PluginToolFieldRead.model_validate(f) for f in block.get("fields", [])]
+    """A table's fields as a read answers them, validated from a copy: the
+    declaration is the community's kept tool set's, and stays as declared."""
+    return [
+        PluginToolFieldRead.model_validate(copy.deepcopy(field))
+        for field in block.get("fields", [])
+    ]
 
 
 def declaration(located: Located) -> PluginToolRead:
