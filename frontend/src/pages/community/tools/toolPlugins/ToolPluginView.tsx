@@ -45,6 +45,7 @@ import { ToolRows } from "./ToolRows";
  * of their own, as every tool's are.
  */
 export const ToolTableRows = ({
+  tool,
   table,
   initiativeId,
   parentId,
@@ -52,6 +53,7 @@ export const ToolTableRows = ({
   primary = false,
   heading,
 }: {
+  tool: InstalledTool;
   table: ToolTable;
   initiativeId: number;
   /** The row the items sit under; none for the tool's own rows. */
@@ -67,7 +69,7 @@ export const ToolTableRows = ({
   const communityId = useActiveCommunityId();
   const navigate = useNavigate();
   const [view, setView] = useState<ToolView>("active");
-  const rows = usePluginToolRows(table.kind, {
+  const rows = usePluginToolRows(table, {
     ...(parentId === undefined ? { initiative_id: initiativeId } : { parent_id: parentId }),
     ...toolViewParams(table.kind, view),
   });
@@ -86,8 +88,8 @@ export const ToolTableRows = ({
   // The lists it declares, each as this place laid it out or as shipped, and
   // the one this person was last in here, or the one it opens on.
   const target = useMemo(
-    () => toolLayoutTarget(table, initiativeId, parentId ?? null),
-    [table, initiativeId, parentId]
+    () => toolLayoutTarget(table.kind, initiativeId, parentId ?? null),
+    [table.kind, initiativeId, parentId]
   );
   const layouts = useToolLayouts(target);
   const saveLayouts = useSaveLayouts(target);
@@ -190,6 +192,7 @@ export const ToolTableRows = ({
       ) : (
         list && (
           <ToolRows
+            tool={tool}
             table={table}
             list={list}
             rows={rows.data.items.map(toolRow)}
@@ -250,6 +253,12 @@ export const ToolPluginView = ({
 }) => {
   const table = tool.tables.get(tool.kind);
   return table ? (
-    <ToolTableRows table={table} initiativeId={fixedInitiativeId} canCreate={canCreate} primary />
+    <ToolTableRows
+      tool={tool}
+      table={table}
+      initiativeId={fixedInitiativeId}
+      canCreate={canCreate}
+      primary
+    />
   ) : null;
 };

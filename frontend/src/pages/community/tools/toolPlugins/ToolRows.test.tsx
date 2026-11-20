@@ -3,24 +3,30 @@
  * its card or a table of its columns, each field in its kind's look, in the
  * order a sort puts them as a view.
  */
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 
-import { buildToolPlugin, buildToolRow, TOOL_PLUGIN_UID } from "@/__tests__/factories";
+import {
+  buildToolPlugin,
+  buildToolRow,
+  buildToolRowRead,
+  TOOL_PLUGIN_UID,
+} from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import { ActorKind } from "@/api/generated/initiativeAPI.schemas";
-import { installedTool, type ToolTable } from "@/lib/toolPlugins";
+import { type InstalledTool, installedTool, type ToolTable } from "@/lib/toolPlugins";
 import { shippedLists } from "@/ui/layouts/layoutSet";
 
 import { ToolRows } from "./ToolRows";
 
 const uid = TOOL_PLUGIN_UID.toLowerCase();
 
-const tableOf = (key: string): ToolTable =>
-  installedTool(buildToolPlugin())?.tables.get(`${key}.${uid}`) as ToolTable;
+const tool = (): InstalledTool => installedTool(buildToolPlugin()) as InstalledTool;
+const tableOf = (key: string): ToolTable => tool().tables.get(`${key}.${uid}`) as ToolTable;
 
 const noop = () => {};
 
@@ -33,6 +39,7 @@ describe("ToolRows", () => {
     const table = tableOf("book");
     renderPage(() => (
       <ToolRows
+        tool={tool()}
         table={table}
         list={shippedLists(table.layouts.lists)[0]}
         rows={[row]}
@@ -50,10 +57,50 @@ describe("ToolRows", () => {
     expect(name.closest("[style]")).toHaveStyle({ backgroundColor: "#336699" });
   });
 
+  it("previews a row's first items on its card, each stepping its counter", async () => {
+    const book = buildToolRowRead({ name: "Emma", fields: { read: 3, pages: 10 } });
+    const shelf = tableOf("shelf");
+    const card = {
+      type: "card",
+      children: [
+        { type: "field", props: { field: "name" } },
+        { type: "items", props: { item: "book", fields: ["name", "read"], limit: 2 } },
+      ],
+    };
+    let stepped: unknown = null;
+    server.use(
+      communityHttp.post(`/plugin-tools/book.${uid}/${book.id}/step`, async ({ request }) => {
+        stepped = await request.json();
+        return HttpResponse.json({ ...book, fields: { ...book.fields, read: 4 } });
+      })
+    );
+    renderPage(() => (
+      <ToolRows
+        tool={tool()}
+        table={shelf}
+        list={shippedLists([{ kind: "grid", card }])[0]}
+        rows={[buildToolRow({ kind: shelf.kind, preview: { [`book.${uid}`]: [book] } })]}
+        initiativeId={3}
+        sorting={[]}
+        onSortingChange={noop}
+      />
+    ));
+
+    expect(await screen.findByRole("link", { name: "Emma" })).toHaveAttribute(
+      "href",
+      `/c/1/i/3/t/book.${uid}/${book.id}`
+    );
+    // Drawn as the book table's first list draws it: as a bar.
+    expect(screen.getByRole("img", { name: "3 / 10" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Step Read up" }));
+    await waitFor(() => expect(stepped).toEqual({ field: "read" }));
+  });
+
   it("draws a table of the columns its list names, sorted as a view", async () => {
     const table = tableOf("shelf");
     renderPage(() => (
       <ToolRows
+        tool={tool()}
         table={table}
         list={shippedLists(table.layouts.lists)[1]}
         rows={[
@@ -112,6 +159,7 @@ describe("ToolRows", () => {
     const lists = shippedLists(table.layouts.lists);
     const view = renderPage(() => (
       <ToolRows
+        tool={tool()}
         table={table}
         list={lists[0]}
         rows={rows}
@@ -128,6 +176,7 @@ describe("ToolRows", () => {
 
     renderPage(() => (
       <ToolRows
+        tool={tool()}
         table={table}
         list={lists[1]}
         rows={rows}

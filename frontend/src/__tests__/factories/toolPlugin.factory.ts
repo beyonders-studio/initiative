@@ -171,6 +171,7 @@ export function buildToolRowRead(overrides: Partial<PluginToolRowRead> = {}): Pl
     tags: [],
     created_at: "2026-11-01T00:00:00.000Z",
     updated_at: "2026-11-02T00:00:00.000Z",
+    preview: null,
     ...overrides,
   };
 }

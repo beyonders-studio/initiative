@@ -12,59 +12,8 @@
  * contract, so this reads it as the contract writes it.
  */
 
-import {
-  Beaker,
-  Book,
-  Bookmark,
-  Box,
-  Briefcase,
-  Calendar,
-  Camera,
-  ChartBar,
-  ChartLine,
-  ChartPie,
-  ClipboardList,
-  Clock,
-  Dice5,
-  FileText,
-  Flag,
-  FlaskConical,
-  Folder,
-  Gauge,
-  Gift,
-  Hammer,
-  Heart,
-  Hourglass,
-  Image,
-  Inbox,
-  Kanban,
-  Layers,
-  Leaf,
-  Lightbulb,
-  List,
-  ListChecks,
-  type LucideIcon,
-  Map as MapIcon,
-  MapPin,
-  MessageSquare,
-  Notebook,
-  Package,
-  Palette,
-  Puzzle,
-  Receipt,
-  Shield,
-  ShoppingCart,
-  Star,
-  Table,
-  Tag,
-  Target,
-  Timer,
-  Trophy,
-  User,
-  Users,
-  Wallet,
-  Wrench,
-} from "lucide-react";
+import { type LucideIcon, type LucideProps, Puzzle } from "lucide-react";
+import { createElement, forwardRef, useEffect, useState } from "react";
 
 import {
   type CommunityPluginRead,
@@ -84,60 +33,93 @@ import type { ListLayoutDefinition } from "@/ui/layouts/layoutSet";
 
 /**
  * The icons a tool plug-in may name (the contract's `toolIcon`), each the
- * app's own. `toolPlugins.test.ts` holds this to the contract's list, so a
- * name the SDK allows always draws.
+ * app's own, loaded the first time one is drawn. `toolPlugins.test.ts` holds
+ * this to the contract's list, so a name the SDK allows always draws.
  */
-export const TOOL_PLUGIN_ICONS: Readonly<Record<string, LucideIcon>> = {
-  beaker: Beaker,
-  book: Book,
-  bookmark: Bookmark,
-  box: Box,
-  briefcase: Briefcase,
-  calendar: Calendar,
-  camera: Camera,
-  "chart-bar": ChartBar,
-  "chart-line": ChartLine,
-  "chart-pie": ChartPie,
-  "clipboard-list": ClipboardList,
-  clock: Clock,
-  "dice-5": Dice5,
-  "file-text": FileText,
-  flag: Flag,
-  "flask-conical": FlaskConical,
-  folder: Folder,
-  gauge: Gauge,
-  gift: Gift,
-  hammer: Hammer,
-  heart: Heart,
-  hourglass: Hourglass,
-  image: Image,
-  inbox: Inbox,
-  kanban: Kanban,
-  layers: Layers,
-  leaf: Leaf,
-  lightbulb: Lightbulb,
-  list: List,
-  "list-checks": ListChecks,
-  map: MapIcon,
-  "map-pin": MapPin,
-  "message-square": MessageSquare,
-  notebook: Notebook,
-  package: Package,
-  palette: Palette,
-  puzzle: Puzzle,
-  receipt: Receipt,
-  shield: Shield,
-  "shopping-cart": ShoppingCart,
-  star: Star,
-  table: Table,
-  tag: Tag,
-  target: Target,
-  timer: Timer,
-  trophy: Trophy,
-  user: User,
-  users: Users,
-  wallet: Wallet,
-  wrench: Wrench,
+export const TOOL_PLUGIN_ICONS: Readonly<Record<string, () => Promise<{ default: LucideIcon }>>> = {
+  beaker: () => import("lucide-react/icons/beaker"),
+  book: () => import("lucide-react/icons/book"),
+  bookmark: () => import("lucide-react/icons/bookmark"),
+  box: () => import("lucide-react/icons/box"),
+  briefcase: () => import("lucide-react/icons/briefcase"),
+  calendar: () => import("lucide-react/icons/calendar"),
+  camera: () => import("lucide-react/icons/camera"),
+  "chart-bar": () => import("lucide-react/icons/chart-bar"),
+  "chart-line": () => import("lucide-react/icons/chart-line"),
+  "chart-pie": () => import("lucide-react/icons/chart-pie"),
+  "clipboard-list": () => import("lucide-react/icons/clipboard-list"),
+  clock: () => import("lucide-react/icons/clock"),
+  "dice-5": () => import("lucide-react/icons/dice-5"),
+  "file-text": () => import("lucide-react/icons/file-text"),
+  flag: () => import("lucide-react/icons/flag"),
+  "flask-conical": () => import("lucide-react/icons/flask-conical"),
+  folder: () => import("lucide-react/icons/folder"),
+  gauge: () => import("lucide-react/icons/gauge"),
+  gift: () => import("lucide-react/icons/gift"),
+  hammer: () => import("lucide-react/icons/hammer"),
+  heart: () => import("lucide-react/icons/heart"),
+  hourglass: () => import("lucide-react/icons/hourglass"),
+  image: () => import("lucide-react/icons/image"),
+  inbox: () => import("lucide-react/icons/inbox"),
+  kanban: () => import("lucide-react/icons/kanban"),
+  layers: () => import("lucide-react/icons/layers"),
+  leaf: () => import("lucide-react/icons/leaf"),
+  lightbulb: () => import("lucide-react/icons/lightbulb"),
+  list: () => import("lucide-react/icons/list"),
+  "list-checks": () => import("lucide-react/icons/list-checks"),
+  map: () => import("lucide-react/icons/map"),
+  "map-pin": () => import("lucide-react/icons/map-pin"),
+  "message-square": () => import("lucide-react/icons/message-square"),
+  notebook: () => import("lucide-react/icons/notebook"),
+  package: () => import("lucide-react/icons/package"),
+  palette: () => import("lucide-react/icons/palette"),
+  puzzle: () => import("lucide-react/icons/puzzle"),
+  receipt: () => import("lucide-react/icons/receipt"),
+  shield: () => import("lucide-react/icons/shield"),
+  "shopping-cart": () => import("lucide-react/icons/shopping-cart"),
+  star: () => import("lucide-react/icons/star"),
+  table: () => import("lucide-react/icons/table"),
+  tag: () => import("lucide-react/icons/tag"),
+  target: () => import("lucide-react/icons/target"),
+  timer: () => import("lucide-react/icons/timer"),
+  trophy: () => import("lucide-react/icons/trophy"),
+  user: () => import("lucide-react/icons/user"),
+  users: () => import("lucide-react/icons/users"),
+  wallet: () => import("lucide-react/icons/wallet"),
+  wrench: () => import("lucide-react/icons/wrench"),
+};
+
+const loadedIcons = new Map<string, LucideIcon>();
+const toolIcons = new Map<string, LucideIcon>();
+
+/** A tool's icon by the name it declares, drawn once it has loaded (taking
+ *  its room until then), or the puzzle piece for a name the app does not
+ *  have. One component per name, so a redraw keeps it. */
+export const toolPluginIcon = (name: string): LucideIcon => {
+  const load = TOOL_PLUGIN_ICONS[name];
+  if (!load) return Puzzle;
+  const known = toolIcons.get(name);
+  if (known) return known;
+  const icon = forwardRef<SVGSVGElement, LucideProps>((props, ref) => {
+    const [Loaded, setLoaded] = useState(() => loadedIcons.get(name));
+    useEffect(() => {
+      if (Loaded) return;
+      let live = true;
+      void load().then(({ default: drawn }) => {
+        loadedIcons.set(name, drawn);
+        if (live) setLoaded(() => drawn);
+      });
+      return () => {
+        live = false;
+      };
+    }, [Loaded]);
+    return Loaded
+      ? createElement(Loaded, { ...props, ref })
+      : createElement("span", { className: props.className, "aria-hidden": true });
+  }) as LucideIcon;
+  icon.displayName = `ToolIcon(${name})`;
+  toolIcons.set(name, icon);
+  return icon;
 };
 
 /** The kinds of field a tool's rows hold (the contract's `toolFieldKind`). */
@@ -292,7 +274,7 @@ export const installedTool = (
     kind: kindOf(tool.key),
     pluginId: plugin.id,
     name: tool.name,
-    icon: TOOL_PLUGIN_ICONS[tool.icon] ?? Puzzle,
+    icon: toolPluginIcon(tool.icon),
     tables: new Map([
       table(tool.key, tool.instance_name, tool.fields ?? [], tool.layouts, null),
       ...items.map((item) =>
@@ -359,16 +341,16 @@ export const toolPluginLayoutsRoute = (
 // in their initiative, as a tool the initiative shares is, and an item
 // table's rows under the row they sit in, as an instance of a tool is.
 
-/** The layouts of `table`'s rows where they are listed: in `initiativeId`
+/** The layouts of a table's rows where they are listed: in `initiativeId`
  *  for the tool's own, under the row `parentId` for an item's. */
 export const toolLayoutTarget = (
-  table: Pick<ToolTable, "kind" | "parent">,
+  kind: string,
   initiativeId: number,
   parentId: number | null
 ): GetLayoutsParams =>
-  table.parent === null || parentId === null
-    ? { tool: table.kind, initiative_id: initiativeId }
-    : { tool: table.kind, tool_id: parentId };
+  parentId === null
+    ? { tool: kind, initiative_id: initiativeId }
+    : { tool: kind, tool_id: parentId };
 
 // --- Rows -------------------------------------------------------------------
 

@@ -222,7 +222,7 @@ export function CollectionPage() {
   const stepCounter = useCounterSteps<CollectionFileSummary>(
     ContentKind.file,
     useCallback(
-      (item, definition) => (definition.collection_id !== null ? canEdit : item.can.edit),
+      (item, summary) => (summary.collection_id !== null ? canEdit : item.can.edit),
       [canEdit]
     )
   );

@@ -42,6 +42,7 @@ export const blankRow = (table: ToolTable, initiativeId: number): ToolRow => {
     tags: [],
     created_at: "",
     updated_at: "",
+    preview: null,
   });
 };
 

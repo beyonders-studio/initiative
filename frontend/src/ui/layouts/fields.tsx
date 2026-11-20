@@ -153,13 +153,13 @@ export type LayoutEnv<I = unknown> = {
   /** What can be done with an item from where it is drawn, beside its title
    *  on a card: a board its reader may change. */
   itemActions?(props: { item: I }): ReactNode;
-  /** Steps a counter on an item where the list's reader may change it there,
-   *  answering with the item's values as the server then holds them. Left
-   *  out, or answering null for an item they may not change, a counter is
-   *  drawn without its buttons. */
+  /** Steps a counter (`summary`, its value as the item holds it) on an item
+   *  where the list's reader may change it there, answering with the item's
+   *  values as the server then holds them. Left out, or answering null for
+   *  an item they may not change, a counter is drawn without its buttons. */
   stepCounter?(
     item: I,
-    definition: PropertyDefinition
+    summary: PropertySummary
   ): ((up: boolean) => Promise<PropertySummary[]>) | null;
 
   /** What its property editors read and change through: a detail's. Left
@@ -302,10 +302,7 @@ const CountField = ({ value, field, variant, env }: FieldRendererProps) => {
 
 const PropertyField = ({ value, item, field, variant, env, oneLine }: FieldRendererProps) => {
   const summary = (value as PropertySummary | null) ?? undefined;
-  const step =
-    summary && field.property?.type === MetadataType.counter
-      ? env.stepCounter?.(item, field.property)
-      : null;
+  const step = summary?.type === MetadataType.counter ? env.stepCounter?.(item, summary) : null;
   return (
     <PropertyValueCell
       summary={summary}

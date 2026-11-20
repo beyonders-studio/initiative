@@ -39,9 +39,11 @@ export function ToolPluginRowPage() {
   const { kind = "" } = useParams({ strict: false }) as { kind?: string };
   const rowId = useRouteId("rowId");
   const initiativeId = useRouteId("initiativeId");
+  // The installs, the row and its page's layouts are read side by side: the
+  // kind and the row are the URL's.
   const installs = useInstalledTools();
   const found = installs.status === "ready" ? toolOfKind(installs.tools, kind) : null;
-  const query = usePluginToolRow(kind, found ? rowId : null);
+  const query = usePluginToolRow(kind, rowId);
   const row = useMemo(() => (query.data ? toolRow(query.data) : null), [query.data]);
   const table = found?.table;
   const detail = useMemo(
@@ -49,9 +51,13 @@ export function ToolPluginRowPage() {
     [table, i18n.language]
   );
   const saves = useMemo(() => itemSaves(pluginToolRowSaves(kind), rowId ?? 0), [kind, rowId]);
-  // Its page as the place it is listed in laid it out, or as shipped.
+  // Its page as the place it is listed in laid it out, or as shipped: the
+  // tool's own rows' in the URL's initiative, an item's under its row.
+  const parentId = row ? row.parent_id : table?.parent === null ? null : undefined;
   const layouts = useToolLayouts(
-    table && row ? toolLayoutTarget(table, row.initiative_id, row.parent_id) : null
+    parentId === undefined || initiativeId === null
+      ? null
+      : toolLayoutTarget(kind, initiativeId, parentId)
   );
 
   if (installs.status === "loading" || query.isLoading) {
@@ -113,6 +119,7 @@ export function ToolPluginRowPage() {
         return items ? (
           <Section key={itemKind} title={toolText(items.name, i18n.language)}>
             <ToolTableRows
+              tool={tool}
               table={items}
               initiativeId={row.initiative_id}
               parentId={row.id}

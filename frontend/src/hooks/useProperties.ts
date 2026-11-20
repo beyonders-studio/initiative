@@ -278,7 +278,7 @@ export const propertySaves = Object.fromEntries(
 ) as Record<ContentKind, FieldSaveKind<PropertyHolder, never>>;
 
 /** A counter on an item a list shows, stepped up or down. */
-export type CounterStep = { itemId: number; definition: PropertyDefinitionRead; up: boolean };
+export type CounterStep = { itemId: number; summary: PropertySummary; up: boolean };
 
 /**
  * Steps counters on the `target`s a list shows, each from what it holds when
@@ -288,11 +288,11 @@ export type CounterStep = { itemId: number; definition: PropertyDefinitionRead; 
  */
 export const useStepCounter = (target: ContentKind) =>
   useCommunityMutation<PropertySummary[], CounterStep>({
-    mutationFn: (communityId, { itemId, definition, up }) => {
-      const body = { merge: true, steps: [{ property_id: definition.id, up }] };
-      return definition.collection_id === null
+    mutationFn: (communityId, { itemId, summary, up }) => {
+      const body = { merge: true, steps: [{ property_id: summary.property_id, up }] };
+      return summary.collection_id === null
         ? setProperties(communityId, target, itemId, body)
-        : setCollectionFileMetadata(communityId, definition.collection_id, itemId, body);
+        : setCollectionFileMetadata(communityId, summary.collection_id, itemId, body);
     },
     invalidate: () =>
       invalidate(

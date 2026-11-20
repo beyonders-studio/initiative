@@ -3,14 +3,20 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
+import { usePluginToolSteps } from "@/hooks/usePluginToolRows";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { type ToolRow, type ToolTable, toolPluginRowRoute } from "@/lib/toolPlugins";
+import {
+  type InstalledTool,
+  type ToolRow,
+  type ToolTable,
+  toolPluginRowRoute,
+} from "@/lib/toolPlugins";
 import type { TranslateFn } from "@/types/i18n";
 import { Card, CardContent } from "@/ui/card";
 import { DataTable } from "@/ui/data-table";
 import { fieldColumn } from "@/ui/layouts/columns";
 import { indexPaths } from "@/ui/layouts/draft";
-import { type LayoutEnv, withDisplays } from "@/ui/layouts/fields";
+import { type ItemPreview, type LayoutEnv, withDisplays } from "@/ui/layouts/fields";
 import type { ListView } from "@/ui/layouts/layoutSet";
 import { sortedItems } from "@/ui/layouts/presets";
 import { type LayoutContext, type LayoutNode, LayoutTree } from "@/ui/layouts/tree";
@@ -28,10 +34,14 @@ export const NAME_CARD: LayoutNode = {
  * its card, or a table of its columns, each field in its kind's look and each
  * scale or counter as the list's `displays` say. A row's name opens its page.
  * They are drawn in `sorting`'s order, a view that never moves the rows' own
- * order; a table's headers change it. With `editing`, as the layout editor
- * draws them, each part of the card is marked.
+ * order; a table's headers change it. A counter steps where its reader may
+ * change the row, and a card's `items` part previews the first items under
+ * its row as the list read them (`include_preview`), each drawn as their
+ * table's first list draws it. With `editing`, as the layout editor draws
+ * them, each part of the card is marked and nothing steps.
  */
 export const ToolRows = ({
+  tool,
   table,
   list,
   rows,
@@ -40,6 +50,7 @@ export const ToolRows = ({
   onSortingChange,
   editing = false,
 }: {
+  tool: InstalledTool;
   table: ToolTable;
   list: ListView;
   rows: ToolRow[];
@@ -55,14 +66,41 @@ export const ToolRows = ({
     () => withDisplays(toolFields(table, i18n.language), displays),
     [table, i18n.language, displays]
   );
-  const env = useMemo<LayoutEnv<ToolRow>>(
-    () => ({
+  const steps = usePluginToolSteps();
+  const env = useMemo<LayoutEnv<ToolRow>>(() => {
+    const envOf = (of: ToolTable): LayoutEnv<ToolRow> => ({
       t: t as TranslateFn,
       communityPath,
-      itemHref: (row) => communityPath(toolPluginRowRoute(initiativeId, table.kind, row.id)),
-    }),
-    [t, communityPath, initiativeId, table.kind]
-  );
+      itemHref: (row) => communityPath(toolPluginRowRoute(initiativeId, of.kind, row.id)),
+      ...(editing ? {} : { stepCounter: steps(of) }),
+    });
+    // Each item table under it by its key, as a card's `items` part names it.
+    const previews = new Map(
+      table.items.flatMap((kind) => {
+        const items = tool.tables.get(kind);
+        if (!items) return [];
+        const fields = withDisplays(
+          toolFields(items, i18n.language),
+          items.layouts.lists[0]?.displays
+        );
+        return [[kind.split(".")[0], { kind, fields, env: envOf(items) }] as const];
+      })
+    );
+    return {
+      ...envOf(table),
+      itemPreview: (row, key): ItemPreview | null => {
+        const preview = previews.get(key);
+        const items = preview && row.preview?.[preview.kind];
+        return items
+          ? {
+              items,
+              fields: preview.fields as ItemPreview["fields"],
+              env: preview.env as LayoutEnv,
+            }
+          : null;
+      },
+    };
+  }, [t, communityPath, initiativeId, tool, table, editing, steps, i18n.language]);
   const sorted = useMemo(
     () => sortedItems(rows, sorting, fields, i18n.language),
     [rows, sorting, fields, i18n.language]
