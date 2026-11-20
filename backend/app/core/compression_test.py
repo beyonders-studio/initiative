@@ -8,7 +8,7 @@ from starlette.responses import Response
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
-from app.core.compression import TextCompressionMiddleware, compressible, takes_gzip
+from app.core.compression import TextCompressionMiddleware, compressible
 
 _BODY = b"x" * 4096
 
@@ -43,26 +43,24 @@ def test_only_text_worth_shrinking_is_gzipped(path, gzipped):
         assert response.content == _BODY
 
 
-@pytest.mark.parametrize("accept", ["identity", "gzip;q=0, identity", "*;q=0"])
-def test_a_client_that_takes_no_gzip_gets_none(accept):
-    response = _client().get("/json", headers={"Accept-Encoding": accept})
-
-    assert "content-encoding" not in response.headers
-
-
 @pytest.mark.parametrize(
     ("accept", "takes"),
     [
         ("gzip", True),
         ("br, gzip;q=0.5", True),
         ("*", True),
+        ("identity", False),
+        ("gzip;q=0, identity", False),
+        ("*;q=0", False),
         ("gzip;q=0, *", False),
         ("gzip;q=nope", False),
         ("", False),
     ],
 )
-def test_gzip_is_taken_only_with_a_quality_above_zero(accept, takes):
-    assert takes_gzip(accept) is takes
+def test_gzip_is_sent_only_with_a_quality_above_zero(accept, takes):
+    response = _client().get("/json", headers={"Accept-Encoding": accept})
+
+    assert (response.headers.get("content-encoding") == "gzip") is takes
 
 
 @pytest.mark.parametrize(

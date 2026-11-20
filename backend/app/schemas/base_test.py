@@ -92,46 +92,21 @@ def test_opted_out_fields_keep_their_markup(field: str) -> None:
     assert getattr(_Model(name="x", **{field: raw}), field) == raw
 
 
-def test_enum_field_not_modified() -> None:
-    # Enums should never be coerced through nh3.clean.
-    m = _Model(name="x", color=_Color.blue)
-    assert m.color is _Color.blue
-
-    # Same goes for string-form enum values.
-    m2 = _Model(name="x", color="red")
-    assert m2.color is _Color.red
-
-
-def test_non_str_fields_not_modified() -> None:
-    m = _Model(name="x", count=42, enabled=True)
-    assert m.count == 42
-    assert m.enabled is True
+def test_only_text_is_sanitized() -> None:
+    # Enums (as members or values), non-str fields and None are never coerced
+    # through nh3.clean; an optional str is sanitized when present.
+    m = _Model(name="x", color=_Color.blue, count=42, enabled=True, bio=None)
+    assert (m.color, m.count, m.enabled, m.bio) == (_Color.blue, 42, True, None)
+    assert _Model(name="x", color="red").color is _Color.red
+    assert _Model(name="x", bio="<script>x</script>safe").bio == "safe"
 
 
-def test_optional_str_sanitized_when_present() -> None:
-    m = _Model(name="x", bio="<script>x</script>safe")
-    assert m.bio == "safe"
-
-
-def test_optional_str_none_passes_through() -> None:
-    m = _Model(name="x", bio=None)
-    assert m.bio is None
-
-
-def test_plain_text_over_max_length_rejected() -> None:
+def test_plain_text_stops_at_the_cap_and_raw_text_does_not() -> None:
+    assert len(_Model(name="x" * MAX_PLAIN_TEXT_LENGTH).name) == MAX_PLAIN_TEXT_LENGTH
     with pytest.raises(ValidationError):
         _Model(name="x" * (MAX_PLAIN_TEXT_LENGTH + 1))
-
-
-def test_plain_text_at_max_length_allowed() -> None:
-    m = _Model(name="x" * MAX_PLAIN_TEXT_LENGTH)
-    assert len(m.name) == MAX_PLAIN_TEXT_LENGTH
-
-
-def test_raw_text_field_exempt_from_length_cap() -> None:
     big = "A" * (MAX_PLAIN_TEXT_LENGTH + 5000)
-    m = _Model(name="ok", raw=big)
-    assert m.raw == big
+    assert _Model(name="ok", raw=big).raw == big
 
 
 @pytest.mark.parametrize("sigil", sorted(RESERVED_SIGILS))
@@ -147,38 +122,25 @@ def test_title_str_rejects_sigil_revealed_by_stripping() -> None:
         _Model(name="x", display="a<b>&#35;</b>b")
 
 
-def test_title_str_allows_ordinary_punctuation() -> None:
-    m = _Model(name="x", display="Q3 Report (final) & notes — v2")
+def test_title_str_is_trimmed_and_bounded() -> None:
+    m = _Model(name="  x  ", display="  Q3 Report (final) & notes — v2  ")
     assert m.display == "Q3 Report (final) & notes — v2"
-
-
-def test_title_str_is_trimmed() -> None:
-    assert _Model(name="  x  ", display="  Q3 Report  ").display == "Q3 Report"
-    assert _Model(name="  x  ").name == "  x  "
+    assert m.name == "  x  "
+    assert _Model(name="x", display=None).display is None
     # Nothing left once trimmed is no title at all.
     with pytest.raises(ValidationError):
         _Model(name="x", display="   ")
-
-
-def test_title_str_none_passes_through() -> None:
-    assert _Model(name="x", display=None).display is None
-
-
-def test_title_str_stops_at_the_bound() -> None:
     at = "a" * MAX_TITLE_LENGTH
     assert _Model(name="x", display=at).display == at
     with pytest.raises(ValidationError):
         _Model(name="x", display=at + "a")
 
 
-def test_plain_str_field_is_not_held_to_the_title_bound() -> None:
-    """A title is a label; a plain str field is bounded by the plain-text cap."""
+def test_a_plain_str_field_is_held_to_neither_title_rule() -> None:
+    """A title is a label; a plain str field is bounded by the plain-text cap,
+    and only TitleStr fields refuse sigils."""
     long = "a" * (MAX_TITLE_LENGTH + 1)
     assert _Model(name=long).name == long
-
-
-def test_plain_str_field_still_accepts_sigils() -> None:
-    """Only TitleStr fields are held to the rule."""
     assert _Model(name="Fix #12 for @alice").name == "Fix #12 for @alice"
 
 

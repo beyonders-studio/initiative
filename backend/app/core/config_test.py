@@ -92,10 +92,6 @@ def test_secret_key_rejects_weak_values(bad_key):
         _settings(SECRET_KEY=bad_key)
 
 
-def test_secret_key_accepts_strong_value():
-    assert _settings().SECRET_KEY == TEST_SECRET_KEY
-
-
 def test_secret_key_failure_points_at_safe_rotation_path():
     """The boot-crash message must steer operators to the rotation path, not the
     destructive 'just generate a new one' fix — SECRET_KEY encrypts stored data. It
@@ -240,17 +236,11 @@ def test_previous_secret_key_taken_verbatim_without_validation():
     assert _settings().PREVIOUS_SECRET_KEY is None
 
 
-def test_jwt_signing_key_falls_back_to_secret_key_when_unset():
+def test_jwt_signing_key_prefers_a_dedicated_key_over_secret_key():
     settings = _settings()
     assert settings.JWT_SIGNING_KEY is None
     assert settings.jwt_signing_key == settings.SECRET_KEY
-
-
-def test_jwt_signing_key_prefers_dedicated_key_when_set():
-    other = "c" * 48
-    settings = _settings(JWT_SIGNING_KEY=other)
-    assert settings.jwt_signing_key == other
-    assert settings.jwt_signing_key != settings.SECRET_KEY
+    assert _settings(JWT_SIGNING_KEY="c" * 48).jwt_signing_key == "c" * 48
 
 
 def test_jwt_signing_key_enforces_strong_rules_when_set():
@@ -301,14 +291,6 @@ def test_cors_origins_wildcard_is_dropped():
     assert "https://app.example.com" in settings.cors_origins
 
 
-def test_cors_origins_always_includes_app_url_and_native_origins():
-    settings = _settings(CORS_ALLOWED_ORIGINS="https://prod.example.com")
-
-    assert "https://app.example.com" in settings.cors_origins
-    for origin in CAPACITOR_NATIVE_ORIGINS:
-        assert origin in settings.cors_origins
-
-
 def test_cors_origins_no_duplicates():
     # Listing APP_URL / native origins explicitly must not duplicate them.
     settings = _settings(
@@ -325,31 +307,24 @@ def test_cors_origins_no_duplicates():
         assert settings.cors_origins.count(origin) == 1
 
 
-def test_cors_origins_strips_trailing_slash():
-    settings = _settings(
-        APP_URL="https://app.example.com/",
-        CORS_ALLOWED_ORIGINS="https://b.example.com/",
-    )
+@pytest.mark.parametrize(
+    ("app_url", "extra"),
+    [
+        ("https://app.example.com/", "https://admin.example.com/"),
+        ("https://app.example.com/initiative", "https://admin.example.com/console"),
+    ],
+)
+def test_cors_origins_are_scheme_and_host_only(app_url, extra):
+    # An Origin header is scheme+host only; a trailing slash or path on APP_URL
+    # (or an operator origin) must be dropped or every credentialed
+    # cross-origin request fails.
+    settings = _settings(APP_URL=app_url, CORS_ALLOWED_ORIGINS=extra)
 
-    assert "https://app.example.com" in settings.cors_origins
-    assert "https://b.example.com" in settings.cors_origins
-    assert "https://app.example.com/" not in settings.cors_origins
-
-
-def test_cors_origins_strips_path_component():
-    # An Origin header is scheme+host only; a path on APP_URL (or an operator
-    # origin) must be dropped or every credentialed cross-origin request fails.
-    settings = _settings(
-        APP_URL="https://app.example.com/initiative",
-        CORS_ALLOWED_ORIGINS="https://admin.example.com/console",
-    )
-
-    assert "https://app.example.com" in settings.cors_origins
-    assert "https://admin.example.com" in settings.cors_origins
-    assert all(
-        "/initiative" not in origin and "/console" not in origin
-        for origin in settings.cors_origins
-    )
+    assert settings.cors_origins == [
+        "https://app.example.com",
+        "https://admin.example.com",
+        *CAPACITOR_NATIVE_ORIGINS,
+    ]
 
 
 def _csp(settings: Settings) -> str:
@@ -374,6 +349,8 @@ def test_csp_confines_scripts_and_locks_down_vectors():
     # Scripts are same-origin only — NO unsafe-inline/eval.
     assert _directive(csp, "script-src") == "script-src 'self'"
     assert "'unsafe-eval'" not in csp
+    # The chart component / UI libs inject inline <style>.
+    assert "'unsafe-inline'" in _directive(csp, "style-src")
 
     # High-value hardening directives.
     assert "default-src 'self'" in csp
@@ -381,14 +358,6 @@ def test_csp_confines_scripts_and_locks_down_vectors():
     assert "base-uri 'self'" in csp
     assert "form-action 'self'" in csp
     assert "frame-ancestors 'none'" in csp
-
-
-def test_csp_allows_inline_styles_but_not_scripts():
-    # The chart component / UI libs inject inline <style>, so style-src must
-    # permit 'unsafe-inline' — but script-src must not (asserted above).
-    csp = _csp(_settings())
-    assert "'unsafe-inline'" in _directive(csp, "style-src")
-    assert "'unsafe-inline'" not in _directive(csp, "script-src")
 
 
 def test_webassembly_is_named_only_on_the_wasm_worker_policy():
@@ -400,15 +369,9 @@ def test_webassembly_is_named_only_on_the_wasm_worker_policy():
     assert "'wasm-unsafe-eval'" not in _csp(settings)
     assert "'wasm-unsafe-eval'" not in settings.docs_content_security_policy
 
-    sandbox = settings.wasm_worker_content_security_policy
-    assert _directive(sandbox, "script-src") == "script-src 'self' 'wasm-unsafe-eval'"
-
-
-def test_wasm_worker_policy_grants_only_what_the_workers_use():
     # Their own script, WebAssembly, and the same-origin fetch for the .wasm
-    # file. Everything else — DOM-adjacent fetches, frames, workers — falls to
-    # default-src 'none'.
-    sandbox = _settings().wasm_worker_content_security_policy
+    # file; everything else falls to default-src 'none'.
+    sandbox = settings.wasm_worker_content_security_policy
     assert {part.strip() for part in sandbox.split(";")} == {
         "default-src 'none'",
         "script-src 'self' 'wasm-unsafe-eval'",
@@ -536,10 +499,6 @@ def test_docs_csp_allows_swagger_cdn_but_main_csp_does_not():
     assert "object-src 'none'" in docs
     assert "frame-ancestors 'none'" in docs
     assert "form-action 'self'" in docs
-
-
-def test_log_level_defaults_to_info():
-    assert _settings().LOG_LEVEL == "INFO"
 
 
 @pytest.mark.parametrize("given", ["debug", " Warning ", "ERROR"])

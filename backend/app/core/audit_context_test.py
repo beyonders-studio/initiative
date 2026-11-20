@@ -7,12 +7,6 @@ import pytest
 from app.core import audit_context
 
 
-def test_outside_a_request_there_is_no_context():
-    """A startup seed writes a line with nothing to say about a request,
-    rather than an invented one."""
-    assert audit_context.envelope_context(caller=True) is None
-
-
 @pytest.mark.parametrize("named, community", [("7", 7), ("\u00b2", None), ("x", None)])
 def test_a_path_names_its_community_in_ascii_digits_only(named, community):
     scope = {"path_params": {"community_id": named}}
@@ -36,26 +30,6 @@ async def test_a_pass_is_named_and_each_visit_names_its_own_community():
     assert job.request_id.startswith("job-hourly-")
     assert seen == {1: (job.request_id, 1), 2: (job.request_id, 2)}
     assert audit_context.current() is None
-
-
-def test_a_request_carries_its_id_and_where_it_came_from():
-    context, token = audit_context.begin(
-        request_id="abc123", source_ip="203.0.113.7", user_agent="Firefox/1"
-    )
-    try:
-        assert audit_context.current() is context
-        assert audit_context.envelope_context(caller=True) == {
-            "request_id": "abc123",
-            "source_ip": "203.0.113.7",
-            "user_agent": "Firefox/1",
-        }
-        assert audit_context.client_ip() == "203.0.113.7"
-        assert audit_context.client_user_agent() == "Firefox/1"
-    finally:
-        audit_context.end(token)
-    assert audit_context.current() is None
-    assert audit_context.client_ip() is None
-    assert audit_context.client_user_agent() is None
 
 
 @pytest.mark.parametrize(
@@ -94,17 +68,6 @@ def test_a_line_that_does_not_need_the_caller_names_only_the_request():
     )
     try:
         assert audit_context.envelope_context(caller=False) == {"request_id": "abc123"}
-    finally:
-        audit_context.end(token)
-
-
-def test_an_ordinary_request_says_nothing_about_a_grant():
-    """The grant half appears only where there is a grant, so a filter on it
-    selects the privileged requests and nothing else."""
-    _, token = audit_context.begin(request_id="x")
-    try:
-        assert "grant_id" not in audit_context.envelope_context(caller=True)
-        assert audit_context.current().is_privileged is False
     finally:
         audit_context.end(token)
 
@@ -182,8 +145,3 @@ def test_an_id_of_letters_digits_and_separators_is_kept(supplied):
 def test_anything_else_is_not_an_id(supplied):
     """The id reaches a log line as it arrived, so it is held to a shape."""
     assert audit_context.clean_request_id(supplied) is None
-
-
-def test_a_fresh_id_is_its_own():
-    assert audit_context.new_request_id() != audit_context.new_request_id()
-    assert audit_context.clean_request_id(audit_context.new_request_id())

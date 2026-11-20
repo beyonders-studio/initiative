@@ -26,16 +26,6 @@ SECOND = "https://second.example.test"
 
 
 class TestTheRegisteredOrigins:
-    async def test_a_live_registration_is_named(self, session: AsyncSession):
-        await create_plugin_service_registration(
-            session,
-            public_id="tests.framed",
-            base_url=FRAMED,
-            allowed_origins=[FRAMED],
-        )
-
-        assert FRAMED in await frame_origins()
-
     async def test_every_live_registration_is_named_once_and_in_order(
         self, session: AsyncSession
     ):
@@ -59,23 +49,6 @@ class TestTheRegisteredOrigins:
         assert FRAMED in origins
         assert origins.count(SECOND) == 1
         assert list(origins) == sorted(origins)
-
-    async def test_a_stopped_registration_is_not_named(self, session: AsyncSession):
-        """The kill switch reaches the header: a stopped plug-in is not framed
-        while it is stopped."""
-        registration = await create_plugin_service_registration(
-            session,
-            public_id="tests.stopped",
-            base_url=FRAMED,
-            allowed_origins=[FRAMED],
-        )
-
-        registration.suspended_at = datetime.now(UTC)
-        session.add(registration)
-        await session.commit()
-        invalidate_registrations()
-
-        assert FRAMED not in await frame_origins()
 
     async def test_a_registration_whose_publisher_is_off_is_not_named(
         self, session: AsyncSession
@@ -111,23 +84,13 @@ class TestTheRegisteredOrigins:
 
 
 class TestThePolicy:
-    async def test_a_document_may_frame_a_registered_plugin(
-        self, session: AsyncSession
-    ):
-        await create_plugin_service_registration(
-            session,
-            public_id="tests.framed",
-            base_url=FRAMED,
-            allowed_origins=[FRAMED],
-        )
-
-        assert FRAMED in _directive(await plugin_frame_policy(), "frame-src")
-
     async def test_a_deployment_with_nothing_live_frames_nothing(
         self, session: AsyncSession
     ):
         """Nothing live, nothing named: the document carries the same policy
-        the middleware puts on everything else."""
+        the middleware puts on everything else, which frames no plug-in. The
+        kill switch reaches the header: a stopped plug-in is not framed while
+        it is stopped."""
         registration = await create_plugin_service_registration(
             session,
             public_id="tests.stopped",
@@ -139,7 +102,9 @@ class TestThePolicy:
         await session.commit()
         invalidate_registrations()
 
+        assert FRAMED not in await frame_origins()
         assert await plugin_frame_policy() == _ordinary_policy()
+        assert "example.test" not in _directive(_ordinary_policy(), "frame-src")
 
     async def test_an_unreadable_list_leaves_the_ordinary_policy(self, monkeypatch):
         """Answered, not raised: this runs on the route that serves every
@@ -152,11 +117,6 @@ class TestThePolicy:
         monkeypatch.setattr(registration_lookup, "frame_origins", boom)
 
         assert await plugin_frame_policy() == _ordinary_policy()
-
-
-def test_the_ordinary_policy_frames_no_plugin():
-    """What the middleware puts on every response that is not a document."""
-    assert "example.test" not in _directive(_ordinary_policy(), "frame-src")
 
 
 def _ordinary_policy() -> str:

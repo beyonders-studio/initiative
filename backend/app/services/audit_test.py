@@ -179,91 +179,45 @@ def test_changed_fields_names_every_move_and_copies_only_safe_values(
     assert audit_service.changed_fields(before, after) == expected
 
 
-def test_snapshot_reads_the_named_attributes():
-    class Row:
-        a = 1
-        b = "x"
-        c = None
-
-    assert audit_service.snapshot(Row(), ["a", "b"]) == {"a": 1, "b": "x"}
+_WHERE_FROM = {"source_ip": "203.0.113.7", "user_agent": "Firefox/1"}
 
 
 @pytest.mark.parametrize(
-    "event_type",
+    ("event_type", "where_from"),
     [
-        AuditEventType.AUTH_SIGNED_IN,
-        AuditEventType.AUTH_SIGN_IN_FAILED,
-        AuditEventType.ACCESS_GRANT_SELF_ISSUED,
-        AuditEventType.PAM_REQUEST,
+        # A sign-in and a privileged reach are the two the address is part of
+        # the answer to.
+        (AuditEventType.AUTH_SIGNED_IN, _WHERE_FROM),
+        (AuditEventType.AUTH_SIGN_IN_FAILED, _WHERE_FROM),
+        (AuditEventType.ACCESS_GRANT_SELF_ISSUED, _WHERE_FROM),
+        (AuditEventType.PAM_REQUEST, _WHERE_FROM),
+        # Somebody working in their own community is recorded as who and what,
+        # not as where they were sitting.
+        (AuditEventType.SHARING_GRANT_CHANGED, {}),
+        (AuditEventType.INITIATIVE_MEMBER_ADDED, {}),
+        (AuditEventType.PLUGIN_INSTALLED, {}),
+        (AuditEventType.AI_REQUEST_SENT, {}),
+        (AuditEventType.USER_SUSPENDED, {}),
+        (AuditEventType.PLATFORM_SETTINGS_CHANGED, {}),
     ],
 )
-def test_getting_in_and_reaching_in_say_where_from(event_type):
-    """A sign-in and a privileged reach are the two the address is part of
-    the answer to."""
-    assert audit_service._identifies_the_caller(event_type)
-
-
-@pytest.mark.parametrize(
-    "event_type",
-    [
-        AuditEventType.SHARING_GRANT_CHANGED,
-        AuditEventType.INITIATIVE_MEMBER_ADDED,
-        AuditEventType.PLUGIN_INSTALLED,
-        AuditEventType.AI_REQUEST_SENT,
-        AuditEventType.USER_SUSPENDED,
-        AuditEventType.PLATFORM_SETTINGS_CHANGED,
-    ],
-)
-def test_everything_else_leaves_the_person_out_of_it(event_type):
-    """Somebody working in their own community is recorded as who and what,
-    not as where they were sitting."""
-    assert not audit_service._identifies_the_caller(event_type)
-
-
-async def test_a_members_own_work_carries_the_request_and_no_address(session, capfd):
-    """The line says which request made the change; a filter can still put it
-    beside the deployment's own logs, and it holds nothing about the person
-    beyond the account that did it."""
+async def test_a_line_carries_its_request_and_only_where_from_when_it_matters(
+    session, capfd, event_type, where_from
+):
+    """The line says which request made the change, so a filter can put it
+    beside the deployment's own logs; the address and agent travel only with
+    the events they answer."""
     actor = await create_user(session)
-    _, token = audit_context.begin(
-        request_id="req-1", source_ip="203.0.113.7", user_agent="Firefox/1"
-    )
+    _, token = audit_context.begin(request_id="req-1", **_WHERE_FROM)
     try:
         capfd.readouterr()
         await audit_service.record(
-            session,
-            event_type=AuditEventType.SHARING_GRANT_CHANGED,
-            actor_user_id=actor.id,
-            guild_id=1,
+            session, event_type=event_type, actor_user_id=actor.id, guild_id=1
         )
         await session.commit()
     finally:
         audit_context.end(token)
 
     (line,) = _audit_lines(capfd.readouterr().out)
-    assert line["context"] == {"request_id": "req-1"}
+    assert line["context"] == {"request_id": "req-1", **where_from}
     assert line["actor_user_id"] == actor.id
-
-
-async def test_a_sign_in_carries_where_it_came_from(session, capfd):
-    actor = await create_user(session)
-    _, token = audit_context.begin(
-        request_id="req-2", source_ip="203.0.113.7", user_agent="Firefox/1"
-    )
-    try:
-        capfd.readouterr()
-        await audit_service.record(
-            session,
-            event_type=AuditEventType.AUTH_SIGNED_IN,
-            actor_user_id=actor.id,
-        )
-        await session.commit()
-    finally:
-        audit_context.end(token)
-
-    (line,) = _audit_lines(capfd.readouterr().out)
-    assert line["context"] == {
-        "request_id": "req-2",
-        "source_ip": "203.0.113.7",
-        "user_agent": "Firefox/1",
-    }
