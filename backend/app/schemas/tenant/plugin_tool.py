@@ -109,6 +109,10 @@ class PluginToolRowRead(ToolState[ToolCan], CreatedByRead):
     tags: list[TagSummary] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
+    #: What its card shows of what is under it, when a list was asked for
+    #: previews: the first items of each item table directly under it, in
+    #: their order, by the item table's kind.
+    preview: dict[str, list[PluginToolRowRead]] | None = None
 
 
 class PluginToolRowList(PageMeta):

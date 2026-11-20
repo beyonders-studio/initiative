@@ -64,6 +64,7 @@ from app.schemas.tenant.plugin_tool import (
     PluginToolValues,
 )
 from app.schemas.tenant.tag import tag_summaries
+from app.schemas.tenant.tool_layout import MAX_PREVIEW_ITEMS
 from app.services.marketplace.declarative import action_change
 from app.services.marketplace.tool_plugins import (
     NEVER_EMPTY,
@@ -563,6 +564,51 @@ async def serialize(
             )
         )
     return read
+
+
+async def previews(
+    session: AsyncSession,
+    context: ActorContext,
+    located: Located,
+    tools: ToolSet,
+    rows: Sequence[ToolRow],
+) -> dict[int, dict[str, list[PluginToolRowRead]]]:
+    """What a card shows of what is under each of ``rows``: the first live
+    items of each item table directly under its table, in their order, by
+    the item table's kind, read for the whole page at once."""
+    ids = [row.id for row in rows]
+    previewed: dict[int, dict[str, list[PluginToolRowRead]]] = {
+        row_id: {} for row_id in ids
+    }
+    if not ids:
+        return previewed
+    for child in children(located, tools):
+        table = child.table
+        parent = table.c[cast(str, parent_column(child))]
+        ranked = (
+            sa.select(
+                table.c.id,
+                sa.func.row_number()
+                .over(partition_by=parent, order_by=(table.c.position, table.c.id))
+                .label("place"),
+            )
+            .where(
+                parent.in_(ids),
+                table.c.deleted_at.is_(None),
+                table.c.archived_at.is_(None),
+            )
+            .subquery()
+        )
+        statement = select_rows(child, tools).where(
+            table.c.id.in_(
+                sa.select(ranked.c.id).where(ranked.c.place <= MAX_PREVIEW_ITEMS)
+            )
+        )
+        found = [row_of(table, each) for each in (await session.exec(statement)).all()]
+        found.sort(key=lambda row: (row.position, row.id))
+        for item in await serialize(session, context, child, found):
+            previewed[cast(int, item.parent_id)].setdefault(child.kind, []).append(item)
+    return previewed
 
 
 # --- writing ------------------------------------------------------------------

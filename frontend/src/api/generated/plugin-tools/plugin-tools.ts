@@ -188,7 +188,8 @@ export function useReadPluginTool<
 
 /**
  * A page of a tool plug-in's rows: its tool's in an initiative, or an
- * item's under the row it sits in, in their order.
+ * item's under the row it sits in, in their order, each with what its card
+ * previews of its items where ``include_preview`` asks.
  * @summary List Plugin Tool Rows
  */
 export const listPluginToolRows = (

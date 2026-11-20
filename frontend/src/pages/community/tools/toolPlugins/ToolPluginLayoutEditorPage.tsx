@@ -30,6 +30,7 @@ import { useRouteId } from "@/hooks/useRouteId";
 import { useSaveLayouts, useToolLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import {
+  type InstalledTool,
   type ToolTable,
   toolLayoutTarget,
   toolOfKind,
@@ -64,11 +65,13 @@ const PAGE_WORDS: EditableDetail["words"] = {
 
 /** The editor over one table found, in the place its rows are listed. */
 const TableLayoutEditor = ({
+  tool,
   table,
   initiativeId,
   parentId,
   initialKind,
 }: {
+  tool: InstalledTool;
   table: ToolTable;
   initiativeId: number;
   parentId: number | null;
@@ -80,13 +83,13 @@ const TableLayoutEditor = ({
   const language = i18n.language;
 
   const target = useMemo(
-    () => toolLayoutTarget(table, initiativeId, parentId),
-    [table, initiativeId, parentId]
+    () => toolLayoutTarget(table.kind, initiativeId, parentId),
+    [table.kind, initiativeId, parentId]
   );
   const set = useToolLayouts(target).data;
   const save = useSaveLayouts(target);
   const listed = usePluginToolRows(
-    table.kind,
+    table,
     parentId === null ? { initiative_id: initiativeId } : { parent_id: parentId }
   );
   const rows = useMemo(() => (listed.data?.items ?? []).map(toolRow), [listed.data]);
@@ -113,6 +116,7 @@ const TableLayoutEditor = ({
         const { kind: _kind, ...definition } = shipped ?? { kind: layout.kind };
         return frame(
           <ToolRows
+            tool={tool}
             table={table}
             list={{
               kind: layout.kind,
@@ -135,7 +139,7 @@ const TableLayoutEditor = ({
         );
       },
     };
-  }, [table, fields, rows, initiativeId]);
+  }, [tool, table, fields, rows, initiativeId]);
 
   const details = useMemo<EditableDetail[]>(() => {
     const detail = toolDetail(table, language);
@@ -211,6 +215,7 @@ export const ToolPluginLayoutEditorPage = () => {
   }
   return (
     <TableLayoutEditor
+      tool={found.tool}
       table={found.table}
       initiativeId={initiativeId}
       parentId={parentId}

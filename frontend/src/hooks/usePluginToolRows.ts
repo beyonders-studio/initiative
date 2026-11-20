@@ -4,13 +4,14 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
 import type {
   PluginToolActionRun,
   PluginToolRowCreate,
   PluginToolRowRead,
   PluginToolRowUpdate,
+  PluginToolStep,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
   createPluginToolRow,
@@ -19,6 +20,7 @@ import {
   getReadPluginToolRowQueryKey,
   listPluginToolRows,
   runPluginToolAction,
+  stepPluginToolRow,
   updatePluginToolRow,
   useReadPluginToolRow,
 } from "@/api/generated/plugin-tools/plugin-tools";
@@ -30,8 +32,14 @@ import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
 import type { FieldSaveKind } from "@/hooks/useFieldSave";
 import { fetchAllPages } from "@/lib/fetchAllPages";
-import { type InstalledTool, installedTools, type ToolRow } from "@/lib/toolPlugins";
+import {
+  type InstalledTool,
+  installedTools,
+  type ToolRow,
+  type ToolTable,
+} from "@/lib/toolPlugins";
 import type { MutationOpts } from "@/types/mutation";
+import type { LayoutEnv } from "@/ui/layouts/fields";
 
 /** The tools the community's tool plug-ins declare, as far as they are known:
  *  still being read, unread for a failure, or read. */
@@ -50,15 +58,16 @@ export const useInstalledTools = (): InstalledTools => {
   return isLoading ? { status: "loading" } : { status: "ready", tools };
 };
 
-/** Every row of `kind` in one place, the tool's own in an initiative or an
- *  item table's under one row, live or archived: `page_size: 0` walks the
- *  server's windows, so a preset sorts all of them. */
+/** Every row of `table` in one place, the tool's own in an initiative or an
+ *  item table's under one row, live or archived, each with what its card
+ *  previews of the items under it: `page_size: 0` walks the server's
+ *  windows, so a preset sorts all of them. */
 export const usePluginToolRows = (
-  kind: string,
+  { kind, items }: Pick<ToolTable, "kind" | "items">,
   where: ({ initiative_id: number } | { parent_id: number }) & { archived?: true }
 ) => {
   const communityId = useActiveCommunityId();
-  const params = { ...where, page_size: 0 };
+  const params = { ...where, ...(items.length > 0 ? { include_preview: true } : {}), page_size: 0 };
   return useQuery({
     queryKey: getListPluginToolRowsQueryKey(communityId, kind, params),
     queryFn: () => fetchAllPages((p) => listPluginToolRows(communityId, kind, p), params),
@@ -89,6 +98,42 @@ export const useRunPluginToolAction = (kind: string, itemKinds: readonly string[
     invalidate: () => invalidate(q.pluginToolRows(kind), ...itemKinds.map(q.pluginToolRows)),
     errorKey: "plugins:error",
   });
+
+/** How a list steps the counter fields of a table's rows: a row's, where
+ *  its reader may change it, as the row's own page would (an edit of the
+ *  tool's own row, contributing to it for an item's). Answers the field's
+ *  value as the row then holds it. A step shows wherever the row is listed,
+ *  so every tool plug-in row is read again. */
+export const usePluginToolSteps = () => {
+  const { mutateAsync } = useCommunityMutation<
+    PluginToolRowRead,
+    { kind: string; rowId: number } & PluginToolStep
+  >({
+    mutationFn: (communityId, { kind, rowId, ...step }) =>
+      stepPluginToolRow(communityId, kind, rowId, step),
+    invalidate: () => invalidate(q.pluginToolRows()),
+    errorKey: "plugins:error",
+  });
+  return useCallback(
+    (table: Pick<ToolTable, "kind" | "parent">): NonNullable<LayoutEnv<ToolRow>["stepCounter"]> =>
+      (row, summary) => {
+        const { key } = summary;
+        const may = table.parent === null ? row.can.edit : row.can.contribute;
+        return key && may
+          ? async (up) => {
+              const read = await mutateAsync({
+                kind: table.kind,
+                rowId: row.id,
+                field: key,
+                ...(up ? {} : { down: true }),
+              });
+              return [{ ...summary, value: read.fields[key] ?? null }];
+            }
+          : null;
+      },
+    [mutateAsync]
+  );
+};
 
 /** Puts a row in the trash, with the items under it. The rows over it list
  *  it no more, so every tool plug-in row is read again. */

@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 
+import { buildToolPlugin, shelfDefinition, TOOL_PLUGIN_UID } from "@/__tests__/factories";
 import { buildTrashItem, buildTrashListResponse } from "@/__tests__/factories/trash.factory";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
@@ -55,6 +56,36 @@ describe("TrashTable", () => {
     // entityType labels come from the trash namespace.
     expect(screen.getByText("Project")).toBeInTheDocument();
     expect(screen.getByText("Task")).toBeInTheDocument();
+  });
+
+  it("names a tool plug-in's row by its own community's install", async () => {
+    const book = `book.${TOOL_PLUGIN_UID.toLowerCase()}`;
+    const renamed = shelfDefinition();
+    renamed.tool.items[0].name = { en: "Volume", de: "Band" };
+    server.use(
+      http.get(myTrashEndpoint, () =>
+        HttpResponse.json(
+          buildTrashListResponse([
+            buildTrashItem({ entity_type: book, name: "Emma", community_id: 1 }),
+            buildTrashItem({ entity_type: book, name: "Persuasion", community_id: 2 }),
+            buildTrashItem({ entity_type: book, name: "Ivanhoe", community_id: 3 }),
+          ])
+        )
+      ),
+      http.get("/api/v1/c/1/plugins/", () => HttpResponse.json({ items: [buildToolPlugin()] })),
+      http.get("/api/v1/c/2/plugins/", () =>
+        HttpResponse.json({ items: [buildToolPlugin({ definition: renamed })] })
+      ),
+      http.get("/api/v1/c/3/plugins/", () => HttpResponse.json({}, { status: 403 }))
+    );
+
+    renderWithProviders(<TrashTable variant="user" showPurgeAction={false} />);
+
+    const badge = async (name: string) =>
+      within((await screen.findByText(name)).closest("tr") as HTMLElement);
+    expect(await (await badge("Emma")).findByText("Book")).toBeInTheDocument();
+    expect(await (await badge("Persuasion")).findByText("Volume")).toBeInTheDocument();
+    expect((await badge("Ivanhoe")).getByText(/plug-in/i)).toBeInTheDocument();
   });
 
   it("pages through the trash, asking the server for each page", async () => {

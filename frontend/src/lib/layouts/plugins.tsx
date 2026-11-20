@@ -19,7 +19,7 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import type { PluginDataParam } from "@/api/pluginData";
 import { PluginParamControl } from "@/components/plugins/PluginParamControl";
-import contract from "@/contract/manifest.contract.json";
+import { caps } from "@/contract/manifest.contract.json";
 import { useCommunityPlugins, useRunPluginAction } from "@/hooks/useCommunityPlugins";
 import { withParamAnswer } from "@/lib/widgets/pluginParams";
 import { type LocalizedText, localized } from "@/lib/widgets/widgetMeta";
@@ -268,7 +268,7 @@ export const pluginFilterFields = (
   );
 
 /** How many parts of one install a tree may place, as the contract says. */
-export const MAX_PLUGIN_PARTS = contract.caps.partsPlacedPerItem;
+export const MAX_PLUGIN_PARTS = caps.partsPlacedPerItem;
 
 /** What an item's page draws of the plug-ins until its layout is saved: each
  *  install's fields, then its parts up to {@link MAX_PLUGIN_PARTS}, as it
