@@ -41,10 +41,11 @@ const serve = (...tickets: FiledTicketDetailRead[]) => {
       HttpResponse.json(tickets.find((one) => one.task_id === Number(params.taskId)))
     ),
     http.post("/api/v1/me/tickets/:taskId/replies", async ({ request }) => {
-      const form = await request.formData();
+      // Read as text: newer Node's multipart parser refuses jsdom's File.
+      const raw = await request.text();
       replies.push({
-        body: form.get("body"),
-        files: form.getAll("files").map((file) => (file as File).name),
+        body: raw.split('name="body"\r\n\r\n')[1]?.split("\r\n")[0],
+        files: [...raw.matchAll(/filename="([^"]+)"/g)].map(([, name]) => name),
       });
       return HttpResponse.json(tickets[0]);
     })
