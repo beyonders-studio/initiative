@@ -132,12 +132,19 @@ async def test_initiative_statuses_collapse_across_projects(
         icon="circle-pause",
     )
     # The same name in another category is its own column.
-    for category, position in (
-        (TaskStatusCategory.todo, 2),
-        (TaskStatusCategory.done, 3),
-    ):
+    reviews = (
+        (TaskStatusCategory.todo, "#94A3B8", "circle"),
+        (TaskStatusCategory.done, "#34D399", "circle-check"),
+    )
+    for position, (category, color, icon) in enumerate(reviews, start=2):
         await create_task_status(
-            session, a.project, name="Review", category=category, position=position
+            session,
+            a.project,
+            name="Review",
+            category=category,
+            position=position,
+            color=color,
+            icon=icon,
         )
 
     response = await client.get(
@@ -156,10 +163,7 @@ async def test_initiative_statuses_collapse_across_projects(
             "project_count": 1,
             "projects_total": 2,
         }
-        for category, color, icon in (
-            ("todo", "#94A3B8", "circle"),
-            ("done", "#34D399", "circle-check"),
-        )
+        for category, color, icon in reviews
     ]
     assert body[:2] == [
         {
