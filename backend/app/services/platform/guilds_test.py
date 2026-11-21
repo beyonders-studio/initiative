@@ -160,7 +160,7 @@ async def test_concurrent_joins_cannot_exceed_user_cap(session: AsyncSession, en
 
 
 async def test_ensure_membership_force_role_updates(session: AsyncSession):
-    """Test that force_role updates an existing membership's role."""
+    """An existing membership keeps its role unless force_role is set."""
     user = await create_user(session)
     guild = await create_guild(session)
 
@@ -171,6 +171,11 @@ async def test_ensure_membership_force_role_updates(session: AsyncSession):
         guild=guild,
         role=CommunityRole.member,
     )
+
+    kept = await guild_service.ensure_membership(
+        session, guild_id=guild.id, user_id=user.id, role=CommunityRole.admin
+    )
+    assert kept.role == CommunityRole.member
 
     # Force upgrade to admin
     membership = await guild_service.ensure_membership(

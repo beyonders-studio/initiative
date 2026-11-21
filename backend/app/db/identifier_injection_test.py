@@ -41,7 +41,7 @@ _HOSTILE_GUILD_IDS = [
     "  ",
     None,
     3.5,
-    42,  # a real id: still only digits after the prefix
+    42,  # a real id: never refused, and named guild_42
 ]
 
 
@@ -52,12 +52,14 @@ _HOSTILE_GUILD_IDS = [
 def test_guild_name_builders_reject_or_sanitize_hostile_ids(builder, hostile):
     """A guild-name builder only ever emits a digits-only identifier from a
     non-integer id — it either raises (``int()`` on a string/None) or coerces
-    to a digits-only name (a float truncates to its integer part)."""
+    to a digits-only name (a float truncates to its integer part). A real id
+    is never refused and keeps its number."""
     try:
         name = builder(hostile)
     except ValueError, TypeError:
+        assert not isinstance(hostile, int)
         return  # rejected outright — the common case
-    assert re.fullmatch(r"[A-Za-z0-9_]*guild_[0-9]+[a-z_]*", name), name
+    assert re.fullmatch(rf"[A-Za-z0-9_]*guild_{int(hostile)}[a-z_]*", name), name
 
 
 @pytest.mark.parametrize(

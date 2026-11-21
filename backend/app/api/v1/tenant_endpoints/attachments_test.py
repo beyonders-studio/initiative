@@ -5,9 +5,13 @@ from datetime import UTC
 
 import pytest
 from httpx2 import AsyncClient
+from starlette.datastructures import UploadFile
 
 from app.models.platform.guild import CommunityRole
-from app.services.tenant.attachments import detect_document_image_type
+from app.services.tenant.attachments import (
+    MAX_IMAGE_BYTES,
+    detect_document_image_type,
+)
 from app.testing import guild_administration
 
 #: A real 1x1 PNG — the header reader walks IHDR, so a stub signature is not
@@ -21,9 +25,18 @@ TINY_PNG = (
 )
 
 
-async def test_upload_image_too_large(client: AsyncClient, acting_user):
-    """Uploading an image larger than MAX_IMAGE_BYTES returns 413."""
+async def test_upload_image_too_large(client: AsyncClient, acting_user, monkeypatch):
+    """Uploading an image larger than MAX_IMAGE_BYTES returns 413, having read
+    only one byte past the limit."""
     a = await acting_user(guild_role=CommunityRole.admin)
+    requested: list[int] = []
+    read = UploadFile.read
+
+    async def recording_read(self: UploadFile, size: int = -1) -> bytes:
+        requested.append(size)
+        return await read(self, size)
+
+    monkeypatch.setattr(UploadFile, "read", recording_read)
 
     oversized = b"\x89PNG\r\n\x1a\n" + b"X" * (11 * 1024 * 1024)
     response = await client.post(
@@ -34,6 +47,7 @@ async def test_upload_image_too_large(client: AsyncClient, acting_user):
 
     assert response.status_code == 413
     assert response.json()["detail"] == "ATTACHMENT_TOO_LARGE"
+    assert requested == [MAX_IMAGE_BYTES + 1]
 
 
 @pytest.mark.parametrize(
