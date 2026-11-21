@@ -14,7 +14,7 @@ import { LinkedMentionSpan, PlainMentionSpan } from "@/components/comments/Menti
 import { remarkMentions } from "@/components/comments/remarkCommentPlugins";
 import { ThemeContext } from "@/hooks/useTheme";
 import { releaseImageUrl } from "@/lib/releaseImages";
-import { isStoredUpload, remarkImageLinks, remarkLineBreaks } from "@/lib/remarkProse";
+import { isStoredUpload, remarkFaces, remarkImageLinks, remarkLineBreaks } from "@/lib/remarkProse";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
 import {
   Carousel,
@@ -320,7 +320,7 @@ export const Markdown = ({
 
   // Mentions resolve before images, so an image-derived link is never
   // mistaken for one.
-  const remarkPlugins: NonNullable<Options["remarkPlugins"]> = [remarkGfm];
+  const remarkPlugins: NonNullable<Options["remarkPlugins"]> = [remarkGfm, remarkFaces];
   if (mentions) remarkPlugins.push(remarkMentions);
   if (!remoteImages) {
     remarkPlugins.push(

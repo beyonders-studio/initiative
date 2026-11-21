@@ -191,6 +191,51 @@ describe("Markdown", () => {
     expect(onChange).toHaveBeenLastCalledWith(content.replace("> - [ ]", "> - [x]"));
   });
 
+  it("reads a face that starts with `>` as the face, and a quote as a quote", () => {
+    const { container } = render(
+      <Markdown
+        surface="message"
+        content={">.> sorry\n\n>_<\n>\n> after a face\n\n>quoted\n\n> also quoted"}
+      />
+    );
+
+    const quotes = [...container.querySelectorAll("blockquote")].map((q) => q.textContent?.trim());
+    expect(quotes).toEqual(["after a face", "quoted", "also quoted"]);
+    expect(screen.getByText(">.> sorry")).toBeInTheDocument();
+    expect(screen.getByText(">_<")).toBeInTheDocument();
+  });
+
+  it("keeps a face that markdown would read as emphasis, a strike or an escape", () => {
+    const { container } = render(
+      <Markdown
+        surface="message"
+        content={[
+          "*bold* eh ¯\\_(ツ)_/¯",
+          "*_* and ~_~ and (*^_^*)",
+          "(╯°□°)╯︵ ┻━┻",
+          "[*_* link](https://example.com) `*_*`",
+          "**hello ~_~ [there](https://example.com)**",
+        ].join("\n\n")}
+      />
+    );
+
+    const paragraphs = [...container.querySelectorAll("p")].map((p) => p.textContent);
+    expect(paragraphs).toEqual([
+      "bold eh ¯\\_(ツ)_/¯",
+      "*_* and ~_~ and (*^_^*)",
+      "(╯°□°)╯︵ ┻━┻",
+      "*_* link *_*",
+      "hello ~_~ there",
+    ]);
+    expect(container.querySelector("em")).toHaveTextContent("bold");
+    expect(container.querySelectorAll("em, del")).toHaveLength(1);
+    // Bold around a face keeps its bold, and the link inside it.
+    expect(container.querySelector("strong")).toHaveTextContent("hello ~_~ there");
+    expect(screen.getByRole("link", { name: "there" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "*_* link" })).toBeInTheDocument();
+    expect(container.querySelector("code")).toHaveTextContent("*_*");
+  });
+
   it("draws a checklist's boxes in place of its bullets, ticked only where it is edited", () => {
     const { container } = render(<Markdown content={"- [x] done\n- [ ] not yet"} />);
 
