@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Shapes and arrows keep the size you draw them on a shared whiteboard.** With the same whiteboard open somewhere else, such as the desktop app and a browser, a shape or arrow no longer shrinks to a fraction of its size when you let go.
 - **Fewer unexpected sign-outs on a laptop or phone that sleeps.** A tab or app nobody is looking at no longer renews its sign-in in the background; it waits until you come back to it, so a renewal can no longer be cut off by the device going to sleep.
 - **A whiteboard opens straight away.** Opening one could leave it loading until somebody else in it saved or you switched windows, and with nobody else in it, for good.
+- **Faces show as you typed them.** `>.>` no longer turns into a quote, `*_*` into italics or `~_~` into strikethrough, and the shrug keeps both arms: ¯\\\_(ツ)\_/¯
 - **Reload in the desktop app no longer leaves a blank window.** The page reloads where you were.
 - **An item's menu is always on its page.** A task, event or plug-in tool's row whose page layout leaves out its menu shows the menu at the top of the page, so archiving, deleting and its other actions are still there.
 - **Events that run past midnight.** On the month calendar, an evening event that ends after midnight is shown with its start time on the day it starts, not as a bar across two days. The list says when it stops on the second day ("Until 12:30am") instead of calling that day "All day". An event that ends at midnight no longer shows on the next day.

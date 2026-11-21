@@ -191,6 +191,43 @@ describe("Markdown", () => {
     expect(onChange).toHaveBeenLastCalledWith(content.replace("> - [ ]", "> - [x]"));
   });
 
+  it("reads a face that starts with `>` as the face, and a quote as a quote", () => {
+    const { container } = render(
+      <Markdown surface="message" content={">.> sorry\n\n>_<\n\n>quoted\n\n> also quoted"} />
+    );
+
+    const quotes = [...container.querySelectorAll("blockquote")].map((q) => q.textContent?.trim());
+    expect(quotes).toEqual(["quoted", "also quoted"]);
+    expect(screen.getByText(">.> sorry")).toBeInTheDocument();
+    expect(screen.getByText(">_<")).toBeInTheDocument();
+  });
+
+  it("keeps a face that markdown would read as emphasis, a strike or an escape", () => {
+    const { container } = render(
+      <Markdown
+        surface="message"
+        content={[
+          "*bold* eh ¯\\_(ツ)_/¯",
+          "*_* and ~_~ and (*^_^*)",
+          "(╯°□°)╯︵ ┻━┻",
+          "[*_* link](https://example.com) `*_*`",
+        ].join("\n\n")}
+      />
+    );
+
+    const paragraphs = [...container.querySelectorAll("p")].map((p) => p.textContent);
+    expect(paragraphs).toEqual([
+      "bold eh ¯\\_(ツ)_/¯",
+      "*_* and ~_~ and (*^_^*)",
+      "(╯°□°)╯︵ ┻━┻",
+      "*_* link *_*",
+    ]);
+    expect(container.querySelector("em")).toHaveTextContent("bold");
+    expect(container.querySelectorAll("em, del")).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "*_* link" })).toBeInTheDocument();
+    expect(container.querySelector("code")).toHaveTextContent("*_*");
+  });
+
   it("draws a checklist's boxes in place of its bullets, ticked only where it is edited", () => {
     const { container } = render(<Markdown content={"- [x] done\n- [ ] not yet"} />);
 
