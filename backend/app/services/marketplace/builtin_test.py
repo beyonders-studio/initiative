@@ -35,7 +35,6 @@ from app.services.marketplace import catalog as catalog_service
 from app.services.marketplace.builtin import (
     load_builtin_manifests,
     seed_builtin_listings,
-    shipped_tools,
 )
 from app.services.marketplace.definitions import (
     RESERVED_PUBLIC_ID_PREFIX,
@@ -245,7 +244,7 @@ class TestShippedManifests:
                 # draws nothing at all — the table fallback, on a dashboard
                 # somebody installed expecting a chart.
                 required = [slot for slot in spec.shape if slot.required]
-                columns = resolve(binding["sql"], tools=shipped_tools()).column_types
+                columns = resolve(binding["sql"]).column_types
                 assert len(columns) >= len(required), (
                     f"{public_id}/{widget['id']}: {widget['type']} "
                     f"needs {len(required)} columns, the statement returns "

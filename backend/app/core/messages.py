@@ -1389,8 +1389,8 @@ class MarketplaceMessages:
     #: deployment does not serve: a newer one, or another major version.
     LISTING_PLUGIN_API_INCOMPATIBLE = "MARKETPLACE_LISTING_PLUGIN_API_INCOMPATIBLE"
     #: A dashboard that ships with a plug-in, asked for by a guild that does not
-    #: have that plug-in installed. Its tiles draw that plug-in's widgets, so there
-    #: would be nothing behind any of them.
+    #: have that plug-in installed, or has a version older than the dashboard's.
+    #: Its tiles draw that plug-in's widgets and tables.
     LISTING_NEEDS_PLUGIN = "MARKETPLACE_LISTING_NEEDS_PLUGIN"
     #: An upgrade was asked for on a dashboard that was authored here, not
     #: installed — there is no listing to re-pin it to.

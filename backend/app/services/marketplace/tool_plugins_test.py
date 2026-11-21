@@ -178,7 +178,14 @@ REFUSALS: dict[str, tuple[Callable[[dict], None], str]] = {
     "hosts": (_set(lambda b: b, "hosts", ["api.example.com"]), "runs no code"),
     "endpoints": (_set(lambda b: b, "endpoints", [{"id": "x"}]), "runs no code"),
     "settings": (_set(lambda b: b, "settings", [{"key": "x"}]), "runs no code"),
-    "another feature": (_set(lambda b: b, "features", ["tool", "widgets"]), "exactly"),
+    "another feature": (
+        _set(lambda b: b, "features", ["tool", "widgets"]),
+        "with 'dashboards' when it has them",
+    ),
+    "dashboards it lacks": (
+        _set(lambda b: b, "features", ["dashboards", "tool"]),
+        "with 'dashboards' when it has them",
+    ),
     "no tool": (_set(lambda b: b, "tool", None), "declares its tool"),
     # Keys.
     "a key starting with a digit": (_set(_tool, "key", "1group"), "lower-case letter"),

@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from app.core.tools import BULK_EXPORT_TOOLS, Tool
 from app.models.platform.publisher import FIRST_PARTY_PUBLISHER_PREFIX, publisher_prefix
@@ -54,6 +54,9 @@ from app.services.marketplace.tool_listings import (
     normalize_tool_listing,
 )
 from app.services.marketplace.tool_plugins import normalize_tool_plugin_definition
+
+if TYPE_CHECKING:
+    from app.core.tool_set import ToolSet
 
 __all__ = [
     "GUILD_INSTALLABLE_PLUGIN_KINDS",
@@ -303,13 +306,19 @@ def _normalize_plugin_definition(
 
 
 def normalize_listing_definition(
-    kind: str, definition: Any, *, public_id: str | None = None
+    kind: str,
+    definition: Any,
+    *,
+    public_id: str | None = None,
+    tools: ToolSet | None = None,
 ) -> dict[str, Any]:
     """Validate and canonicalize a listing's definition for its kind.
 
     A tool's listing is that tool's export envelope, held to the tool's own
     importer (``tool_listings``); the other kinds each have their own shape.
     ``public_id`` is the listing's, which names a declarative plug-in.
+    ``tools`` are what a dashboard's queries may name: the built-in tools
+    unless a tool plug-in brings the dashboard.
     """
     if kind not in LISTING_KINDS:
         raise ListingDefinitionError(f"unknown listing kind {kind!r}")
@@ -323,7 +332,7 @@ def normalize_listing_definition(
         return normalize_profile_pack_definition(definition)
     if kind == "home_layout":
         return normalize_home_layout_definition(definition)
-    return normalize_tool_listing(TOOL_LISTING_KINDS[kind], definition)
+    return normalize_tool_listing(TOOL_LISTING_KINDS[kind], definition, tools=tools)
 
 
 def normalize_listing_example(

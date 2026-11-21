@@ -44,7 +44,7 @@ import operator
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ValidationError
@@ -81,9 +81,14 @@ from app.services.marketplace.service_plugins import (
     _expression,
     _field_options,
     _label,
+    bundled_dashboards,
+    bundled_query_tile,
     listing_terms,
 )
 from app.services.marketplace.widget_meta import MAX_TEXT_LENGTH, localized_text
+
+if TYPE_CHECKING:
+    from app.core.tool_set import ToolSet
 
 __all__ = [
     "NEVER_EMPTY",
@@ -95,6 +100,8 @@ __all__ = [
     "TOOL_PLUGIN_TERMS",
     "TableFields",
     "ToolChanges",
+    "check_dashboards",
+    "declared_tool_set",
     "detail_layout",
     "effective_defaults",
     "is_tool_plugin",
@@ -106,13 +113,20 @@ __all__ = [
     "value_fits",
 ]
 
-#: The plug-in kind, and the one feature, of a plug-in that declares a tool.
+#: The plug-in kind, and the feature, of a plug-in that declares a tool.
 TOOL = "tool"
+#: The feature of a plug-in that brings dashboards.
+DASHBOARDS = "dashboards"
 
-#: What a tool plug-in carries: its tool, and the listing terms every plug-in
-#: has. Every other term the contract declares serves or calls something, and
-#: a tool plug-in runs no code.
-TOOL_PLUGIN_TERMS: frozenset[str] = LISTING_TERMS | {"plugin_kind", "tool", "features"}
+#: What a tool plug-in carries: its tool, its dashboards, and the listing
+#: terms every plug-in has. Every other term the contract declares serves or
+#: calls something, and a tool plug-in runs no code.
+TOOL_PLUGIN_TERMS: frozenset[str] = LISTING_TERMS | {
+    "plugin_kind",
+    "tool",
+    "features",
+    DASHBOARDS,
+}
 
 TOOL_FIELD_KINDS: frozenset[str] = contract.enum("toolFieldKind")
 TOOL_ICONS: frozenset[str] = contract.enum("toolIcon")
@@ -1008,17 +1022,90 @@ def normalize_tool_plugin_definition(definition: Any) -> dict[str, Any]:
             fail(
                 f"tool plug-in: a tool plug-in runs no code, so it carries no {term!r}"
             )
-    if body.get("features") != [TOOL]:
-        fail("tool plug-in: its features are exactly ['tool']")
+    features = [DASHBOARDS, TOOL] if body.get(DASHBOARDS) else [TOOL]
+    if body.get("features") != features:
+        fail(
+            "tool plug-in: its features are ['tool'], with 'dashboards' when it has them"
+        )
     if body.get("tool") is None:
         fail("tool plug-in: it declares its tool")
     cleaned: dict[str, Any] = {
         "plugin_kind": TOOL,
-        "features": [TOOL],
+        "features": features,
         "tool": _tool(body["tool"]),
         **listing_terms(body),
     }
+    if body.get(DASHBOARDS):
+        cleaned[DASHBOARDS] = bundled_dashboards(
+            body[DASHBOARDS],
+            bundled_query_tile,
+            plugin_public_id=None,
+            what="tool plug-in",
+        )
     check_json_size(
         cleaned, what="tool plug-in definition", limit=MAX_SERVICE_DEFINITION_BYTES
     )
     return cleaned
+
+
+def declared_tool_set(definition: Mapping[str, Any], uid: str) -> ToolSet:
+    """The built-in tools and the tool ``definition`` declares, listed as
+    ``uid``: what a dashboard it brings is read against. Its kinds take the
+    codes a built-in kind passed to them, and stand-ins otherwise, so the set
+    says what a query may name and is never a community's."""
+    import sqlalchemy as sa
+
+    from app.core.tool_set import BUILTIN_TOOLS, ToolSet
+    from app.db.plugin_tools import InstalledTool, build_tool
+    from app.models.platform.plugin_kind_code import (
+        ADOPTED_KIND_CODES,
+        FIRST_PLUGIN_KIND_CODE,
+    )
+
+    tool = InstalledTool(uid, dict(definition))
+    kinds = tool_kinds(tool.definition, listing_uid=uid)
+    codes = {
+        kind: ADOPTED_KIND_CODES.get(kind, FIRST_PLUGIN_KIND_CODE + index)
+        for index, kind in enumerate(kinds)
+    }
+    record = build_tool(tool, codes, sa.MetaData())
+    return ToolSet((*BUILTIN_TOOLS, record), digest=f"declared:{uid}")
+
+
+def check_dashboards(definition: Mapping[str, Any], uid: str) -> None:
+    """Refuse a dashboard a tool plug-in brings whose query reads anything
+    but the plug-in's own tables, or that a dashboard could not draw.
+
+    Each query is read the way a dashboard's is, against the built-in tools
+    and the plug-in's tool, and may name only the plug-in's tables: no
+    built-in tool's, no other plug-in's, no shared one, no spreadsheet and no
+    plug-in call."""
+    from app.services.query import QueryError, resolve
+    from app.services.tenant.dashboard_definition import (
+        DashboardDefinitionError,
+        normalize_dashboard_definition,
+    )
+
+    dashboards = definition.get(DASHBOARDS) or []
+    if not dashboards:
+        return
+    tools = declared_tool_set(definition, uid)
+    record = tools.installed[0]
+    own = {record.table.name, *(table.name for table in record.items)}
+    for dashboard in dashboards:
+        what = f"tool plug-in: dashboard {dashboard['public_id']!r}"
+        try:
+            normalize_dashboard_definition({"widgets": dashboard["widgets"]}, tools)
+        except DashboardDefinitionError as refused:
+            fail(f"{what}: {refused.code}")
+        for widget in dashboard["widgets"]:
+            try:
+                statement = resolve(widget["binding"]["sql"], tools=tools)
+            except QueryError as refused:
+                fail(f"{what}: {widget['id']}: {refused.code}")
+            others = sorted(set(statement.relations) - own)
+            if others or statement.sheets or statement.plugins:
+                fail(
+                    f"{what}: {widget['id']} reads {', '.join(others) or 'a call'}; "
+                    "a tool plug-in's dashboard reads only its own tables"
+                )

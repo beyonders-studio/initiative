@@ -67,7 +67,7 @@ A row is **Live** once it has everything it needs, and only then are communities
 
 There's nothing to set up. Once its listing arrives, communities can add it, and each community that does gets the tool's tables in its own schema. Removing it from a community hides the tool at once and deletes its contents 30 days later, a window the community's superadmin agrees to when removing it; adding it back within the window brings everything back. Turning on **Install in every community** for a tool plug-in adds it nowhere: each community adds a tool itself.
 
-[Counters](../guides/counters.md) ships with Initiative as `core.counters`, so a server with registry updates switched off offers it too.
+[Counters](../guides/counters.md) comes from the registry. A community that used counters before they became a plug-in has it already, carried over on upgrade, whether or not the server gets registry updates.
 
 ??? techspec "Where a tool plug-in's data lives"
     | What | Where |

@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, date, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -55,6 +55,9 @@ from app.services.marketplace.publish_profile import (
     shift_dates,
     strip_for_listing,
 )
+
+if TYPE_CHECKING:
+    from app.core.tool_set import ToolSet
 
 __all__ = [
     "MAX_LISTING_BODY_BYTES",
@@ -133,7 +136,7 @@ def _check_size(body: Any, *, what: str) -> None:
 
 
 def normalize_tool_listing(
-    tool: Tool, body: Any, *, what: str = "definition"
+    tool: Tool, body: Any, *, what: str = "definition", tools: ToolSet | None = None
 ) -> dict[str, Any]:
     """Validate and canonicalize a tool listing's envelope.
 
@@ -174,25 +177,28 @@ def normalize_tool_listing(
 
     stored = validated.model_dump(mode="json", exclude=set(_NOT_STORED))
     if tool is Tool.dashboard:
-        stored = _canonical_dashboard(stored, what=what)
+        from app.core.tool_set import BUILTIN_TOOLS
+
+        stored = _canonical_dashboard(stored, what=what, tools=tools or BUILTIN_TOOLS)
     return stored
 
 
-def _canonical_dashboard(envelope: dict[str, Any], *, what: str) -> dict[str, Any]:
+def _canonical_dashboard(
+    envelope: dict[str, Any], *, what: str, tools: ToolSet
+) -> dict[str, Any]:
     """A dashboard envelope's canvas, held to the renderer's vocabulary.
 
     The importer is lenient on purpose — a backup restores a dashboard it
     cannot draw as an empty one rather than losing it — but a listing is
     published to be installed, so a canvas this build cannot draw is refused
     here, by the same validator the create endpoint runs. Its queries may
-    read the datasets of a tool plug-in this build ships, as well as a
-    built-in tool's.
+    read the datasets of ``tools``: the built-in tools, and the tool plug-in's
+    that brings it, if one does.
 
     ``config`` is dropped. It fills the binding slots a definition leaves open
     with one community's own counters and files, which a listing has none
     of: that is the installer's to fill.
     """
-    from app.services.marketplace.builtin import shipped_tools
     from app.services.tenant.dashboard_definition import (
         DashboardDefinitionError,
         normalize_dashboard_definition,
@@ -200,7 +206,7 @@ def _canonical_dashboard(envelope: dict[str, Any], *, what: str) -> dict[str, An
 
     try:
         envelope["definition"] = normalize_dashboard_definition(
-            envelope.get("definition") or {}, shipped_tools()
+            envelope.get("definition") or {}, tools
         )
     except DashboardDefinitionError as exc:
         raise ListingDefinitionError(f"invalid dashboard {what}: {exc}") from exc

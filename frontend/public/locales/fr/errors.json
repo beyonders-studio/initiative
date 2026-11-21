@@ -394,7 +394,7 @@
   "BILLING_PORTAL_SIGNING_NOT_CONFIGURED": "Le portail de facturation n'est pas encore entièrement configuré. Prévenez la personne qui gère ce serveur.",
   "BILLING_PORTAL_GRANT_UNAVAILABLE": "Impossible d'obtenir l'accès à la facturation de cette communauté. Vérifie si une demande d'accès est encore en attente.",
   "MARKETPLACE_LISTING_NOT_FOUND": "Cette fiche du catalogue n'existe plus.",
-  "MARKETPLACE_LISTING_NEEDS_PLUGIN": "Ce tableau de bord accompagne un plug-in que votre communauté n'a pas installé. Installez d'abord le plug-in, puis ajoutez le tableau de bord.",
+  "MARKETPLACE_LISTING_NEEDS_PLUGIN": "Ce tableau de bord accompagne un plug-in que votre communauté n'a pas installé, ou une version plus récente de celui-ci. Installez ou mettez à jour le plug-in d'abord, puis ajoutez le tableau de bord.",
   "MARKETPLACE_LISTING_UNAVAILABLE": "Cette fiche a été retirée et ne peut plus être installée.",
   "MARKETPLACE_LISTING_VERSION_INCOMPATIBLE": "Cette fiche nécessite une version plus récente de l'application. Demandez à la personne qui gère ce serveur de la mettre à jour, puis réessayez.",
   "MARKETPLACE_LISTING_PLUGIN_API_INCOMPATIBLE": "Cette version du plug-in a été conçue pour une API de plug-in que ce serveur ne fournit pas. Il lui faut un serveur plus récent, ou une version du plug-in faite pour celui-ci.",

@@ -397,7 +397,7 @@
   "BILLING_PORTAL_SIGNING_NOT_CONFIGURED": "The billing portal is not fully configured yet. Let whoever runs this server know.",
   "BILLING_PORTAL_GRANT_UNAVAILABLE": "Could not obtain access to this community's billing. Check whether you have an access request still pending for it.",
   "MARKETPLACE_LISTING_NOT_FOUND": "That marketplace listing no longer exists.",
-  "MARKETPLACE_LISTING_NEEDS_PLUGIN": "This dashboard comes with a plug-in your community has not installed. Install the plug-in first, then add the dashboard.",
+  "MARKETPLACE_LISTING_NEEDS_PLUGIN": "This dashboard comes with a plug-in your community has not installed, or with a newer version of it. Install or update the plug-in first, then add the dashboard.",
   "MARKETPLACE_LISTING_UNAVAILABLE": "This listing has been withdrawn and can no longer be installed.",
   "MARKETPLACE_LISTING_VERSION_INCOMPATIBLE": "This listing needs a newer version of the app. Ask whoever runs this server to update, then try again.",
   "MARKETPLACE_LISTING_PLUGIN_API_INCOMPATIBLE": "This version of the plug-in was built for a plug-in API this server doesn't provide. It needs a newer server, or a release of the plug-in made for this one.",

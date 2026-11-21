@@ -109,10 +109,12 @@ from app.testing.tool_plugins import (
     COUNTERS_UID,
     add_counter,
     convert_counters,
+    counters_listing,
     counters_tool_manifest,
     counters_tool_set,
     install_counters,
     install_tool_plugin,
+    list_counters,
 )
 
 __all__ = [
@@ -130,6 +132,7 @@ __all__ = [
     "checklist_items",
     "community_plan",
     "convert_counters",
+    "counters_listing",
     "counters_tool_manifest",
     "counters_tool_set",
     "create_access_grant",
@@ -194,6 +197,7 @@ __all__ = [
     "install_counters",
     "install_tool_plugin",
     "lexical_body",
+    "list_counters",
     "make_actor",
     "make_operations_community",
     "marketplace_uid",

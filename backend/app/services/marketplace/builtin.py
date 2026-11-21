@@ -21,9 +21,8 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Iterator
-from functools import cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -34,9 +33,6 @@ from app.services.marketplace.catalog import (
     withdraw_builtins_except,
 )
 
-if TYPE_CHECKING:
-    from app.core.tool_set import ToolSet
-
 logger = logging.getLogger(__name__)
 
 #: Where the shipped manifests live. Repo-relative, copied into the image.
@@ -46,7 +42,6 @@ __all__ = [
     "CATALOG_DIR",
     "load_builtin_manifests",
     "seed_builtin_listings",
-    "shipped_tools",
 ]
 
 
@@ -69,45 +64,6 @@ def load_builtin_manifests(directory: Path | None = None) -> Iterator[dict[str, 
             logger.warning("marketplace: skipping listing %s: not an object", path)
             continue
         yield manifest
-
-
-@cache
-def shipped_tools() -> ToolSet:
-    """The built-in tools and those of the tool plug-ins this build ships:
-    the datasets a listed dashboard may read. Their kinds take the codes they
-    were given where a built-in kind's passed to them, and stand-ins
-    otherwise, so this set says what a dashboard may name and is never a
-    community's."""
-    import sqlalchemy as sa
-
-    from app.core.tool_set import BUILTIN_TOOLS, ToolSet
-    from app.db.plugin_tools import InstalledTool, build_tool
-    from app.models.platform.plugin_kind_code import (
-        ADOPTED_KIND_CODES,
-        FIRST_PLUGIN_KIND_CODE,
-    )
-    from app.services.marketplace.tool_plugins import is_tool_plugin, tool_kinds
-
-    shipped = [
-        InstalledTool(manifest["uid"], manifest["definition"])
-        for manifest in load_builtin_manifests()
-        if manifest.get("kind") == "plugin"
-        and is_tool_plugin(manifest.get("definition"))
-    ]
-    kinds = [
-        kind
-        for tool in shipped
-        for kind in tool_kinds(tool.definition, listing_uid=tool.listing_uid)
-    ]
-    codes = {
-        kind: ADOPTED_KIND_CODES.get(kind, FIRST_PLUGIN_KIND_CODE + index)
-        for index, kind in enumerate(kinds)
-    }
-    metadata = sa.MetaData()
-    return ToolSet(
-        (*BUILTIN_TOOLS, *(build_tool(tool, codes, metadata) for tool in shipped)),
-        digest="shipped",
-    )
 
 
 def _manifest_file_count(directory: Path | None = None) -> int:

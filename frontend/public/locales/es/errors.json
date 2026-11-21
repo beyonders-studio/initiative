@@ -394,7 +394,7 @@
   "BILLING_PORTAL_SIGNING_NOT_CONFIGURED": "El portal de facturación aún no está configurado por completo. Avisa a quien gestiona este servidor.",
   "BILLING_PORTAL_GRANT_UNAVAILABLE": "No se pudo obtener acceso a la facturación de esta comunidad. Comprueba si tienes una solicitud de acceso pendiente.",
   "MARKETPLACE_LISTING_NOT_FOUND": "Ese elemento del mercado ya no existe.",
-  "MARKETPLACE_LISTING_NEEDS_PLUGIN": "Este panel viene con un complemento que tu comunidad no tiene instalado. Instala primero el complemento y después añade el panel.",
+  "MARKETPLACE_LISTING_NEEDS_PLUGIN": "Este panel viene con un complemento que tu comunidad no tiene instalado, o con una versión más reciente de él. Instala o actualiza primero el complemento y después añade el panel.",
   "MARKETPLACE_LISTING_UNAVAILABLE": "Este elemento se ha retirado y ya no se puede instalar.",
   "MARKETPLACE_LISTING_VERSION_INCOMPATIBLE": "Este elemento necesita una versión más reciente de la aplicación. Pide a quien gestiona este servidor que la actualice y vuelve a intentarlo.",
   "MARKETPLACE_LISTING_PLUGIN_API_INCOMPATIBLE": "Esta versión del complemento se creó para una API de complementos que este servidor no ofrece. Necesita un servidor más reciente o una versión del complemento hecha para este.",

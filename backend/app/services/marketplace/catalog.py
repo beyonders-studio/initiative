@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import Exists, func, or_
 from sqlalchemy import update as sa_update
@@ -57,10 +57,15 @@ from app.services.marketplace.definitions import (
 )
 from app.services.marketplace.manifest_values import check_public_id
 from app.services.marketplace.tool_plugins import (
+    check_dashboards,
+    declared_tool_set,
     is_tool_plugin,
     tool_changes,
     tool_kinds,
 )
+
+if TYPE_CHECKING:
+    from app.core.tool_set import ToolSet
 
 __all__ = [
     "REGISTRY_SOURCE",
@@ -172,11 +177,11 @@ def _check_version(version: str) -> str:
     return version
 
 
-def _version_tuple(value: str) -> tuple[int, ...]:
+def version_tuple(value: str) -> tuple[int, ...]:
     """A version as comparable integers, ignoring any pre-release suffix.
 
-    Only used to answer "is this deployment new enough", so a coarse reading is
-    the right one: `1.2.3-rc1` and `1.2.3` are the same floor.
+    It answers "is this new enough", so a coarse reading is the right one:
+    `1.2.3-rc1` and `1.2.3` are the same floor.
     """
     head = value.split("-", 1)[0].split("+", 1)[0]
     parts: list[int] = []
@@ -197,7 +202,7 @@ def version_is_compatible(min_app_version: str | None) -> bool:
     """
     if not min_app_version:
         return True
-    return _version_tuple(get_version()) >= _version_tuple(min_app_version)
+    return version_tuple(get_version()) >= version_tuple(min_app_version)
 
 
 def version_runs_here(version: MarketplaceListingVersion) -> bool:
@@ -441,6 +446,7 @@ async def upsert_listing(
     *,
     source: str,
     bundled_with: str | None = None,
+    tools: ToolSet | None = None,
     hold_for_review: bool = False,
     submitted_by: int | None = None,
 ) -> MarketplaceListing:
@@ -457,7 +463,9 @@ async def upsert_listing(
     :func:`_publish_bundled_dashboards`, which is the plug-in's own publish; every
     other caller leaves it ``None`` and is publishing something that stands on
     its own. A publish whose ownership disagrees with the stored row is refused
-    rather than applied, in either direction.
+    rather than applied, in either direction. ``tools``, given with it for a
+    tool plug-in's dashboard, are what its queries are read against: the
+    built-in tools and the plug-in's.
 
     ``hold_for_review`` stores the version without offering it: it does not
     become the listing's latest, a new listing is created unavailable, and an
@@ -484,8 +492,10 @@ async def upsert_listing(
 
     try:
         definition = normalize_listing_definition(
-            kind, manifest.get("definition"), public_id=public_id
+            kind, manifest.get("definition"), public_id=public_id, tools=tools
         )
+        if kind == "plugin" and is_tool_plugin(definition):
+            check_dashboards(definition, uid)
         example = normalize_listing_example(kind, manifest.get("example"), definition)
 
         # Required on every ingestion path: seeding, an operator upload, a
@@ -630,7 +640,7 @@ async def upsert_listing(
         )
         session.add(version)
         await session.flush()
-    elif _stored_body(kind, version, public_id=public_id) != (
+    elif _stored_body(kind, version, public_id=public_id, tools=tools) != (
         definition,
         example,
         release_notes,
@@ -718,7 +728,7 @@ async def _require_tool_compatible(
             continue
         older, newer = sorted(
             ((other, other_definition), (version, definition)),
-            key=lambda pair: _version_tuple(pair[0]),
+            key=lambda pair: version_tuple(pair[0]),
         )
         changes = tool_changes(older[1], newer[1])
         if changes.removed_tables:
@@ -727,7 +737,7 @@ async def _require_tool_compatible(
                 f" or moves it under another ({', '.join(changes.removed_tables)})"
             )
         if changes.drops and (
-            _version_tuple(older[0])[:1] == _version_tuple(newer[0])[:1]
+            version_tuple(older[0])[:1] == version_tuple(newer[0])[:1]
         ):
             raise CatalogError(
                 f"{public_id} {newer[0]}: within a major version a field is never"
@@ -737,7 +747,11 @@ async def _require_tool_compatible(
 
 
 def _stored_body(
-    kind: str, version: MarketplaceListingVersion, *, public_id: str
+    kind: str,
+    version: MarketplaceListingVersion,
+    *,
+    public_id: str,
+    tools: ToolSet | None,
 ) -> tuple[Any, Any, Any, Any, Any] | None:
     """A published version's content as today's code would write it. A field
     the definition format gained since then takes its default on both sides,
@@ -748,7 +762,7 @@ def _stored_body(
     it, which would make every republish of one read as changed."""
     try:
         definition = normalize_listing_definition(
-            kind, version.definition, public_id=public_id
+            kind, version.definition, public_id=public_id, tools=tools
         )
         example = normalize_listing_example(kind, version.example, definition)
     except ListingDefinitionError:
@@ -824,29 +838,38 @@ async def _publish_bundled_dashboards(
     plug-in's publish. ``bundled_with_uid`` is what marks it, and is how the browse
     path knows to offer it only where the plug-in is installed.
 
-    Widget types are resolved to their namespaced form here. A manifest carries
-    no uid inside it, so a publisher writes the bare widget id and this stamps
-    the plug-in's own uid on — the same value :func:`plugin_widget_type` puts on the
-    palette. What gets stored is therefore the shape the dashboard tool already
-    renders, and nothing downstream needs to know the row was derived.
+    A service plug-in's widget types are resolved to their namespaced form
+    here. A manifest carries no uid inside it, so a publisher writes the bare
+    widget id and this stamps the plug-in's own uid on — the same value
+    :func:`plugin_widget_type` puts on the palette. What gets stored is
+    therefore the shape the dashboard tool already renders, and nothing
+    downstream needs to know the row was derived. A tool plug-in's tiles are
+    built-in widgets drawing queries, published as written and read against
+    the built-in tools and the plug-in's.
     """
     published: set[str] = set()
+    tool_plugin = is_tool_plugin(definition)
+    tools = declared_tool_set(definition, plugin.uid) if tool_plugin else None
 
     for entry in definition.get("dashboards") or []:
-        widgets = [
-            {
-                "id": widget["id"],
-                "type": plugin_widget_type(plugin.uid, widget["type"]),
-                **({"title": widget["title"]} if "title" in widget else {}),
-                **({"grid": widget["grid"]} if "grid" in widget else {}),
-                "binding": {
-                    "source": "plugin",
-                    "plugin_uid": plugin.uid,
-                    **widget["binding"],
-                },
-            }
-            for widget in entry["widgets"]
-        ]
+        widgets = (
+            entry["widgets"]
+            if tool_plugin
+            else [
+                {
+                    "id": widget["id"],
+                    "type": plugin_widget_type(plugin.uid, widget["type"]),
+                    **({"title": widget["title"]} if "title" in widget else {}),
+                    **({"grid": widget["grid"]} if "grid" in widget else {}),
+                    "binding": {
+                        "source": "plugin",
+                        "plugin_uid": plugin.uid,
+                        **widget["binding"],
+                    },
+                }
+                for widget in entry["widgets"]
+            ]
+        )
         manifest: dict[str, Any] = {
             "uid": entry["uid"],
             "public_id": entry["public_id"],
@@ -871,7 +894,9 @@ async def _publish_bundled_dashboards(
         # Ownership goes in as part of the publish rather than being stamped on
         # afterwards, so the same call that refuses to reassign a uid refuses to
         # take a listing away from whoever already published it.
-        await upsert_listing(session, manifest, source=source, bundled_with=plugin.uid)
+        await upsert_listing(
+            session, manifest, source=source, bundled_with=plugin.uid, tools=tools
+        )
         published.add(entry["uid"])
 
     # A dashboard dropped from the manifest is withdrawn rather than left

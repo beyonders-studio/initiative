@@ -394,7 +394,7 @@
   "BILLING_PORTAL_SIGNING_NOT_CONFIGURED": "Das Abrechnungsportal ist noch nicht vollständig konfiguriert. Gib der Person Bescheid, die diesen Server betreibt.",
   "BILLING_PORTAL_GRANT_UNAVAILABLE": "Zugriff auf die Abrechnung dieser Community nicht möglich. Prüfe, ob dafür noch eine Zugriffsanfrage offen ist.",
   "MARKETPLACE_LISTING_NOT_FOUND": "Diesen Marktplatz-Eintrag gibt es nicht mehr.",
-  "MARKETPLACE_LISTING_NEEDS_PLUGIN": "Dieses Dashboard gehört zu einem Plug-in, das deine Community nicht installiert hat. Installiere zuerst das Plug-in und füge dann das Dashboard hinzu.",
+  "MARKETPLACE_LISTING_NEEDS_PLUGIN": "Dieses Dashboard gehört zu einem Plug-in, das deine Community nicht installiert hat, oder zu einer neueren Version davon. Installiere oder aktualisiere zuerst das Plug-in und füge dann das Dashboard hinzu.",
   "MARKETPLACE_LISTING_UNAVAILABLE": "Dieser Eintrag wurde zurückgezogen und kann nicht mehr installiert werden.",
   "MARKETPLACE_LISTING_VERSION_INCOMPATIBLE": "Dieser Eintrag benötigt eine neuere Version der App. Bitte die Person, die diesen Server betreibt, um ein Update und versuche es dann erneut.",
   "MARKETPLACE_LISTING_PLUGIN_API_INCOMPATIBLE": "Diese Version des Plug-ins wurde für eine Plug-in-API gebaut, die dieser Server nicht bereitstellt. Sie braucht einen neueren Server oder eine Version des Plug-ins, die für diesen gemacht ist.",
