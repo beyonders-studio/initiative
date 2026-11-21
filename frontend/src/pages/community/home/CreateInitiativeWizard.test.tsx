@@ -6,7 +6,7 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { buildCommunity, buildInitiative } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
@@ -14,10 +14,6 @@ import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 
 import { CreateInitiativeWizard } from "./CreateInitiativeWizard";
-
-vi.mock("@/lib/mascotToast", () => ({
-  toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
-}));
 
 /** Captures the create payload, and the role PATCHes that follow it — with
  *  the initiative id each one was addressed to, because sending them to the
@@ -70,12 +66,18 @@ const nameIt = async (name = "Apollo") => {
 };
 
 describe("CreateInitiativeWizard", () => {
-  it("will not move past a nameless initiative", async () => {
+  it("will not move past a nameless initiative, and lets a step be taken back", async () => {
     stubCreate();
     renderWizard();
 
     // The name is the one thing with no sensible default, so the step holds.
     expect(await screen.findByRole("button", { name: "Next: Tools" })).toBeDisabled();
+    // Nothing about a first initiative once the community has one.
+    expect(screen.queryByText("Your first initiative")).not.toBeInTheDocument();
+
+    await nameIt("Gemini");
+    await userEvent.click(await screen.findByRole("button", { name: "Back" }));
+    expect(await screen.findByLabelText(/name/i)).toHaveValue("Gemini");
   });
 
   it("refuses an initiative with nothing in it, and says why", async () => {
@@ -92,28 +94,12 @@ describe("CreateInitiativeWizard", () => {
     expect(screen.getByText(/needs somewhere to put things/i)).toBeInTheDocument();
   });
 
-  it("sends exactly the tools that were ticked", async () => {
-    const { created } = stubCreate();
+  it("sends exactly the tools that were ticked, and lets members see them, by default", async () => {
+    const { created, rolePatches, patchedInitiatives } = stubCreate();
     renderWizard();
     await nameIt();
 
     // Add a calendar to the two that start on.
-    await userEvent.click(await screen.findByRole("switch", { name: /Calendar/ }));
-    await userEvent.click(screen.getByRole("button", { name: "Next: Membership" }));
-    await userEvent.click(await screen.findByRole("button", { name: "Next: Permissions" }));
-    await userEvent.click(await screen.findByRole("button", { name: "Create initiative" }));
-
-    await waitFor(() => expect(created).toHaveLength(1));
-    expect(created[0]).toMatchObject({
-      name: "Apollo",
-      tools: { project: true, file: true, calendar: true },
-    });
-  });
-
-  it("lets ordinary members see the tools it just switched on, by default", async () => {
-    const { rolePatches } = stubCreate();
-    renderWizard();
-    await nameIt();
     await userEvent.click(await screen.findByRole("switch", { name: /Calendar/ }));
     await userEvent.click(screen.getByRole("button", { name: "Next: Membership" }));
     await userEvent.click(await screen.findByRole("button", { name: "Next: Permissions" }));
@@ -123,9 +109,14 @@ describe("CreateInitiativeWizard", () => {
     expect(await screen.findByRole("radio", { name: /See things/ })).toBeChecked();
     await userEvent.click(screen.getByRole("button", { name: "Create initiative" }));
 
+    await waitFor(() => expect(created).toHaveLength(1));
+    expect(created[0]).toMatchObject({
+      name: "Apollo",
+      tools: { project: true, file: true, calendar: true },
+    });
     // Without this the calendar is on for managers and invisible to everybody
     // else — the whole reason the step exists. Managers are skipped: they hold
-    // every permission by construction. Viewing only: no create_* is written.
+    // every permission by construction.
     await waitFor(() => expect(rolePatches).toHaveLength(1));
     expect(rolePatches[0]).toMatchObject({
       permissions: {
@@ -137,6 +128,9 @@ describe("CreateInitiativeWizard", () => {
         create_projects: false,
       },
     });
+    // The id only exists once the create resolves. Reading it from state would
+    // send every write to the initiative that state held a render ago — none.
+    expect(patchedInitiatives).toEqual(["7"]);
   });
 
   it("lets members make things when asked to", async () => {
@@ -183,19 +177,6 @@ describe("CreateInitiativeWizard", () => {
     });
   });
 
-  it("addresses the permissions to the initiative it just created", async () => {
-    const { patchedInitiatives } = stubCreate();
-    renderWizard();
-    await nameIt();
-    await userEvent.click(await screen.findByRole("button", { name: "Next: Membership" }));
-    await userEvent.click(await screen.findByRole("button", { name: "Next: Permissions" }));
-    await userEvent.click(screen.getByRole("button", { name: "Create initiative" }));
-
-    // The id only exists once the create resolves. Reading it from state would
-    // send every write to the initiative that state held a render ago — none.
-    await waitFor(() => expect(patchedInitiatives).toEqual(["7"]));
-  });
-
   it("explains what an initiative is when it is the community's first", async () => {
     stubCreate();
     renderPage(() => <CreateInitiativeWizard open isFirst onOpenChange={() => {}} />, {
@@ -214,23 +195,5 @@ describe("CreateInitiativeWizard", () => {
       "href",
       "https://beyonders-studio.github.io/initiative/en/guides/initiatives/"
     );
-  });
-
-  it("says nothing of the sort once the community has one", async () => {
-    stubCreate();
-    renderWizard();
-
-    await screen.findByLabelText(/name/i);
-    expect(screen.queryByText("Your first initiative")).not.toBeInTheDocument();
-  });
-
-  it("lets a step be taken back without losing the answer before it", async () => {
-    stubCreate();
-    renderWizard();
-    await nameIt("Gemini");
-
-    await userEvent.click(await screen.findByRole("button", { name: "Back" }));
-
-    expect(await screen.findByLabelText(/name/i)).toHaveValue("Gemini");
   });
 });

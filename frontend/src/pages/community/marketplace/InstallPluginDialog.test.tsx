@@ -86,6 +86,11 @@ describe("InstallPluginDialog", () => {
 
     expect(await screen.findByLabelText("Read projects")).toBeChecked();
     expect(screen.getByLabelText("See who is in your community, by name")).toBeChecked();
+    // A scope the server does not allow is shown, and cannot be ticked.
+    const change = screen.getByLabelText("Read and change projects");
+    expect(change).toBeDisabled();
+    expect(change).not.toBeChecked();
+    expect(screen.getByText("This server doesn't allow it")).toBeInTheDocument();
 
     expect(await install()).toEqual({
       listing_uid: "WIDGETCO000001",
@@ -93,15 +98,6 @@ describe("InstallPluginDialog", () => {
       placements: "all",
       callers: [],
     });
-  });
-
-  it("shows a scope the server does not allow, and cannot tick it", async () => {
-    open();
-
-    const change = await screen.findByLabelText("Read and change projects");
-    expect(change).toBeDisabled();
-    expect(change).not.toBeChecked();
-    expect(screen.getByText("This server doesn't allow it")).toBeInTheDocument();
   });
 
   it("sends what the seat unticked as not granted", async () => {

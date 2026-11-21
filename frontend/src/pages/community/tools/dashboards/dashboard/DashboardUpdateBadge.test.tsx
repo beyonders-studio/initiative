@@ -53,12 +53,7 @@ beforeEach(() => {
 });
 
 describe("DashboardUpdateBadge", () => {
-  it("offers the newer version to someone who can apply it", () => {
-    renderWithProviders(<DashboardUpdateBadge dashboard={dashboard()} canEdit />);
-    expect(screen.getByRole("button", { name: /2\.0\.0/ })).toBeInTheDocument();
-  });
-
-  it("applies it only when asked", async () => {
+  it("offers the newer version to someone who can apply it, and applies it only when asked", async () => {
     const user = userEvent.setup();
     renderWithProviders(<DashboardUpdateBadge dashboard={dashboard()} canEdit />);
     expect(upgrade).not.toHaveBeenCalled();
@@ -73,49 +68,28 @@ describe("DashboardUpdateBadge", () => {
     expect(screen.getByText(/2\.0\.0/)).toBeInTheDocument();
   });
 
-  it("shows nothing for a dashboard that was authored here", () => {
-    const { container } = renderWithProviders(
-      <DashboardUpdateBadge dashboard={dashboard({ listing_uid: null })} canEdit />
-    );
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it("shows nothing when the pinned version is the current one", () => {
-    listing = publishing("1.0.0") as Partial<MarketplaceListingDetail>;
-    const { container } = renderWithProviders(
-      <DashboardUpdateBadge dashboard={dashboard()} canEdit />
-    );
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it("shows nothing when this build cannot run the newer version", () => {
+  it.each([
+    ["the dashboard was authored here", { listing_uid: null }, publishing("2.0.0")],
+    ["the pinned version is the current one", {}, publishing("1.0.0")],
     // Offering it would produce a 409; the listing page is where "upgrade the
     // app first" belongs, not a button here that cannot work.
-    listing = publishing("3.0.0", false) as Partial<MarketplaceListingDetail>;
-    const { container } = renderWithProviders(
-      <DashboardUpdateBadge dashboard={dashboard()} canEdit />
-    );
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it("shows nothing when the listing has been withdrawn", () => {
+    ["this build cannot run the newer version", {}, publishing("3.0.0", false)],
     // A withdrawn listing can still have a newer version on record. Installing
     // or upgrading it is refused, so offering the button would only fail.
-    listing = {
-      installable: false,
-      available: false,
-      latest_version: { version: "2.0.0", compatible: true },
-    } as Partial<MarketplaceListingDetail>;
+    [
+      "the listing has been withdrawn",
+      {},
+      {
+        installable: false,
+        available: false,
+        latest_version: { version: "2.0.0", compatible: true },
+      },
+    ],
+    ["the listing is no longer in the catalog", {}, undefined],
+  ])("shows nothing when %s", (_, overrides, published) => {
+    listing = published as Partial<MarketplaceListingDetail> | undefined;
     const { container } = renderWithProviders(
-      <DashboardUpdateBadge dashboard={dashboard()} canEdit />
-    );
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it("shows nothing when the listing is no longer in the catalog", () => {
-    listing = undefined;
-    const { container } = renderWithProviders(
-      <DashboardUpdateBadge dashboard={dashboard()} canEdit />
+      <DashboardUpdateBadge dashboard={dashboard(overrides)} canEdit />
     );
     expect(container).toBeEmptyDOMElement();
   });

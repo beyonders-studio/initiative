@@ -19,30 +19,13 @@
  */
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { communityHttp } from "@/__tests__/helpers/communityHttp";
+import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import type { DefinitionWidget } from "@/lib/widgets/definition";
-
-const apiGet = vi.hoisted(() => vi.fn());
-// The generated client calls it as a function, which answers only the widget
-// catalog, from `apiGet`; the hand-written reads (a parameter's options) go
-// through `get`. Any other generated read fails, as an unserved request would.
-vi.mock("@/api/client", () => ({
-  apiClient: Object.assign(
-    (config: { url: string }) =>
-      config.url.endsWith("/plugins/widget-catalog")
-        ? apiGet(config.url)
-        : Promise.reject(new Error(`not served: ${config.url}`)),
-    {
-      get: apiGet,
-      post: vi.fn(),
-      put: vi.fn(),
-      delete: vi.fn(),
-    }
-  ),
-  API_BASE_URL: "http://test/api/v1",
-}));
 
 const renderWidget = vi.hoisted(() => vi.fn());
 const readWidgetMeta = vi.hoisted(() => vi.fn());
@@ -130,25 +113,26 @@ const unpointed: DefinitionWidget = {
   binding: { source: "plugin", plugin_uid: PLUGIN_UID },
 };
 
-const isCatalog = (url: string) => url.endsWith("/plugins/widget-catalog");
-const isOptions = (url: string) => url.includes("/options");
+/** Each request for a parameter's menu, as sent. */
+let asked: URL[] = [];
 
 /** The plug-in answers a menu, or says it cannot. */
 const serve = (options: { menu?: unknown[]; unavailable?: string | null } = {}) =>
-  apiGet.mockImplementation((url: string) => {
-    if (isCatalog(url)) return Promise.resolve({ data: CATALOG });
-    if (isOptions(url)) {
-      return Promise.resolve({
-        data: { options: options.menu ?? [], unavailable: options.unavailable ?? null },
+  server.use(
+    communityHttp.get("/plugins/widget-catalog", () => HttpResponse.json(CATALOG)),
+    communityHttp.get("/plugins/:pluginId/endpoints/:endpointId/options", ({ request }) => {
+      asked.push(new URL(request.url));
+      return HttpResponse.json({
+        options: options.menu ?? [],
+        unavailable: options.unavailable ?? null,
       });
-    }
-    return Promise.resolve({ data: {} });
-  });
+    })
+  );
 
 const onSave = vi.fn();
 
 beforeEach(() => {
-  apiGet.mockReset();
+  asked = [];
   onSave.mockReset();
   renderWidget.mockReset();
   readWidgetMeta.mockReset();
@@ -170,22 +154,15 @@ const mount = (which: DefinitionWidget = widget) =>
   );
 
 describe("configuring a plug-in widget", () => {
-  it("offers its plug-in's reads and no source to choose", async () => {
+  it("offers the reads the widget declares, and no others, and no source to choose", async () => {
     // The built-in catalog passed in here is empty, exactly as it is for any
     // `plugin:` type, and the reads still come from the install.
-    serve();
-    mount();
-
-    await screen.findByRole("combobox", { name: /what it reads/i });
-    expect(screen.queryByRole("combobox", { name: /data source/i })).not.toBeInTheDocument();
-  });
-
-  it("offers the reads the widget declares, and no others", async () => {
     serve();
     const user = userEvent.setup();
     mount();
 
     await user.click(await screen.findByRole("combobox", { name: /what it reads/i }));
+    expect(screen.queryByRole("combobox", { name: /data source/i })).not.toBeInTheDocument();
     expect(await screen.findByRole("option", { name: ORDERS })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: REVENUE })).toBeInTheDocument();
   });
@@ -206,10 +183,9 @@ describe("configuring a plug-in widget", () => {
 
     // And it asked the plug-in, for that parameter in the dashboard's
     // initiative, rather than guessing.
-    const asked = apiGet.mock.calls.find(([url]) => isOptions(url));
-    expect(asked?.[0]).toContain(encodeURIComponent(ORDERS));
-    expect(asked?.[1]?.params?.param).toBe("shop");
-    expect(asked?.[1]?.params?.initiative_id).toBe(7);
+    const shop = asked.find((url) => url.searchParams.get("param") === "shop");
+    expect(shop?.pathname).toContain(`/plugins/3/endpoints/${ORDERS}/options`);
+    expect(shop?.searchParams.get("initiative_id")).toBe("7");
   });
 
   it("saves the chosen value onto the binding's own params", async () => {
@@ -273,23 +249,17 @@ describe("configuring a plug-in widget", () => {
 });
 
 describe("what a form must not be able to save", () => {
-  it("will not save a plug-in widget that names no read", async () => {
+  it("will not save a plug-in widget that names no read, and saves once one is chosen", async () => {
     // `endpoint_id` is required where a definition is normalized, so this
     // would come back 422 — after the dialog had closed, which is the worst
     // place to learn it. The control that fills it is right there.
     serve();
-    mount(unpointed);
-
-    await screen.findByRole("combobox", { name: /what it reads/i });
-    expect(screen.getByRole("button", { name: /save/i })).toBeDisabled();
-  });
-
-  it("saves once a read is chosen", async () => {
-    serve();
     const user = userEvent.setup();
     mount(unpointed);
 
-    await user.click(await screen.findByRole("combobox", { name: /what it reads/i }));
+    const reads = await screen.findByRole("combobox", { name: /what it reads/i });
+    expect(screen.getByRole("button", { name: /save/i })).toBeDisabled();
+    await user.click(reads);
     await user.click(await screen.findByRole("option", { name: ORDERS }));
 
     const save = screen.getByRole("button", { name: /save/i });
@@ -328,10 +298,13 @@ describe("a parameter that takes several values", () => {
 });
 
 describe("a value chosen under another value", () => {
-  it("is dropped when the value it was chosen under changes", async () => {
+  it.each([
     // An aisle belongs to the shop that was chosen when it was picked. Leaving
     // it behind is how a binding ends up naming an aisle of a shop it no longer
     // reads — a filter that looks set and matches nothing.
+    ["dropped when the value it was chosen under changes", "south", undefined],
+    ["kept when the same value is chosen again", "north", "A1"],
+  ])("is %s", async (_, shopAgain, aisle) => {
     serve({
       menu: [
         { value: "north", label: null },
@@ -348,36 +321,13 @@ describe("a value chosen under another value", () => {
     await user.click(await screen.findByRole("option", { name: "A1" }));
 
     await user.click(screen.getByRole("combobox", { name: /^shop/i }));
-    await user.click(await screen.findByRole("option", { name: "south" }));
+    await user.click(await screen.findByRole("option", { name: shopAgain }));
     await user.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => expect(onSave).toHaveBeenCalled());
     const saved = onSave.mock.calls[0][0].binding.params;
-    expect(saved.shop).toBe("south");
-    expect(saved.aisle).toBeUndefined();
-  });
-
-  it("is kept when the same value is chosen again", async () => {
-    serve({
-      menu: [
-        { value: "north", label: null },
-        { value: "A1", label: null },
-      ],
-    });
-    const user = userEvent.setup();
-    mount();
-
-    await user.click(await screen.findByRole("combobox", { name: /^shop/i }));
-    await user.click(await screen.findByRole("option", { name: "north" }));
-    await user.click(await screen.findByRole("combobox", { name: /aisle/i }));
-    await user.click(await screen.findByRole("option", { name: "A1" }));
-
-    await user.click(screen.getByRole("combobox", { name: /^shop/i }));
-    await user.click(await screen.findByRole("option", { name: "north" }));
-    await user.click(screen.getByRole("button", { name: /save/i }));
-
-    await waitFor(() => expect(onSave).toHaveBeenCalled());
-    expect(onSave.mock.calls[0][0].binding.params.aisle).toBe("A1");
+    expect(saved.shop).toBe(shopAgain);
+    expect(saved.aisle).toBe(aisle);
   });
 });
 
@@ -405,30 +355,5 @@ describe("a value's declared type", () => {
 
     await waitFor(() => expect(onSave).toHaveBeenCalled());
     expect(onSave.mock.calls[0][0].binding.params.floors).toEqual([1, 2]);
-  });
-
-  it("sends an integer for a single int parameter that is typed", async () => {
-    serve();
-    const user = userEvent.setup();
-    mount();
-
-    await user.type(await screen.findByLabelText(/limit/i), "12");
-    await user.click(screen.getByRole("button", { name: /save/i }));
-
-    await waitFor(() => expect(onSave).toHaveBeenCalled());
-    expect(onSave.mock.calls[0][0].binding.params.limit).toBe(12);
-  });
-
-  it("keeps a string parameter a string", async () => {
-    serve({ menu: [{ value: "north", label: null }] });
-    const user = userEvent.setup();
-    mount();
-
-    await user.click(await screen.findByRole("combobox", { name: /^shop/i }));
-    await user.click(await screen.findByRole("option", { name: "north" }));
-    await user.click(screen.getByRole("button", { name: /save/i }));
-
-    await waitFor(() => expect(onSave).toHaveBeenCalled());
-    expect(onSave.mock.calls[0][0].binding.params.shop).toBe("north");
   });
 });

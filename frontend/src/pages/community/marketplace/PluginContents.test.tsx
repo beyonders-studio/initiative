@@ -3,32 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { renderWithProviders } from "@/__tests__/helpers/render";
-import { PluginTag } from "@/api/generated/initiativeAPI.schemas";
 
-import { PluginContents, PluginTagBadge } from "./PluginContents";
+import { PluginContents } from "./PluginContents";
 
 const rowText = (label: string) =>
   screen.getByRole("rowheader", { name: label }).closest("tr")?.querySelector("td")?.textContent;
 
-describe("PluginTagBadge", () => {
-  it("names how the plug-in shows up, and nothing for other listings", () => {
-    const { rerender } = renderWithProviders(<PluginTagBadge tag={PluginTag.connection} />);
-    expect(screen.getByText("Connects an account")).toBeInTheDocument();
-    rerender(<PluginTagBadge tag={null} />);
-    expect(screen.queryByText("Connects an account")).not.toBeInTheDocument();
-  });
-});
-
 describe("PluginContents", () => {
-  it("is collapsed until opened", async () => {
-    renderWithProviders(
-      <PluginContents definition={{ plugin_kind: "tool_instance", tool: "calendar" }} />
-    );
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "What it adds" }));
-    expect(rowText("Tool")).toBe("Calendar, for the whole community");
-  });
-
   it("says where each name lands, beside the names that land there", async () => {
     renderWithProviders(
       <PluginContents

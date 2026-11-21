@@ -10,19 +10,15 @@ import { renderPage } from "@/__tests__/helpers/render";
 import { ConnectedPage } from "./ConnectedPage";
 
 describe("ConnectedPage", () => {
-  it("asks the person to finish where they are signed in", async () => {
-    renderPage(ConnectedPage, { routerSearch: { outcome: "sign_in_required" } });
-
-    expect(
-      await screen.findByText(
-        "Finish connecting in the browser where you're signed in to Initiative, as the person who started it."
-      )
-    ).toBeInTheDocument();
-  });
-
-  it("reads an ending it does not know as expired", async () => {
-    renderPage(ConnectedPage, { routerSearch: { outcome: "whatever" } });
-
-    expect(await screen.findByText("That link has expired")).toBeInTheDocument();
+  it.each([
+    [
+      "sign_in_required",
+      "Finish connecting in the browser where you're signed in to Initiative, as the person who started it.",
+    ],
+    // An ending it does not know reads as expired.
+    ["whatever", "That link has expired"],
+  ])("says what the %s ending means", async (outcome, text) => {
+    renderPage(ConnectedPage, { routerSearch: { outcome } });
+    expect(await screen.findByText(text)).toBeInTheDocument();
   });
 });

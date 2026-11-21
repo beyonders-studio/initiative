@@ -180,12 +180,20 @@ describe("CommunitiesPage", () => {
     expect(screen.getByText("Community theatre.")).toBeInTheDocument();
     expect(screen.getByText("12 members")).toBeInTheDocument();
     expect(screen.getByText("Art & design")).toBeInTheDocument();
+    // Everything is asked for until a category is picked.
+    expect(directoryFor).toHaveBeenCalledWith(
+      { search: undefined, category: undefined },
+      { enabled: true }
+    );
+    // No more is offered once every match is on screen.
+    expect(screen.queryByRole("button", { name: "Show more" })).not.toBeInTheDocument();
   });
 
-  it("says where a community is", async () => {
+  it("says where a community is, under its banner", async () => {
     directoryFor.mockReturnValue(
       directoryResult([
         community({
+          banner: buildBanner({ image_url: "/api/v1/communities/1/image/abc" }),
           location: {
             text: "Seattle, Washington, United States",
             label: "Queen Anne Neighborhood",
@@ -197,29 +205,18 @@ describe("CommunitiesPage", () => {
       ])
     );
 
-    renderDirectory();
+    const { container } = renderDirectory();
 
     expect(
       await screen.findByRole("link", {
         name: "Location: Queen Anne Neighborhood, Seattle, Washington, United States",
       })
     ).toBeInTheDocument();
-  });
-
-  it("puts the community's banner across the top of its card", async () => {
-    directoryFor.mockReturnValue(
-      directoryResult([
-        community({ banner: buildBanner({ image_url: "/api/v1/communities/1/image/abc" }) }),
-      ])
-    );
-
-    const { container } = renderDirectory();
-
-    await screen.findByText("Riverside Players");
-    const banner = container.querySelector('img[src="/api/v1/communities/1/image/abc"]');
-    expect(banner).not.toBeNull();
     // Decorative: the card already says the community's name beneath it.
-    expect(banner).toHaveAttribute("alt", "");
+    expect(container.querySelector('img[src="/api/v1/communities/1/image/abc"]')).toHaveAttribute(
+      "alt",
+      ""
+    );
   });
 
   // A card with no artwork still has a banner: whatever colour its community set,
@@ -260,22 +257,14 @@ describe("CommunitiesPage", () => {
     }
   });
 
-  it("asks for everything until a category is picked", async () => {
-    renderDirectory();
-
-    await screen.findByText("Riverside Players");
-    expect(directoryFor).toHaveBeenCalledWith(
-      { search: undefined, category: undefined },
-      { enabled: true }
-    );
-  });
-
   // The filters are the sidebar's, and the address is what carries them here,
   // so what this page owes is that it asks for what the address says.
   it.each([
     ["category", { category: "ttrpg" }, { category: ["ttrpg"] }],
     ["categories", { category: ["ttrpg", "gaming"] }, { category: ["ttrpg", "gaming"] }],
-    ["search", { q: "dice" }, { search: "dice" }],
+    ["search, naming no countries", { q: "dice" }, { search: "dice", search_country: undefined }],
+    // A search that names a country reaches where communities are.
+    ["search's countries", { q: "Japan" }, { search: "Japan", search_country: ["JP"] }],
   ])("narrows the request to the %s in the address", async (_label, search, asked) => {
     renderDirectory(search);
 
@@ -296,26 +285,6 @@ describe("CommunitiesPage", () => {
         expect.objectContaining({ search: "dice" }),
         expect.anything()
       )
-    );
-  });
-
-  it("sends the countries a search names, so it reaches where communities are", async () => {
-    renderDirectory({ q: "Japan" });
-    await screen.findByText("Riverside Players");
-
-    expect(directoryFor).toHaveBeenCalledWith(
-      expect.objectContaining({ search: "Japan", search_country: ["JP"] }),
-      expect.anything()
-    );
-  });
-
-  it("sends no countries for a search that names none", async () => {
-    renderDirectory({ q: "dice" });
-    await screen.findByText("Riverside Players");
-
-    expect(directoryFor).toHaveBeenCalledWith(
-      expect.objectContaining({ search: "dice", search_country: undefined }),
-      expect.anything()
     );
   });
 
@@ -372,25 +341,15 @@ describe("CommunitiesPage", () => {
     await waitFor(() => expect(join).toHaveBeenCalledWith(1));
   });
 
-  it("asks an unconfirmed account its age before joining, not after", async () => {
-    join.mockResolvedValue({ id: 1 });
-    renderDirectory({}, { user: buildUser({ age_confirmed_at: null }) });
-    await screen.findByText("Riverside Players");
-
-    await userEvent.click(screen.getByRole("button", { name: "Join" }));
-
-    expect(await screen.findByText("How old are you?")).toBeInTheDocument();
-    // Nothing joined on the strength of an unanswered question.
-    expect(join).not.toHaveBeenCalled();
-  });
-
-  it("forgets a birthdate that was typed and then backed out of", async () => {
+  it("asks an unconfirmed account its age first, and forgets a birthdate backed out of", async () => {
     // The dialog is kept mounted by the card, so nothing unmounts to clear
     // this — and a date left behind contradicts the note under the field.
     renderDirectory({}, { user: buildUser({ age_confirmed_at: null }) });
     await screen.findByText("Riverside Players");
 
     await userEvent.click(screen.getByRole("button", { name: "Join" }));
+    // An unconfirmed account is asked its age before joining, not after.
+    expect(await screen.findByText("How old are you?")).toBeInTheDocument();
     await userEvent.click(await screen.findByLabelText("Date of birth"));
     await userEvent.type(await screen.findByLabelText("Type or pick a date"), "1990-05-04{Enter}");
     await userEvent.keyboard("{Escape}");
@@ -485,13 +444,5 @@ describe("CommunitiesPage", () => {
       expect.objectContaining({ page_size: expect.anything() }),
       expect.anything()
     );
-  });
-
-  it("offers no more once every match is on screen", async () => {
-    directoryFor.mockReturnValue(directoryResult([community()], { hasNextPage: false }));
-    renderDirectory();
-
-    await screen.findByText("Riverside Players");
-    expect(screen.queryByRole("button", { name: "Show more" })).not.toBeInTheDocument();
   });
 });

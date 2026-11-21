@@ -90,6 +90,9 @@ describe("ConnectSignInWizard", () => {
     render();
 
     expect(screen.getByText("Which way in")).toBeInTheDocument();
+    // No provider the deployment cannot sign anybody in with.
+    expect(screen.getByRole("button", { name: /keycloak/i })).toBeDisabled();
+    expect(screen.getByText("Unavailable")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /entra/i }));
 
     expect(await screen.findByText("Whose people")).toBeInTheDocument();
@@ -125,7 +128,7 @@ describe("ConnectSignInWizard", () => {
     );
   });
 
-  it("will not connect without saying who on the provider counts", async () => {
+  it("will not connect without saying who on the provider counts, nor from half a narrowing", async () => {
     const user = userEvent.setup();
     render();
 
@@ -136,16 +139,9 @@ describe("ConnectSignInWizard", () => {
     // way past this step that leaves the question unanswered.
     expect(await screen.findByRole("button", { name: /^next$/i })).toBeDisabled();
     expect(screen.queryByRole("button", { name: /skip this/i })).not.toBeInTheDocument();
-  });
-
-  it("will not go on from half a narrowing", async () => {
-    const user = userEvent.setup();
-    render();
-
-    await user.click(screen.getByRole("button", { name: /entra/i }));
-    await pickClaim(user, /microsoft entra tenant/i);
 
     // A claim with nothing counting against it reads on nobody.
+    await pickClaim(user, /microsoft entra tenant/i);
     expect(screen.getByRole("button", { name: /^next$/i })).toBeDisabled();
   });
 
@@ -211,12 +207,5 @@ describe("ConnectSignInWizard", () => {
     });
     expect(connect).not.toHaveBeenCalled();
     expect(createRule).not.toHaveBeenCalled();
-  });
-
-  it("offers no provider the deployment cannot sign anybody in with", () => {
-    render();
-
-    expect(screen.getByRole("button", { name: /keycloak/i })).toBeDisabled();
-    expect(screen.getByText("Unavailable")).toBeInTheDocument();
   });
 });

@@ -66,25 +66,9 @@ describe("PlatformAuthSection", () => {
   });
 
   describe("ways in", () => {
-    it("sends the change without a number of its own", () => {
-      settings.methods = [
-        {
-          method: "password",
-          enabled: true,
-          primary: true,
-          answers_factor: false,
-          would_strand: 0,
-        },
-        { method: "sso", enabled: true, primary: true, answers_factor: false, would_strand: 3 },
-      ];
-      renderWithProviders(<PlatformAuthSection />);
-
-      fireEvent.click(screen.getByLabelText("Single sign-on"));
-
-      expect(methodsMutate).toHaveBeenCalledWith({ methods: ["password"] });
-    });
-
-    it("asks with the number the server sent back, and acknowledges that one", () => {
+    it("sends the change without a number of its own, then asks with the one the server sent back", () => {
+      // The listed count is not sent: the server names the number it holds.
+      settings.methods[1].would_strand = 3;
       renderWithProviders(<PlatformAuthSection />);
 
       fireEvent.click(screen.getByLabelText("Single sign-on"));
@@ -97,17 +81,9 @@ describe("PlatformAuthSection", () => {
         screen.getByText(/3 accounts sign in only this way and will not be able/)
       ).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "Withdraw" }));
+      expect(methodsMutate).toHaveBeenLastCalledWith({ ...change, acknowledge_stranded: 3 });
 
-      expect(methodsMutate).toHaveBeenLastCalledWith({
-        methods: ["password"],
-        acknowledge_stranded: 3,
-      });
-    });
-
-    it("asks again with the fresh number when the one it sent has moved on", () => {
-      renderWithProviders(<PlatformAuthSection />);
-
-      const change: PlatformAuthSettingsUpdate = { methods: ["password"] };
+      // The number it sent has moved on: it asks again with the fresh one.
       refuse(refusal("SETTINGS_LOGIN_METHODS_STALE_ACK", 4), {
         ...change,
         acknowledge_stranded: 3,
@@ -117,11 +93,7 @@ describe("PlatformAuthSection", () => {
         screen.getByText(/4 accounts sign in only this way and will not be able/)
       ).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "Withdraw" }));
-
-      expect(methodsMutate).toHaveBeenLastCalledWith({
-        methods: ["password"],
-        acknowledge_stranded: 4,
-      });
+      expect(methodsMutate).toHaveBeenLastCalledWith({ ...change, acknowledge_stranded: 4 });
     });
 
     it("says when communities still require a sign-in of their own", () => {
@@ -134,16 +106,7 @@ describe("PlatformAuthSection", () => {
     });
 
     it("will not let the last way in be withdrawn", () => {
-      settings.methods = [
-        {
-          method: "password",
-          enabled: true,
-          primary: true,
-          answers_factor: false,
-          would_strand: 0,
-        },
-        { method: "sso", enabled: false, primary: true, answers_factor: false, would_strand: 0 },
-      ];
+      settings.methods[1].enabled = false;
       renderWithProviders(<PlatformAuthSection />);
 
       // Stated as on, with why, rather than a box that cannot be unticked.

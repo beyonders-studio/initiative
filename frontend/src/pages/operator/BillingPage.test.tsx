@@ -60,21 +60,26 @@ describe("BillingPage", () => {
   });
 
   it.each([
-    ["directory", /open the directory/i, mintDirectoryHandoff],
-    ["control", /open control/i, mintControlHandoff],
-  ])("opens the %s for an owner, under its own door", async (door, name, mint) => {
+    ["directory", /open the directory/i, mintDirectoryHandoff, "owner"],
+    ["control", /open control/i, mintControlHandoff, "owner"],
+    ["contracts", /open contracts/i, mintContractsHandoff, "operator"],
+    // Insights' handoff names no community.
+    ["insights", /open billing insights/i, mintHandoff, "operator"],
+  ] as const)("opens %s under its own door", async (door, name, mint, role) => {
     const location = { href: "" };
     const tab = { opener: {} as unknown, location, close: vi.fn() };
     const openSpy = vi.spyOn(window, "open").mockReturnValue(tab as unknown as Window);
     mint.mockResolvedValue({ handoff_token: "tok-o", expires_in_seconds: 60 });
 
-    renderPage("owner");
+    renderPage(role);
     await userEvent.click(await screen.findByRole("button", { name }));
 
     const [path, fragment] = location.href.split("#");
     expect(path).toBe(`https://billing.example.com/${door}?lang=en`);
     expect(fragment).toBe(`${door}_handoff=tok-o`);
-    expect(mintHandoff).not.toHaveBeenCalled();
+    expect(tab.opener).toBeNull();
+    // Each door mints its own handoff, never insights'.
+    if (door !== "insights") expect(mintHandoff).not.toHaveBeenCalled();
     openSpy.mockRestore();
   });
 
@@ -84,38 +89,6 @@ describe("BillingPage", () => {
     await screen.findByRole("button", { name: /open contracts/i });
     expect(screen.queryByRole("button", { name: /open the directory/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /open control/i })).toBeNull();
-  });
-
-  it("opens the contracts console under its own door", async () => {
-    const location = { href: "" };
-    const tab = { opener: {} as unknown, location, close: vi.fn() };
-    const openSpy = vi.spyOn(window, "open").mockReturnValue(tab as unknown as Window);
-    mintContractsHandoff.mockResolvedValue({ handoff_token: "tok-c", expires_in_seconds: 60 });
-
-    renderPage();
-    await userEvent.click(await screen.findByRole("button", { name: /open contracts/i }));
-
-    const [path, fragment] = location.href.split("#");
-    expect(path).toBe("https://billing.example.com/contracts?lang=en");
-    expect(fragment).toBe("contracts_handoff=tok-c");
-    expect(mintHandoff).not.toHaveBeenCalled();
-    openSpy.mockRestore();
-  });
-
-  it("opens the insights page with a handoff that names no community", async () => {
-    const location = { href: "" };
-    const tab = { opener: {} as unknown, location, close: vi.fn() };
-    const openSpy = vi.spyOn(window, "open").mockReturnValue(tab as unknown as Window);
-    mintHandoff.mockResolvedValue({ handoff_token: "tok-9", expires_in_seconds: 60 });
-
-    renderPage();
-    await userEvent.click(await screen.findByRole("button", { name: /open billing insights/i }));
-
-    const [path, fragment] = location.href.split("#");
-    expect(path).toBe("https://billing.example.com/insights?lang=en");
-    expect(fragment).toBe("insights_handoff=tok-9");
-    expect(tab.opener).toBeNull();
-    openSpy.mockRestore();
   });
 
   it("does not double the slash when the billing URL ends in one", async () => {

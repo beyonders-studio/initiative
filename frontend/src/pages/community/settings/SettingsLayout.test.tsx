@@ -1,4 +1,4 @@
-import { cleanup, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -47,45 +47,27 @@ vi.mock(import("@/hooks/useCommunityBillingSummary"), () => ({
     ({ data: summary }) as unknown as ReturnType<typeof useCommunityBillingSummaryType>,
 }));
 
-// Partial: the render helper reaches for ``CommunityContext`` from this module.
-vi.mock(import("@/hooks/useCommunities"), async (importOriginal) => ({
-  ...(await importOriginal()),
-  useCommunities: () => {
-    const activeCommunity: CommunityEntry = {
-      ...buildCommunity({
-        id: 4,
-        name: "Test Community",
-        role: communityRole,
-        auth_options: authOptions,
-        max_guests: maxGuests,
-        can: communityCan(communityRole, {
-          content: reachesContent,
-          ...(canWriteSettings === undefined ? {} : { configure: canWriteSettings }),
-        }),
-      }),
-      grantSettingsLevel,
-    };
-    return {
-      communities: [activeCommunity],
-      activeCommunity,
-      activeCommunityId: 4,
-      activeCommunityReadOnly: false,
-      loading: false,
-      error: null,
-      refreshCommunities: vi.fn(),
-      switchCommunity: vi.fn(),
-      syncCommunityFromUrl: vi.fn(),
-      createCommunity: vi.fn(),
-      updateCommunityInState: vi.fn(),
-      reorderCommunities: vi.fn(),
-      canCreateCommunities: false,
-    };
-  },
-}));
-
 import { SettingsLayout } from "./SettingsLayout";
 
-const render = () => renderPage(SettingsLayout, { auth: { user: buildUser() } });
+const render = () => {
+  const activeCommunity: CommunityEntry = {
+    ...buildCommunity({
+      id: 4,
+      role: communityRole,
+      auth_options: authOptions,
+      max_guests: maxGuests,
+      can: communityCan(communityRole, {
+        content: reachesContent,
+        ...(canWriteSettings === undefined ? {} : { configure: canWriteSettings }),
+      }),
+    }),
+    grantSettingsLevel,
+  };
+  return renderPage(SettingsLayout, {
+    auth: { user: buildUser() },
+    communities: { communities: [activeCommunity], activeCommunity, activeCommunityId: 4 },
+  });
+};
 
 describe("SettingsLayout", () => {
   beforeEach(() => {
@@ -148,11 +130,6 @@ describe("SettingsLayout", () => {
     ]);
   });
 
-  it("offers Guests where the server allows guests and the community takes them", async () => {
-    render();
-    expect(await screen.findByRole("tab", { name: "Guests" })).toBeInTheDocument();
-  });
-
   it.each([
     ["the server does not allow guests", false, null],
     ["the community takes none", true, 0],
@@ -165,18 +142,16 @@ describe("SettingsLayout", () => {
     expect(screen.queryByRole("tab", { name: "Guests" })).not.toBeInTheDocument();
   });
 
-  it("puts Usage first for the seat, and keeps it from an ordinary admin", async () => {
-    // What the community uses against its caps, and on a hosted install the
-    // plan they come with, is the seat's — like its sign-in.
+  it("puts Usage first for the seat, with Security, Integrations and Data", async () => {
+    // What the community uses against its caps, its sign-in, what it hands to
+    // somebody outside it and taking it out in one file are all the seat's. An
+    // ordinary admin's bar (the first test) has none of them.
     render();
     const tabs = await screen.findAllByRole("tab");
     expect(tabs[0]).toHaveAccessibleName("Usage");
-
-    cleanup();
-    communityRole = "admin";
-    render();
-    expect(await screen.findByRole("tab", { name: /community/i })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: /usage/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /security/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /integrations/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /data/i })).toBeInTheDocument();
   });
 
   it("names it for the plan where there is a billing portal", async () => {
@@ -218,59 +193,18 @@ describe("SettingsLayout", () => {
     expect(tab).toHaveAccessibleName("Plan & usage");
   });
 
-  it("offers the Security tab to the seat that owns it", async () => {
-    render();
-
-    expect(await screen.findByRole("tab", { name: /security/i })).toBeInTheDocument();
-  });
-
-  it.each<[CommunityAuthOption]>([["providers"], ["restrictions"]])(
-    "offers it on the %s grant alone",
-    async (option) => {
-      // The two grants are independent, and either one puts something on the
-      // page worth reaching.
-      authOptions = [option];
-      render();
-
-      expect(await screen.findByRole("tab", { name: /security/i })).toBeInTheDocument();
-    }
-  );
-
-  it("offers Integrations to the seat and not to an admin", async () => {
-    // What the community hands to somebody outside it is the seat's, the way
-    // its sign-in is.
-    render();
-    expect(await screen.findByRole("tab", { name: /integrations/i })).toBeInTheDocument();
-
-    cleanup();
-    communityRole = "admin";
-    render();
-    expect(await screen.findByRole("tab", { name: /community/i })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: /integrations/i })).not.toBeInTheDocument();
-  });
-
-  it("offers Data to the seat and not to an admin", async () => {
-    // Taking the community out in one file, or putting one back, reaches as
-    // far as deleting it does — so it sits with the same seat.
-    render();
-    expect(await screen.findByRole("tab", { name: /data/i })).toBeInTheDocument();
-
-    cleanup();
-    communityRole = "admin";
-    render();
-    expect(await screen.findByRole("tab", { name: /community/i })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: /data/i })).not.toBeInTheDocument();
-  });
-
-  it("does not offer it to an ordinary admin", async () => {
-    // Everything on that tab is the superadmin's to set, so an ordinary
-    // admin is not shown a page they could only look at. A member gets no
-    // settings section at all — see "turns a member with nothing away".
-    communityRole = "admin";
+  it.each<[CommunityAuthOption[], boolean]>([
+    [["providers"], true],
+    [["restrictions"], true],
+    [[], false],
+  ])("offers the seat Security on the grants %j: %s", async (options, offered) => {
+    // The two grants are independent, and either one puts something on the
+    // page worth reaching; with neither there is nothing on it for anybody.
+    authOptions = options;
     render();
 
     expect(await screen.findByRole("tab", { name: /community/i })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: /security/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /security/i }) !== null).toBe(offered);
   });
 
   it("gives a superadmin settings grantee every tab the seat holds", async () => {
@@ -320,29 +254,20 @@ describe("SettingsLayout", () => {
     expect(screen.queryByRole("tab", { name: /trash/i })).not.toBeInTheDocument();
   });
 
-  it("shows the settings for viewing when the server says they are not changed here", async () => {
-    // A settings grant with no read/write grant beside it reads what its rung
-    // reaches; every control on the pages is disabled, and the page says why.
-    communityRole = "superadmin";
-    grantSettingsLevel = "superadmin";
-    canWriteSettings = false;
-    render();
+  it.each([false, true])(
+    "lets a superadmin grantee change the settings only when the server says so (%s)",
+    async (writes) => {
+      // A settings grant with no read/write grant beside it reads what its rung
+      // reaches; every control on the pages is disabled, and the page says why.
+      grantSettingsLevel = "superadmin";
+      canWriteSettings = writes;
+      render();
 
-    expect(await screen.findByRole("tab", { name: /security/i })).toBeInTheDocument();
-    expect(screen.getByText(/read\/write grant/i)).toBeInTheDocument();
-    expect(screen.getByRole("group")).toBeDisabled();
-  });
-
-  it("leaves the settings changeable when the server says so", async () => {
-    communityRole = "superadmin";
-    grantSettingsLevel = "superadmin";
-    canWriteSettings = true;
-    render();
-
-    expect(await screen.findByRole("tab", { name: /security/i })).toBeInTheDocument();
-    expect(screen.queryByText(/read\/write grant/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("group")).toBeEnabled();
-  });
+      expect(await screen.findByRole("tab", { name: /security/i })).toBeInTheDocument();
+      expect(screen.queryByText(/read\/write grant/i) === null).toBe(writes);
+      expect(screen.getByRole("group").matches(":disabled")).toBe(!writes);
+    }
+  );
 
   it("turns a member with nothing away", async () => {
     communityRole = "member";
@@ -350,15 +275,5 @@ describe("SettingsLayout", () => {
     render();
 
     expect(await screen.findByText(/permission/i)).toBeInTheDocument();
-  });
-
-  it("does not offer it to a community the operator has granted nothing", async () => {
-    // Which is most of them: with neither grant there is nothing on that tab
-    // for anybody, seat or no seat.
-    authOptions = [];
-    render();
-
-    expect(await screen.findByRole("tab", { name: /community/i })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: /security/i })).not.toBeInTheDocument();
   });
 });

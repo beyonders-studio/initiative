@@ -74,18 +74,12 @@ const selectedTab = () =>
   screen.getAllByRole("tab").find((tab) => tab.getAttribute("aria-selected") === "true");
 
 describe("InitiativePage", () => {
-  it("heads the page with the headcount and the reader's own role", async () => {
+  it("heads the page with the headcount, opening the roster, and the reader's own role", async () => {
     stubEverything();
     renderAt();
 
-    expect((await screen.findAllByText("4 members")).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Project Manager").length).toBeGreaterThan(0);
-  });
-
-  it("opens the roster from the headcount only for a reader who may read it", async () => {
-    stubEverything();
-    renderAt();
     expect(await screen.findByRole("button", { name: "4 members" })).toBeInTheDocument();
+    expect(screen.getAllByText("Project Manager").length).toBeGreaterThan(0);
   });
 
   it("shows a guest given items the headcount and nobody in it", async () => {
@@ -96,12 +90,16 @@ describe("InitiativePage", () => {
     expect(screen.queryByRole("button", { name: "4 members" })).not.toBeInTheDocument();
   });
 
-  it("selects the tab the route names", async () => {
+  it("selects the tab the route names, and links each tab at its own URL", async () => {
     stubEverything();
     renderAt(Tool.dashboard);
 
     expect(await screen.findByRole("tab", { name: "Dashboards" })).toBeInTheDocument();
     expect(selectedTab()).toHaveAccessibleName("Dashboards");
+    expect(screen.getByRole("tab", { name: "Projects" })).toHaveAttribute(
+      "href",
+      `/c/1/i/${INITIATIVE_ID}/projects`
+    );
   });
 
   it("falls back to the first tab when the route names none", async () => {
@@ -121,14 +119,6 @@ describe("InitiativePage", () => {
     expect(await screen.findByRole("tab", { name: "Projects" })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Dashboards" })).not.toBeInTheDocument();
     expect(selectedTab()).toHaveAccessibleName("Projects");
-  });
-
-  it("links each tab at its own URL rather than swapping state", async () => {
-    stubEverything();
-    renderAt(Tool.file);
-
-    const projectsTab = await screen.findByRole("tab", { name: "Projects" });
-    expect(projectsTab).toHaveAttribute("href", `/c/1/i/${INITIATIVE_ID}/projects`);
   });
 
   describe("a tool plug-in's tab", () => {

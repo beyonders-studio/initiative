@@ -128,6 +128,11 @@ describe("HomePage", () => {
     await user.click(await screen.findByRole("button", { name: "Customize" }));
     await user.click(screen.getByRole("button", { name: "New view" }));
     const picker = await screen.findByRole("dialog", { name: "New view" });
+    // More layouts are a trip to the marketplace away.
+    expect(within(picker).getByRole("link", { name: "Browse the marketplace" })).toHaveAttribute(
+      "href",
+      "/marketplace"
+    );
     await user.click(within(picker).getByRole("button", { name: /assigned work/i }));
 
     await waitFor(() => expect(keptViews(kept)?.views).toHaveLength(2));
@@ -683,20 +688,6 @@ describe("HomePage", () => {
         expect(box).toBeDisabled();
       }
     });
-  });
-
-  it("sends the reader to the marketplace for more layouts", async () => {
-    const user = userEvent.setup();
-    keepLayout(comingUpAndCommunities);
-    renderHome();
-
-    await user.click(await screen.findByRole("button", { name: "Customize" }));
-    await user.click(screen.getByRole("button", { name: "New view" }));
-    const picker = await screen.findByRole("dialog", { name: "New view" });
-    expect(within(picker).getByRole("link", { name: "Browse the marketplace" })).toHaveAttribute(
-      "href",
-      "/marketplace"
-    );
   });
 
   it("wears the banner a view was given, while the reader still has it", async () => {

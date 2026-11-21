@@ -61,14 +61,7 @@ afterEach(() => {
 });
 
 describe("CommunityRecentComments read more", () => {
-  it("offers read more on a comment that overflows its clamp", async () => {
-    simulateClamping();
-    showFeed([buildEntry({ content: "A very long comment. ".repeat(50) })]);
-
-    expect(await screen.findByRole("button", { name: /read more/i })).toBeInTheDocument();
-  });
-
-  it("expands and collapses the comment", async () => {
+  it("offers read more on a comment that overflows its clamp, and expands and collapses it", async () => {
     simulateClamping();
     const { container } = showFeed([buildEntry({ content: "A very long comment. ".repeat(50) })]);
 
@@ -88,6 +81,8 @@ describe("CommunityRecentComments read more", () => {
 
     expect(await screen.findByText("Short.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /read more/i })).toBeNull();
+    // Nor any reactions on an entry that drew none.
+    expect(screen.queryByRole("button", { name: /reaction/i })).toBeNull();
   });
 
   it("names an image in the preview without loading it or adding a link", async () => {
@@ -121,12 +116,5 @@ describe("CommunityRecentComments reactions", () => {
     // The feed reports; reacting belongs in the thread the entry links to.
     expect(chip).toBeDisabled();
     expect(screen.queryByRole("button", { name: /add a reaction/i })).toBeNull();
-  });
-
-  it("adds nothing to an entry with no reactions", async () => {
-    showFeed([buildEntry()]);
-
-    expect(await screen.findByText("Looks good to me.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /reaction/i })).toBeNull();
   });
 });

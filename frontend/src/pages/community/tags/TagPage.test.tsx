@@ -89,20 +89,26 @@ describe("TagPage", () => {
     expect(asked.projects?.has("initiative_id")).toBe(false);
 
     expect(screen.getByRole("heading", { name: /Tasks \(1\)/ })).toBeInTheDocument();
-    expect(await screen.findByRole("link", { name: /Wire the doorbell/ })).toHaveAttribute(
-      "href",
-      "/c/1/i/5/projects/7/tasks/9"
-    );
+    const task = await screen.findByRole("link", { name: /Wire the doorbell/ });
+    expect(task).toHaveAttribute("href", "/c/1/i/5/projects/7/tasks/9");
+    // A tagged task's row has no controls the row cannot promise.
+    const row = task.closest("tr") as HTMLElement;
+    expect(within(row).getByText("To Do")).toBeInTheDocument();
+    expect(within(row).queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(within(row).queryByRole("combobox")).not.toBeInTheDocument();
     // Nothing inside a project but tasks carries tags, and no wiki is asked
     // for until its tab opens.
     expect(asked.entities).toEqual([]);
   });
 
-  it("lists the pages inside a wiki by name, beside the wiki they are in", async () => {
+  it("opens the tab the address names, listing a wiki's pages beside the wiki they are in", async () => {
     const asked = serveTag();
-    renderTagPage();
+    renderTagPage({ tool: "wikis" });
 
-    await userEvent.click(await screen.findByRole("tab", { name: /Wikis \(1\)/ }));
+    expect(await screen.findByRole("tab", { name: /Wikis \(1\)/ })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
     const panel = await screen.findByRole("tabpanel");
     expect(within(panel).queryByRole("heading", { name: /^Wikis/ })).not.toBeInTheDocument();
     expect(await within(panel).findByRole("link", { name: /Rota/ })).toHaveAttribute(
@@ -114,20 +120,6 @@ describe("TagPage", () => {
       "/c/1/i/5/wikis/4"
     );
     expect(asked.entities.map((params) => params.get("kind"))).toEqual(["wiki_page"]);
-  });
-
-  it("opens the tab the address names", async () => {
-    serveTag();
-    renderTagPage({ tool: "wikis" });
-
-    expect(await screen.findByRole("tab", { name: /Wikis \(1\)/ })).toHaveAttribute(
-      "aria-selected",
-      "true"
-    );
-    expect(await screen.findByRole("link", { name: /Rota/ })).toHaveAttribute(
-      "href",
-      "/c/1/i/5/wikis/4/pages/11"
-    );
   });
 
   it("says when the tag's counts could not be read, and asks again", async () => {
@@ -145,27 +137,6 @@ describe("TagPage", () => {
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     fail = false;
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
-    expect(await screen.findByText("Nothing carries this tag yet.")).toBeInTheDocument();
-  });
-
-  it("lists tagged tasks without controls a row cannot promise", async () => {
-    serveTag();
-    renderTagPage();
-
-    const link = await screen.findByRole("link", { name: /Wire the doorbell/ });
-    const row = link.closest("tr") as HTMLElement;
-    expect(within(row).getByText("To Do")).toBeInTheDocument();
-    expect(within(row).queryByRole("checkbox")).not.toBeInTheDocument();
-    expect(within(row).queryByRole("combobox")).not.toBeInTheDocument();
-  });
-
-  it("says so when nothing carries the tag", async () => {
-    server.use(
-      communityHttp.get("/tags/:tagId", () => HttpResponse.json(tag)),
-      communityHttp.get("/tags/:tagId/counts", () => HttpResponse.json({ counts: {} }))
-    );
-    renderTagPage();
-
     expect(await screen.findByText("Nothing carries this tag yet.")).toBeInTheDocument();
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
   });

@@ -156,17 +156,11 @@ describe("IntakePage", () => {
     expect(screen.queryByRole("button", { name: /^Set up/ })).not.toBeInTheDocument();
   });
 
-  it("offers each unrouted stream a Set up once a community is named", () => {
-    state.operationsCommunityId = 3;
-    renderPage();
-    expect(screen.getAllByText("Not set up")).toHaveLength(STREAMS.length);
-    expect(screen.getByRole("button", { name: "Set up Security" })).toBeEnabled();
-  });
-
-  it("sets a stream up from its blueprint", async () => {
+  it("offers each unrouted stream a Set up once a community is named, from its blueprint", async () => {
     state.operationsCommunityId = 3;
     renderPage();
     const user = userEvent.setup();
+    expect(screen.getAllByText("Not set up")).toHaveLength(STREAMS.length);
 
     await user.click(screen.getByRole("button", { name: "Set up Security" }));
     const dialog = await screen.findByRole("dialog");
@@ -268,17 +262,22 @@ describe("IntakePage", () => {
     ).toBeInTheDocument();
   });
 
-  it("says the read failed rather than showing an unconfigured deployment", () => {
-    // The page shows the failure and withholds the picker, so a change is only
-    // made against a value that was actually read.
-    state.isError = true;
-    state.operationsCommunityId = 3;
-    renderPage();
+  // The page shows the failure and withholds the picker, so a change is only
+  // made against a value that was actually read. The two reads describe one
+  // community between them, so a page that acted on only one would offer
+  // destinations it could not name.
+  it.each(["isError", "optionsError"] as const)(
+    "says the read failed (%s) rather than showing an unconfigured deployment",
+    (failed) => {
+      state[failed] = true;
+      state.operationsCommunityId = 3;
+      renderPage();
 
-    expect(screen.getByRole("alert")).toBeInTheDocument();
-    expect(screen.queryByRole("combobox", { name: "Community" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("list")).not.toBeInTheDocument();
-  });
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+      expect(screen.queryByRole("combobox", { name: "Community" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("list")).not.toBeInTheDocument();
+    }
+  );
 
   it("offers no destination while the two reads disagree", () => {
     // Mid-refetch the bindings and the projects they could name can be from
@@ -289,17 +288,6 @@ describe("IntakePage", () => {
 
     expect(screen.getByRole("combobox", { name: "Community" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Set up Security" })).toBeDisabled();
-  });
-
-  it("says so when the options read is the one that failed", () => {
-    // The two reads describe one community between them, so a page that acted
-    // on only one would offer destinations it could not name.
-    state.optionsError = true;
-    state.operationsCommunityId = 3;
-    renderPage();
-
-    expect(screen.getByRole("alert")).toBeInTheDocument();
-    expect(screen.queryByRole("combobox", { name: "Community" })).not.toBeInTheDocument();
   });
 
   it("says a stream whose project was archived receives nothing", async () => {

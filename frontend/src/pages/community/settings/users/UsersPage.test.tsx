@@ -218,14 +218,30 @@ describe("UsersPage roles", () => {
   });
 });
 
+const ada = {
+  id: 9,
+  user: {
+    id: 43,
+    username: "ada",
+    discriminator: 7,
+    avatar_url: null,
+    status: "active" as const,
+  },
+  message: "We met at the Thursday read.",
+  created_at: new Date().toISOString(),
+};
+
 describe("UsersPage invites", () => {
-  it("leaves invites out for a rung that reads the roster", async () => {
+  it("leaves invites and the join queue out for a rung that only reads the roster", async () => {
+    state.joinRequests = [ada];
     const community = buildCommunity({ role: "admin" }) as CommunityRead;
     setup({ role: "admin", can: { ...community.can, configure: false } });
 
     expect(await screen.findByRole("table")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Generate invite" })).not.toBeInTheDocument();
     expect(listInvites).not.toHaveBeenCalled();
+    expect(screen.queryByText("Requests to join")).not.toBeInTheDocument();
+    expect(listJoinRequests).not.toHaveBeenCalled();
   });
 
   it("shows a new invite's link once, until the invite is deleted", async () => {
@@ -281,19 +297,6 @@ describe("UsersPage invites", () => {
 });
 
 describe("UsersPage requests to join", () => {
-  const ada = {
-    id: 9,
-    user: {
-      id: 43,
-      username: "ada",
-      discriminator: 7,
-      avatar_url: null,
-      status: "active" as const,
-    },
-    message: "We met at the Thursday read.",
-    created_at: new Date().toISOString(),
-  };
-
   it("lists who asked and answers them", async () => {
     state.joinRequests = [ada];
     const community = setup({ role: "admin" });
@@ -306,16 +309,6 @@ describe("UsersPage requests to join", () => {
       { communityId: community.id, requestId: 9, approved: true },
       expect.anything()
     );
-  });
-
-  it("leaves the queue out for a rung that only reads the roster", async () => {
-    state.joinRequests = [ada];
-    const community = buildCommunity({ role: "admin" }) as CommunityRead;
-    setup({ role: "admin", can: { ...community.can, configure: false } });
-
-    expect(await screen.findByRole("table")).toBeInTheDocument();
-    expect(screen.queryByText("Requests to join")).not.toBeInTheDocument();
-    expect(listJoinRequests).not.toHaveBeenCalled();
   });
 });
 
@@ -345,16 +338,12 @@ describe("UsersPage API access", () => {
     });
   });
 
-  it("is the seat's, not an ordinary admin's", async () => {
-    setup({ role: "admin" });
-
-    await screen.findByRole("combobox", { name: /community role for/i });
-    expect(apiSwitch()).not.toBeInTheDocument();
-  });
-
-  it("is not offered while the community does not hold restrictions", async () => {
-    state.authOptions = ["providers"];
-    setup({});
+  it.each<[string, Partial<CommunityRead>, CommunityAuthOption[]]>([
+    ["to an ordinary admin: it is the seat's", { role: "admin" }, ["restrictions"]],
+    ["while the community does not hold restrictions", {}, ["providers"]],
+  ])("is not offered %s", async (_label, overrides, options) => {
+    state.authOptions = options;
+    setup(overrides);
 
     await screen.findByRole("combobox", { name: /community role for/i });
     expect(apiSwitch()).not.toBeInTheDocument();
@@ -416,13 +405,6 @@ describe("UsersPage bans and timeouts", () => {
     setup({ role: "admin" });
 
     expect(await screen.findByText("Banned")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Lift ban" })).not.toBeInTheDocument();
-  });
-
-  it("says nothing about bans while there are none", async () => {
-    setup({ role: "admin" });
-
-    await screen.findByRole("table");
     expect(screen.queryByRole("button", { name: "Lift ban" })).not.toBeInTheDocument();
   });
 

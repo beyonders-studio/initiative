@@ -7,7 +7,7 @@
  * install pins, not on the name or the public id.
  */
 import { Capacitor } from "@capacitor/core";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -71,12 +71,18 @@ beforeEach(() => {
 });
 
 describe("BrowsePage", () => {
-  it("shows a card per listing", async () => {
+  it("shows a card per listing, asking the catalog only for dashboards", async () => {
     renderPage(BrowsePage);
-    expect(await screen.findByText("Sprint health")).toBeInTheDocument();
+    const card = await screen.findByRole("link", { name: /Sprint health/ });
     // Attribution rides along with how the listing got here, so a card never
     // shows an author's name on its own.
-    expect(screen.getByText("by Initiative")).toBeInTheDocument();
+    expect(within(card).getByText("by Initiative")).toBeInTheDocument();
+    // The whole card is the link; nothing nests a second one inside it.
+    expect(within(card).queryByRole("link")).toBeNull();
+    // Defaulted by the page itself: `useSearch({ strict: false })` does not run
+    // the route's validation, so a page that leaned on it would drop the filter
+    // and mix plug-ins into the grid.
+    expect(listingsFor).toHaveBeenCalledWith(expect.objectContaining({ kind: "dashboard" }));
   });
 
   it("marks a plug-in in beta, and no other", async () => {
@@ -95,21 +101,6 @@ describe("BrowsePage", () => {
     expect(screen.getAllByText("Beta")).toHaveLength(1);
   });
 
-  it("asks the catalog only for dashboards", async () => {
-    // Defaulted by the page itself: `useSearch({ strict: false })` does not run
-    // the route's validation, so a page that leaned on it would drop the filter
-    // and mix plug-ins into the grid.
-    renderPage(BrowsePage);
-    await screen.findByText("Sprint health");
-    expect(listingsFor).toHaveBeenCalledWith(expect.objectContaining({ kind: "dashboard" }));
-  });
-
-  it("asks for plug-ins on the plug-ins shelf", async () => {
-    renderPage(BrowsePage, { routerSearch: { kind: "plugin" } });
-    await screen.findByText("Sprint health");
-    expect(listingsFor).toHaveBeenCalledWith(expect.objectContaining({ kind: "plugin" }));
-  });
-
   it("marks an installed plug-in on the plug-ins shelf", async () => {
     // Each shelf asks its own tool: the dashboards aggregate knows nothing
     // about plug-ins, so reading installed state from it here would report every
@@ -117,6 +108,7 @@ describe("BrowsePage", () => {
     installedPlugins = [{ listing_uid: "SPRNT000000001" }];
     renderPage(BrowsePage, { routerSearch: { kind: "plugin" } });
     expect(await screen.findByText("Installed")).toBeInTheDocument();
+    expect(listingsFor).toHaveBeenCalledWith(expect.objectContaining({ kind: "plugin" }));
   });
 
   it("does not read plug-in installs from the dashboard aggregate", async () => {
@@ -144,6 +136,7 @@ describe("BrowsePage", () => {
     installed = { SPRNT000000001: 1 };
     renderPage(BrowsePage);
     expect(await screen.findByText("Installed")).toBeInTheDocument();
+    expect(screen.queryByText(/couldn't check which of these/i)).toBeNull();
   });
 
   it("does not mark a listing whose uid nobody here pinned", async () => {
@@ -173,13 +166,6 @@ describe("BrowsePage", () => {
     await screen.findByText("Sprint health");
     expect(screen.queryByText("Installed")).toBeNull();
     expect(screen.getByText(/couldn't check which of these/i)).toBeInTheDocument();
-  });
-
-  it("says nothing extra when the check succeeds", async () => {
-    installed = { SPRNT000000001: 1 };
-    renderPage(BrowsePage);
-    await screen.findByText("Installed");
-    expect(screen.queryByText(/couldn't check which of these/i)).toBeNull();
   });
 
   it("does not present a failed catalog as an empty one", async () => {

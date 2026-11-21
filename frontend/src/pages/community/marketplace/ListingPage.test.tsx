@@ -119,10 +119,18 @@ beforeEach(() => {
 });
 
 describe("ListingPage", () => {
-  it("returns to the shelf it was opened from", async () => {
+  it("credits this build, offers the install, and returns to the shelf it was opened from", async () => {
     renderPage(ListingPage, { routerSearch: { kind: "plugin" } });
     await screen.findByRole("heading", { name: "Community calendar" });
     expect(backHref()).toContain("kind=plugin");
+    // The same sentence the card showed, on the page where the decision is made.
+    expect(screen.getByText("by Initiative")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Add to community/ })).toBeEnabled();
+    expect(screen.queryByText(/has to be set up for your community/)).toBeNull();
+    // A plug-in mounts a tool; there is no definition to draw.
+    expect(screen.queryByText("Preview")).toBeNull();
+    // No report on a listing BeyondersStudio publishes.
+    expect(screen.queryByRole("button", { name: "Report" })).toBeNull();
   });
 
   it("returns to the shelf when the listing failed to load", async () => {
@@ -143,41 +151,55 @@ describe("ListingPage", () => {
     expect(backHref()).toContain("kind=plugin");
   });
 
-  it("says a plug-in is in beta", async () => {
-    listing = { ...pluginListing(), beta: true } as unknown as MarketplaceListingDetail;
-    renderPage(ListingPage, { routerSearch: { kind: "plugin" } });
-    await screen.findByRole("heading", { name: "Community calendar" });
-    expect(screen.getByText("Beta")).toBeInTheDocument();
-  });
-
-  it("answers who wrote it before the install button", async () => {
-    // The same sentence the card showed, on the page where the decision is
-    // actually made.
-    renderPage(ListingPage, { routerSearch: { kind: "plugin" } });
-    await screen.findByRole("heading", { name: "Community calendar" });
-    expect(screen.getByText("by Initiative")).toBeInTheDocument();
-  });
-
-  it("names the publisher of a listing that did not ship with this build", async () => {
+  it("names somebody else's listing's publisher, offers to report it, and says it is in beta", async () => {
     listing = {
       ...pluginListing(),
-      source: "operator",
+      source: "registry",
       publisher: "Acme Widgets",
+      first_party: false,
+      beta: true,
     } as unknown as MarketplaceListingDetail;
     renderPage(ListingPage, { routerSearch: { kind: "plugin" } });
     await screen.findByRole("heading", { name: "Community calendar" });
     expect(screen.getByText("by Acme Widgets")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Report" })).toBeInTheDocument();
+    expect(screen.getByText("Beta")).toBeInTheDocument();
   });
 
-  it("offers no canvas preview for a plug-in", async () => {
+  it("shows the description, the screenshots full size, and what the plug-in adds", async () => {
+    listing = {
+      ...pluginListing(),
+      images: ["/a.webp", "/b.webp"],
+      long_description: "Calendars for everyone.\n\n- One to start\n- Add more",
+      plugin_tag: "connection",
+      definition: { plugin_kind: "tool_instance", tool: "calendar" },
+    } as unknown as MarketplaceListingDetail;
+    const user = userEvent.setup();
     renderPage(ListingPage, { routerSearch: { kind: "plugin" } });
     await screen.findByRole("heading", { name: "Community calendar" });
-    // A plug-in mounts a tool; there is no definition to draw.
-    expect(screen.queryByText("Preview")).toBeNull();
+
+    expect(screen.getByText("Connects an account")).toBeInTheDocument();
+    // A paragraph of "- " lines is a list; the rest are paragraphs.
+    expect(screen.getByText("Calendars for everyone.").tagName).toBe("P");
+    const list = screen.getByText("One to start").closest("ul") as HTMLElement;
+    expect(
+      within(list)
+        .getAllByRole("listitem")
+        .map((item) => item.textContent)
+    ).toEqual(["One to start", "Add more"]);
+    // What it adds is collapsed until opened.
+    expect(screen.queryByRole("table")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "What it adds" }));
+    expect(
+      screen.getByRole("rowheader", { name: "Tool" }).closest("tr")?.querySelector("td")
+    ).toHaveTextContent("Calendar, for the whole community");
+
+    await user.click(screen.getByRole("button", { name: "Community calendar screenshot 2" }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
-  it("tells a member who can add a plug-in they cannot", async () => {
-    communityRole = "member";
+  it.each(["member", "admin"])("tells a %s that the superadmin adds plug-ins", async (role) => {
+    communityRole = role;
     renderPage(ListingPage, { routerSearch: { kind: "plugin" } });
 
     expect(
@@ -185,16 +207,6 @@ describe("ListingPage", () => {
     ).toBeInTheDocument();
     // The button is present but refuses, rather than being hidden: seeing what
     // the plug-in offers is the point of letting them in here.
-    expect(screen.getByRole("button", { name: /Add to community/ })).toBeDisabled();
-  });
-
-  it("tells an ordinary admin that the superadmin adds plug-ins", async () => {
-    communityRole = "admin";
-    renderPage(ListingPage, { routerSearch: { kind: "plugin" } });
-
-    expect(
-      await screen.findByText("Ask your community's superadmin to add this plug-in.")
-    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Add to community/ })).toBeDisabled();
   });
 
@@ -248,24 +260,6 @@ describe("ListingPage", () => {
 
     await screen.findByRole("heading", { name: "Community calendar" });
     expect(screen.getByRole("button", { name: /Add to community/ })).toBeDisabled();
-  });
-
-  it("offers to report a listing somebody else publishes", async () => {
-    listing = {
-      ...pluginListing(),
-      source: "registry",
-      publisher: "Acme Apps",
-      first_party: false,
-    } as unknown as MarketplaceListingDetail;
-    renderPage(ListingPage, { routerSearch: { kind: "plugin" } });
-    await screen.findByRole("heading", { name: "Community calendar" });
-    expect(screen.getByRole("button", { name: "Report" })).toBeInTheDocument();
-  });
-
-  it("offers no report on a listing BeyondersStudio publishes", async () => {
-    renderPage(ListingPage, { routerSearch: { kind: "plugin" } });
-    await screen.findByRole("heading", { name: "Community calendar" });
-    expect(screen.queryByRole("button", { name: "Report" })).toBeNull();
   });
 
   it("says a listing outside the curated catalogue is not available on an iPhone", async () => {
@@ -404,15 +398,6 @@ describe("a plug-in this community cannot add yet", () => {
     expect(
       screen.getByText("This plug-in has to be set up for your community before it can be added.")
     ).toBeInTheDocument();
-  });
-
-  it("offers the button again once it can", async () => {
-    listing = { ...pluginListing(), unavailable: null };
-    renderPage(ListingPage);
-    await screen.findByRole("heading", { name: "Community calendar" });
-
-    expect(screen.getByRole("button", { name: /Add to community/ })).toBeEnabled();
-    expect(screen.queryByText(/has to be set up for your community/)).toBeNull();
   });
 });
 

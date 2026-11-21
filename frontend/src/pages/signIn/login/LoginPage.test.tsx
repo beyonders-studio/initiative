@@ -257,7 +257,7 @@ describe("LoginPage password", () => {
 describe("LoginPage second factor", () => {
   beforeEach(resetLoginMocks);
 
-  it("asks for the code once the password is accepted", async () => {
+  it("asks for the code once the password is accepted, takes a recovery one, and starts over", async () => {
     const user = userEvent.setup();
     mocks.login.mockRejectedValue(new SecondFactorRequiredError("a-challenge"));
     renderLogin();
@@ -267,19 +267,16 @@ describe("LoginPage second factor", () => {
     await waitFor(() => expect(screen.getByLabelText(/authentication code/i)).toBeInTheDocument());
     // And it has stopped asking for the password it already has.
     expect(screen.queryByLabelText(/^password$/i)).not.toBeInTheDocument();
-  });
 
-  it("swaps the code field for the recovery one on asking", async () => {
-    const user = userEvent.setup();
-    mocks.login.mockRejectedValue(new SecondFactorRequiredError("a-challenge"));
-    renderLogin();
-    await signIn(user);
-    await screen.findByLabelText(/authentication code/i);
-
+    // The code field swaps for the recovery one on asking.
     await user.click(screen.getByRole("button", { name: /use a recovery code/i }));
-
     expect(await screen.findByLabelText(/recovery code/i)).toBeInTheDocument();
     expect(screen.queryByLabelText(/authentication code/i)).not.toBeInTheDocument();
+
+    // Starting over puts the password back.
+    await user.click(screen.getByRole("button", { name: /start over/i }));
+    await waitFor(() => expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument());
+    expect(screen.queryByLabelText(/recovery code/i)).not.toBeInTheDocument();
   });
 
   it("lets them try again after a refused code", async () => {
@@ -313,19 +310,6 @@ describe("LoginPage second factor", () => {
       expect.objectContaining({ challenge: "a-challenge", code: "123456" })
     );
   });
-
-  it("starting over puts the password back", async () => {
-    const user = userEvent.setup();
-    mocks.login.mockRejectedValue(new SecondFactorRequiredError("a-challenge"));
-    renderLogin();
-    await signIn(user);
-    await screen.findByLabelText(/authentication code/i);
-
-    await user.click(screen.getByRole("button", { name: /start over/i }));
-
-    await waitFor(() => expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument());
-    expect(screen.queryByLabelText(/authentication code/i)).not.toBeInTheDocument();
-  });
 });
 
 /**
@@ -342,52 +326,35 @@ describe("LoginPage return path", () => {
     mocks.login.mockResolvedValue(undefined);
   });
 
-  it("finishes the trip they were on", async () => {
+  it.each([
+    ["finishes the trip they were on", "/profile/security", "/profile/security"],
+    ["keeps a destination outside this app out of it", "//evil.test/take-me", "/"],
+  ])("%s", async (_, next, landed) => {
     const user = userEvent.setup();
-    const { router } = renderLogin({ next: "/profile/security" });
+    const { router } = renderLogin({ next });
 
     await signIn(user);
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/profile/security"));
+    await waitFor(() => expect(router.state.location.pathname).toBe(landed));
   });
 
-  it("keeps a destination outside this app out of it", async () => {
-    const user = userEvent.setup();
-    const { router } = renderLogin({ next: "//evil.test/take-me" });
-
-    await signIn(user);
-
-    await waitFor(() => expect(router.state.location.pathname).toBe("/"));
-  });
-
-  it("carries the same trip into a provider's sign-in", async () => {
-    // An account that signs in through SSO only is the case the passkey trip
-    // depends on: the app hands the browser the provider, and the provider's
-    // callback is what lands somewhere.
+  // An account that signs in through SSO only is the case the passkey trip
+  // depends on: the app hands the browser the provider, and the provider's
+  // callback is what lands somewhere. A trip that was not one of ours is left
+  // behind.
+  it.each([
+    ["/profile/security", "/api/v1/auth/corp/login?next=%2Fprofile%2Fsecurity"],
+    ["//evil.test/take-me", "/api/v1/auth/corp/login"],
+  ])("carries the trip to %s into a provider's sign-in as %s", async (next, departed) => {
     const user = userEvent.setup();
     offering([corp]);
     const departure = watchWhereItLeavesFor();
     try {
-      renderLogin({ next: "/profile/security" });
+      renderLogin({ next });
 
       await user.click(await screen.findByRole("button", { name: /continue with corp/i }));
 
-      expect(departure.left()).toBe("/api/v1/auth/corp/login?next=%2Fprofile%2Fsecurity");
-    } finally {
-      departure.restore();
-    }
-  });
-
-  it("leaves for the provider bare when the trip was not one of ours", async () => {
-    const user = userEvent.setup();
-    offering([corp]);
-    const departure = watchWhereItLeavesFor();
-    try {
-      renderLogin({ next: "//evil.test/take-me" });
-
-      await user.click(await screen.findByRole("button", { name: /continue with corp/i }));
-
-      expect(departure.left()).toBe("/api/v1/auth/corp/login");
+      expect(departure.left()).toBe(departed);
     } finally {
       departure.restore();
     }
@@ -405,22 +372,24 @@ describe("LoginPage passkey", () => {
 
   afterEach(() => consoleDebug.mockRestore());
 
-  it("offers one where the deployment and the browser both do", async () => {
+  it("offers one where the deployment and the browser both do, beside the saved addresses", async () => {
     renderLogin();
 
     expect(await passkeyButton()).toBeEnabled();
+    // The browser may offer a passkey in the address field's own suggestions.
+    expect(screen.getByLabelText(/email/i)).toHaveAttribute("autocomplete", "username webauthn");
   });
 
-  it("offers none where the deployment has withdrawn them", async () => {
-    mocks.config = { passwordLoginEnabled: true, passkeyLoginEnabled: false };
-    renderLogin();
-
-    await screen.findByLabelText(/email/i);
-    expect(screen.queryByRole("button", { name: /passkey/i })).not.toBeInTheDocument();
-  });
-
-  it("offers none where this browser cannot present one", async () => {
-    mocks.passkeysRunHere.mockReturnValue(false);
+  it.each([
+    [
+      "the deployment has withdrawn them",
+      () => {
+        mocks.config = { passwordLoginEnabled: true, passkeyLoginEnabled: false };
+      },
+    ],
+    ["this browser cannot present one", () => mocks.passkeysRunHere.mockReturnValue(false)],
+  ])("offers none where %s", async (_, arrange) => {
+    arrange();
     renderLogin();
 
     await screen.findByLabelText(/email/i);
@@ -527,15 +496,6 @@ describe("LoginPage passkey", () => {
     await new Promise((resolve) => setTimeout(resolve, 25));
     expect(mocks.signInWithPasskey).toHaveBeenCalledTimes(2);
     expect(screen.queryByText(/didn't work/i)).not.toBeInTheDocument();
-  });
-
-  it("lets the browser offer a passkey beside the saved addresses", async () => {
-    renderLogin();
-
-    expect(await screen.findByLabelText(/email/i)).toHaveAttribute(
-      "autocomplete",
-      "username webauthn"
-    );
   });
 
   it("signs an app in under the device's name", async () => {

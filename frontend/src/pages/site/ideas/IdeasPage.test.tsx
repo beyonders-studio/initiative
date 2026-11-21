@@ -57,6 +57,7 @@ describe("IdeasPage", () => {
         status: considering(),
         votes: 2,
       }),
+      buildIdea({ title: "Print a month", status: shipped(), votes: 5 }),
     ]);
     renderPage(IdeasPage, { initialRoute: "/suggestions", server: cloud, auth: { user: null } });
 
@@ -64,12 +65,17 @@ describe("IdeasPage", () => {
       await screen.findByRole("link", { name: "Recurring events skip holidays" })
     ).toHaveAttribute("href", "/suggestions/2");
     expect(screen.getByText("A repeating event leaves out the public holidays.")).toBeVisible();
-    const row = within(screen.getByRole("list", { name: "Suggestions" })).getByRole("listitem");
+    const [row, closed] = within(screen.getByRole("list", { name: "Suggestions" })).getAllByRole(
+      "listitem"
+    );
     expect(within(row).getByText("Calendars")).toBeVisible();
     expect(within(row).getByText("Under consideration")).toBeVisible();
     expect(
       within(row).getByRole("button", { name: "2 votes. Upvote Recurring events skip holidays" })
     ).toHaveAttribute("aria-pressed", "false");
+    // A closed suggestion's votes are text, with no button.
+    expect(within(closed).getByRole("img", { name: "5 votes, voting closed" })).toBeVisible();
+    expect(within(closed).queryByRole("button", { name: /Upvote/ })).toBeNull();
     // Signed out, the band says how to vote, and comes back here.
     expect(screen.getByRole("link", { name: "Sign in to vote" })).toHaveAttribute(
       "href",
@@ -148,14 +154,6 @@ describe("IdeasPage", () => {
     expect(signedIn).not.toHaveAccessibleDescription();
     await user.click(signedIn);
     expect(await screen.findByText("Upvoted. 3 votes.")).toBeInTheDocument();
-  });
-
-  it("shows a closed suggestion's votes as text, with no button", async () => {
-    serveList([buildIdea({ title: "Print a month", status: shipped(), votes: 5 })]);
-    renderPage(IdeasPage, { initialRoute: "/suggestions", server: cloud, auth: { user: null } });
-
-    expect(await screen.findByRole("img", { name: "5 votes, voting closed" })).toBeVisible();
-    expect(screen.queryByRole("button", { name: /Upvote/ })).toBeNull();
   });
 
   it("draws the Roadmap's columns, each a list under its status", async () => {

@@ -11,7 +11,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { communityCan } from "@/__tests__/factories";
+import { buildCommunity } from "@/__tests__/factories";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { CommunityPluginUninstallNotice } from "@/api/generated/initiativeAPI.schemas";
 
@@ -30,18 +30,6 @@ vi.mock(import("@/api/generated/plugins/plugins"), async (importOriginal) => ({
   uninstallCommunityPlugin: uninstall,
 }));
 
-vi.mock("@/hooks/useCommunities", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/hooks/useCommunities")>()),
-  useCommunities: () => ({
-    activeCommunityId: 1,
-    activeCommunity: {
-      id: 1,
-      role: "superadmin",
-      can: communityCan("superadmin"),
-      closed_surfaces: closedSurfaces,
-    },
-  }),
-}));
 vi.mock("@/hooks/useBillingPortal", () => ({
   useBillingPortal: () => ({ canSell: true, openAddress }),
 }));
@@ -81,8 +69,20 @@ beforeEach(() => {
   uninstall.mockResolvedValue(undefined);
 });
 
+const render = () =>
+  renderPage(PluginsPage, {
+    communities: {
+      activeCommunityId: 1,
+      activeCommunity: buildCommunity({
+        id: 1,
+        role: "superadmin",
+        closed_surfaces: closedSurfaces,
+      }),
+    },
+  });
+
 async function openRemoval() {
-  renderPage(PluginsPage);
+  render();
   await userEvent.click(await screen.findByRole("button", { name: "Remove" }));
   return screen.findByRole("alertdialog");
 }
@@ -153,7 +153,7 @@ describe("when whoever runs the server manages plug-ins", () => {
   it("lists what is installed, says so, and offers nothing to change", async () => {
     closedSurfaces = ["plugins"];
     pendingVersion = "1.1.0";
-    renderPage(PluginsPage);
+    render();
 
     expect(
       await screen.findByText("Whoever runs this server manages plug-ins for this community.")
@@ -166,25 +166,19 @@ describe("when whoever runs the server manages plug-ins", () => {
 });
 
 describe("a version waiting for the seat", () => {
-  it("marks its row, and the notice's link opens that row", async () => {
+  it("marks its row, and the notice's link opens that row; a read-only one is marked so", async () => {
     pendingVersion = "1.1.0";
-    const { router } = renderPage(PluginsPage);
+    readOnly = true;
+    const { router } = render();
 
     expect(await screen.findByText("Update waiting")).toBeInTheDocument();
+    // Staff or billing made it read-only.
+    expect(screen.getByText("Read-only")).toBeInTheDocument();
     const trigger = screen.getByRole("button", { name: "Open settings" });
     expect(trigger).toHaveAttribute("aria-expanded", "false");
 
     // Followed while the page is already open.
     await router.navigate({ to: ".", search: { plugin: 4 } });
     await waitFor(() => expect(trigger).toHaveAttribute("aria-expanded", "true"));
-  });
-});
-
-describe("a plug-in staff or billing made read-only", () => {
-  it("is marked read-only", async () => {
-    readOnly = true;
-    renderPage(PluginsPage);
-
-    expect(await screen.findByText("Read-only")).toBeInTheDocument();
   });
 });

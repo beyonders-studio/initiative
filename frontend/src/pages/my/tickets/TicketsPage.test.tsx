@@ -2,31 +2,29 @@
  * The reader's own tickets, each leading to its own page.
  */
 import { screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { HttpResponse, http } from "msw";
+import { describe, expect, it } from "vitest";
 
 import { buildUser } from "@/__tests__/factories";
+import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { FiledTicketList } from "@/api/generated/initiativeAPI.schemas";
 
-const state = vi.hoisted(() => ({ list: undefined as FiledTicketList | undefined }));
+import { TicketsPage } from "./TicketsPage";
 
-vi.mock("@/hooks/useTickets", async () => {
-  const actual = await vi.importActual<typeof import("@/hooks/useTickets")>("@/hooks/useTickets");
-  return {
-    ...actual,
-    useFiledTickets: () => ({ data: state.list, isLoading: false, isError: false }),
-    useTicketAvailability: () => ({
-      data: {
+/** Serves the reader's tickets, where security reports are taken by a form. */
+const serve = (list: FiledTicketList = { items: [] }) =>
+  server.use(
+    http.get("/api/v1/me/tickets", () => HttpResponse.json(list)),
+    http.get("/api/v1/me/tickets/availability", () =>
+      HttpResponse.json({
         support: { mode: "none", contact: null, evidence: null },
         moderation: { mode: "form", contact: null, evidence: null },
         feedback: { mode: "none", contact: null, evidence: null },
         security: { mode: "form", contact: null, evidence: null },
-      },
-    }),
-  };
-});
-
-import { TicketsPage } from "./TicketsPage";
+      })
+    )
+  );
 
 const now = new Date().toISOString();
 
@@ -34,12 +32,8 @@ const open = () =>
   renderPage(TicketsPage, { initialRoute: "/my-tickets/", auth: { user: buildUser() } });
 
 describe("TicketsPage", () => {
-  beforeEach(() => {
-    state.list = undefined;
-  });
-
   it("lists each ticket with where it stands", async () => {
-    state.list = {
+    serve({
       items: [
         {
           task_id: 7,
@@ -60,7 +54,7 @@ describe("TicketsPage", () => {
           updated_at: null,
         },
       ],
-    };
+    });
     open();
     const link = await screen.findByRole("link", { name: /Lost my phone/ });
     expect(link).toHaveAttribute("href", "/my-tickets/7");
@@ -72,14 +66,17 @@ describe("TicketsPage", () => {
     );
   });
 
-  it("explains an empty list", async () => {
-    state.list = { items: [] };
+  it("explains an empty list, and offers reporting a security problem where the server takes it", async () => {
+    serve();
     open();
     expect(await screen.findByText(/haven't filed any tickets/)).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "Report a security problem" })
+    ).toBeInTheDocument();
   });
 
   it("opens the security form when a link asks for it", async () => {
-    state.list = { items: [] };
+    serve();
     renderPage(TicketsPage, {
       initialRoute: "/my-tickets/",
       routerSearch: { report: "security" },
@@ -87,14 +84,6 @@ describe("TicketsPage", () => {
     });
     expect(
       await screen.findByRole("dialog", { name: "Report a security problem" })
-    ).toBeInTheDocument();
-  });
-
-  it("offers reporting a security problem where the server takes it", async () => {
-    state.list = { items: [] };
-    open();
-    expect(
-      await screen.findByRole("button", { name: "Report a security problem" })
     ).toBeInTheDocument();
   });
 });

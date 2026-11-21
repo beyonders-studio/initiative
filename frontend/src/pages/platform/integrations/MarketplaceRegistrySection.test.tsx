@@ -111,25 +111,23 @@ describe("MarketplaceRegistrySection", () => {
     expect(screen.queryByRole("button", { name: "Upload bundle" })).toBeNull();
   });
 
-  it("names one skipped listing in the toast, with why", async () => {
-    refreshResult = refreshing([skip({ listing_name: "Demo" })]);
+  // One skipped listing is named in the toast with why; several are named together.
+  it.each([
+    [[skip({ listing_name: "Demo" })], `Demo was skipped. ${REUSED_TEXT}`],
+    [
+      [
+        skip({ listing_name: "Demo" }),
+        skip({ code: "MARKETPLACE_REGISTRY_TARGET_REJECTED", listing_name: "GitHub" }),
+      ],
+      "Skipped: Demo, GitHub. The status below says why.",
+    ],
+  ])("names what a refresh skipped in the toast (%#)", async (skipped, said) => {
+    refreshResult = refreshing(skipped);
     render();
 
     await userEvent.click(screen.getByRole("button", { name: "Refresh now" }));
 
-    expect(toast.warning).toHaveBeenCalledWith(`Demo was skipped. ${REUSED_TEXT}`);
-  });
-
-  it("names every skipped listing when there are several", async () => {
-    refreshResult = refreshing([
-      skip({ listing_name: "Demo" }),
-      skip({ code: "MARKETPLACE_REGISTRY_TARGET_REJECTED", listing_name: "GitHub" }),
-    ]);
-    render();
-
-    await userEvent.click(screen.getByRole("button", { name: "Refresh now" }));
-
-    expect(toast.warning).toHaveBeenCalledWith("Skipped: Demo, GitHub. The status below says why.");
+    expect(toast.warning).toHaveBeenCalledWith(said);
   });
 
   it("lists what the last update skipped and why, by name", async () => {

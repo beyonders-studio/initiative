@@ -7,18 +7,16 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   buildCommunity,
   buildInitiative,
-  buildInitiativeJoinRequest,
   buildInitiativeRole,
   buildPropertyDefinition,
   buildPropertyGroup,
   buildToolLayoutSet,
   buildToolPlugin,
-  buildUserSummary,
   initiativeCan,
   shelfDefinition,
   TOOL_PLUGIN_UID,
@@ -27,10 +25,6 @@ import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { InitiativeRead } from "@/api/generated/initiativeAPI.schemas";
-
-vi.mock("@/lib/mascotToast", () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
-}));
 
 import { DangerPage } from "./DangerPage";
 import { ExportPage } from "./ExportPage";
@@ -71,40 +65,11 @@ const renderSection = (
   });
 
 describe("initiative settings sections", () => {
-  it("serves the roster, and the queue feeding it, at /settings/members", async () => {
-    stubInitiative();
-    server.use(
-      communityHttp.get("/initiatives/:id/join-requests", () =>
-        HttpResponse.json([
-          buildInitiativeJoinRequest({
-            id: 11,
-            initiative_id: INITIATIVE_ID,
-            user: buildUserSummary({ id: 42, display_name: "Ada Lovelace" }),
-          }),
-        ])
-      )
-    );
-
-    renderSection(MembersPage, "members");
-
-    expect(await screen.findByText("Requests to join")).toBeInTheDocument();
-    expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
-    expect(screen.getByText("Members")).toBeInTheDocument();
-  });
-
-  it("serves role permissions at /settings/roles", async () => {
-    stubInitiative();
-
-    renderSection(RolesPage, "roles");
-
-    expect(await screen.findByText("Role permissions")).toBeInTheDocument();
-  });
-
   /**
    * Moderator holds every permission by construction, so its card says what the
    * role is instead of offering a set of switches with nothing to change.
    */
-  it("gives the moderator a card with no tool switches on /settings/roles", async () => {
+  it("serves role permissions at /settings/roles, the moderator's card with no tool switches", async () => {
     stubInitiative();
     server.use(
       communityHttp.get("/initiatives/:id/roles", () =>
@@ -129,6 +94,7 @@ describe("initiative settings sections", () => {
 
     renderSection(RolesPage, "roles");
 
+    expect(await screen.findByText("Role permissions")).toBeInTheDocument();
     expect(await screen.findByText("Moderator")).toBeInTheDocument();
     expect(screen.getByText("Full access")).toBeInTheDocument();
     expect(screen.getByText(/Moderators can use every tool/)).toBeInTheDocument();
