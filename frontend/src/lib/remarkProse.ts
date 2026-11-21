@@ -178,14 +178,23 @@ export function remarkFaces() {
         const text = quote.children?.[0]?.children?.[0];
         if (text?.type !== "text") continue;
         text.value = `>${text.value}`;
-        children.splice(i, 1, ...(quote.children ?? []));
+        // The face is the quote's first paragraph; what follows it is quoted.
+        const [faceLine, ...quoted] = quote.children ?? [];
+        const rest = quoted.length
+          ? [{ ...quote, children: quoted, position: quoted[0].position }]
+          : [];
+        children.splice(i, 1, faceLine, ...rest);
       }
 
+      // A face sits among a line's words, so only a parent holding some looks.
       const from = parent.position?.start.offset;
       const to = parent.position?.end.offset;
       if (from === undefined || to === undefined) return;
+      if (!children.some((child) => FORMATTING.has(child.type))) return;
+      const words = source.slice(from, to);
       for (const face of INLINE_FACES) {
-        for (let at = source.indexOf(face, from); at !== -1 && at < to; ) {
+        for (let found = words.indexOf(face); found !== -1; ) {
+          const at = from + found;
           const end = at + face.length;
           const hit = children.flatMap((child, index) => {
             const a = child.position?.start.offset;
@@ -194,18 +203,24 @@ export function remarkFaces() {
           });
           const first = children[hit[0]];
           const last = children[hit[hit.length - 1]];
-          // Only formatting is undone. A link or a paragraph looks at its own
-          // children, code holds the face as typed, and so may plain text.
+          // Formatting the face's characters made is undone. Bold that wraps a
+          // face, its markers outside it, keeps its bold and looks at its own
+          // children, as a link does. Code holds the face as typed, and so
+          // may plain text.
+          const wraps =
+            hit.length === 1 &&
+            (first.value?.includes(face) ||
+              (first.children !== undefined &&
+                (first.position?.start.offset ?? at) < at &&
+                (first.position?.end.offset ?? end) > end));
           const formatted =
-            hit.length > 0 &&
-            hit.every((index) => FORMATTING.has(children[index].type)) &&
-            !(hit.length === 1 && first.value?.includes(face));
+            hit.length > 0 && hit.every((index) => FORMATTING.has(children[index].type)) && !wraps;
           if (formatted && first.position && last.position) {
             const position = { start: first.position.start, end: last.position.end };
             const value = source.slice(position.start.offset, position.end.offset);
             children.splice(hit[0], hit.length, { type: "text", value, position });
           }
-          at = source.indexOf(face, end);
+          found = words.indexOf(face, found + face.length);
         }
       }
     });

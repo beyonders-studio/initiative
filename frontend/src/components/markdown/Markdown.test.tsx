@@ -193,11 +193,14 @@ describe("Markdown", () => {
 
   it("reads a face that starts with `>` as the face, and a quote as a quote", () => {
     const { container } = render(
-      <Markdown surface="message" content={">.> sorry\n\n>_<\n\n>quoted\n\n> also quoted"} />
+      <Markdown
+        surface="message"
+        content={">.> sorry\n\n>_<\n>\n> after a face\n\n>quoted\n\n> also quoted"}
+      />
     );
 
     const quotes = [...container.querySelectorAll("blockquote")].map((q) => q.textContent?.trim());
-    expect(quotes).toEqual(["quoted", "also quoted"]);
+    expect(quotes).toEqual(["after a face", "quoted", "also quoted"]);
     expect(screen.getByText(">.> sorry")).toBeInTheDocument();
     expect(screen.getByText(">_<")).toBeInTheDocument();
   });
@@ -211,6 +214,7 @@ describe("Markdown", () => {
           "*_* and ~_~ and (*^_^*)",
           "(╯°□°)╯︵ ┻━┻",
           "[*_* link](https://example.com) `*_*`",
+          "**hello ~_~ [there](https://example.com)**",
         ].join("\n\n")}
       />
     );
@@ -221,9 +225,13 @@ describe("Markdown", () => {
       "*_* and ~_~ and (*^_^*)",
       "(╯°□°)╯︵ ┻━┻",
       "*_* link *_*",
+      "hello ~_~ there",
     ]);
     expect(container.querySelector("em")).toHaveTextContent("bold");
     expect(container.querySelectorAll("em, del")).toHaveLength(1);
+    // Bold around a face keeps its bold, and the link inside it.
+    expect(container.querySelector("strong")).toHaveTextContent("hello ~_~ there");
+    expect(screen.getByRole("link", { name: "there" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "*_* link" })).toBeInTheDocument();
     expect(container.querySelector("code")).toHaveTextContent("*_*");
   });
