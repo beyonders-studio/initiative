@@ -41,11 +41,23 @@ const serve = (...tickets: FiledTicketDetailRead[]) => {
       HttpResponse.json(tickets.find((one) => one.task_id === Number(params.taskId)))
     ),
     http.post("/api/v1/me/tickets/:taskId/replies", async ({ request }) => {
-      // Read as text: newer Node's multipart parser refuses jsdom's File.
-      const raw = await request.text();
+      // Split by hand: newer Node's multipart parser refuses jsdom's File.
+      const boundary = request.headers.get("content-type")?.split("boundary=")[1];
+      const parts = (await request.text())
+        .split(`--${boundary}`)
+        .slice(1, -1)
+        .map((part) => {
+          const end = part.indexOf("\r\n\r\n");
+          const head = part.slice(0, end);
+          return {
+            field: /name="([^"]*)"/.exec(head)?.[1],
+            filename: /filename="([^"]*)"/.exec(head)?.[1],
+            value: part.slice(end + 4, -2),
+          };
+        });
       replies.push({
-        body: raw.split('name="body"\r\n\r\n')[1]?.split("\r\n")[0],
-        files: [...raw.matchAll(/filename="([^"]+)"/g)].map(([, name]) => name),
+        body: parts.find((part) => part.field === "body")?.value,
+        files: parts.filter((part) => part.field === "files").map((part) => part.filename ?? ""),
       });
       return HttpResponse.json(tickets[0]);
     })
@@ -89,9 +101,11 @@ describe("TicketPage", () => {
     await user.upload(input, [photo, script]);
     expect(screen.getByRole("img", { name: "screen.png" })).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("run.sh");
-    await user.type(screen.getByRole("textbox"), "This one.");
+    await user.type(screen.getByRole("textbox"), "This one.{Enter}The second.");
     await user.click(screen.getByRole("button", { name: "Send reply" }));
-    await waitFor(() => expect(replies).toEqual([{ body: "This one.", files: ["screen.png"] }]));
+    await waitFor(() =>
+      expect(replies).toEqual([{ body: "This one.\r\nThe second.", files: ["screen.png"] }])
+    );
   });
 
   it("starts another ticket's page without the last one's draft", async () => {
