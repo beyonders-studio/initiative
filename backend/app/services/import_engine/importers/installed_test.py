@@ -67,10 +67,14 @@ async def _import(client: Any, actor: Any, envelope: Any, initiative_id: int) ->
     )
 
 
-async def test_a_tool_plugins_row_round_trips_into_another_initiative(
+async def test_a_tool_plugins_row_round_trips_where_it_can_be_made(
     client, session, acting_user
 ):
-    a, _seat, _install, target = await _counters(client, session, acting_user)
+    """A group exported with its counters, fields, tags, property values,
+    links and layouts comes back in another initiative the tool is placed
+    in. The envelope is refused where the tool is not installed, not placed,
+    or not the importer's to create."""
+    a, seat, install, target = await _counters(client, session, acting_user)
 
     async def call(method: str, path: str, body: Any) -> Any:
         response = await client.request(method, a.g(path), headers=a.headers, json=body)
@@ -216,23 +220,6 @@ async def test_a_tool_plugins_row_round_trips_into_another_initiative(
         {"columns": ["name", "count"]},
     )
 
-
-async def test_a_tool_plugins_envelope_is_refused_where_it_cannot_be_made(
-    client, session, acting_user
-):
-    a, seat, install, target = await _counters(client, session, acting_user)
-    group = await client.post(
-        a.g(f"/plugin-tools/{GROUP}/"),
-        headers=a.headers,
-        json={"initiative_id": a.initiative.id, "name": "Party"},
-    )
-    response = await client.get(
-        a.g(f"/exports/{GROUP}"),
-        headers=a.headers,
-        params={"ids": [group.json()["id"]], "format": "json"},
-    )
-    envelope = response.json()
-
     async def refusal(actor: Any, body: Any, initiative_id: int) -> tuple:
         response = await _import(client, actor, body, initiative_id)
         return response.status_code, response.json()["detail"]
@@ -327,23 +314,45 @@ def _group_entry(job: dict[str, Any]) -> dict[str, Any]:
 async def test_a_restore_places_a_tool_plugin_in_the_initiative_it_makes(
     client, session, acting_user, monkeypatch, role_session
 ):
-    """The Counters group is written in the initiative the restore made, its
-    install placed there, and its reference to the project restored after it
-    names that project, with the edge its text makes."""
+    """Where the restorer may not place the tool, the Counters group is left
+    out and the install stays where it was. Where they may, the group is
+    written in the initiative the restore made, its install placed there, and
+    its reference to the project restored after it names that project, with
+    the edge its text makes."""
     from app.models.tenant.project import Project
 
     seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
     install = await install_tool_plugin(
         client, session, seat, placements=[seat.initiative.id]
     )
+    path = seat.g(f"/plugins/{install['id']}")
 
+    async def surface(plugins: bool) -> None:
+        await rules.put(
+            session,
+            SURFACE_PLUGINS,
+            plugins,
+            guild_id=seat.guild.id,
+            set_by=SetBy.deployment,
+        )
+        await session.commit()
+
+    await surface(False)
     job = await _restore(client, seat, monkeypatch, role_session)
-    made, _later = job["result"]["initiatives"]
+    entry = _group_entry(job)
+    assert (entry["status"], entry["error"]) == (
+        "skipped",
+        ImportEngineMessages.IMPORT_TOOL_NOT_PLACED,
+    )
+    response = await client.get(path, headers=seat.headers)
+    assert response.json()["placed_initiative_ids"] == [seat.initiative.id]
+
+    await surface(True)
+    job = await _restore(client, seat, monkeypatch, role_session)
+    made, later = job["result"]["initiatives"]
     assert _group_entry(job)["status"] == "created", job["result"]["entries"]
 
-    response = await client.get(
-        seat.g(f"/plugins/{install['id']}"), headers=seat.headers
-    )
+    response = await client.get(path, headers=seat.headers)
     assert response.json()["placed_initiative_ids"] == sorted(
         [seat.initiative.id, made["initiative_id"]]
     )
@@ -359,7 +368,12 @@ async def test_a_restore_places_a_tool_plugin_in_the_initiative_it_makes(
     ).all()
     assert group.name == "Party"
     project = (
-        await session.exec(sa.select(Project).where(Project.name == "Imported Board"))
+        await session.exec(
+            sa.select(Project).where(
+                Project.name == "Imported Board",
+                Project.initiative_id == later["initiative_id"],
+            )
+        )
     ).scalar_one()
     assert group.description == f"See #project[Imported Board]({project.id})"
     edge = (
@@ -373,30 +387,6 @@ async def test_a_restore_places_a_tool_plugin_in_the_initiative_it_makes(
         )
     ).scalar_one()
     assert edge.target_id == project.id
-
-
-async def test_a_restore_leaves_out_a_tool_plugin_it_may_not_place(
-    client, session, acting_user, monkeypatch, role_session
-):
-    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
-    install = await install_tool_plugin(
-        client, session, seat, placements=[seat.initiative.id]
-    )
-    await rules.put(
-        session, SURFACE_PLUGINS, False, guild_id=seat.guild.id, set_by=SetBy.deployment
-    )
-    await session.commit()
-
-    job = await _restore(client, seat, monkeypatch, role_session)
-    entry = _group_entry(job)
-    assert (entry["status"], entry["error"]) == (
-        "skipped",
-        ImportEngineMessages.IMPORT_TOOL_NOT_PLACED,
-    )
-    response = await client.get(
-        seat.g(f"/plugins/{install['id']}"), headers=seat.headers
-    )
-    assert response.json()["placed_initiative_ids"] == [seat.initiative.id]
 
 
 async def test_a_person_a_tool_plugins_property_names_is_let_in(

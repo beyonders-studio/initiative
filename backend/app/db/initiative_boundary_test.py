@@ -106,8 +106,6 @@ from app.testing import (
     route_session_to_guild,
 )
 
-pytestmark = pytest.mark.always
-
 #: insufficient_privilege: a missing grant, and a row a policy refuses.
 _REFUSED = "42501"
 
@@ -748,6 +746,7 @@ async def _tools_on(
     assert expected <= set(context.enabled_tools)
 
 
+@pytest.mark.always
 @pytest.mark.parametrize("converted", [False, True], ids=["installed", "converted"])
 async def test_nobody_outside_an_initiative_reaches_its_rows(
     converted: bool,
@@ -1241,8 +1240,8 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
 class _PluginInA:
     """A community with initiatives A and B and the test Counters installed by
     its seat: A's admin and a moderator of each, a member of no initiative,
-    and, where seeded, a counter group and a counter in A, made by A's
-    moderator and shared by name with B's moderator and the outsider."""
+    and a counter group and a counter in A, made by A's moderator and shared
+    by name with each of the three."""
 
     admin: Actor
     initiative_b: Any
@@ -1253,7 +1252,7 @@ class _PluginInA:
     install: dict[str, Any]
     tools: ToolSet
     #: The item row as the seeder made it, and the tool's row and the item by
-    #: kind; empty where not seeded.
+    #: kind.
     item_row: dict[str, Any]
     rows: dict[str, int]
 
@@ -1271,82 +1270,83 @@ class _PluginInA:
         return kind
 
 
-@pytest.fixture
-def plugin_in_a(
+async def test_a_tool_plugins_rows_stay_in_their_initiative_on_every_route(
     session: AsyncSession,
     acting_user: Callable[..., Awaitable[Actor]],
-    client: AsyncClient,
-) -> Callable[..., Awaitable[_PluginInA]]:
-    """Sets up :class:`_PluginInA`: seeded unless ``seeded`` is false, the
-    rows shared with A's moderator too where ``shared_with_a``. Committed."""
-
-    async def make(*, seeded: bool = True, shared_with_a: bool = False) -> _PluginInA:
-        admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-        guild = admin.guild
-        initiative_b = await create_initiative(session, guild, admin.user)
-        moderator_a = await acting_user(
-            guild=guild, initiative=admin.initiative, initiative_role="moderator"
-        )
-        moderator_b = await acting_user(
-            guild=guild, initiative=initiative_b, initiative_role="moderator"
-        )
-        outsider = await acting_user(guild=guild)
-        await session.commit()
-        seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
-        install = await install_tool_plugin(client, session, seat)
-        tools = await provisioned_tools(guild.id)
-        tool = tools.installed[0]
-        item_row: dict[str, Any] = {}
-        rows: dict[str, int] = {}
-        if seeded:
-            await route_session_to_guild(session, guild.id)
-            seeder = _Seeder(
-                session,
-                await _Catalog.read(session),
-                admin.initiative.id,
-                grantor=moderator_a.user.id,
-                grantees=(
-                    *((moderator_a.user.id,) if shared_with_a else ()),
-                    moderator_b.user.id,
-                    outsider.user.id,
-                ),
-                tools=tools,
-            )
-            item_row = await seeder.make(tool.items[0].name, moderator_a.user.id)
-            (item_kind,) = (child.value for child in tool.children)
-            rows = {
-                tool.kind: item_row[f"{tool.kind.split('.')[0]}_id"],
-                item_kind: item_row["id"],
-            }
-            await session.commit()
-        return _PluginInA(
-            admin,
-            initiative_b,
-            moderator_a,
-            moderator_b,
-            outsider,
-            seat,
-            install,
-            tools,
-            item_row,
-            rows,
-        )
-
-    return make
-
-
-async def test_the_universal_routes_keep_a_tool_plugins_rows_in_their_initiative(
     reading_as: Callable[[int, int], Awaitable[AsyncSession]],
     client: AsyncClient,
-    plugin_in_a: Callable[..., Awaitable[_PluginInA]],
+) -> None:
+    """Sets up :class:`_PluginInA` once, its rows shared with A's moderator
+    too, and takes it through each surface in turn, in an order where each
+    leaves what the next reads as that one expects it: the universal routes,
+    references, exports and counts, tags and links, notices and marks, the
+    tool plug-in routes, and last sharing, holds and responses, which leave
+    the plug-in read only."""
+    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    guild = admin.guild
+    initiative_b = await create_initiative(session, guild, admin.user)
+    moderator_a = await acting_user(
+        guild=guild, initiative=admin.initiative, initiative_role="moderator"
+    )
+    moderator_b = await acting_user(
+        guild=guild, initiative=initiative_b, initiative_role="moderator"
+    )
+    outsider = await acting_user(guild=guild)
+    await session.commit()
+    seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
+    install = await install_tool_plugin(client, session, seat)
+    tools = await provisioned_tools(guild.id)
+    tool = tools.installed[0]
+    await route_session_to_guild(session, guild.id)
+    seeder = _Seeder(
+        session,
+        await _Catalog.read(session),
+        admin.initiative.id,
+        grantor=moderator_a.user.id,
+        # Shared with A's moderator too, as a count counts what is shared
+        # with its reader.
+        grantees=(moderator_a.user.id, moderator_b.user.id, outsider.user.id),
+        tools=tools,
+    )
+    item_row = await seeder.make(tool.items[0].name, moderator_a.user.id)
+    (item_kind,) = (child.value for child in tool.children)
+    rows = {
+        tool.kind: item_row[f"{tool.kind.split('.')[0]}_id"],
+        item_kind: item_row["id"],
+    }
+    await session.commit()
+    a = _PluginInA(
+        admin,
+        initiative_b,
+        moderator_a,
+        moderator_b,
+        outsider,
+        seat,
+        install,
+        tools,
+        item_row,
+        rows,
+    )
+
+    await _universal_routes(a, reading_as, client)
+    await _references(a, session, client)
+    await _exports_and_counts(a, client)
+    await _tags_and_links(a, session, client)
+    await _notices_and_marks(a, session, acting_user, client)
+    await _tool_plugin_routes(a, reading_as, client)
+    await _sharing_holds_and_responses(a, session, reading_as, client)
+
+
+async def _universal_routes(
+    a: _PluginInA,
+    reading_as: Callable[[int, int], Awaitable[AsyncSession]],
+    client: AsyncClient,
 ) -> None:
     """A tool plug-in's row and its item, in initiative A and shared by name
     with a moderator of B and a member of no initiative, are archived,
     commented on, found and taken out of the trash through the universal
     routes by A's moderator, and by neither of the others."""
     from app.services.tenant.soft_delete import trash
-
-    a = await plugin_in_a()
 
     for actor in (a.moderator_b, a.outsider):
         for kind, row_id in a.rows.items():
@@ -1429,10 +1429,10 @@ async def test_the_universal_routes_keep_a_tool_plugins_rows_in_their_initiative
     assert response.status_code == 200, response.text
 
 
-async def test_the_tool_plugin_routes_keep_its_rows_in_their_initiative(
+async def _tool_plugin_routes(
+    a: _PluginInA,
     reading_as: Callable[[int, int], Awaitable[AsyncSession]],
     client: AsyncClient,
-    plugin_in_a: Callable[..., Awaitable[_PluginInA]],
 ) -> None:
     """A tool plug-in's row and its item, in initiative A and shared by name
     with a moderator of B and a member of no initiative, are read, listed,
@@ -1442,7 +1442,6 @@ async def test_the_tool_plugin_routes_keep_its_rows_in_their_initiative(
     them, is answered 404."""
     from app.api.content_socket import tool_authorizer
 
-    a = await plugin_in_a()
     tool_id = a.rows[a.tool.kind]
 
     def addressed(kind: str, row_id: int) -> list[tuple[str, str, Any]]:
@@ -1528,16 +1527,15 @@ async def test_the_tool_plugin_routes_keep_its_rows_in_their_initiative(
     await watching.rollback()
 
 
-async def test_tags_and_links_keep_a_tool_plugins_rows_in_their_initiative(
+async def _tags_and_links(
+    a: _PluginInA,
     session: AsyncSession,
     client: AsyncClient,
-    plugin_in_a: Callable[..., Awaitable[_PluginInA]],
 ) -> None:
     """A tool plug-in's row and its item, in initiative A and shared by name
     with a moderator of B and a member of no initiative, are tagged, linked
     and have their tags and links listed by A's moderator, and by neither of
     the others. A kind the community does not have is not found."""
-    a = await plugin_in_a()
     tag = await create_tag(session, a.guild)
     await session.commit()
     link = {
@@ -1665,10 +1663,10 @@ async def test_tags_and_links_keep_a_tool_plugins_rows_in_their_initiative(
         assert response.status_code == 404, response.text
 
 
-async def test_references_keep_a_tool_plugins_rows_in_their_initiative(
+async def _references(
+    a: _PluginInA,
     session: AsyncSession,
     client: AsyncClient,
-    plugin_in_a: Callable[..., Awaitable[_PluginInA]],
 ) -> None:
     """A reference to a tool plug-in's row or its item in initiative A, shared
     by name with a moderator of B and a member of no initiative, resolves to
@@ -1678,7 +1676,6 @@ async def test_references_keep_a_tool_plugins_rows_in_their_initiative(
     from app.models.tenant.relationship import EntityRelationship
     from app.services.tenant.relationships import Endpoint
 
-    a = await plugin_in_a()
     refs = [f"{kind}:{row_id}" for kind, row_id in a.rows.items()]
     written = " ".join(
         f"#{kind.replace('_', '-')}[It]({row_id})" for kind, row_id in a.rows.items()
@@ -1730,9 +1727,9 @@ async def test_references_keep_a_tool_plugins_rows_in_their_initiative(
     assert await recorded(task_a.id) == set(a.rows.items())
 
 
-async def test_exports_and_counts_keep_a_tool_plugins_rows_in_their_initiative(
+async def _exports_and_counts(
+    a: _PluginInA,
     client: AsyncClient,
-    plugin_in_a: Callable[..., Awaitable[_PluginInA]],
 ) -> None:
     """A tool plug-in's row and its item in initiative A, shared by name with
     its moderator, a moderator of B and a member of no initiative, are
@@ -1741,9 +1738,6 @@ async def test_exports_and_counts_keep_a_tool_plugins_rows_in_their_initiative(
     backups and statements hold none of it. Its export is imported into A by
     A's moderator once the tool is placed there, and into an initiative the
     importer is not in by nobody."""
-    # Shared with A's moderator too, as a count counts what is shared with
-    # its reader.
-    a = await plugin_in_a(shared_with_a=True)
     item_row, tool_id = a.item_row, a.rows[a.tool.kind]
     in_a, in_b = a.admin.initiative.id, a.initiative_b.id
     # The dashboard dataset of the tool's items, named by its table.
@@ -1868,11 +1862,11 @@ async def test_exports_and_counts_keep_a_tool_plugins_rows_in_their_initiative(
     assert (await restore(a.moderator_a, in_a))[0] == 201
 
 
-async def test_sharing_holds_and_responses_keep_a_tool_plugins_rows_in_their_initiative(
+async def _sharing_holds_and_responses(
+    a: _PluginInA,
     session: AsyncSession,
     reading_as: Callable[[int, int], Awaitable[AsyncSession]],
     client: AsyncClient,
-    plugin_in_a: Callable[..., Awaitable[_PluginInA]],
 ) -> None:
     """A tool plug-in's row in initiative A, shared by name with a moderator
     of B and a member of no initiative, is shared, held and taken out of the
@@ -1881,7 +1875,6 @@ async def test_sharing_holds_and_responses_keep_a_tool_plugins_rows_in_their_ini
     and links nothing more on them."""
     from app.services.tenant.soft_delete import trash
 
-    a = await plugin_in_a(seeded=False)
     mine = await reading_as(a.moderator_a.user.id, a.guild.id)
     rows: dict[str, int] = dict(
         zip(
@@ -2048,11 +2041,11 @@ async def test_sharing_holds_and_responses_keep_a_tool_plugins_rows_in_their_ini
         await linking.rollback()
 
 
-async def test_notices_and_marks_keep_a_tool_plugins_rows_in_their_initiative(
+async def _notices_and_marks(
+    a: _PluginInA,
     session: AsyncSession,
     acting_user: Callable[..., Awaitable[Actor]],
     client: AsyncClient,
-    plugin_in_a: Callable[..., Awaitable[_PluginInA]],
 ) -> None:
     """A reply, an @mention and a subscription on a tool plug-in's item in
     initiative A tell only people who can open it, and its line names it: a
@@ -2061,7 +2054,6 @@ async def test_notices_and_marks_keep_a_tool_plugins_rows_in_their_initiative(
     and its tool. Neither of them views, bookmarks or subscribes to A's rows
     or sets a property on them, which A's moderators do; a kind the community
     lacks is not found."""
-    a = await plugin_in_a()
     mentioned_a, subscriber_a = [
         await acting_user(
             guild=a.guild,

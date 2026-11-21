@@ -335,6 +335,7 @@ class TestVersions:
         so a version saved before it is not "different content"."""
         listing = await service.upsert_listing(session, _manifest(), source="builtin")
         stored = await service.get_listing_version(session, listing.latest_version_id)
+        assert stored is not None
         definition = dict(stored.definition)
         assert definition.pop("properties") == []
         stored.definition = definition

@@ -203,11 +203,13 @@ async def test_a_plain_name_begins_a_ceremony_naming_this_deployment(
 
     async def challenges() -> list[AuthChallenge]:
         session.expire_all()
-        return (
-            await session.exec(
-                select(AuthChallenge).where(AuthChallenge.user_id == user_id)
-            )
-        ).all()
+        return list(
+            (
+                await session.exec(
+                    select(AuthChallenge).where(AuthChallenge.user_id == user_id)
+                )
+            ).all()
+        )
 
     assert await challenges() == []
 

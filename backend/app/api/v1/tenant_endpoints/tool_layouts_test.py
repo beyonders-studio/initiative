@@ -1022,8 +1022,13 @@ async def test_a_tool_plugins_table_is_laid_out_as_its_plugin_declares(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
     """Its lists and its rows' page are the declared ones, drawn as shipped
-    until they are changed; a change names the table's own fields, is read
-    back as stored, and a reset draws it as shipped again."""
+    until they are changed; a change names the table's own fields and is held
+    to the declaration, is read back as stored, and a reset draws it as
+    shipped again. A row purged takes the layouts of its items with it."""
+    from app.db.plugin_tools import provisioned_tools
+    from app.db.tool_rows import ToolRow
+    from app.services.tenant.soft_delete import hard_purge_entities
+
     admin, _member, counters, _groups = await _counters_installed(
         client, session, acting_user
     )
@@ -1071,15 +1076,6 @@ async def test_a_tool_plugins_table_is_laid_out_as_its_plugin_declares(
     ).all()
     assert sorted(row.kind for row in stored) == ["grid"]
 
-
-async def test_a_tool_plugins_layout_is_held_to_its_declaration(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    admin, _member, counters, _groups = await _counters_installed(
-        client, session, acting_user
-    )
-    item = counters["tool"]
-
     for change in (
         # A field it does not declare.
         {"kind": item, "definition": {"main": [_field("title")]}},
@@ -1113,6 +1109,27 @@ async def test_a_tool_plugins_layout_is_held_to_its_declaration(
         )
         assert response.status_code == 400, (change, response.text)
         assert response.json()["detail"] == "TOOL_LAYOUTS_KIND_NOT_ALLOWED"
+
+    saved = await client.put(
+        admin.g("/layouts/"),
+        params=counters,
+        json={"kind": "table", "definition": {"columns": ["name"]}},
+        headers=admin.headers,
+    )
+    assert saved.status_code == 200, saved.text
+
+    tools = await provisioned_tools(admin.guild.id)
+    (tool,) = tools.installed
+    await route_session_to_guild(session, admin.guild.id)
+    await hard_purge_entities(
+        session, [ToolRow(tool.table, {"id": counters["tool_id"]})], tools=tools
+    )
+    await session.commit()
+
+    left = await session.exec(
+        select(ToolLayout).where(ToolLayout.tool == counters["tool"])
+    )
+    assert left.all() == []
 
 
 async def test_a_tool_plugins_own_rows_are_laid_out_by_the_initiatives_managers(
@@ -1156,35 +1173,3 @@ async def test_a_tool_plugins_own_rows_are_laid_out_by_the_initiatives_managers(
         )
         assert read.status_code in (403, 404), read.text
         assert written.status_code in (403, 404), written.text
-
-
-async def test_a_purged_row_takes_the_layouts_of_its_items(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    from app.db.plugin_tools import provisioned_tools
-    from app.db.tool_rows import ToolRow
-    from app.services.tenant.soft_delete import hard_purge_entities
-
-    admin, _member, counters, _groups = await _counters_installed(
-        client, session, acting_user
-    )
-    saved = await client.put(
-        admin.g("/layouts/"),
-        params=counters,
-        json={"kind": "table", "definition": {"columns": ["name"]}},
-        headers=admin.headers,
-    )
-    assert saved.status_code == 200, saved.text
-
-    tools = await provisioned_tools(admin.guild.id)
-    (tool,) = tools.installed
-    await route_session_to_guild(session, admin.guild.id)
-    await hard_purge_entities(
-        session, [ToolRow(tool.table, {"id": counters["tool_id"]})], tools=tools
-    )
-    await session.commit()
-
-    left = await session.exec(
-        select(ToolLayout).where(ToolLayout.tool == counters["tool"])
-    )
-    assert left.all() == []
