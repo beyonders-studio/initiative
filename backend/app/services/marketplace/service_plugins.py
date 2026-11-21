@@ -35,9 +35,10 @@ foothold in a guild is a legitimate install with nothing to render.
 
 from __future__ import annotations
 
+import math
 import re
 import string
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from app.core.currencies import CURRENCY_CODES
@@ -89,6 +90,8 @@ __all__ = [
     "TONES",
     "USE_PERMISSION",
     "WIDGET_BINDABLE_DIRECTIONS",
+    "bundled_dashboards",
+    "bundled_query_tile",
     "declared_permissions",
     "listing_terms",
     "members_hold",
@@ -434,6 +437,10 @@ MAX_BUNDLED_DASHBOARDS = contract.cap("bundledDashboards")
 MAX_DASHBOARD_WIDGETS = contract.cap("dashboardWidgets")
 MAX_DASHBOARD_GRID_COLUMNS = contract.cap("dashboardGridColumns")
 MAX_DASHBOARD_BINDING_PARAMS = contract.cap("dashboardBindingParams")
+MAX_DASHBOARD_WIDGET_OPTIONS = contract.cap("dashboardWidgetOptions")
+MAX_DASHBOARD_QUERY_LENGTH = contract.cap("dashboardQueryLength")
+#: A tool plug-in's tile reads its data with a query.
+QUERY_SOURCE = "query"
 #: How many values one binding parameter may fix, where the endpoint declared
 #: it takes several.
 MAX_BINDING_PARAM_VALUES = 64
@@ -2557,8 +2564,44 @@ def _widget(
     return cleaned
 
 
+def bundled_dashboards(
+    raw: Any,
+    tile: Callable[[Any, str], dict[str, Any]],
+    *,
+    plugin_public_id: str | None,
+    what: str,
+) -> list[dict[str, Any]]:
+    """The dashboards a plug-in ships with itself, each tile checked by
+    ``tile``: a service plug-in's name its widgets and endpoints, a tool
+    plug-in's are queries (:func:`bundled_query_tile`)."""
+    dashboards = [
+        _bundled_dashboard(entry, tile)
+        for entry in require_list(raw, f"{what}: dashboards", MAX_BUNDLED_DASHBOARDS)
+    ]
+    seen_uids: set[str] = set()
+    seen_public_ids: set[str] = set()
+    for dashboard in dashboards:
+        # Checked here as well as by the catalog: these become listing rows
+        # whose identities are unique, and a manifest that collides with
+        # itself would fail halfway through a publish.
+        if dashboard["uid"] in seen_uids:
+            fail(f"{what}: two dashboards share the uid {dashboard['uid']}")
+        if dashboard["public_id"] in seen_public_ids:
+            fail(
+                f"{what}: two dashboards share the public_id {dashboard['public_id']!r}"
+            )
+        if dashboard["public_id"] == plugin_public_id:
+            fail(
+                f"{what}: dashboard {dashboard['uid']} uses the plug-in's own "
+                "public_id; a bundled dashboard is its own listing"
+            )
+        seen_uids.add(dashboard["uid"])
+        seen_public_ids.add(dashboard["public_id"])
+    return dashboards
+
+
 def _bundled_dashboard(
-    raw: Any, *, widget_ids: set[str], readable_ids: set[str]
+    raw: Any, tile: Callable[[Any, str], dict[str, Any]]
 ) -> dict[str, Any]:
     """One dashboard a plug-in ships with itself.
 
@@ -2602,9 +2645,7 @@ def _bundled_dashboard(
     )
 
     widgets = [
-        _bundled_dashboard_widget(
-            widget, widget_ids=widget_ids, readable_ids=readable_ids, what=what
-        )
+        tile(widget, what)
         for widget in require_list(
             entry.get("widgets"), f"{what} widgets", MAX_DASHBOARD_WIDGETS
         )
@@ -2669,6 +2710,12 @@ def _bundled_dashboard_widget(
         "binding": bound,
     }
 
+    return {**cleaned, **_tile_placement(widget, what=what)}
+
+
+def _tile_placement(widget: Mapping[str, Any], *, what: str) -> dict[str, Any]:
+    """A tile's title and where it sits on the grid, as far as it says."""
+    placed: dict[str, Any] = {}
     title = clean_text(
         widget.get("title"),
         what=f"{what} widget title",
@@ -2676,11 +2723,11 @@ def _bundled_dashboard_widget(
         required=False,
     )
     if title is not None:
-        cleaned["title"] = title
+        placed["title"] = title
 
     grid = widget.get("grid")
     if isinstance(grid, dict):
-        placed = {
+        cells = {
             key: _grid_int(
                 grid.get(key),
                 low=0 if key in ("x", "y") else 1,
@@ -2689,9 +2736,66 @@ def _bundled_dashboard_widget(
             )
             for key in ("x", "y", "w", "h")
         }
-        kept = {key: value for key, value in placed.items() if value is not None}
+        kept = {key: value for key, value in cells.items() if value is not None}
         if kept:
-            cleaned["grid"] = kept
+            placed["grid"] = kept
+    return placed
+
+
+def bundled_query_tile(raw: Any, what: str) -> dict[str, Any]:
+    """One tile of a tool plug-in's dashboard: a built-in widget drawing a
+    query. Which widget and which tables the query reads are checked where
+    the plug-in's uid names its tables (``tool_plugins.check_dashboards``);
+    here, that it is a query and nothing else."""
+    widget = require_mapping(raw, f"{what} widget")
+    widget_type = check_identifier(widget.get("type"), what=f"{what} widget type")
+    binding = require_mapping(widget.get("binding"), f"{what} widget binding")
+    sql = binding.get("sql")
+    if set(binding) != {"source", "sql"} or binding.get("source") != QUERY_SOURCE:
+        fail(
+            f"{what}: a tool plug-in has no endpoints, so its tile's binding is "
+            "{'source': 'query', 'sql': ...}"
+        )
+    if not isinstance(sql, str) or not sql.strip():
+        fail(f"{what}: a tile's query is required")
+    if len(sql) > MAX_DASHBOARD_QUERY_LENGTH:
+        fail(
+            f"{what}: a tile's query is at most {MAX_DASHBOARD_QUERY_LENGTH} characters"
+        )
+
+    cleaned: dict[str, Any] = {
+        "id": check_identifier(
+            widget.get("id") or widget_type, what=f"{what} widget id"
+        ),
+        "type": widget_type,
+        **_tile_placement(widget, what=what),
+    }
+    options = widget.get("options")
+    if options is not None:
+        cleaned["options"] = _tile_options(options, what=what)
+    cleaned["binding"] = {"source": QUERY_SOURCE, "sql": sql}
+    return cleaned
+
+
+def _tile_options(raw: Any, *, what: str) -> dict[str, Any]:
+    """A built-in widget's options, each a string, number or boolean. The
+    widget's own check, which knows its options, runs when the dashboard is
+    published."""
+    options = require_mapping(raw, f"{what} widget options")
+    if len(options) > MAX_DASHBOARD_WIDGET_OPTIONS:
+        fail(f"{what}: a tile carries at most {MAX_DASHBOARD_WIDGET_OPTIONS} options")
+    cleaned: dict[str, Any] = {}
+    for key, value in options.items():
+        name = check_identifier(key, what=f"{what} widget option")
+        if isinstance(value, str):
+            value = clean_text(
+                value, what=f"{what} widget option {name}", limit=MAX_PARAM_VALUE_LENGTH
+            )
+        elif not isinstance(value, (bool, int, float)) or (
+            isinstance(value, float) and not math.isfinite(value)
+        ):
+            fail(f"{what}: option {name!r} must be a string, number or boolean")
+        cleaned[name] = value
     return cleaned
 
 
@@ -3861,37 +3965,15 @@ def normalize_service_plugin_definition(
     # After the widgets and endpoints it can name, because every tile is checked
     # against them — the whole point of bundling rather than publishing
     # separately is that this cross-check is possible at all.
-    dashboards = [
-        _bundled_dashboard(entry, widget_ids=widget_ids, readable_ids=readable_ids)
-        for entry in require_list(
-            body.get("dashboards"),
-            "service plug-in: dashboards",
-            MAX_BUNDLED_DASHBOARDS,
-        )
-    ]
+    dashboards = bundled_dashboards(
+        body.get("dashboards"),
+        lambda widget, what: _bundled_dashboard_widget(
+            widget, widget_ids=widget_ids, readable_ids=readable_ids, what=what
+        ),
+        plugin_public_id=plugin_public_id,
+        what="service plug-in",
+    )
     if dashboards:
-        seen_uids: set[str] = set()
-        seen_public_ids: set[str] = set()
-        for dashboard in dashboards:
-            # Checked here as well as by the catalog: these become listing rows
-            # whose identities are unique, and a manifest that collides with
-            # itself would fail halfway through a publish.
-            if dashboard["uid"] in seen_uids:
-                fail(
-                    f"service plug-in: two dashboards share the uid {dashboard['uid']}"
-                )
-            if dashboard["public_id"] in seen_public_ids:
-                fail(
-                    "service plug-in: two dashboards share the public_id "
-                    f"{dashboard['public_id']!r}"
-                )
-            if dashboard["public_id"] == plugin_public_id:
-                fail(
-                    f"service plug-in: dashboard {dashboard['uid']} uses the plug-in's own "
-                    "public_id; a bundled dashboard is its own listing"
-                )
-            seen_uids.add(dashboard["uid"])
-            seen_public_ids.add(dashboard["public_id"])
         cleaned["dashboards"] = dashboards
 
     # After the endpoints, because it names one of them. A summary is a read:

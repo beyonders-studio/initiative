@@ -182,6 +182,8 @@ The menu is only there for people who can change the thing.
 
 It lives by the same rules as everything else in the initiative. Its things can carry comments and links, turn up in the community's search, can be charted on a [dashboard](dashboards.md), and go into a backup of the initiative or the whole community. A plug-in can also say when one of its things counts as finished, so a task [blocked by one](mentions-and-links.md#see-whats-blocking-a-task) waits until it is: a task blocked by a counter waits until the count reaches its max.
 
+A plug-in's tool can also bring ready-made dashboards over its own things. Once the community has the plug-in, they're in the marketplace for each initiative to [add like any other](#adding-a-dashboard). Counters brings the **Counter board**: one counter as the headline, its progress toward the goal, and the rest of its group charted alongside. Like any dashboard, it shows each person only what they could already see.
+
 ## Report a listing or a plug-in
 
 Something in a plug-in or listing that shouldn't be there? Tell whoever runs your server.

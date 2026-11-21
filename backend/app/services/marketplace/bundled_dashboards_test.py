@@ -15,6 +15,8 @@ as installable in the next.
 import pytest
 from sqlmodel import select
 
+from app.core.tools import Tool
+from app.models.platform.guild import CommunityRole
 from app.models.platform.marketplace import MarketplaceListing
 from app.services.marketplace import catalog as service
 from app.services.marketplace.catalog import CatalogError
@@ -22,7 +24,14 @@ from app.services.marketplace.installs import (
     ListingInstallError,
     resolve_listing_install,
 )
-from app.testing import create_guild, create_guild_plugin, create_user
+from app.testing import (
+    COUNTERS_UID,
+    counters_tool_manifest,
+    create_guild,
+    create_guild_plugin,
+    create_user,
+    switch_tools,
+)
 from app.testing.schema_harness import route_session_to_guild
 
 PLUGIN_UID = "TYG4VVZKAWRMBZ"
@@ -450,3 +459,175 @@ class TestWhoMayInstallOne:
             await resolve_listing_install(session, DASH_UID, kind="dashboard")
         assert caught.value.code == "MARKETPLACE_LISTING_NEEDS_PLUGIN"
         assert caught.value.status_code == 409
+
+
+# ---------------------------------------------------------------------------
+# A tool plug-in's dashboards: built-in widgets over its own tables
+# ---------------------------------------------------------------------------
+
+BOARD_UID = "8V57MMR212TEY5"
+GROUP = "counter_group.tsjvtcm0s7gv2x"
+COUNTER = "counter.tsjvtcm0s7gv2x"
+#: Counters' counter table, the one its board reads.
+COUNTERS_TABLE = "p_tsjvtcm0s7gv2x_counter"
+
+
+def _board(
+    sql: str = f"SELECT name, count FROM {COUNTERS_TABLE} ORDER BY name", **binding
+):
+    return {
+        "uid": BOARD_UID,
+        "public_id": "tests.counter-board",
+        "name": "Counter board",
+        "layout": {"columns": 12},
+        "widgets": [
+            {
+                "id": "w1",
+                "type": "chart",
+                "title": "The whole group",
+                "grid": {"x": 0, "y": 0, "w": 12, "h": 4},
+                "options": {"mark": "bar"},
+                "binding": binding or {"source": "query", "sql": sql},
+            }
+        ],
+    }
+
+
+def _counters_manifest(board):
+    return {
+        "uid": COUNTERS_UID,
+        "public_id": "tests.counters",
+        "kind": "plugin",
+        "name": "Counters",
+        "publisher": "Tests",
+        "description": "Numbers that move.",
+        "version": "1.1.0",
+        "definition": {
+            **counters_tool_manifest(),
+            "features": ["dashboards", "tool"],
+            "dashboards": [board],
+        },
+    }
+
+
+class TestAToolPluginsDashboards:
+    async def test_its_tiles_are_published_as_the_queries_they_are(self, session):
+        await service.upsert_listing(
+            session, _counters_manifest(_board()), source="operator"
+        )
+        await session.commit()
+
+        board = await _by_uid(session, BOARD_UID)
+        assert board is not None and board.bundled_with_uid == COUNTERS_UID
+        version = await service.get_listing_version(session, board.latest_version_id)
+        (widget,) = version.definition["definition"]["widgets"]
+        assert widget["type"] == "chart"
+        assert widget["options"] == {"mark": "bar"}
+        assert widget["binding"] == {
+            "source": "query",
+            "sql": f"SELECT name, count FROM {COUNTERS_TABLE} ORDER BY name",
+        }
+
+        # Published again unchanged, it is the same version.
+        await service.upsert_listing(
+            session, _counters_manifest(_board()), source="operator"
+        )
+
+    @pytest.mark.parametrize(
+        "sql",
+        [
+            "SELECT title FROM tasks",
+            f"SELECT c.name FROM {COUNTERS_TABLE} c JOIN projects p ON p.id = c.id",
+            "SELECT 1 AS n FROM members",
+        ],
+    )
+    async def test_a_query_naming_another_table_is_refused(self, session, sql):
+        with pytest.raises(CatalogError, match="reads only its own tables"):
+            await service.upsert_listing(
+                session, _counters_manifest(_board(sql)), source="operator"
+            )
+        assert await _by_uid(session, COUNTERS_UID) is None
+        assert await _by_uid(session, BOARD_UID) is None
+
+    async def test_an_endpoint_binding_is_refused(self, session):
+        board = _board(endpoint_id="plugin.tests.counters.read")
+        with pytest.raises(CatalogError, match="has no endpoints"):
+            await service.upsert_listing(
+                session, _counters_manifest(board), source="operator"
+            )
+        assert await _by_uid(session, COUNTERS_UID) is None
+
+    async def test_a_viewer_sees_only_the_counters_they_may_read(
+        self, client, session, acting_user
+    ):
+        """The board runs as whoever opens it: a counter in a group the
+        viewer may not read is not on it."""
+        member = await acting_user(guild_role=CommunityRole.member, initiative=True)
+        manager = await acting_user(
+            guild=member.guild,
+            guild_role=CommunityRole.admin,
+            initiative=member.initiative,
+        )
+        seat = await acting_user(
+            guild=member.guild, guild_role=CommunityRole.superadmin
+        )
+        await switch_tools(session, member.initiative, {Tool.dashboard: True})
+        await service.upsert_listing(
+            session, _counters_manifest(_board()), source="operator"
+        )
+        await session.commit()
+        installed = await client.post(
+            seat.g("/plugins/"),
+            headers=seat.headers,
+            json={"listing_uid": COUNTERS_UID, "placements": "all"},
+        )
+        assert installed.status_code == 201, installed.text
+
+        async def counter(actor, group_name: str, name: str) -> int:
+            group = await client.post(
+                actor.g(f"/plugin-tools/{GROUP}/"),
+                headers=actor.headers,
+                json={"initiative_id": member.initiative.id, "name": group_name},
+            )
+            assert group.status_code == 201, group.text
+            made = await client.post(
+                actor.g(f"/plugin-tools/{COUNTER}/"),
+                headers=actor.headers,
+                json={"parent_id": group.json()["id"], "name": name},
+            )
+            assert made.status_code == 201, made.text
+            return group.json()["id"]
+
+        await counter(member, "Mine", "Laps")
+        theirs = await counter(manager, "Theirs", "Secret")
+        # Kept to its owner: the initiative's members no longer read it.
+        kept = await client.put(
+            manager.g("/resource-grants/bulk"),
+            headers=manager.headers,
+            json={
+                "items": [{"resource_type": GROUP, "resource_id": theirs, "grants": []}]
+            },
+        )
+        assert kept.status_code == 200, kept.text
+        hidden = await client.get(
+            member.g(f"/plugin-tools/{GROUP}/{theirs}"), headers=member.headers
+        )
+        assert hidden.status_code == 404, hidden.text
+
+        added = await client.post(
+            member.g(f"/marketplace/listings/by-uid/{BOARD_UID}/install"),
+            json={"initiative_id": member.initiative.id, "start_from": "blank"},
+            headers=member.headers,
+        )
+        assert added.status_code == 201, added.text
+        dashboard_id = added.json()["result"]["entity_id"]
+
+        async def board_rows(actor) -> list:
+            data = await client.get(
+                actor.g(f"/dashboards/{dashboard_id}/data"), headers=actor.headers
+            )
+            assert data.status_code == 200, data.text
+            return data.json()["widgets"]["w1"]["result"]["rows"]
+
+        assert [row[0] for row in await board_rows(member)] == ["Laps"]
+        assert [row[0] for row in await board_rows(manager)] == ["Laps", "Secret"]

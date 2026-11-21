@@ -424,7 +424,24 @@ def maximal_tool_manifest() -> dict:
     gives the other conditions)."""
     return {
         "plugin_kind": "tool",
-        "features": ["tool"],
+        "features": ["dashboards", "tool"],
+        "dashboards": [
+            {
+                "uid": "8V57MMR212TEY5",
+                "public_id": "acme.tally-board",
+                "name": "Tally board",
+                "widgets": [
+                    {
+                        "id": "all",
+                        "type": "chart",
+                        "title": "Every tally",
+                        "grid": {"x": 0, "y": 0, "w": 12, "h": 4},
+                        "options": {"mark": "bar"},
+                        "binding": {"source": "query", "sql": "SELECT 1"},
+                    }
+                ],
+            }
+        ],
         "default_name": "Tallies",
         "minimum_age": {"default": 13},
         "min_plugin_api": "4.2",
@@ -1065,7 +1082,12 @@ def _nodes(published: dict, declarative: dict, tool: dict) -> list[tuple[str, di
         ("widget", widget),
         ("page", published["pages"][0]),
         ("bundledDashboard", dashboard),
-        ("bundledDashboardWidget", dashboard["widgets"][0]),
+        # A service plug-in's tile names an endpoint, a tool plug-in's is a
+        # built-in widget with options, drawing a query.
+        (
+            "bundledDashboardWidget",
+            {**dashboard["widgets"][0], **tool["dashboards"][0]["widgets"][0]},
+        ),
         # `requires` names one operator at a time, so the two are covered from
         # the two places that use them.
         ("requires", {**read["requires"], **widget["requires"]}),

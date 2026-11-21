@@ -28,7 +28,6 @@ from app.testing import (
     create_project,
     create_relationship,
     create_task,
-    install_tool_plugin,
 )
 
 
@@ -398,7 +397,6 @@ class TestEveryShippedDashboardDrawsItsShape:
         self, client, session, acting_user
     ):
         actor = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-        await _install_shipped_tools(client, session, acting_user, actor)
         checked = 0
         for public_id, widget, sql in self._widgets():
             response = await client.post(
@@ -414,13 +412,6 @@ class TestEveryShippedDashboardDrawsItsShape:
             assert not unfilled, f"{where} cannot fill {unfilled} from {columns}"
             checked += 1
         assert checked, "no shipped dashboard widgets were checked"
-
-
-async def _install_shipped_tools(client, session, acting_user, actor) -> None:
-    """Counters, the tool plug-in this build ships, installed in ``actor``'s
-    community by its seat: a shipped dashboard may read its dataset."""
-    seat = await acting_user(guild=actor.guild, guild_role=CommunityRole.superadmin)
-    await install_tool_plugin(client, session, seat)
 
 
 def _unfilled(columns: list[FieldType], shape) -> list[str]:
@@ -750,7 +741,6 @@ class TestEveryShippedDashboardReportsOnLiveWork:
         from app.services import query as query_service
 
         actor = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-        await _install_shipped_tools(client, session, acting_user, actor)
         live = await create_project(session, actor.initiative, actor.user)
         await create_task(session, live, title="live work")
 
