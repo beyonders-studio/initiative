@@ -177,11 +177,11 @@ def _check_version(version: str) -> str:
     return version
 
 
-def _version_tuple(value: str) -> tuple[int, ...]:
+def version_tuple(value: str) -> tuple[int, ...]:
     """A version as comparable integers, ignoring any pre-release suffix.
 
-    Only used to answer "is this deployment new enough", so a coarse reading is
-    the right one: `1.2.3-rc1` and `1.2.3` are the same floor.
+    It answers "is this new enough", so a coarse reading is the right one:
+    `1.2.3-rc1` and `1.2.3` are the same floor.
     """
     head = value.split("-", 1)[0].split("+", 1)[0]
     parts: list[int] = []
@@ -202,7 +202,7 @@ def version_is_compatible(min_app_version: str | None) -> bool:
     """
     if not min_app_version:
         return True
-    return _version_tuple(get_version()) >= _version_tuple(min_app_version)
+    return version_tuple(get_version()) >= version_tuple(min_app_version)
 
 
 def version_runs_here(version: MarketplaceListingVersion) -> bool:
@@ -728,7 +728,7 @@ async def _require_tool_compatible(
             continue
         older, newer = sorted(
             ((other, other_definition), (version, definition)),
-            key=lambda pair: _version_tuple(pair[0]),
+            key=lambda pair: version_tuple(pair[0]),
         )
         changes = tool_changes(older[1], newer[1])
         if changes.removed_tables:
@@ -737,7 +737,7 @@ async def _require_tool_compatible(
                 f" or moves it under another ({', '.join(changes.removed_tables)})"
             )
         if changes.drops and (
-            _version_tuple(older[0])[:1] == _version_tuple(newer[0])[:1]
+            version_tuple(older[0])[:1] == version_tuple(newer[0])[:1]
         ):
             raise CatalogError(
                 f"{public_id} {newer[0]}: within a major version a field is never"

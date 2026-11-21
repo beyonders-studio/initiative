@@ -434,7 +434,8 @@ class TestWhoMayInstallOne:
         canvas = version.definition["definition"]
         assert canvas["widgets"][0]["binding"]["plugin_uid"] == PLUGIN_UID
 
-    async def test_a_guild_that_switched_the_plugin_off_may_not(self, session):
+    @pytest.mark.parametrize("why", ["switched off", "older version"])
+    async def test_a_guild_without_the_plugin_it_came_with_may_not(self, session, why):
         user = await create_user(session)
         guild = await create_guild(session, creator=user)
         plugin = await create_guild_plugin(
@@ -447,10 +448,14 @@ class TestWhoMayInstallOne:
             },
             listing_uid=PLUGIN_UID,
         )
-        plugin.enabled = False
+        plugin.enabled = why != "switched off"
         session.add(plugin)
         await service.upsert_listing(
-            session, _plugin_manifest([_dashboard()]), source="operator"
+            session,
+            _plugin_manifest(
+                [_dashboard()], version="1.1.0" if why == "older version" else "1.0.0"
+            ),
+            source="operator",
         )
         await session.commit()
         await route_session_to_guild(session, guild.id)
