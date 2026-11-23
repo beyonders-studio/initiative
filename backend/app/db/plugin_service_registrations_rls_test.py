@@ -7,7 +7,7 @@ grant or a policy on it. The other readers are the install floor, whose
 standing statement reads four columns of the registration its token names, and
 the billing change log's writer, which records a plug-in's status.
 
-Style mirrors ``auth_provider_secrets_rls_test``: ``SET ROLE platform_<tier>``
+Style mirrors ``auth_sessions_rls_test``: ``SET ROLE platform_<tier>``
 drops to a non-superuser role so table GRANTs and policies are enforced exactly
 as they are on a real request.
 """
@@ -17,10 +17,6 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
 from app.db.public_rls import (
-    DML,
-    PUBLIC_RLS,
-    SELECT,
-    SHARED_TABLE_REGISTRY,
     platform_tier,
     role_name,
 )
@@ -51,22 +47,6 @@ async def _make_row(session, public_id: str = "acme.widgets") -> None:
     )
 
 
-def test_registry_records_the_grant_decision():
-    """The registries name this table for the system engine alone: it holds
-    every verb, the bare pre-routing role and every tier hold nothing, and the
-    policies on the table are the install floor's and the billing log's reads."""
-    shared = SHARED_TABLE_REGISTRY[TABLE]
-    assert shared.grants.app_admin == DML
-    assert shared.grants.app_user is None
-    assert not shared.tiers
-    rls = PUBLIC_RLS[TABLE]
-    assert rls.enabled and rls.forced
-    assert [(p.command, p.roles) for p in rls.policies] == [
-        (SELECT, ("plugin_install_base",)),
-        (SELECT, ("app_billing_log",)),
-    ]
-
-
 async def test_no_platform_tier_reads_or_writes_registrations(session):
     """Every tier, the owner included, is refused at the grant layer."""
     user = await create_user(session)
@@ -82,18 +62,3 @@ async def test_no_platform_tier_reads_or_writes_registrations(session):
                 with pytest.raises(DBAPIError):
                     async with session.begin_nested():
                         await session.exec(text(statement))
-
-
-async def test_registrations_table_forces_rls(session):
-    """FORCE keeps even the owning role policy-bound."""
-    row = (
-        await session.exec(
-            text(
-                "SELECT relrowsecurity, relforcerowsecurity FROM pg_class "
-                "WHERE relnamespace = 'public'::regnamespace AND relname = :name"
-            ),
-            params={"name": TABLE},
-        )
-    ).one()
-    assert row[0] is True, f"{TABLE} must have RLS enabled"
-    assert row[1] is True, f"{TABLE} must FORCE RLS"

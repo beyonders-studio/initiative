@@ -30,7 +30,9 @@
     "plugins": "Complementos",
     "pluginFallback": "Complemento {{id}}",
     "pluginGrantHint": "La configuración de la comunidad decide a qué puede acceder un complemento, así que no se puede cambiar aquí.",
-    "settingsDescription": "Elige quién puede ver y editar esto."
+    "settingsDescription": "Elige quién puede ver y editar esto.",
+    "noteLabel": "Nota para las personas que añadas",
+    "notePlaceholder": "Se envía con la próxima persona que añadas (opcional)"
   },
   "bulkAccess": {
     "title": "Editar acceso",
@@ -98,8 +100,6 @@
     "resource_project_other": "proyectos",
     "resource_file_one": "archivo",
     "resource_file_other": "archivos",
-    "resource_counter_group_one": "grupo de contadores",
-    "resource_counter_group_other": "grupos de contadores",
     "resource_calendar_one": "calendario",
     "resource_calendar_other": "calendarios",
     "resource_dashboard_one": "panel",
@@ -109,7 +109,9 @@
     "resource_wiki_one": "wiki",
     "resource_wiki_other": "wikis",
     "resource_contact_one": "contacto",
-    "resource_contact_other": "contactos"
+    "resource_contact_other": "contactos",
+    "resource_item_one": "elemento",
+    "resource_item_other": "elementos"
   },
   "request": {
     "needAccess": "Necesitas acceso",
@@ -157,5 +159,21 @@
     "answered": "Ya respondida",
     "answeredDescription": "Aquí ya no queda nada por responder.",
     "error": "No se pudo enviar tu respuesta. Inténtalo de nuevo."
+  },
+  "send": {
+    "button": "Enviar a…",
+    "copyLink": "Copiar enlace",
+    "title": "Enviar a…",
+    "description": "Lo reciben en sus notificaciones y lo abren en lo que estén usando.",
+    "people": "Personas",
+    "addPeople": "Añadir personas",
+    "remove": "Quitar a {{name}}",
+    "letIn": "Si alguien todavía no puede abrirlo",
+    "letAsk": "Que pida acceso",
+    "submit": "Enviar",
+    "sent": "Enviado",
+    "sentSomeMayAsk_one": "Enviado. {{count}} persona todavía no puede abrirlo y puede pedir acceso.",
+    "sentSomeMayAsk_other": "Enviado. {{count}} personas todavía no pueden abrirlo y pueden pedir acceso.",
+    "error": "No se pudo enviar. Inténtalo de nuevo."
   }
 }

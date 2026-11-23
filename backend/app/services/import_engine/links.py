@@ -86,7 +86,7 @@ class LinkCollector:
     #: Rows whose body names things by the ref they had where it was exported
     #: — placed once every entry has been written
     #: (:func:`app.services.import_engine.references.resolve_references`).
-    _referencing: list[tuple[SearchEntityType, int]] = field(default_factory=list)
+    _referencing: list[tuple[SearchEntityType | str, int]] = field(default_factory=list)
 
     def lookup(self, ref: str) -> Endpoint | None:
         """The row a ref names, if it has been written yet this job."""
@@ -102,24 +102,31 @@ class LinkCollector:
         bodies, self._bodies = self._bodies, []
         return bodies
 
-    def note_references(self, kind: SearchEntityType, entity_id: int) -> None:
+    def note_references(self, kind: SearchEntityType | str, entity_id: int) -> None:
         """Say that this row's body names things by their exported refs, so
-        the job comes back to it once everything it names could exist."""
+        the job comes back to it once everything it names could exist: a
+        tool plug-in's row by its kind, its body being its text fields."""
         if (kind, entity_id) not in self._referencing:
             self._referencing.append((kind, entity_id))
 
-    def take_references(self) -> list[tuple[SearchEntityType, int]]:
+    def take_references(self) -> list[tuple[SearchEntityType | str, int]]:
         noted, self._referencing = self._referencing, []
         return noted
 
     def register(
-        self, ref: str | None, kind: SearchEntityType, entity_id: int | None
+        self,
+        ref: str | None,
+        kind: SearchEntityType | str,
+        entity_id: int | None,
+        *,
+        code: int | None = None,
     ) -> None:
         """Say that ``ref`` is now this row.
 
         A ref the envelope did not give, and a row that somehow has no id, are
         both nothing to record rather than something to fail over — a task
-        with no external ref is simply a task nothing can point at.
+        with no external ref is simply a task nothing can point at. ``code``
+        is a tool plug-in's kind's, from the community's tool set.
 
         A repeated ref keeps the **first** row it named. Two things claiming
         one name is the source's ambiguity, and picking the earlier one at
@@ -130,7 +137,7 @@ class LinkCollector:
         if ref in self._refs:
             logger.info("import link ref claimed twice ref=%s", ref)
             return
-        self._refs[ref] = Endpoint(kind=kind, id=entity_id)
+        self._refs[ref] = Endpoint(kind=kind, id=entity_id, code=code)
 
     def link(
         self,

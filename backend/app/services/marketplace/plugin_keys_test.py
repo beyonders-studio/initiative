@@ -121,13 +121,17 @@ async def test_a_failed_fetch_finds_no_key():
     assert fetched == [JWKS_URI]
 
 
-async def test_private_and_symmetric_entries_are_left_out():
+async def test_private_symmetric_and_non_ed25519_entries_are_left_out():
     private = _jwk(_published, "priv-1")
     private["d"] = "AAAA"
     symmetric = {"kty": "oct", "kid": "sym-1", "k": "c2VjcmV0"}
-    _fetched, transport = _serving({"keys": [private, symmetric]})
+    p256 = json.loads(
+        ECAlgorithm.to_jwk(ec.generate_private_key(ec.SECP256R1()).public_key())
+    )
+    p256["kid"] = "p256-1"
+    _fetched, transport = _serving({"keys": [private, symmetric, p256]})
 
-    for kid in ("priv-1", "sym-1"):
+    for kid in ("priv-1", "sym-1", "p256-1"):
         assert await plugin_keys.key_for(_snapshot(), kid, transport=transport) is None
 
 
@@ -156,13 +160,3 @@ def test_a_thumbprint_is_rfc_7638():
     assert (
         plugin_keys.jwk_thumbprint(key) == "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k"
     )
-
-
-async def test_a_published_key_that_is_not_ed25519_is_left_out():
-    p256 = json.loads(
-        ECAlgorithm.to_jwk(ec.generate_private_key(ec.SECP256R1()).public_key())
-    )
-    p256["kid"] = "p256-1"
-    _fetched, transport = _serving({"keys": [p256]})
-
-    assert await plugin_keys.key_for(_snapshot(), "p256-1", transport=transport) is None

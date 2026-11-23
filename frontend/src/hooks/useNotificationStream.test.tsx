@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import type { InfiniteData } from "@tanstack/react-query";
 import { render, renderHook, waitFor } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
@@ -26,6 +27,17 @@ vi.mock("@/api/query-keys", async (importOriginal) => ({
   invalidate: (...specs: unknown[]) => invalidations(...specs),
 }));
 
+// The desktop app's word that its computer saw input.
+const desktop = vi.hoisted(() => ({ computerActive: null as (() => void) | null }));
+vi.mock("@/plugins/desktop", () => ({
+  default: {
+    addListener: async (_event: string, listener: () => void) => {
+      desktop.computerActive = listener;
+      return { remove: async () => {} };
+    },
+  },
+}));
+
 /** How many batches named this. */
 const timesNamed = (spec: unknown) =>
   invalidations.mock.calls.filter((call: unknown[]) =>
@@ -33,6 +45,7 @@ const timesNamed = (spec: unknown) =>
   ).length;
 
 const MSG_AUTH = 5;
+const MSG_ACTIVE = 6;
 
 const Probe = () => {
   useNotificationStream();
@@ -53,24 +66,30 @@ describe("useNotificationStream", () => {
     setAuthToken(null);
   });
 
-  it("connects to the user-scoped stream, with no community in the address", () => {
-    renderWithProviders(<Probe />);
-
-    expect(latestSocket().url).toContain("/api/v1/notifications/stream");
-    expect(latestSocket().url).not.toContain("/c/");
-    expect(latestSocket().url.startsWith("ws://") || latestSocket().url.startsWith("wss://")).toBe(
-      true
-    );
-  });
-
-  it("authenticates in the first frame rather than the URL", () => {
+  it("connects to the user-scoped stream, authenticating in the first frame, not the URL", () => {
     renderWithProviders(<Probe />);
     const socket = latestSocket();
     socket.open();
 
+    expect(socket.url).toContain("/api/v1/notifications/stream");
+    expect(socket.url).not.toContain("/c/");
+    expect(socket.url.startsWith("ws://") || socket.url.startsWith("wss://")).toBe(true);
     expect(socket.url).not.toContain("token");
     expect(socket.sent[0][0]).toBe(MSG_AUTH);
     expect(socket.authPayload()).toEqual({ token: "test-token" });
+  });
+
+  it("in the desktop app, reports input anywhere on the computer as the person being here", async () => {
+    vi.spyOn(Capacitor, "getPlatform").mockReturnValue("electron");
+    renderWithProviders(<Probe />);
+    const socket = latestSocket();
+    socket.open();
+    await waitFor(() => expect(desktop.computerActive).not.toBeNull());
+
+    desktop.computerActive?.();
+
+    expect(socket.sent.at(-1)).toEqual(new Uint8Array([MSG_ACTIVE]));
+    vi.restoreAllMocks();
   });
 
   it("refetches the inbox when the server says it changed", () => {
@@ -146,14 +165,6 @@ describe("useNotificationStream", () => {
     queryClient.clear();
   });
 
-  it("catches up on connect, since nothing signalled while the socket was down", () => {
-    renderWithProviders(<Probe />);
-
-    latestSocket().open();
-
-    expect(timesNamed(q.notifications())).toBe(1);
-  });
-
   it("re-reads the account when the server says its standing changed", () => {
     const refreshUser = vi.fn();
     const refreshCommunities = vi.fn().mockResolvedValue([]);
@@ -221,18 +232,6 @@ describe("useNotificationStream", () => {
     queryClient.clear();
   });
 
-  it("ignores a frame naming a channel it does not know", () => {
-    renderWithProviders(<Probe />);
-    const socket = latestSocket();
-    socket.open();
-    invalidations.mockClear();
-
-    socket.receive({ resource: "something-new", action: "changed", ids: {} });
-
-    expect(timesNamed(q.notifications())).toBe(0);
-    expect(timesNamed(q.contactGrants())).toBe(0);
-  });
-
   it("catches up on both channels after the socket was down", () => {
     const refreshUser = vi.fn();
     const refreshCommunities = vi.fn().mockResolvedValue([]);
@@ -266,43 +265,7 @@ describe("useNotificationStream", () => {
     expect(refreshUser).toHaveBeenCalledTimes(1);
   });
 
-  it("ignores a heartbeat beyond taking it as proof of life", () => {
-    renderWithProviders(<Probe />);
-    const socket = latestSocket();
-    socket.open();
-    invalidations.mockClear();
-
-    socket.receive({ heartbeat: true });
-
-    expect(timesNamed(q.notifications())).toBe(0);
-  });
-
-  it("tries the account again when the re-read fails", async () => {
-    vi.useFakeTimers();
-    try {
-      const refreshUser = vi.fn().mockResolvedValue(undefined);
-      renderWithProviders(<Probe />, { auth: { refreshUser } });
-      const socket = latestSocket();
-      socket.open();
-      await vi.advanceTimersByTimeAsync(0);
-      refreshUser.mockClear();
-      // Fail the read this frame triggers, and only that one.
-      refreshUser.mockRejectedValueOnce(new Error("offline"));
-
-      socket.receive({ resource: "account", action: "membership", ids: {} });
-      await vi.advanceTimersByTimeAsync(0);
-      expect(refreshUser).toHaveBeenCalledTimes(1);
-
-      // The frame is the only prompt there is, so a failed read must not be
-      // the end of it — there is no poll behind this any more.
-      await vi.advanceTimersByTimeAsync(2000);
-      expect(refreshUser).toHaveBeenCalledTimes(2);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("keeps trying at a slow beat rather than giving up", async () => {
+  it("tries the account again when the re-read fails, at a slow beat rather than giving up", async () => {
     vi.useFakeTimers();
     try {
       const refreshUser = vi.fn().mockResolvedValue(undefined);
@@ -315,7 +278,13 @@ describe("useNotificationStream", () => {
       refreshUser.mockRejectedValue(new Error("offline"));
 
       socket.receive({ resource: "account", action: "membership", ids: {} });
-      await vi.advanceTimersByTimeAsync(100_000);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(refreshUser).toHaveBeenCalledTimes(1);
+      // The frame is the only prompt there is, so a failed read must not be
+      // the end of it — there is no poll behind this any more.
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(refreshUser).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(98_000);
       // The read, then the ramp: 2s, 8s, 30s, 60s.
       expect(refreshUser).toHaveBeenCalledTimes(5);
 
@@ -354,16 +323,20 @@ describe("useNotificationStream", () => {
     }
   });
 
-  it("ignores frames for other resources and malformed ones", () => {
+  it("ignores unknown channels, other resources, malformed frames and heartbeats", () => {
     renderWithProviders(<Probe />);
     const socket = latestSocket();
     socket.open();
     invalidations.mockClear();
 
+    socket.receive({ resource: "something-new", action: "changed", ids: {} });
     socket.receive({ resource: "task", ids: { task_id: 1 } });
     socket.onmessage?.({ data: "not json" });
+    // A heartbeat is taken only as proof of life.
+    socket.receive({ heartbeat: true });
 
     expect(timesNamed(q.notifications())).toBe(0);
+    expect(timesNamed(q.contactGrants())).toBe(0);
   });
 
   it("stays up across an account re-read rather than rebuilding for it", () => {

@@ -8,6 +8,8 @@ Communities add plug-ins from the marketplace. Whether a plug-in can run on your
 
 Most plug-ins need nothing from you. The rest need an address, a key or a few values from another service, and this page is where those go.
 
+Plug-ins are also how a server stays lean. A tool only some groups use, [Counters](../guides/counters.md) first, comes as a tool plug-in, and a tool plug-in's tables exist only in the communities that added it. A server whose communities never count anything carries no counter tables at all.
+
 ## Where plug-ins come from
 
 | Source | What it is |
@@ -22,15 +24,14 @@ Every plug-in from any of these gets a row under **Plug-in services**. Its listi
 
 The registry is a catalog of plug-ins and content from BeyondersStudio and the publishers it signs for. Anyone can [propose a listing](publishing-listings.md#publishing-to-the-initiative-registry). It's a [TUF](https://theupdateframework.io/) repository: every file it brings is checked against a signing key built into Initiative before anything is used, so a listing arrives exactly as it was published or not at all.
 
-Its panel is **Marketplace registry**, under **Integrations**.
+Its panel is **Plug-in registry**, under **Integrations**.
 
 | Control | What it does |
 |---|---|
-| **Follow the registry** | On by default. Off, the server stops asking for updates, and whatever the registry already brought stays. |
-| **Refresh now** | Checks straight away rather than at the next scheduled check. |
-| **Upload a registry bundle** | For a server with no internet access: a `.tar.gz` of the registry's `metadata` and `targets` folders, carried in by hand. It's checked against the same key, so a bundle that spent a week in somebody's coat pocket is exactly as trustworthy as one that didn't. |
+| **Get updates from the registry** | On by default, with **Refresh now** beside it to check straight away rather than at the next scheduled check. Off, the server stops asking for updates, and whatever the registry already brought stays. |
+| **Drop a registry bundle** | Shown while updates are off, for a server with no internet access: a `.tar.gz` of the registry's `metadata` and `targets` folders, carried in by hand. It applies as soon as you drop it, and it's checked against the same key, so a bundle that spent a week in somebody's coat pocket is exactly as trustworthy as one that didn't. |
 
-The panel also shows the registry's address, when it last updated, how many listings came from it, and why the last attempt stopped, if it did. A listing it skipped is named with its reason.
+The panel also says when the registry last updated and how many listings came from it, and why the last attempt stopped, if it did. A listing it skipped is named with its reason.
 
 Registry signatures expire on purpose: the newest one lasts a day. A server that hasn't reached the registry in a while says when the signatures it holds ran out, and that its listings may be out of date. Nothing the registry already brought stops working, and the next successful update brings it current. An update that fails for any reason changes nothing: the last verified catalog stays exactly as it was.
 
@@ -41,7 +42,7 @@ Registry signatures expire on purpose: the newest one lasts a day. A server that
 | A bundle | 32 MiB compressed, 64 MiB and 5,000 files unpacked |
 
 ??? techspec "Registry settings"
-    These are environment variables, read at startup, so a change needs a restart. Whether the server follows the registry at all is the **Follow the registry** switch, not a variable.
+    These are environment variables, read at startup, so a change needs a restart. Whether the server gets updates from the registry at all is the **Get updates from the registry** switch, not a variable.
 
     | Variable | What it does | Default |
     |---|---|---|
@@ -52,15 +53,30 @@ Registry signatures expire on purpose: the newest one lasts a day. A server that
 
     A build whose shipped root is a placeholder has no registry to follow. The panel says so, and no background check runs.
 
-## The two kinds of plug-in
+## What runs for each kind of plug-in
 
-| | Runs inside Initiative | Runs as a container |
-|---|---|---|
-| What runs | Nothing extra. Initiative makes the plug-in's calls itself, from its manifest. | The plug-in's own program, beside Initiative. |
-| What it needs from you | Its vendor values, if it talks to another service. | Where it answers, the keys it signs with, and any vendor values. |
-| Its row says | *Initiative makes this plug-in's calls itself.* | *Container image:* and the image it runs. |
+| | A tool plug-in | Runs inside Initiative | Runs as a container |
+|---|---|---|---|
+| What runs | Nothing. Initiative builds the tool from the plug-in's declaration, in each community that adds it. | Nothing extra. Initiative makes the plug-in's calls itself, from its manifest. | The plug-in's own program, beside Initiative. |
+| What it needs from you | Nothing. | Its vendor values, if it talks to another service. | Where it answers, the keys it signs with, and any vendor values. |
+| For example | Counters | GitHub | A plug-in with pages of its own, or a service answering what its manifest declares |
 
 A row is **Live** once it has everything it needs, and only then are communities offered it. Until then it shows **Not live** with a line saying what's missing, and no community sees it on the Plug-ins shelf.
+
+### A tool plug-in
+
+There's nothing to set up. Once its listing arrives, communities can add it, and each community that does gets the tool's tables in its own schema. Removing it from a community hides the tool at once and deletes its contents 30 days later, a window the community's superadmin agrees to when removing it; adding it back within the window brings everything back. Turning on **Install in every community** for a tool plug-in adds it nowhere: each community adds a tool itself.
+
+[Counters](../guides/counters.md) comes from the registry. A community that used counters before they became a plug-in has it already, carried over on upgrade, whether or not the server gets registry updates.
+
+??? techspec "Where a tool plug-in's data lives"
+    | What | Where |
+    |---|---|
+    | Its tables | In each installing community's `guild_<id>` schema only, named `p_`, the plug-in's listing uid in lower case, `_` and the table's declared key (`p_tsjvtcm0s7gv2x_counter_group`). No other community, and not `guild_template`, has them. |
+    | Its columns | The ones every built-in tool table has, plus one typed column per declared field. |
+    | Its row security | Rendered from the same records as a built-in tool's, so the initiative boundary, sharing, holds and the trash apply to it unchanged. The community's provisioning stamp names the installed tools it was rendered with, so the start-up backfill re-renders a community whose tools changed. |
+    | Its kinds | The declared key, `.` and the uid in lower case (`counter_group.tsjvtcm0s7gv2x`). Each kind's numeric code is recorded in `public.plugin_kind_codes` when a version declaring it is registered. That row names the kind and its code and nothing about any community. |
+    | Removal | The install is marked deleted at once. After `30` days the deletion sweep deletes its rows and everything naming them (links, comments, tags, search entries, permissions), and the community's next provisioning drops its tables. |
 
 ### A plug-in that runs inside Initiative
 
@@ -75,7 +91,23 @@ If it talks to another service, its row has a **Vendor client** section for the 
 5. Select **Save**.
 
 !!! tip "The GitHub plug-in fills all of that in for you"
-    Its row has **Create the GitHub App**. Give a **GitHub organization** to own the app, or leave it blank for your own account, and select **Create the GitHub App**. GitHub opens with the plug-in's permissions, events and your server's addresses already filled in. Confirm it there, and GitHub sends all six values back to Initiative. You type and copy none of them.
+    Its row has **Create the GitHub App**. Choose who owns the app: **Your GitHub account**, or **A GitHub organization** you're an owner of, giving its name as it appears in its address. Then select **Create the GitHub App**. GitHub opens with the plug-in's permissions, events and your server's addresses already filled in. Confirm it there, and GitHub sends all six values back to Initiative. You type and copy none of them.
+
+??? techspec "What the GitHub App needs"
+    A GitHub App keeps the permissions and events it was created with, so one made by hand, or made before the plug-in asked for more, needs these set on GitHub under its **Permissions & events**. Each organization's owner then accepts the change on GitHub, which asks them. `{APP_URL}` is Initiative's public address.
+
+    | Setting | Value |
+    |---|---|
+    | Callback URL | `{APP_URL}/api/v1/plugin-connections/callback` |
+    | Setup URL | `{APP_URL}/api/v1/plugin-connections/setup` |
+    | Webhook URL | `{APP_URL}/api/v1/plugin-hooks/beyonders-studio.github` |
+    | Expire user authorization tokens | On |
+    | Request user authorization (OAuth) during installation | Off |
+    | Repository permissions | Issues: read and write · Pull requests: read and write · Contents: read and write · Checks: read · Commit statuses: read · Dependabot alerts: read · Metadata: read |
+    | Organization permissions | Members: read · Projects: read and write |
+    | Events | Issues · Pull request · Release · Create · Delete · Pull request review · Check suite |
+
+    The plug-in asks GitHub for every installation token with read access, plus write access to issues and pull requests for the writes it makes as the organization and, on an organization, its Projects permission. No installation token can change a repository's contents. Branches started from a task are created with the member's own account. What the plug-in does with all of it is on [GitHub](../guides/github.md).
 
 ### A plug-in that runs as a container
 
@@ -114,10 +146,15 @@ The **Base URL** and **Browser address** are `http` or `https` addresses with a 
 | **Suspend everywhere** | Every community that added the plug-in stops reaching it at once, and stops seeing it: its data, its settings, its events and its pages. Nothing goes to the plug-in while it's suspended. Nothing is deleted, and **Lift** puts everything where it was. A restart never lifts it for you. |
 | **Install in every community** | Adds it to every community, new ones included, and community admins can't remove it or turn it off. Where it appears and what it may do stay each community's call. Shown as **In every community**. |
 | **Who can use it** | The plug-in says this itself, in each release: **Every community**, **The operations community** (the [operations community](operations-community.md) alone), or, for a plug-in in **Beta**, the communities you pick, as many as you like. Until you pick one, nobody can use a beta plug-in. A community out of its reach can't find it, install it or use it, and a copy already added there disappears until it's back in reach; nothing is deleted. With **Install in every community** also on, it's added only where it can be used. When a release leaves beta, your list is deleted and every community can use it. |
-| **Share installations between communities** | Off, one installation at the vendor (one GitHub organization, say) connects to one community on this server, and the next community to try is told it's taken, never by whom. On, several communities can connect the same one, which suits a server where every community belongs to one company. It won't switch off while an installation is connected to more than one community. Only shown for a plug-in with vendor values. |
 | **Delete** | Removes the registration for good, after you type its identifier to confirm. Adding it back means registering it again. A plug-in from the registry can't be deleted, because the next update would bring it straight back, so suspend it instead. |
 
 A row marked **Publisher switched off** has stopped because every plug-in from that publisher has. Nothing is deleted there either.
+
+### Connect an account for every community
+
+By default each community connects its own account for a plug-in (its own GitHub organization, say), and anyone who controls an account can connect it in as many communities as they like; each one gets that account's updates. On a server where every community works with the same account, connect it once instead: on the plug-in's page, under **Connect for every community**, select **Connect for every community** and finish at the vendor as the account's owner. Every community with the plug-in then uses that account and can't change or disconnect it; their own settings say it was connected for every community.
+
+**Disconnect** ends it for every community. A community that had connected its own account before goes back to it; the others connect one when they want to. The section shows only for a connection the server can run end to end, such as GitHub's organization, and only once the plug-in's vendor values are set.
 
 ??? techspec "Switching a whole publisher off"
     A publisher is the part of a plug-in's identifier before the dot. The publishers list has no page in the app. An owner reaches it through the API with a personal API key that isn't read-only:

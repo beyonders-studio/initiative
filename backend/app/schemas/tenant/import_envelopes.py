@@ -1,10 +1,11 @@
-"""Import-side pydantic mirrors of the export envelopes.
+"""The envelopes: the JSON a tool exports and its importer reads back.
 
-Each model parses the dict shape its export adapter emits (see
-``services/export/adapters/{file,counter_group,calendar,post,contact}.py``)
-with ``extra="ignore"``: informational export fields (event ids and
-timestamps, linked file titles) parse and drop — they reference guild-local
-state an import cannot rebind.
+Each model is both sides of one shape. The export writes an envelope from the
+tool's rows by reading its model field by field (``services/export/envelope.py``),
+and the import parses it with the same model, with ``extra="ignore"``:
+informational fields a tool writes of its own (event ids and timestamps,
+linked file titles) parse and drop — they reference guild-local state an
+import cannot rebind.
 
 Every envelope is schema version 1. There is no support for reading an
 earlier shape: the app imports what this build exports, and nothing else. The
@@ -14,10 +15,13 @@ lines (``app.core.recurrence.imported``).
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from functools import cache
+from typing import Any, Literal, get_args
 
 from pydantic import ConfigDict, Field, model_validator
 
+from app.core.relationships import RelationshipType
+from app.core.tools import Tool, tool_envelope_type
 from app.models.tenant.metadata import MetadataType
 from app.models.tenant.wiki import WikiPageOrder, WikiReadingWidth
 from app.schemas.base import SanitizedBaseModel
@@ -31,6 +35,22 @@ from app.schemas.tenant.contact import (
 
 CURRENT_SCHEMA_VERSION = 1
 MIN_SUPPORTED_IMPORT_VERSION = 1
+
+
+def envelope_literal(tool: Tool) -> Any:
+    """The ``type`` an envelope of ``tool``'s carries (``tool_envelope_type``),
+    as the ``Literal`` its model holds it to."""
+    return Literal[tool_envelope_type(tool)]  # ty: ignore[invalid-type-form]
+
+
+# Each tool's envelope ``type``, which its model below declares. Names rather
+# than calls, since an annotation holds a name.
+FileEnvelopeType: Any = envelope_literal(Tool.file)
+WikiEnvelopeType: Any = envelope_literal(Tool.wiki)
+DashboardEnvelopeType: Any = envelope_literal(Tool.dashboard)
+PostEnvelopeType: Any = envelope_literal(Tool.post)
+ContactEnvelopeType: Any = envelope_literal(Tool.contact)
+CalendarEnvelopeType: Any = envelope_literal(Tool.calendar)
 
 
 class _EnvelopeBase(SanitizedBaseModel):
@@ -66,8 +86,64 @@ class EnvelopePropertyValue(SanitizedBaseModel):
     project: bool = False
 
 
+class EnvelopeLink(SanitizedBaseModel):
+    """An edge a row asserts, named by the far end's ``external_ref``.
+
+    Refs rather than ids because the far end may not exist yet — it can be in
+    a later entry of the same backup, or in a different envelope entirely. The
+    job's deferred pass resolves every ref once the last entry has flushed
+    (``import_engine.links``), so the order entries apply in does not matter.
+    """
+
+    type: RelationshipType
+    target_external_ref: str
+
+
+class InstalledToolLayout(SanitizedBaseModel):
+    """One of the layouts an item table keeps under a row, as it was changed
+    from the one its plug-in ships: a list by its kind, the item's page by
+    the item's, or the list it opens on (``default``). Held to the
+    declaration where it is restored, and drawn as shipped where it is not."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    kind: str
+    definition: dict[str, Any] = {}
+
+
+class InstalledToolRow(SanitizedBaseModel):
+    """A tool plug-in's row, or an item, as ``export/adapters/installed.py``
+    writes it: its declared fields by key under ``fields``, a person by
+    handle, and the items under it by their table's key under ``items``. What
+    a field holds is held to the declaration when it is written
+    (``plugin_tool_rows.column_values``), not here, since the declaration is
+    the community's."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    name: str
+    position: float | None = None
+    external_ref: str | None = None
+    fields: dict[str, Any] = {}
+    #: The handles its text fields mention as ``@<handle>``.
+    mention_handles: list[str] = []
+    tags: list[str] = []
+    properties: list[EnvelopePropertyValue] = []
+    links: list[EnvelopeLink] = []
+    items: dict[str, list[InstalledToolRow]] = {}
+    #: The layouts each item table under it keeps there, by the table's key.
+    layouts: dict[str, list[InstalledToolLayout]] = {}
+
+
+class InstalledToolEnvelope(_EnvelopeBase, InstalledToolRow):
+    """An installed tool's row and everything under it: ``initiative-<kind>``,
+    the kind being the community's."""
+
+    type: str
+
+
 class FileEnvelope(_EnvelopeBase):
-    type: Literal["initiative-file"]
+    type: FileEnvelopeType
     file_type: str  # one of the editor's types: lexical | excalidraw | sheet | url
     name: str
     content: dict[str, Any] = {}
@@ -186,7 +262,7 @@ class WikiEnvelope(_EnvelopeBase):
     a wiki imported from one keeps the defaults.
     """
 
-    type: Literal["initiative-wiki"]
+    type: WikiEnvelopeType
     name: str
     description: str | None = None
     home_page: str | None = None
@@ -204,33 +280,6 @@ class WikiEnvelope(_EnvelopeBase):
     files: list[WikiFiledFile] = []
 
 
-class CounterEnvelopeItem(SanitizedBaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    name: str
-    color: str | None = None
-    count: float = 0
-    min: float | None = None
-    max: float | None = None
-    step: float = 1
-    initial_count: float = 0
-    view_mode: str = "number"
-    position: float = 0
-    properties: list[EnvelopePropertyValue] = []
-    #: What this counter was called where it came from — a thing a reference
-    #: elsewhere in the same import can name. Refs live for one job.
-    external_ref: str | None = None
-
-
-class CounterGroupEnvelope(_EnvelopeBase):
-    type: Literal["initiative-counter-group"]
-    name: str
-    description: str | None = None
-    tags: list[str] = []
-    properties: list[EnvelopePropertyValue] = []
-    counters: list[CounterEnvelopeItem] = []
-
-
 class DashboardEnvelope(_EnvelopeBase):
     """A dashboard as a backup carries it: a presentation spec and its canvas
     config, and no content of its own.
@@ -242,7 +291,7 @@ class DashboardEnvelope(_EnvelopeBase):
     is no second definition validator.
     """
 
-    type: Literal["initiative-dashboard"]
+    type: DashboardEnvelopeType
     name: str
     description: str | None = None
     # Present only for a dashboard built on a built-in plug-in. Dropped on import
@@ -315,7 +364,7 @@ class PostEnvelope(_EnvelopeBase):
     so rather than failing a whole restore over a long title.
     """
 
-    type: Literal["initiative-post"]
+    type: PostEnvelopeType
     name: str
     body: dict[str, Any] = {}
     tags: list[str] = []
@@ -343,7 +392,7 @@ class ContactEnvelope(_EnvelopeBase):
     it, held to the rules a contact's create holds them to, since a file is
     not a trusted source."""
 
-    type: Literal["initiative-contact"]
+    type: ContactEnvelopeType
     name: str = Field(min_length=1, max_length=255)
     is_organization: bool = False
     emails: list[ContactEmail] = Field(default_factory=list, max_length=MAX_DETAILS)
@@ -395,10 +444,30 @@ class EventEnvelopeItem(SanitizedBaseModel):
 
 
 class CalendarEnvelope(_EnvelopeBase):
-    type: Literal["initiative-calendar"]
+    type: CalendarEnvelopeType
     name: str
     description: str | None = None
     color: str | None = None
     tags: list[str] = []
     properties: list[EnvelopePropertyValue] = []
     events: list[EventEnvelopeItem] = []
+
+
+def tool_envelope(tool: Tool) -> type[_EnvelopeBase]:
+    """The model an envelope of ``tool``'s is read with: the one whose
+    ``type`` is the tool's."""
+    return _envelopes_by_type()[tool_envelope_type(tool)]
+
+
+@cache
+def _envelopes_by_type() -> dict[str, type[_EnvelopeBase]]:
+    # The project's envelope is a schema of its own, which reads this module.
+    from app.schemas.tenant import project_export  # noqa: F401
+
+    # A tool plug-in's envelope names its type as the community's tool set
+    # does, not as a literal.
+    return {
+        named[0]: model
+        for model in _EnvelopeBase.__subclasses__()
+        if (named := get_args(model.model_fields["type"].annotation))
+    }

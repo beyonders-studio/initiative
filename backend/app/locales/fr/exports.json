@@ -4,16 +4,13 @@
   },
   "footer": {
     "tasks": "Export des tâches",
-    "project": "{{name}} — rapport de projet",
-    "counters": "{{name}} — export des compteurs"
+    "project": "{{name}} — rapport de projet"
   },
   "summary": {
     "tasks_one": "{{count}} tâche",
     "tasks_other": "{{count}} tâches",
     "items_one": "{{count}} élément",
-    "items_other": "{{count}} éléments",
-    "counters_one": "{{count}} compteur",
-    "counters_other": "{{count}} compteurs"
+    "items_other": "{{count}} éléments"
   },
   "round": "tour {{round}}",
   "pageOf": "sur",
@@ -68,12 +65,7 @@
     "user_id": "Membre",
     "notes": "Notes",
     "order": "N°",
-    "status": "Statut",
-    "name": "Compteur",
-    "count": "Valeur",
-    "min": "Min",
-    "max": "Max",
-    "step": "Pas"
+    "status": "Statut"
   },
   "groups": {
     "empty": {

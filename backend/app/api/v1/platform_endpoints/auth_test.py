@@ -9,6 +9,7 @@ Tests the auth API endpoints including:
 - Password reset
 """
 
+import json
 import secrets
 import uuid
 from datetime import date, timedelta
@@ -20,9 +21,12 @@ from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.audit_events import AuditEventType
 from app.core.config import settings
 from app.core.email_i18n import email_t
 from app.core.encryption import (
+    SALT_EMAIL,
+    decrypt_field,
     decrypt_token,
     hash_email,
 )
@@ -46,6 +50,7 @@ from app.services.auth.oidc.provider import OidcClientConfig, OidcProvider
 from app.services.auth.platform_provider import PLATFORM_OIDC_SLUG
 from app.services.platform import app_settings as app_settings_service
 from app.services.platform import email_outbox, rules
+from app.testing.audit import emitted
 from app.testing.captcha import captcha_switched_on
 from app.testing.factories import (
     create_auth_provider,
@@ -102,16 +107,19 @@ async def test_bootstrap_status_with_users(
     assert response.json()["demo"] is True
 
 
-async def test_register_first_user(client: AsyncClient, session: AsyncSession):
-    """The first registered user becomes owner, and a registration that names
-    no community creates none."""
+async def test_register_first_user(client: AsyncClient, session: AsyncSession, capfd):
+    """The first registered user becomes owner under its normalized address,
+    keeps the UTC default when the caller sends no timezone, and a
+    registration that names no community creates none. The account's arrival
+    is recorded without its address."""
     from app.models.platform.guild import GuildMembership
 
     user_data = {
-        "email": "first@example.com",
+        "email": "  FIRST@EXAMPLE.COM  ",
         "username": "first",
         "password": "securepassword123",
     }
+    capfd.readouterr()
 
     response = await client.post("/api/v1/auth/register", json=user_data)
 
@@ -124,6 +132,26 @@ async def test_register_first_user(client: AsyncClient, session: AsyncSession):
         select(GuildMembership).where(GuildMembership.user_id == data["id"])
     )
     assert held.all() == []
+    user = await session.get(User, data["id"])
+    assert user.timezone == "UTC"
+    # The address is held encrypted, as the account's primary, proved at
+    # sign-up.
+    address = (
+        await session.exec(select(UserEmail).where(UserEmail.user_id == data["id"]))
+    ).one()
+    assert decrypt_field(address.email_encrypted, SALT_EMAIL) == "first@example.com"
+    assert (address.is_primary, address.source) == (True, addresses.SOURCE_SIGNUP)
+
+    rows = emitted(capfd, AuditEventType.USER_CREATED)
+    assert [(r["actor_user_id"], r["target_user_id"], r["guild_id"]) for r in rows] == [
+        (data["id"], data["id"], None)
+    ]
+    assert rows[0]["detail"] == {
+        "via": "registration",
+        "first_user": True,
+        "invited": False,
+    }
+    assert "first@example.com" not in json.dumps(rows[0]).lower()
 
 
 async def test_register_with_a_community_makes_it(
@@ -393,9 +421,12 @@ async def test_register_with_a_bound_invite_joins_on_confirming(
     assert again.json()["detail"] == "OPERATOR_NOTHING_TO_VERIFY"
 
 
-async def test_register_duplicate_email(client: AsyncClient, session: AsyncSession):
-    """Test that registration fails for duplicate email."""
+async def test_register_duplicate_email(
+    client: AsyncClient, session: AsyncSession, capfd
+):
+    """Registration fails for a duplicate email, and records no account."""
     await create_user(session, email="existing@example.com")
+    capfd.readouterr()
 
     user_data = {
         "email": "existing@example.com",
@@ -407,6 +438,7 @@ async def test_register_duplicate_email(client: AsyncClient, session: AsyncSessi
 
     assert response.status_code == 400
     assert response.json()["detail"] == "EMAIL_ALREADY_REGISTERED"
+    assert emitted(capfd, AuditEventType.USER_CREATED) == []
 
 
 async def test_closed_registration_says_nothing_about_the_address(
@@ -433,21 +465,6 @@ async def test_closed_registration_says_nothing_about_the_address(
         answers.append((response.status_code, response.json()["detail"]))
 
     assert answers == [(403, "REGISTRATION_REQUIRES_INVITE")] * 2
-
-
-async def test_register_normalizes_email(client: AsyncClient):
-    """Test that email is normalized during registration."""
-    user_data = {
-        "email": "  TEST@EXAMPLE.COM  ",
-        "username": "test",
-        "password": "password1234",
-    }
-
-    response = await client.post("/api/v1/auth/register", json=user_data)
-
-    assert response.status_code == 201
-    data = response.json()
-    assert data["email"] == "test@example.com"
 
 
 async def test_register_persists_browser_timezone(
@@ -495,32 +512,6 @@ async def test_register_rejects_invalid_timezone(client: AsyncClient):
     assert response.json()["detail"] == "UNKNOWN_TIMEZONE"
 
 
-async def test_register_without_timezone_keeps_utc_default(
-    client: AsyncClient, session: AsyncSession
-):
-    """Non-SPA callers (curl, integration scripts) that omit the field
-    still hit the model default — keeps the change non-breaking."""
-    from sqlmodel import select
-
-    response = await client.post(
-        "/api/v1/auth/register",
-        json={
-            "email": "no-tz@example.com",
-            "username": "no-tz",
-            "password": "password1234",
-        },
-    )
-    assert response.status_code == 201
-    user = (
-        await session.exec(
-            select(User)
-            .join(UserEmail, UserEmail.user_id == User.id)
-            .where(UserEmail.email_hash == hash_email("no-tz@example.com"))
-        )
-    ).one()
-    assert user.timezone == "UTC"
-
-
 # --- Captcha gate ----------------------------------------------------
 
 
@@ -565,16 +556,18 @@ async def test_register_skips_captcha_for_bootstrap_first_user(
 
 
 async def test_register_no_captcha_required_when_provider_unset(
-    client: AsyncClient, session: AsyncSession, monkeypatch
+    client: AsyncClient, session: AsyncSession, monkeypatch, capfd
 ):
     """OSS deployments leave the captcha vars unset — registration must
-    work as before, with no field required."""
+    work as before, with no field required. An account after the first is
+    recorded as one."""
     from app.core.config import settings as app_settings
 
     await create_user(session)  # second-user path
     monkeypatch.setattr(app_settings, "CAPTCHA_PROVIDER", None)
     monkeypatch.setattr(app_settings, "CAPTCHA_SITE_KEY", None)
     monkeypatch.setattr(app_settings, "CAPTCHA_SECRET_KEY", None)
+    capfd.readouterr()
 
     response = await client.post(
         "/api/v1/auth/register",
@@ -585,6 +578,8 @@ async def test_register_no_captcha_required_when_provider_unset(
         },
     )
     assert response.status_code == 201
+    rows = emitted(capfd, AuditEventType.USER_CREATED)
+    assert [r["detail"]["first_user"] for r in rows] == [False]
 
 
 async def test_register_with_valid_captcha_token_succeeds(
@@ -615,73 +610,72 @@ async def test_register_with_valid_captcha_token_succeeds(
     assert response.status_code == 201
 
 
-async def test_login_success(client: AsyncClient, session: AsyncSession):
-    """Test successful login returns access token."""
-    # Create user with known password
-    password = "testpassword123"
-    await create_user(
-        session,
-        email="login@example.com",
-        hashed_password=get_password_hash(password),
-        status=UserStatus.active,
-        email_verified=True,
-    )
+async def test_login_success(client: AsyncClient, session: AsyncSession, capfd):
+    """A sign-in, by an address however it is typed, mints the new-model
+    access token: short-lived (AUTH_ACCESS_TTL), carrying the server-side
+    session id and satisfied factors (sid/amr/sat), beside the rotating
+    refresh cookie. It stamps the address it resolved through and is recorded
+    with its method."""
+    import jwt as pyjwt
 
-    # Attempt login
+    user = await create_user(session, email="login@example.com")
+    user_id = user.id
+    capfd.readouterr()
+
     response = await client.post(
         "/api/v1/auth/token",
-        data={
-            "username": "login@example.com",
-            "password": password,
-        },
+        data={"username": "  LOGIN@EXAMPLE.COM ", "password": "testpassword123"},
     )
 
     assert response.status_code == 200
     data = response.json()
-    assert "access_token" in data
     assert data["token_type"] == "bearer"
-    assert len(data["access_token"]) > 0
+    claims = pyjwt.decode(data["access_token"], options={"verify_signature": False})
+    assert claims["amr"] == ["pwd"]
+    assert claims["sat"] == []
+    assert claims["sid"]
+    assert response.cookies.get(REFRESH_COOKIE_NAME)
+    set_cookies = response.headers.get_list("set-cookie")
+    expected_age = f"Max-Age={settings.AUTH_ACCESS_TTL_MINUTES * 60}"
+    assert any(
+        c.startswith(f"{SESSION_COOKIE_NAME}=") and expected_age in c
+        for c in set_cookies
+    ), set_cookies
 
-
-async def test_login_wrong_password(client: AsyncClient, session: AsyncSession):
-    """Test that login fails with wrong password."""
-    password = "correct_password"
-    await create_user(
-        session,
-        email="test@example.com",
-        hashed_password=get_password_hash(password),
-        status=UserStatus.active,
-        email_verified=True,
-    )
-
-    response = await client.post(
-        "/api/v1/auth/token",
-        data={
-            "username": "test@example.com",
-            "password": "wrong_password",
-        },
-    )
-
-    assert response.status_code == 400
-    assert "incorrect" in response.json()["detail"].lower()
+    rows = emitted(capfd, AuditEventType.AUTH_SIGNED_IN)
+    assert [r["actor_user_id"] for r in rows] == [user_id]
+    assert rows[0]["detail"] == {"method": "password"}
+    session.expire_all()
+    address = (
+        await session.exec(select(UserEmail).where(UserEmail.user_id == user_id))
+    ).one()
+    assert address.last_login_at is not None
+    assert rows[0]["tier"] == AuditEventType.AUTH_SIGNED_IN.tier
 
 
 @pytest.mark.parametrize("origin", [None, APP_ORIGIN])
 async def test_password_token_refusal_does_not_reveal_account_resolution(
-    client: AsyncClient, session: AsyncSession, origin: dict[str, str] | None
+    client: AsyncClient,
+    session: AsyncSession,
+    capfd,
+    origin: dict[str, str] | None,
 ) -> None:
     """Known, unknown, and non-password accounts have one public refusal shape,
-    from a browser and from the app alike."""
+    from a browser and from the app alike. Each refusal is recorded against
+    the account it was made against, with no actor, and the unknown one with
+    no identity at all."""
     endpoint = "app" if origin else "browser"
-    await create_user(session, email=f"known-{endpoint}@example.com")
+    known = await create_user(session, email=f"known-{endpoint}@example.com")
     # Built through the factory rather than by hand: an account is more than
     # its row now that addresses are resolved separately, and a test that
     # assembles one itself asserts against a shape it invented.
-    await create_user(
+    sso = await create_user(
         session,
         email=f"sso-{endpoint}@example.com",
         hashed_password=None,
     )
+    known_id, sso_id = known.id, sso.id
+    capfd.readouterr()
 
     async def refuse(email: str):
         return await client.post(
@@ -704,6 +698,18 @@ async def test_password_token_refusal_does_not_reveal_account_resolution(
         (400, {"detail": "INCORRECT_CREDENTIALS"}, None),
         (400, {"detail": "INCORRECT_CREDENTIALS"}, None),
     ]
+    rows = emitted(capfd, AuditEventType.AUTH_SIGN_IN_FAILED)
+    assert [(r["actor_user_id"], r["target_user_id"]) for r in rows] == [
+        (None, known_id),
+        (None, None),
+        (None, sso_id),
+    ]
+    assert rows[1]["target"] is None
+    assert [r["detail"] for r in rows] == [
+        {"method": "password", "reason": "bad_password"}
+    ] * 3
+    # A refusal changed nothing, so it is not a write.
+    assert [r["is_write"] for r in rows] == [False] * 3
 
 
 @pytest.fixture
@@ -956,27 +962,27 @@ async def test_login_refused_for_account_without_password(
     assert response.json()["detail"] == "INCORRECT_CREDENTIALS"
 
 
-async def test_login_inactive_user(client: AsyncClient, session: AsyncSession):
-    """Test that inactive users cannot login."""
-    password = "testpassword"
-    await create_user(
-        session,
-        email="inactive@example.com",
-        hashed_password=get_password_hash(password),
-        status=UserStatus.deactivated,  # Deactivated user
-        email_verified=True,
+async def test_login_inactive_user(client: AsyncClient, session: AsyncSession, capfd):
+    """A deactivated account cannot sign in, and the refusal is recorded
+    apart from a wrong password."""
+    user = await create_user(
+        session, email="inactive@example.com", status=UserStatus.deactivated
     )
+    user_id = user.id
+    capfd.readouterr()
 
     response = await client.post(
         "/api/v1/auth/token",
-        data={
-            "username": "inactive@example.com",
-            "password": password,
-        },
+        data={"username": "inactive@example.com", "password": "testpassword123"},
     )
 
     assert response.status_code == 400
-    assert "inactive" in response.json()["detail"].lower()
+    assert response.json()["detail"] == "INACTIVE_USER"
+    rows = emitted(capfd, AuditEventType.AUTH_SIGN_IN_FAILED)
+    assert [(r["actor_user_id"], r["target_user_id"]) for r in rows] == [
+        (None, user_id)
+    ]
+    assert rows[0]["detail"]["reason"] == "inactive"
 
 
 async def test_login_unverified_email(client: AsyncClient, session: AsyncSession):
@@ -1000,45 +1006,6 @@ async def test_login_unverified_email(client: AsyncClient, session: AsyncSession
 
     assert response.status_code == 400
     assert response.json()["detail"] == "EMAIL_NOT_VERIFIED"
-
-
-async def test_login_nonexistent_user(client: AsyncClient):
-    """Test that login fails for nonexistent user."""
-    response = await client.post(
-        "/api/v1/auth/token",
-        data={
-            "username": "nonexistent@example.com",
-            "password": "anypassword",
-        },
-    )
-
-    assert response.status_code == 400
-    assert "incorrect" in response.json()["detail"].lower()
-
-
-async def test_login_email_case_insensitive(client: AsyncClient, session: AsyncSession):
-    """Test that login email is case-insensitive."""
-    password = "testpassword"
-    await create_user(
-        session,
-        email="test@example.com",
-        hashed_password=get_password_hash(password),
-        status=UserStatus.active,
-        email_verified=True,
-    )
-
-    # Login with uppercase email
-    response = await client.post(
-        "/api/v1/auth/token",
-        data={
-            "username": "TEST@EXAMPLE.COM",  # uppercase
-            "password": password,
-        },
-    )
-
-    assert response.status_code == 200
-    data = response.json()
-    assert "access_token" in data
 
 
 async def test_login_rehashes_a_password_under_outdated_parameters(
@@ -1215,9 +1182,9 @@ async def test_upload_token_copies_session_satisfied_providers(
 
 
 async def test_logout_leaves_the_account_signed_in_elsewhere(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, capfd
 ):
-    """Signing out is per device.
+    """Signing out is per device, and recorded.
 
     ``token_version`` is the account-wide switch, so a sign-out must not touch
     it — bumping it rejected the access token every other device was holding,
@@ -1226,9 +1193,12 @@ async def test_logout_leaves_the_account_signed_in_elsewhere(
     user = await create_user(session)
     initial_version = user.token_version
     another_device = get_auth_token(user)
+    capfd.readouterr()
 
     response = await client.post("/api/v1/auth/logout", headers=get_auth_headers(user))
     assert response.status_code == 204
+    rows = emitted(capfd, AuditEventType.AUTH_SIGNED_OUT)
+    assert [r["actor_user_id"] for r in rows] == [user.id]
 
     await session.refresh(user)
     assert user.token_version == initial_version
@@ -1494,27 +1464,35 @@ async def test_oidc_login_rejects_incomplete_discovery(
 
 
 async def test_oidc_callback_provisions_new_user_and_sets_cookie(
-    client: AsyncClient, session: AsyncSession, monkeypatch
+    client: AsyncClient, session: AsyncSession, monkeypatch, capfd
 ):
     """Happy path: a verified id_token provisions the unknown user, links the
-    federated identity, and issues the web session cookie."""
+    federated identity, opens a server-side session recording which provider
+    satisfied the login (amr/sat), and issues the web session cookie minted
+    from it plus the rotating refresh cookie. The arrival is recorded once,
+    against the provider, and a second sign-in creates nobody."""
+    import jwt as pyjwt
+
     await _enable_platform_oidc(session)
     idp = FakeIdp()
     _wire_fake_idp(monkeypatch, idp)
+    claims = {"email": "new@example.com", "username": "new", "email_verified": True}
+    capfd.readouterr()
 
-    response = await _run_oidc_flow(
-        client,
-        idp,
-        id_token_claims={
-            "email": "new@example.com",
-            "username": "new",
-            "email_verified": True,
-        },
-    )
+    response = await _run_oidc_flow(client, idp, id_token_claims=claims)
     assert response.status_code in (302, 307)
     assert response.headers["location"].endswith("/oidc/callback")
     assert SESSION_COOKIE_NAME in response.cookies
+    assert response.cookies.get(REFRESH_COOKIE_NAME)
 
+    events = emitted(capfd)
+    rows = [r for r in events if r["event_type"] == AuditEventType.USER_CREATED]
+    signed_in = [r for r in events if r["event_type"] == AuditEventType.AUTH_SIGNED_IN]
+    provider = (
+        await session.exec(
+            select(AuthProvider).where(AuthProvider.slug == PLATFORM_OIDC_SLUG)
+        )
+    ).one()
     user = (
         await session.exec(
             select(User)
@@ -1522,6 +1500,15 @@ async def test_oidc_callback_provisions_new_user_and_sets_cookie(
             .where(UserEmail.email_hash == hash_email("new@example.com"))
         )
     ).one()
+    assert [(r["actor_user_id"], r["target_user_id"]) for r in rows] == [
+        (user.id, user.id)
+    ]
+    assert rows[0]["detail"] == {"via": "sso", "provider_id": provider.id}
+    assert [(r["actor_user_id"], r["detail"]) for r in signed_in] == [
+        (user.id, {"method": "oidc", "provider": PLATFORM_OIDC_SLUG, "step_up": False})
+    ]
+    assert "new@example.com" not in json.dumps(rows[0])
+
     assert await addresses.has_proven_address(session, user_id=user.id)
     # SSO-only account: no password hash — the identity link carries the
     # subject, sync stamp, and (companion) refresh token.
@@ -1534,71 +1521,38 @@ async def test_oidc_callback_provisions_new_user_and_sets_cookie(
     assert secret is not None
     assert decrypt_token(secret.refresh_token_encrypted) == "rt-1"
 
-
-async def test_oidc_callback_establishes_refresh_session(
-    client: AsyncClient, session: AsyncSession, monkeypatch
-):
-    """The web callback opens a server-side session recording which provider
-    satisfied the login (amr/sat), mints the new-model access token from it,
-    and issues the rotating refresh cookie — parity with password login."""
-    import jwt as pyjwt
-
-    await _enable_platform_oidc(session)
-    idp = FakeIdp()
-    _wire_fake_idp(monkeypatch, idp)
-
-    response = await _run_oidc_flow(
-        client,
-        idp,
-        id_token_claims={
-            "email": "sso-session@example.com",
-            "username": "sso-session",
-            "email_verified": True,
-        },
-    )
-    assert response.status_code in (302, 307)
-    assert response.cookies.get(REFRESH_COOKIE_NAME)
-    assert SESSION_COOKIE_NAME in response.cookies
-
-    provider = (
-        await session.exec(
-            select(AuthProvider).where(AuthProvider.slug == PLATFORM_OIDC_SLUG)
-        )
-    ).one()
-    user = (
-        await session.exec(
-            select(User)
-            .join(UserEmail, UserEmail.user_id == User.id)
-            .where(UserEmail.email_hash == hash_email("sso-session@example.com"))
-        )
-    ).one()
     auth_session = (
         await session.exec(select(AuthSession).where(AuthSession.user_id == user.id))
     ).one()
     assert auth_session.amr == [f"oidc:{PLATFORM_OIDC_SLUG}"]
     assert auth_session.satisfied_providers == [provider.id]
-
-    # The cookie carries the new-model access token minted from that session.
-    claims = pyjwt.decode(
+    token_claims = pyjwt.decode(
         response.cookies[SESSION_COOKIE_NAME], options={"verify_signature": False}
     )
-    assert claims["sid"] == str(auth_session.id)
-    assert claims["amr"] == [f"oidc:{PLATFORM_OIDC_SLUG}"]
-    assert claims["sat"] == [provider.id]
+    assert token_claims["sid"] == str(auth_session.id)
+    assert token_claims["amr"] == [f"oidc:{PLATFORM_OIDC_SLUG}"]
+    assert token_claims["sat"] == [provider.id]
+
+    again = await _run_oidc_flow(client, idp, id_token_claims=claims)
+    assert again.status_code in (302, 307)
+    assert emitted(capfd, AuditEventType.USER_CREATED) == []
+    assert len(await _federated_identities(session)) == 1
 
 
 async def test_an_oidc_sign_in_keeps_what_the_idp_said_about_it(
-    client: AsyncClient, session: AsyncSession, monkeypatch
+    client: AsyncClient, session: AsyncSession, monkeypatch, capfd
 ):
     """The id_token's own account of the authentication — which methods, which
     context class, when — is kept against the provider that performed it.
 
     Its own vocabulary joins the session's ``amr`` too; the markers a rule
     reads (``mfa``, ``hwk``, ``swk``) do so only where the operator has said
-    this provider's word counts, which nobody has here."""
+    this provider's word counts, which nobody has here. The sign-in's audit
+    record carries what the provider named."""
     await _enable_platform_oidc(session)
     idp = FakeIdp()
     _wire_fake_idp(monkeypatch, idp)
+    capfd.readouterr()
 
     response = await _run_oidc_flow(
         client,
@@ -1613,6 +1567,17 @@ async def test_an_oidc_sign_in_keeps_what_the_idp_said_about_it(
         },
     )
     assert response.status_code in (302, 307)
+    rows = emitted(capfd, AuditEventType.AUTH_SIGNED_IN)
+    assert [r["detail"] for r in rows] == [
+        {
+            "method": "oidc",
+            "provider": PLATFORM_OIDC_SLUG,
+            "step_up": False,
+            "auth_time": 1757600000,
+            "amr": ["pwd", "mfa"],
+            "acr": "phr",
+        }
+    ]
 
     provider = (
         await session.exec(
@@ -2170,38 +2135,96 @@ async def test_oidc_callback_refuses_existing_account_when_email_unverified(
     assert not await addresses.has_proven_address(session, user_id=existing.id)
 
 
+@pytest.mark.parametrize("proved", [True, False], ids=["proved", "unproved"])
 async def test_oidc_callback_links_existing_account_when_email_verified(
-    client: AsyncClient,
-    session: AsyncSession,
-    monkeypatch,
+    client: AsyncClient, session: AsyncSession, monkeypatch, capfd, proved
 ):
-    """Counterpart: a matching email with ``email_verified=true`` logs
-    into the existing account, promotes it to verified, and now writes the
-    (provider, subject) link so later logins resolve by subject."""
+    """A matching email with ``email_verified=true`` logs into the existing
+    account and writes the (provider, subject) link so later logins resolve
+    by subject. The claim is recorded and its holder told. Where the account
+    had not proved the address, the provider's word is its first proof, what
+    the account held before it is retired, and the account's open connections
+    are rechecked once that commits."""
+    from app.db import post_commit
+    from app.models.platform.mfa_recovery_code import MfaRecoveryCode
+    from app.models.platform.user_passkey import UserPasskey
+    from app.services import content_sockets
+    from app.services.auth import totp as totp_service
+
+    rechecked: list[int] = []
+
+    async def _recheck(user_id: int) -> None:
+        rechecked.append(user_id)
+
+    monkeypatch.setattr(content_sockets.sockets, "revoke_user_everywhere", _recheck)
+    await _enable_platform_oidc(session)
     existing = await create_user(
         session,
         email="member@example.com",
-        email_verified=False,
+        email_verified=proved,
+        hashed_password=get_password_hash("set-before-proof"),
     )
-    await _enable_platform_oidc(session)
+    existing_id = existing.id
+    session.add(
+        UserPasskey(
+            user_id=existing_id,
+            credential_id=b"set-before-proof",
+            public_key=b"key",
+            rp_id="localhost",
+            name="Laptop",
+        )
+    )
+    await totp_service.issue_recovery_codes(session, user_id=existing_id)
+    await session.commit()
     idp = FakeIdp()
     _wire_fake_idp(monkeypatch, idp)
 
-    claims = {
-        "email": "member@example.com",
-        "email_verified": True,
-        "name": "Member",
-    }
-    response = await _run_oidc_flow(client, idp, id_token_claims=claims)
+    letters: list[str] = []
 
+    async def _letter(user, pieces, **_) -> None:
+        letters.append(pieces.subject)
+
+    monkeypatch.setattr(email_outbox, "enqueue_account_letter", _letter)
+    claims = {"email": "member@example.com", "email_verified": True, "name": "Member"}
+    capfd.readouterr()
+
+    response = await _run_oidc_flow(client, idp, id_token_claims=claims)
     assert response.status_code in (302, 307)
     assert "OIDC_EMAIL_UNVERIFIED" not in response.headers["location"]
     assert SESSION_COOKIE_NAME in response.cookies
-    await session.refresh(existing)
-    assert await addresses.has_proven_address(session, user_id=existing.id)
+    await post_commit.settle_all()
+
+    events = emitted(capfd)
+    rows = [r for r in events if r["event_type"] == "auth.identity_linked"]
+    assert [r["actor_user_id"] for r in rows] == [existing_id]
+    assert rows[0]["detail"]["matched_by"] == "verified_email"
+    # Its holder is told of the new way in, with the way to say it wasn't them.
+    assert email_t("identity.linked.subject", "en", escape=False) in letters
+    retired = [r for r in events if r["event_type"] == "auth.credentials_retired"]
+    assert len(retired) == (0 if proved else 1)
+    assert (existing_id in rechecked) is not proved
+    session.expire_all()
+    row = await session.get(User, existing_id)
+    assert row is not None
+    assert (row.hashed_password is not None) is proved
+    kept = (
+        await session.exec(
+            select(UserPasskey).where(UserPasskey.user_id == existing_id)
+        )
+    ).all()
+    codes = (
+        await session.exec(
+            select(MfaRecoveryCode).where(MfaRecoveryCode.user_id == existing_id)
+        )
+    ).all()
+    assert (len(kept), bool(codes)) == ((1, True) if proved else (0, False))
+    # Either way the account now holds the address as proved.
+    assert await addresses.holds_address(
+        session, user_id=existing_id, email="member@example.com"
+    )
     identities = await _federated_identities(session)
     assert [(i.user_id, i.subject) for i in identities] == [
-        (existing.id, "idp-subject-1")
+        (existing_id, "idp-subject-1")
     ]
 
     # The second login resolves through the link (and still issues a session).
@@ -2446,9 +2469,22 @@ async def test_oidc_callback_ignores_userinfo_with_mismatched_sub(
 # --- Password policy -------------------------------------------------
 
 
-async def test_register_rejects_password_shorter_than_minimum(client: AsyncClient):
+async def test_register_rejects_password_shorter_than_minimum(
+    client: AsyncClient, monkeypatch
+):
     """11-char passwords (the previous loose default in our own tests)
-    must now be rejected. Locks down the new NIST-aligned 12-char floor."""
+    must now be rejected. Locks down the new NIST-aligned 12-char floor.
+    The cheap local check fires first, so a short password is refused
+    without a breach lookup."""
+    from app.services import hibp as hibp_module
+
+    looked_up: list[str] = []
+
+    async def _breached(password: str) -> bool:
+        looked_up.append(password)
+        return True
+
+    monkeypatch.setattr(hibp_module, "is_password_breached", _breached)
     response = await client.post(
         "/api/v1/auth/register",
         json={
@@ -2459,28 +2495,40 @@ async def test_register_rejects_password_shorter_than_minimum(client: AsyncClien
     )
     assert response.status_code == 422
     assert response.json()["detail"] == "PASSWORD_TOO_SHORT"
+    assert looked_up == []
 
 
-async def test_register_rejects_breached_password(client: AsyncClient, monkeypatch):
+async def test_register_rejects_breached_password(
+    client: AsyncClient, session: AsyncSession, monkeypatch
+):
     """A password that passes the length floor but appears in HIBP must
-    be rejected with the BREACHED code, not silently accepted."""
+    be rejected with the BREACHED code, not silently accepted. The lookup
+    receives the plaintext, so it can hash it and send only the prefix. A
+    deployment that cannot reach the corpus turns the check off."""
     from app.services import hibp as hibp_module
 
-    async def _breached(_pw: str) -> bool:
+    looked_up: list[str] = []
+
+    async def _breached(password: str) -> bool:
+        looked_up.append(password)
         return True
 
     monkeypatch.setattr(hibp_module, "is_password_breached", _breached)
+    body = {
+        "email": "breached@example.com",
+        "username": "breached",
+        "password": "long-enough-but-pwned",
+    }
 
-    response = await client.post(
-        "/api/v1/auth/register",
-        json={
-            "email": "breached@example.com",
-            "username": "breached",
-            "password": "long-enough-but-pwned",
-        },
-    )
+    response = await client.post("/api/v1/auth/register", json=body)
     assert response.status_code == 422
     assert response.json()["detail"] == "PASSWORD_BREACHED"
+    assert looked_up == ["long-enough-but-pwned"]
+
+    await rules.put(session, "breached_password_check_enabled", False)
+    await session.commit()
+    response = await client.post("/api/v1/auth/register", json=body)
+    assert response.status_code == 201, response.text
 
 
 async def test_register_accepts_compliant_password(client: AsyncClient):
@@ -2604,9 +2652,10 @@ async def test_password_reset_revokes_sessions_on_every_device(
 
 
 async def test_password_reset_tells_the_account(
-    client: AsyncClient, session: AsyncSession, monkeypatch
+    client: AsyncClient, session: AsyncSession, monkeypatch, capfd
 ):
-    """A changed password is announced, as a changed passkey or factor is."""
+    """A changed password is announced, as a changed passkey or factor is, and
+    recorded as a reset."""
     from app.models.platform.user_token import UserTokenPurpose
     from app.services.platform import user_tokens
 
@@ -2624,6 +2673,7 @@ async def test_password_reset_tells_the_account(
         told.append(user_.id)
 
     monkeypatch.setattr(email_outbox, "enqueue_account_letter", _capture)
+    capfd.readouterr()
 
     response = await client.post(
         "/api/v1/auth/password/reset",
@@ -2631,6 +2681,8 @@ async def test_password_reset_tells_the_account(
     )
     assert response.status_code == 200, response.text
     assert told == [user_id]
+    rows = emitted(capfd, AuditEventType.AUTH_PASSWORD_CHANGED)
+    assert [r["detail"]["via"] for r in rows] == ["reset"]
 
 
 async def test_register_rolls_back_when_guild_seed_fails(
@@ -2706,63 +2758,26 @@ async def _login(client: AsyncClient, email: str, password: str):
     )
 
 
-async def test_login_sets_refresh_cookie(client: AsyncClient, session: AsyncSession):
-    """Login additively issues a rotating refresh cookie (the legacy session
-    cookie is still set too — this is additive-first)."""
-    _, password = await _make_login_user(session, "cookie@example.com")
-    resp = await _login(client, "cookie@example.com", password)
-
-    assert resp.status_code == 200
-    assert resp.cookies.get("refresh_token")
-    assert resp.cookies.get("session_token")  # legacy cookie unchanged
-
-
-async def test_login_issues_session_access_token(
-    client: AsyncClient, session: AsyncSession
-):
-    """Login mints the new-model access token: short-lived (AUTH_ACCESS_TTL),
-    carrying the server-side session id and satisfied factors (sid/amr/sat)."""
-    import jwt as pyjwt
-
-    from app.core.config import settings as app_settings
-
-    _, password = await _make_login_user(session, "newmodel@example.com")
-    resp = await _login(client, "newmodel@example.com", password)
-    assert resp.status_code == 200
-
-    claims = pyjwt.decode(
-        resp.json()["access_token"], options={"verify_signature": False}
-    )
-    assert claims["amr"] == ["pwd"]
-    assert claims["sat"] == []
-    assert claims["sid"]
-    assert resp.cookies.get(REFRESH_COOKIE_NAME)
-    set_cookies = resp.headers.get_list("set-cookie")
-    expected_age = f"Max-Age={app_settings.AUTH_ACCESS_TTL_MINUTES * 60}"
-    assert any(
-        c.startswith(f"{SESSION_COOKIE_NAME}=") and expected_age in c
-        for c in set_cookies
-    ), set_cookies
-
-
 async def test_a_login_that_cannot_open_a_session_is_refused(
-    client: AsyncClient, session: AsyncSession, monkeypatch
+    client: AsyncClient, session: AsyncSession, monkeypatch, capfd
 ):
     """A sign-in is the session. If the store cannot be written there is
     nothing to hand back, and the request says so rather than issuing a
-    credential that cannot renew."""
+    credential that cannot renew. Nothing signed in, so nothing is recorded."""
     _, password = await _make_login_user(session, "nostore@example.com")
 
     async def _boom(*args, **kwargs):
         raise RuntimeError("session store down")
 
     monkeypatch.setattr("app.services.auth.sessions.create_session", _boom)
+    capfd.readouterr()
 
     resp = await _login(client, "nostore@example.com", password)
     assert resp.status_code == 503
     assert resp.json()["detail"] == "SESSION_STORE_UNAVAILABLE"
     assert resp.cookies.get(REFRESH_COOKIE_NAME) is None
     assert SESSION_COOKIE_NAME not in resp.cookies
+    assert emitted(capfd, AuditEventType.AUTH_SIGNED_IN) == []
 
 
 async def test_refresh_rotates_and_new_token_authenticates(
@@ -2837,17 +2852,20 @@ async def test_refresh_with_invalid_cookie_returns_401(client: AsyncClient):
 
 
 async def test_reused_refresh_token_returns_401(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, capfd
 ):
     """Endpoint-level theft detection: replaying a spent refresh token is 401
-    (and the service revokes the chain — covered in the service tests)."""
-    _, password = await _make_login_user(session, "reuse@example.com")
+    (and the service revokes the chain — covered in the service tests). The
+    replay is recorded against the chain's owner."""
+    user, password = await _make_login_user(session, "reuse@example.com")
+    user_id = user.id
     login = await _login(client, "reuse@example.com", password)
     first_refresh = login.cookies.get("refresh_token")
 
     # Spend it once (jar rotates to the new token).
     ok = await client.post("/api/v1/auth/refresh")
     assert ok.status_code == 200
+    capfd.readouterr()
 
     # Replay the original (now spent) token.
     client.cookies.clear()
@@ -2855,6 +2873,15 @@ async def test_reused_refresh_token_returns_401(
     replay = await client.post("/api/v1/auth/refresh")
     assert replay.status_code == 401
     assert replay.json()["detail"] == "INVALID_REFRESH_TOKEN"
+
+    rows = emitted(capfd, AuditEventType.AUTH_REFRESH_REUSE_DETECTED)
+    # The endpoint is authorised by the cookie alone and has just rejected it,
+    # so the owner of the chain is the target, not the one who presented it.
+    assert [(r["actor_user_id"], r["target_user_id"]) for r in rows] == [
+        (None, user_id)
+    ]
+    # The same browser, the session its renewal opened never used.
+    assert rows[0]["detail"]["lost_reply"] is True
 
 
 async def test_logout_revokes_refresh_session(
@@ -2925,20 +2952,27 @@ async def test_logout_with_no_access_token_ends_only_the_presented_session(
 
 
 async def test_password_change_revokes_refresh_session(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, capfd
 ):
     """A credential change must invalidate refresh sessions too — otherwise a
     captured refresh token keeps minting valid access tokens (at the new
-    token_version) right past the password change."""
-    _, password = await _make_login_user(session, "pwchange@example.com")
+    token_version) right past the password change. The change is recorded
+    with how it was made."""
+    user, password = await _make_login_user(session, "pwchange@example.com")
+    user_id = user.id
     login = await _login(client, "pwchange@example.com", password)
     captured = login.cookies.get("refresh_token")
+    capfd.readouterr()
 
     change = await client.patch(
         "/api/v1/me",
         json={"password": "newpassword456", "current_password": password},
     )
     assert change.status_code == 200
+    rows = emitted(capfd, AuditEventType.AUTH_PASSWORD_CHANGED)
+    assert [(r["actor_user_id"], r["detail"]) for r in rows] == [
+        (user_id, {"via": "self_service"})
+    ]
 
     # The refresh token captured before the change can no longer rotate.
     client.cookies.clear()

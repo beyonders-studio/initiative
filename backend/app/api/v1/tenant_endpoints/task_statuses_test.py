@@ -20,168 +20,85 @@ from app.services.tenant import task_statuses as task_statuses_service
 from app.services.tenant.soft_delete import soft_delete_entity
 from app.testing import guild_of, route_session_to_guild
 from app.testing.factories import (
-    create_guild,
-    create_guild_membership,
-    create_initiative,
     create_project,
     create_task,
     create_task_status,
-    create_user,
-    get_auth_headers,
 )
 
 
-async def _setup_project(session: AsyncSession):
-    user = await create_user(session)
-    guild = await create_guild(session, creator=user)
-    await create_guild_membership(session, user=user, guild=guild)
-    initiative = await create_initiative(session, guild, user, name="Test Initiative")
-    project = await create_project(session, initiative, user, name="Test Project")
-    headers = get_auth_headers(user)
-    return project, headers
-
-
-async def test_create_status_uses_category_defaults(
-    client: AsyncClient, session: AsyncSession
+async def test_a_project_starts_with_its_categories_looks(
+    client: AsyncClient, acting_user
 ):
-    project, headers = await _setup_project(session)
-
-    response = await client.post(
-        f"/api/v1/c/{guild_of(project)}/projects/{project.id}/task-statuses/",
-        json={"name": "Review", "category": "todo"},
-        headers=headers,
+    """A new project's statuses wear their category's colour and icon, and so
+    does a status added without its own; one given its own keeps it, and a
+    colour that is not a hex is refused."""
+    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    created = await client.post(
+        a.g("/projects/"),
+        headers=a.headers,
+        json={"name": "Seed Project", "initiative_id": a.initiative.id},
     )
+    assert created.status_code == 201, created.text
+    url = a.g(f"/projects/{created.json()['id']}/task-statuses/")
 
-    assert response.status_code == 201
-    body = response.json()
-    assert body["color"] == "#94A3B8"
-    assert body["icon"] == "circle"
+    seeded = await client.get(url, headers=a.headers)
+    assert [
+        (s["name"], s["category"], s["is_default"], s["color"], s["icon"])
+        for s in seeded.json()
+    ] == [
+        ("To Do", "todo", True, "#94A3B8", "circle"),
+        ("In Progress", "in_progress", False, "#60A5FA", "circle-play"),
+        ("Done", "done", False, "#34D399", "circle-check"),
+    ]
 
+    async def add(**body) -> dict:
+        response = await client.post(url, json=body, headers=a.headers)
+        assert response.status_code == 201, response.text
+        return response.json()
 
-async def test_create_status_respects_explicit_color_icon(
-    client: AsyncClient, session: AsyncSession
-):
-    project, headers = await _setup_project(session)
-
-    response = await client.post(
-        f"/api/v1/c/{guild_of(project)}/projects/{project.id}/task-statuses/",
-        json={
-            "name": "Shipping",
-            "category": "in_progress",
-            "color": "#FF00AA",
-            "icon": "rocket",
-        },
-        headers=headers,
+    review = await add(name="Review", category="backlog")
+    assert (review["color"], review["icon"]) == ("#94A3B8", "circle-dashed")
+    shipping = await add(
+        name="Shipping", category="in_progress", color="#FF00AA", icon="rocket"
     )
+    assert (shipping["color"], shipping["icon"]) == ("#FF00AA", "rocket")
 
-    assert response.status_code == 201
-    body = response.json()
-    assert body["color"] == "#FF00AA"
-    assert body["icon"] == "rocket"
-
-
-async def test_patch_updates_color_and_icon(client: AsyncClient, session: AsyncSession):
-    project, headers = await _setup_project(session)
-    statuses = await task_statuses_service.ensure_default_statuses(
-        session, project.id, locale="en"
+    bad = await client.post(
+        url,
+        json={"name": "Bad color", "category": "todo", "color": "notcolor"},
+        headers=a.headers,
     )
-    await session.commit()
-    todo = next(s for s in statuses if s.category == TaskStatusCategory.todo)
-
-    response = await client.patch(
-        f"/api/v1/c/{guild_of(project)}/projects/{project.id}/task-statuses/{todo.id}",
-        json={"color": "#123456", "icon": "star"},
-        headers=headers,
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["color"] == "#123456"
-    assert body["icon"] == "star"
+    assert bad.status_code == 422
 
 
 async def test_patch_category_change_keeps_existing_color_icon(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, acting_user
 ):
-    project, headers = await _setup_project(session)
+    a = await acting_user(
+        guild_role=CommunityRole.member, initiative=True, project=True
+    )
     statuses = await task_statuses_service.ensure_default_statuses(
-        session, project.id, locale="en"
+        session, a.project.id, locale="en"
     )
     await session.commit()
-    todo = next(
-        s
-        for s in statuses
-        if s.category == TaskStatusCategory.todo and s.name == "To Do"
-    )
+    todo = next(s for s in statuses if s.category == TaskStatusCategory.todo)
+    url = a.g(f"/projects/{a.project.id}/task-statuses/{todo.id}")
 
-    # First set explicit custom color/icon
     first = await client.patch(
-        f"/api/v1/c/{guild_of(project)}/projects/{project.id}/task-statuses/{todo.id}",
-        json={"color": "#ABCDEF", "icon": "flag"},
-        headers=headers,
+        url, json={"color": "#ABCDEF", "icon": "flag"}, headers=a.headers
     )
     assert first.status_code == 200
+    assert (first.json()["color"], first.json()["icon"]) == ("#ABCDEF", "flag")
 
     # Now change category only — color/icon should remain untouched
     second = await client.patch(
-        f"/api/v1/c/{guild_of(project)}/projects/{project.id}/task-statuses/{todo.id}",
-        json={"category": "in_progress"},
-        headers=headers,
+        url, json={"category": "in_progress"}, headers=a.headers
     )
     assert second.status_code == 200
     body = second.json()
     assert body["category"] == "in_progress"
     assert body["color"] == "#ABCDEF"
     assert body["icon"] == "flag"
-
-
-async def test_create_status_rejects_invalid_hex_color(
-    client: AsyncClient, session: AsyncSession
-):
-    project, headers = await _setup_project(session)
-
-    response = await client.post(
-        f"/api/v1/c/{guild_of(project)}/projects/{project.id}/task-statuses/",
-        json={
-            "name": "Bad color",
-            "category": "todo",
-            "color": "notcolor",
-        },
-        headers=headers,
-    )
-
-    assert response.status_code == 422
-
-
-async def test_default_seeded_statuses_have_category_colors(
-    session: AsyncSession,
-):
-    user = await create_user(session)
-    guild = await create_guild(session, creator=user)
-    await create_guild_membership(session, user=user, guild=guild)
-    initiative = await create_initiative(session, guild, user, name="Seed Initiative")
-    project = await create_project(session, initiative, user, name="Seed Project")
-
-    statuses = await task_statuses_service.ensure_default_statuses(
-        session, project.id, locale="en"
-    )
-    by_category = {s.category: s for s in statuses}
-
-    assert [(s.name, s.category, s.is_default) for s in statuses] == [
-        ("To Do", TaskStatusCategory.todo, True),
-        ("In Progress", TaskStatusCategory.in_progress, False),
-        ("Done", TaskStatusCategory.done, False),
-    ]
-    assert by_category[TaskStatusCategory.todo].color == "#94A3B8"
-    assert by_category[TaskStatusCategory.todo].icon == "circle"
-    assert task_statuses_service.defaults_for_category(TaskStatusCategory.backlog) == (
-        "#94A3B8",
-        "circle-dashed",
-    )
-    assert by_category[TaskStatusCategory.in_progress].color == "#60A5FA"
-    assert by_category[TaskStatusCategory.in_progress].icon == "circle-play"
-    assert by_category[TaskStatusCategory.done].color == "#34D399"
-    assert by_category[TaskStatusCategory.done].icon == "circle-check"
 
 
 # ---------------------------------------------------------------------------
@@ -214,6 +131,21 @@ async def test_initiative_statuses_collapse_across_projects(
         color="#FBBF24",
         icon="circle-pause",
     )
+    # The same name in another category is its own column.
+    reviews = (
+        (TaskStatusCategory.todo, "#94A3B8", "circle"),
+        (TaskStatusCategory.done, "#34D399", "circle-check"),
+    )
+    for position, (category, color, icon) in enumerate(reviews, start=2):
+        await create_task_status(
+            session,
+            a.project,
+            name="Review",
+            category=category,
+            position=position,
+            color=color,
+            icon=icon,
+        )
 
     response = await client.get(
         a.g(f"/initiatives/{a.initiative.id}/task-statuses/"), headers=a.headers
@@ -222,7 +154,18 @@ async def test_initiative_statuses_collapse_across_projects(
     assert response.status_code == 200
     body = response.json()
     # Ordered by board position: the shared Backlog column, then Blocked.
-    assert body == [
+    assert body[2:] == [
+        {
+            "name": "Review",
+            "category": category,
+            "color": color,
+            "icon": icon,
+            "project_count": 1,
+            "projects_total": 2,
+        }
+        for category, color, icon in reviews
+    ]
+    assert body[:2] == [
         {
             "name": "Backlog",
             "category": "backlog",
@@ -239,35 +182,6 @@ async def test_initiative_statuses_collapse_across_projects(
             "project_count": 1,
             "projects_total": 2,
         },
-    ]
-
-
-async def test_initiative_statuses_separate_same_name_by_category(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    await create_task_status(
-        session, a.project, name="Review", category=TaskStatusCategory.todo, position=0
-    )
-    await create_task_status(
-        session,
-        a.project,
-        name="Review",
-        category=TaskStatusCategory.done,
-        position=1,
-    )
-
-    response = await client.get(
-        a.g(f"/initiatives/{a.initiative.id}/task-statuses/"), headers=a.headers
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert [(entry["name"], entry["category"]) for entry in body] == [
-        ("Review", "todo"),
-        ("Review", "done"),
     ]
 
 
@@ -307,11 +221,16 @@ async def test_initiative_statuses_only_cover_readable_projects(
 async def test_initiative_statuses_skip_archived_and_template_projects(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
+    """An initiative with no readable project offers no columns."""
+    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    url = a.g(f"/initiatives/{a.initiative.id}/task-statuses/")
+    empty = await client.get(url, headers=a.headers)
+    assert empty.status_code == 200
+    assert empty.json() == []
+
+    active = await create_project(session, a.initiative, a.user, name="Active")
     await create_task_status(
-        session, a.project, name="Active", category=TaskStatusCategory.todo
+        session, active, name="Active", category=TaskStatusCategory.todo
     )
     archived = await create_project(
         session,
@@ -330,27 +249,12 @@ async def test_initiative_statuses_skip_archived_and_template_projects(
         session, template, name="Template Only", category=TaskStatusCategory.todo
     )
 
-    response = await client.get(
-        a.g(f"/initiatives/{a.initiative.id}/task-statuses/"), headers=a.headers
-    )
+    response = await client.get(url, headers=a.headers)
 
     assert response.status_code == 200
     body = response.json()
     assert [entry["name"] for entry in body] == ["Active"]
     assert body[0]["projects_total"] == 1
-
-
-async def test_initiative_statuses_empty_when_no_readable_projects(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-
-    response = await client.get(
-        a.g(f"/initiatives/{a.initiative.id}/task-statuses/"), headers=a.headers
-    )
-
-    assert response.status_code == 200
-    assert response.json() == []
 
 
 async def test_initiative_statuses_cover_the_guild_for_an_admin(
@@ -427,6 +331,7 @@ async def test_initiative_statuses_cover_the_initiative_on_full_access(
 async def test_initiative_statuses_refused_to_a_non_member(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
+    """An initiative a member is not in reads as one that does not exist."""
     owner = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
@@ -435,26 +340,13 @@ async def test_initiative_statuses_refused_to_a_non_member(
     )
     outsider = await acting_user(guild_role=CommunityRole.member, guild=owner.guild)
 
-    response = await client.get(
-        outsider.g(f"/initiatives/{owner.initiative.id}/task-statuses/"),
-        headers=outsider.headers,
-    )
-
-    assert response.status_code == 404
-    assert response.json()["detail"] == "INITIATIVE_NOT_FOUND"
-
-
-async def test_initiative_statuses_404_for_an_unknown_initiative(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-
-    response = await client.get(
-        a.g("/initiatives/999999/task-statuses/"), headers=a.headers
-    )
-
-    assert response.status_code == 404
-    assert response.json()["detail"] == "INITIATIVE_NOT_FOUND"
+    for initiative_id in (owner.initiative.id, 999999):
+        response = await client.get(
+            outsider.g(f"/initiatives/{initiative_id}/task-statuses/"),
+            headers=outsider.headers,
+        )
+        assert response.status_code == 404
+        assert response.json()["detail"] == "INITIATIVE_NOT_FOUND"
 
 
 # ---------------------------------------------------------------------------
@@ -501,49 +393,11 @@ async def test_delete_moves_tasks_to_the_default_without_a_fallback(
     assert task.json()["task_status_id"] == default_status.id
 
 
-async def test_delete_accepts_a_fallback_in_another_category(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    statuses = await task_statuses_service.ensure_default_statuses(
-        session, a.project.id, locale="en"
-    )
-    await session.commit()
-    in_progress = next(
-        s for s in statuses if s.category == TaskStatusCategory.in_progress
-    )
-    blocked = await create_task_status(
-        session, a.project, name="Blocked", category=TaskStatusCategory.todo, position=9
-    )
-    created = await client.post(
-        a.g("/tasks/"),
-        headers=a.headers,
-        json={
-            "project_id": a.project.id,
-            "title": "Unblocked",
-            "task_status_id": blocked.id,
-        },
-    )
-    assert created.status_code == 201, created.text
-
-    response = await client.request(
-        "DELETE",
-        a.g(f"/projects/{a.project.id}/task-statuses/{blocked.id}"),
-        headers=a.headers,
-        json={"fallback_status_id": in_progress.id},
-    )
-
-    assert response.status_code == 204, response.text
-    task = await client.get(a.g(f"/tasks/{created.json()['id']}"), headers=a.headers)
-    assert task.json()["task_status_id"] == in_progress.id
-
-
 async def test_delete_into_done_completes_the_tasks_it_moves(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
-    """Crossing the done boundary stamps ``completed_at``, as a task move would."""
+    """A fallback may be in another category, and crossing the done boundary
+    stamps ``completed_at``, as a task move would."""
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
@@ -574,6 +428,7 @@ async def test_delete_into_done_completes_the_tasks_it_moves(
 
     assert response.status_code == 204, response.text
     task = await client.get(a.g(f"/tasks/{created.json()['id']}"), headers=a.headers)
+    assert task.json()["task_status_id"] == done.id
     assert task.json()["completed_at"] is not None
 
 
@@ -717,9 +572,10 @@ async def test_deleting_the_default_promotes_the_next_entry_column(
 
 
 async def test_a_legacy_projects_entry_column_is_its_backlog_not_its_blocked(
-    session: AsyncSession, acting_user
+    client: AsyncClient, session: AsyncSession, acting_user
 ):
-    """A project seeded before this change keeps Backlog as where work starts.
+    """A project seeded before default statuses existed keeps Backlog as where
+    work starts.
 
     Its Blocked column is ``todo``, so a preference that reached for ``todo``
     first would start every task in it.
@@ -737,16 +593,14 @@ async def test_a_legacy_projects_entry_column_is_its_backlog_not_its_blocked(
             session, a.project, name=name, category=category, position=position
         )
 
-    statuses = await task_statuses_service.list_statuses(session, a.project.id)
-    assert all(not s.is_default for s in statuses)
-
-    entry = task_statuses_service.first_by_category_preference(statuses)
-    assert entry is not None and entry.name == "Backlog"
-
-    default_status = await task_statuses_service.get_default_status(
-        session, a.project.id
+    created = await client.post(
+        a.g("/tasks/"),
+        headers=a.headers,
+        json={"project_id": a.project.id, "title": "Where does it start"},
     )
-    assert default_status.name == "Backlog"
+
+    assert created.status_code == 201, created.text
+    assert created.json()["task_status"]["name"] == "Backlog"
 
 
 # ---------------------------------------------------------------------------

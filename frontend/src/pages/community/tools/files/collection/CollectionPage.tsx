@@ -14,10 +14,10 @@ import { useTranslation } from "react-i18next";
 
 import {
   type CollectionFileSummary,
+  ContentKind,
   FileKind,
   type FileSummary,
   type ListLayoutDefinitionInput,
-  PropertyTarget,
   type PropertyValueInput,
   SearchEntityType,
   type TimelineBucket,
@@ -77,14 +77,13 @@ import type { ToolIndexRow } from "@/pages/community/tools/ToolIndexPage";
 import { TABLE_SORT_FIELDS, ToolIndexTable } from "@/pages/community/tools/ToolIndexTable";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
 import { DropdownMenuItem } from "@/ui/dropdown-menu";
 import { DropOverlay } from "@/ui/file-drop";
 import { Label } from "@/ui/label";
 import { DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
 import { requiredKeys, type StoredRegions } from "@/ui/layouts/detailLayout";
 import { withDisplays } from "@/ui/layouts/fields";
-import { LayoutsOverview } from "@/ui/layouts/LayoutList";
+import { LayoutsDialog } from "@/ui/layouts/LayoutList";
 import { detailLayoutOf, listLayouts } from "@/ui/layouts/layoutSet";
 import { listLayoutLooks } from "@/ui/layouts/looks";
 import { formatPeriod } from "@/ui/lib/formatDate";
@@ -220,9 +219,9 @@ export function CollectionPage() {
   // The collection's metadata is the collection's to change; a file's own
   // properties are the file's.
   const stepCounter = useCounterSteps<CollectionFileSummary>(
-    PropertyTarget.file,
+    ContentKind.file,
     useCallback(
-      (item, definition) => (definition.collection_id !== null ? canEdit : item.can.edit),
+      (item, summary) => (summary.collection_id !== null ? canEdit : item.can.edit),
       [canEdit]
     )
   );
@@ -508,7 +507,7 @@ export function CollectionPage() {
               entity={collection}
               kind={{
                 archivable: "collection",
-                properties: propertySaves[PropertyTarget.collection],
+                properties: propertySaves[ContentKind.collection],
                 saveTags: (ids) => update.mutateAsync({ tag_ids: ids }),
               }}
             />
@@ -864,20 +863,14 @@ export function CollectionPage() {
       />
 
       {collection && layoutsQuery.data?.can_configure ? (
-        <Dialog open={layoutsOpen} onOpenChange={setLayoutsOpen}>
-          <DialogContent className="sm:max-w-xl">
-            <DialogHeader>
-              <DialogTitle>{t("layouts:tab")}</DialogTitle>
-              <DialogDescription>{t("layouts:settingsDescription")}</DialogDescription>
-            </DialogHeader>
-            <LayoutsOverview
-              layouts={layoutsQuery.data.layouts}
-              pageLooks={detailLayoutLooks}
-              save={saveLayouts.mutateAsync}
-              editor={gp(`${collectionRoute(collection.initiative_id, collection.id)}/layouts`)}
-            />
-          </DialogContent>
-        </Dialog>
+        <LayoutsDialog
+          open={layoutsOpen}
+          onOpenChange={setLayoutsOpen}
+          layouts={layoutsQuery.data.layouts}
+          pageLooks={detailLayoutLooks}
+          save={saveLayouts.mutateAsync}
+          editor={gp(`${collectionRoute(collection.initiative_id, collection.id)}/layouts`)}
+        />
       ) : null}
     </div>
   );

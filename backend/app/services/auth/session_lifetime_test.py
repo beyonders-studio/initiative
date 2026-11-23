@@ -29,7 +29,11 @@ async def _hold_to_the_standard(session, guild):
 
 
 async def test_a_deployment_that_asks_for_no_limit_stamps_none(session):
-    """The default. Nothing about an upgrade shortens a session."""
+    """The default. Nothing about an upgrade shortens a session: the idle
+    window is the only thing ending it, and nothing asks for less than the
+    usual length."""
+    from app.core.config import settings as app_config
+
     user = await create_user(session, email="sl-none@example.com")
     await _set_platform_hours(session, None)
 
@@ -37,8 +41,9 @@ async def test_a_deployment_that_asks_for_no_limit_stamps_none(session):
         session, user_id=user.id, amr=["pwd"], satisfied_providers=[], now=_AT
     )
     assert issued.session.chain_expires_at is None
-    # The idle window is the only thing ending it, exactly as before.
-    assert issued.session.expires_at > _AT + timedelta(days=29)
+    assert issued.session.expires_at == _AT + timedelta(
+        days=app_config.AUTH_REFRESH_TTL_DAYS
+    )
 
 
 async def test_the_deployments_own_figure_ends_the_chain(session):
@@ -115,9 +120,10 @@ async def test_a_communitys_standard_only_ever_tightens(session):
 
 
 async def test_renewing_does_not_move_the_chains_end(session):
-    """The idle window slides; the chain's end is the thing that does not."""
+    """The idle window slides; the chain's end is the thing that does not.
+    Reached, the answer is a fresh sign-in rather than another renewal."""
     user = await create_user(session, email="sl-rotate@example.com")
-    await _set_platform_hours(session, 48)
+    await _set_platform_hours(session, 2)
 
     first = await session_service.create_session(
         session, user_id=user.id, amr=["pwd"], satisfied_providers=[], now=_AT
@@ -129,25 +135,16 @@ async def test_renewing_does_not_move_the_chains_end(session):
         now=_AT + timedelta(hours=1),
     )
     assert rotated.issued is not None
-    assert rotated.issued.session.chain_expires_at == _AT + timedelta(hours=48)
+    assert rotated.issued.session.chain_expires_at == _AT + timedelta(hours=2)
 
-
-async def test_a_chain_past_its_end_is_not_renewed(session):
-    """Reached, the answer is a fresh sign-in rather than another renewal."""
-    user = await create_user(session, email="sl-expired@example.com")
-    await _set_platform_hours(session, 2)
-
-    first = await session_service.create_session(
-        session, user_id=user.id, amr=["pwd"], satisfied_providers=[], now=_AT
-    )
     await session.flush()
-    rotated = await session_service.rotate_session(
+    past = await session_service.rotate_session(
         session,
-        raw_refresh_token=first.refresh_token,
+        raw_refresh_token=rotated.issued.refresh_token,
         now=_AT + timedelta(hours=3),
     )
-    assert rotated.outcome == session_service.RefreshOutcome.EXPIRED
-    assert rotated.issued is None
+    assert past.outcome == session_service.RefreshOutcome.EXPIRED
+    assert past.issued is None
 
 
 # ---------------------------------------------------------------------------
@@ -155,30 +152,19 @@ async def test_a_chain_past_its_end_is_not_renewed(session):
 # ---------------------------------------------------------------------------
 
 
-async def test_an_ordinary_session_keeps_the_deployments_idle_window(session):
-    """Nothing asks for less, so the refresh row stands the usual length."""
-    from app.core.config import settings as app_config
-
-    user = await create_user(session, email="sl-idle-none@example.com")
-
-    issued = await session_service.create_session(
-        session, user_id=user.id, amr=["pwd"], satisfied_providers=[], now=_AT
-    )
-
-    assert issued.session.expires_at == _AT + timedelta(
-        days=app_config.AUTH_REFRESH_TTL_DAYS
-    )
-
-
 async def test_a_community_holds_its_members_to_an_idle_window(session):
     """Belonging to one shortens how long a session may be left alone, the
-    same way it shortens how long the session may last at all."""
+    same way it shortens how long the session may last at all. The window
+    travels with the chain: a rotation that read the deployment's own figure
+    would widen a narrowed session on its first renewal."""
     user = await create_user(session, email="sl-idle@example.com")
     guild = await create_guild(session)
     await create_guild_membership(
         session, user=user, guild=guild, role=CommunityRole.member
     )
     await _hold_to_the_standard(session, guild)
+    window = timedelta(minutes=session_lifetime.COMPLIANCE_IDLE_MINUTES)
+    later = _AT + timedelta(minutes=5)
 
     # A device's session is held to it as a browser's is.
     for install in (None, uuid.uuid4()):
@@ -190,35 +176,13 @@ async def test_a_community_holds_its_members_to_an_idle_window(session):
             install_id=install,
             now=_AT,
         )
+        assert issued.session.expires_at == _AT + window
 
-        assert issued.session.expires_at == _AT + timedelta(
-            minutes=session_lifetime.COMPLIANCE_IDLE_MINUTES
+        result = await session_service.rotate_session(
+            session, raw_refresh_token=issued.refresh_token, now=later
         )
-
-
-async def test_renewing_keeps_the_narrow_idle_window(session):
-    """The window travels with the chain. A rotation that read the
-    deployment's own figure would widen a narrowed session on its first
-    renewal, which is the whole thing this control is for."""
-    user = await create_user(session, email="sl-idle-renew@example.com")
-    guild = await create_guild(session)
-    await create_guild_membership(
-        session, user=user, guild=guild, role=CommunityRole.member
-    )
-    await _hold_to_the_standard(session, guild)
-    first = await session_service.create_session(
-        session, user_id=user.id, amr=["pwd"], satisfied_providers=[], now=_AT
-    )
-
-    later = _AT + timedelta(minutes=5)
-    result = await session_service.rotate_session(
-        session, raw_refresh_token=first.refresh_token, now=later
-    )
-
-    assert result.issued is not None
-    assert result.issued.session.expires_at == later + timedelta(
-        minutes=session_lifetime.COMPLIANCE_IDLE_MINUTES
-    )
+        assert result.issued is not None
+        assert result.issued.session.expires_at == later + window
 
 
 async def test_the_idle_window_never_outlasts_the_chain(session):
@@ -272,19 +236,6 @@ def test_an_access_token_does_not_outlive_the_session_it_names():
 
     exact = SimpleNamespace(expires_at=_AT + standard)
     assert access_ttl_for(exact, now=_AT) is None
-
-
-async def test_the_deployment_can_set_its_own_idle_window(session):
-    """A figure here narrows the window every session is opened with."""
-    user = await create_user(session, email="sl-idle-platform@example.com")
-    await rules.put(session, "session_idle_minutes", 45)
-    await session.flush()
-
-    issued = await session_service.create_session(
-        session, user_id=user.id, amr=["pwd"], satisfied_providers=[], now=_AT
-    )
-
-    assert issued.session.expires_at == _AT + timedelta(minutes=45)
 
 
 async def test_the_stricter_idle_window_wins(session):

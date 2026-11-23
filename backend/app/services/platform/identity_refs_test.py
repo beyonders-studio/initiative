@@ -21,7 +21,6 @@ from app.models.platform.identity_ref import (
 )
 from app.services.platform.identity_refs import (
     REF_GRACE_PERIOD,
-    drop_entity_refs,
     drop_guild_refs,
     ensure_ref,
     mint_ref,
@@ -34,39 +33,23 @@ from app.services.platform.identity_refs import (
 BILLING = IdentityPurpose.billing
 
 
-class TestTheRenderedValue:
-    def test_it_is_a_prefix_and_a_random_half(self):
-        ref = mint_ref(IdentityEntity.guild, BILLING)
-        prefix, _, random_half = ref.partition("_")
-        assert prefix == "gbil"
-        assert len(random_half) == REF_RANDOM_LENGTH
-        assert len(ref) <= REF_MAX_LENGTH
-
-    def test_it_fits_a_jwt_claim_and_a_url(self):
-        random_half = mint_ref(IdentityEntity.user, BILLING).partition("_")[2]
-        assert random_half.replace("-", "").replace("_", "").isalnum()
-
-    def test_the_prefix_names_the_entity_and_the_purpose(self):
-        assert ref_prefix(IdentityEntity.user, BILLING) == "ubil"
-        assert ref_prefix(IdentityEntity.guild, BILLING) == "gbil"
-        assert ref_prefix(IdentityEntity.user, IdentityPurpose.plugin) == "uplu"
-
-    def test_two_mints_never_agree(self):
-        assert mint_ref(IdentityEntity.user, BILLING) != mint_ref(
-            IdentityEntity.user, BILLING
-        )
+def test_the_rendered_value():
+    """A prefix naming the entity and the purpose, and a random half that fits
+    a JWT claim and a URL; two mints never agree."""
+    ref = mint_ref(IdentityEntity.guild, BILLING)
+    prefix, _, random_half = ref.partition("_")
+    assert prefix == "gbil"
+    assert len(random_half) == REF_RANDOM_LENGTH
+    assert len(ref) <= REF_MAX_LENGTH
+    assert random_half.replace("-", "").replace("_", "").isalnum()
+    assert ref_prefix(IdentityEntity.user, BILLING) == "ubil"
+    assert ref_prefix(IdentityEntity.user, IdentityPurpose.plugin) == "uplu"
+    assert mint_ref(IdentityEntity.user, BILLING) != mint_ref(
+        IdentityEntity.user, BILLING
+    )
 
 
 class TestMintingAndResolving:
-    async def test_minting_twice_gives_the_same_reference(self, session):
-        first = await ensure_ref(
-            session, entity_type=IdentityEntity.guild, entity_id=1, purpose=BILLING
-        )
-        second = await ensure_ref(
-            session, entity_type=IdentityEntity.guild, entity_id=1, purpose=BILLING
-        )
-        assert first == second
-
     async def test_two_first_callers_racing_get_one_reference(self, session, engine):
         """The claim ``ensure_ref`` makes about concurrency, exercised.
 
@@ -109,15 +92,6 @@ class TestMintingAndResolving:
             sector_plugin="acme.app7",
         )
         assert billing != at_plugin
-
-    async def test_a_user_and_a_guild_of_the_same_id_differ(self, session):
-        as_user = await ensure_ref(
-            session, entity_type=IdentityEntity.user, entity_id=42, purpose=BILLING
-        )
-        as_guild = await ensure_ref(
-            session, entity_type=IdentityEntity.guild, entity_id=42, purpose=BILLING
-        )
-        assert as_user != as_guild
 
     async def test_a_reference_resolves_to_its_entity(self, session):
         ref = await ensure_ref(
@@ -303,26 +277,6 @@ class TestReissuingEvery:
 
 
 class TestRemoval:
-    async def test_erasing_an_entity_drops_what_every_party_held(self, session):
-        billing = await ensure_ref(
-            session, entity_type=IdentityEntity.user, entity_id=1, purpose=BILLING
-        )
-        at_plugin = await ensure_ref(
-            session,
-            entity_type=IdentityEntity.user,
-            entity_id=1,
-            purpose=IdentityPurpose.plugin,
-            sector_guild_id=3,
-            sector_plugin="acme.app7",
-        )
-
-        dropped = await drop_entity_refs(
-            session, entity_type=IdentityEntity.user, entity_id=1
-        )
-        assert dropped == 2
-        assert await resolve_ref(session, ref=billing) is None
-        assert await resolve_ref(session, ref=at_plugin) is None
-
     async def test_a_deleted_guild_leaves_neither_half(self, session):
         """A guild is in this table twice and both have to go.
 

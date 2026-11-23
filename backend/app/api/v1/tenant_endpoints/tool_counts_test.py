@@ -26,9 +26,7 @@ async def _one_of_each(session, acting_user, tool: Tool):
     one tagged, beside a second live row with no tag. A tool with templates
     also has an archived template, which belongs to the archive."""
     actor = await acting_user(guild_role=CommunityRole.admin)
-    home = await create_initiative(
-        session, actor.guild, actor.user, **{t.view_permission: True for t in Tool}
-    )
+    home = await create_initiative(session, actor.guild, actor.user)
     factory = TOOL_FACTORIES[tool]
     tagged = await factory(session, home, actor.user)
     await factory(session, home, actor.user)
@@ -149,7 +147,10 @@ async def test_the_tag_tree_counts_the_view_shown(
 async def test_the_sidebar_counts_each_tools_live_view(
     client: AsyncClient, session, acting_user, tool: Tool
 ):
+    """An initiative with the tool switched off counts nothing."""
     actor, home, _tag = await _one_of_each(session, acting_user, tool)
+    off = await create_initiative(session, actor.guild, actor.user, tools={tool: False})
+    await TOOL_FACTORIES[tool](session, off, actor.user)
 
     response = await client.get(
         actor.g("/tools/counts/by-initiative"), headers=actor.headers
@@ -165,7 +166,7 @@ async def test_a_view_the_tool_does_not_have_is_refused(
     actor = await acting_user(guild_role=CommunityRole.admin)
 
     response = await client.get(
-        actor.g("/tools/counter_group/counts"),
+        actor.g("/tools/wiki/counts"),
         headers=actor.headers,
         params={"view": "templates"},
     )

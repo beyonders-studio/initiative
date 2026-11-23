@@ -129,25 +129,6 @@ vi.mock(import("@/hooks/useAccessGrants"), async (importOriginal) => ({
   useRevokeAccessGrant: () => idle(),
 }));
 
-vi.mock(import("@/hooks/useCommunities"), async (importOriginal) => ({
-  ...(await importOriginal()),
-  useCommunities: () => ({
-    communities: [],
-    activeCommunity: null,
-    activeCommunityId: null,
-    activeCommunityReadOnly: false,
-    loading: false,
-    error: null,
-    refreshCommunities: vi.fn(),
-    switchCommunity: vi.fn(),
-    syncCommunityFromUrl: vi.fn(),
-    createCommunity: vi.fn(),
-    updateCommunityInState: vi.fn(),
-    reorderCommunities: vi.fn(),
-    canCreateCommunities: false,
-  }),
-}));
-
 // The communities the picker finds, and what it last searched for. Only the
 // fields the picker reads.
 const pickable = [
@@ -239,8 +220,10 @@ describe("AccessPage", () => {
     const user = userEvent.setup();
     render();
 
+    await user.type(await screen.findByLabelText(/reason/i), "looking into a report");
+    // Not before a community is chosen.
+    expect(screen.getByRole("button", { name: /request access/i })).toBeDisabled();
     await pickCommunity(user);
-    await user.type(screen.getByLabelText(/reason/i), "looking into a report");
     await user.click(screen.getByRole("button", { name: /request access/i }));
 
     expect(createRequest).toHaveBeenCalledTimes(1);
@@ -362,7 +345,7 @@ describe("AccessPage", () => {
     expect(createRequest).not.toHaveBeenCalled();
   });
 
-  it("names each community with its id, and says when one is not active", async () => {
+  it("names each community with its id, says when one is not active, and searches the server", async () => {
     const user = userEvent.setup();
     render();
 
@@ -372,25 +355,10 @@ describe("AccessPage", () => {
     // Still pickable: a grant may be needed on exactly this one.
     const gone = screen.getByRole("option", { name: /Gone Community.*Deleted · #9/ });
     expect(gone).not.toHaveAttribute("aria-disabled", "true");
-  });
 
-  it("searches the server with what is typed", async () => {
-    const user = userEvent.setup();
-    render();
-
-    await user.click(await screen.findByRole("combobox", { name: "Community" }));
+    // What is typed searches the server.
     await user.type(screen.getByPlaceholderText("Search by name or number…"), "river");
-
     await waitFor(() => expect(searched).toBe("river"));
-  });
-
-  it("will not send a request before a community is chosen", async () => {
-    const user = userEvent.setup();
-    render();
-
-    await user.type(await screen.findByLabelText(/reason/i), "looking into a report");
-
-    expect(screen.getByRole("button", { name: /request access/i })).toBeDisabled();
   });
 
   it("starts with the community it was opened for", async () => {
@@ -567,24 +535,16 @@ describe("AccessPage", () => {
       expect(createRequest.mock.calls[0][0]).toMatchObject({ community_id: 7, case_task_id: 31 });
     });
 
-    it("takes the community the case is about until another is picked", async () => {
-      grantCases = { items: [spamWave], required: false };
+    it("takes the community the case is about until another is picked, then warns without refusing", async () => {
+      grantCases = { items: [spamWave], required: true };
       const user = userEvent.setup();
       render();
 
       await pickCase(user, /Spam wave/);
       expect(screen.getByRole("combobox", { name: "Community" })).toHaveTextContent("#7");
       expect(screen.queryByText(/This case is about community/)).toBeNull();
-    });
 
-    it("warns, without refusing, when the community picked is not the case's", async () => {
-      grantCases = { items: [spamWave], required: true };
-      const user = userEvent.setup();
-      render();
-
-      await pickCase(user, /Spam wave/);
       await pickCommunity(user, /Gone Community/);
-
       expect(
         screen.getByText("This case is about community #7, not the one chosen.")
       ).toBeInTheDocument();

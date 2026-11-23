@@ -1,11 +1,5 @@
-"""Todoist's CSV as this app's project envelope.
-
-The load-bearing test is the last one: whatever the mapping produces has to
-validate as a real ``ProjectExportEnvelope``, because the apply path is the
-one that has existed for months and knows nothing about Todoist. Something
-almost-right would fail at apply time, inside a worker, long after the person
-who started the import went away.
-"""
+"""Todoist's CSV as this app's project envelope. That one applies as a real
+project is tested through the import endpoint, in ``imports_test``."""
 
 from datetime import UTC, datetime
 
@@ -284,30 +278,6 @@ def test_preview_counts_only_top_level_tasks():
 
 def test_preview_of_an_empty_file_says_nothing_is_there():
     assert tm.preview("")[0].task_count == 0
-
-
-# --- the one that matters --------------------------------------------------
-
-
-def test_the_envelope_validates_as_a_real_project_export():
-    mapped = _build(
-        _csv(
-            "section,Doing,,,,,,,,,,,,,",
-            "task,Ship it,With detail,1,1,,Sam Reed (9),2026-03-01,,,,,,2026-03-09,",
-            "task,A step,,4,2,,,,,,,,,,",
-            "note,Said something,,,,Dana (42),,,,,,,,,",
-        )
-    )
-    envelope = ProjectExportEnvelope.model_validate(mapped.envelope)
-    assert envelope.type == "initiative-project"
-    assert envelope.project.name == "My project"
-    (task,) = envelope.tasks
-    assert task.title == "Ship it"
-    assert task.priority == TaskPriority.urgent
-    assert task.status_name == "Doing"
-    assert task.checklist[0].text == "A step"
-    assert task.comments[0].body == "Said something"
-    assert task.assignee_handles == ["Sam Reed"]
 
 
 def test_an_unnamed_import_still_gets_a_project_name():

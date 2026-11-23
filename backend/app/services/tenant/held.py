@@ -19,7 +19,8 @@ from app.core.errors import CodedError
 from app.core.messages import CommonMessages
 from app.db.query import ids_in
 from app.db.soft_delete_filter import select_including_deleted
-from app.services.tenant.lifecycle_tree import Level, subtree_levels
+from app.db.tool_rows import ToolRow, table_of
+from app.services.tenant.lifecycle_tree import Level, Tree, subtree_levels
 
 
 class HeldContent(CodedError):
@@ -36,20 +37,20 @@ async def _any_held(session: AsyncSession, rows: Level) -> bool:
     from app.models.tenant.initiative import Initiative
     from app.models.tenant.upload import Upload
 
-    for model, ids in rows.items():
-        if not ids or not hasattr(model, "held_at"):
+    for table, ids in rows.items():
+        if not ids or "held_at" not in table.c:
             continue
         found = (
             await session.exec(
-                select_including_deleted(model)
-                .where(ids_in(model.id, ids))
-                .where(model.held_at.is_not(None))
+                select_including_deleted(table.c.id)
+                .where(ids_in(table.c.id, ids))
+                .where(table.c.held_at.is_not(None))
                 .limit(1)
             )
         ).first()
         if found is not None:
             return True
-    initiatives = rows.get(Initiative)
+    initiatives = rows.get(Initiative.__table__)  # type: ignore[attr-defined]
     if initiatives:
         # An initiative's uploads go with it, and are no part of the tree.
         found = (
@@ -66,10 +67,10 @@ async def _any_held(session: AsyncSession, rows: Level) -> bool:
 
 
 async def refuse_if_held(
-    session: AsyncSession, roots: Iterable[object], doomed: Level
+    session: AsyncSession, roots: Iterable[object], doomed: Level, *, tree: Tree
 ) -> None:
     """Refuse a purge of ``roots`` — ``doomed`` is what the session found at
-    and under them — when any of it is held.
+    and under them in the community's ``tree`` — when any of it is held.
 
     A person's session reads nothing held, so for one routed as a person the
     walk is made again as the platform, which sees it all.
@@ -85,26 +86,31 @@ async def refuse_if_held(
         return
     async with cohorts.system_session(context.guild_id) as system:
         await set_rls_context(system, SystemGuild(context.guild_id, read_only=True))
-        again = []
+        again: list[object] = []
         for root in roots:
-            model = type(root)
+            table = table_of(root)
             found = (
                 await system.exec(
-                    select_including_deleted(model).where(model.id == root.id)  # type: ignore[attr-defined]
+                    select_including_deleted(table.c.id).where(
+                        table.c.id == root.id  # type: ignore[attr-defined]
+                    )
                 )
             ).first()
             if found is not None:
-                again.append(found)
-        held = bool(again) and await holds_under(system, again)
+                again.append(ToolRow(table, {"id": found}))
+        held = bool(again) and await holds_under(system, again, tree=tree)
         await system.rollback()
     if held:
         raise HeldContent()
 
 
-async def holds_under(session: AsyncSession, roots: Iterable[object]) -> bool:
-    """Whether anything at or under ``roots`` is held."""
+async def holds_under(
+    session: AsyncSession, roots: Iterable[object], *, tree: Tree | None = None
+) -> bool:
+    """Whether anything at or under ``roots`` is held, in the community's
+    ``tree`` (the session's community's when not given)."""
     doomed: Level = {}
-    for level in await subtree_levels(session, list(roots)):
-        for model, ids in level.items():
-            doomed.setdefault(model, []).extend(ids)
+    for level in await subtree_levels(session, list(roots), tree=tree):
+        for table, ids in level.items():
+            doomed.setdefault(table, []).extend(ids)
     return await _any_held(session, doomed)

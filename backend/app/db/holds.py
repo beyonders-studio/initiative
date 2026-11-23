@@ -28,8 +28,14 @@ read it back.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from app.db.authorization import IN_POLICY, SYSTEM_SESSION
 from app.db.frozen import FROZEN_SQLSTATE, HELD_CONSTRAINT
+from app.db.names import object_name
+
+if TYPE_CHECKING:
+    from app.core.tool_set import ToolSet
 
 
 def _holdable() -> frozenset[str]:
@@ -83,7 +89,7 @@ def _table_block(table: str) -> str:
             f"  USING (held_at IS NULL OR {HELD_READERS})",
             f"  WITH CHECK (held_at IS NULL OR {IN_POLICY.system});",
             (
-                f"CREATE OR REPLACE TRIGGER tr_{table}_held_guard "
+                f"CREATE OR REPLACE TRIGGER {object_name('tr', table, 'held_guard')} "
                 f"BEFORE UPDATE OR DELETE ON {table} FOR EACH ROW "
                 "WHEN (OLD.held_at IS NOT NULL) "
                 "EXECUTE FUNCTION public.fn_held_guard();"
@@ -108,10 +114,12 @@ def _record_block() -> str:
     )
 
 
-def render_holds_ddl() -> str:
-    """Everything above, for one guild schema. Rendered after every table's
-    own row security is on."""
-    blocks = [_table_block(table) for table in sorted(HOLDABLE_TABLES)]
+def render_holds_ddl(tools: ToolSet) -> str:
+    """Everything above, for one guild schema with ``tools``: a tool
+    plug-in's tables carry the hold columns from the same mixin. Rendered
+    after every table's own row security is on."""
+    holdable = HOLDABLE_TABLES | tools.tables_carrying("held_at")
+    blocks = [_table_block(table) for table in sorted(holdable)]
     return "\n\n".join([_SECTION, held_guard_fn(), *blocks, _record_block()])
 
 

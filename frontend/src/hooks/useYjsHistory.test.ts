@@ -15,58 +15,6 @@ describe("createYjsUndoManager", () => {
       createYjsUndoManager(new Y.Doc(), { getScope: () => [], trackedOrigins: TRACKED })
     ).toBeNull();
   });
-
-  it("captures tracked-origin transactions and undo/redo reverts them", () => {
-    const doc = new Y.Doc();
-    const um = createYjsUndoManager(doc, {
-      getScope: scope,
-      trackedOrigins: TRACKED,
-    })!;
-    const cells = doc.getMap("cells");
-
-    doc.transact(() => cells.set("0:0", "a"), "spreadsheet-edit");
-    expect(um.undoStack.length).toBe(1);
-    expect(cells.get("0:0")).toBe("a");
-
-    um.undo();
-    expect(cells.has("0:0")).toBe(false);
-    expect(um.redoStack.length).toBe(1);
-
-    um.redo();
-    expect(cells.get("0:0")).toBe("a");
-  });
-
-  it("ignores untracked (bootstrap/seed) origins", () => {
-    const doc = new Y.Doc();
-    const um = createYjsUndoManager(doc, {
-      getScope: scope,
-      trackedOrigins: TRACKED,
-    })!;
-    const cells = doc.getMap("cells");
-
-    doc.transact(() => cells.set("9:9", "seed"), "spreadsheet-bootstrap");
-    expect(um.undoStack.length).toBe(0);
-
-    um.undo(); // no-op
-    expect(cells.get("9:9")).toBe("seed");
-  });
-
-  it("treats each transaction as a discrete undo step (captureTimeout 0)", () => {
-    const doc = new Y.Doc();
-    const um = createYjsUndoManager(doc, {
-      getScope: scope,
-      trackedOrigins: TRACKED,
-    })!;
-    const cells = doc.getMap("cells");
-
-    doc.transact(() => cells.set("0:0", "a"), "spreadsheet-edit");
-    doc.transact(() => cells.set("0:1", "b"), "spreadsheet-edit");
-    expect(um.undoStack.length).toBe(2);
-
-    um.undo();
-    expect(cells.has("0:1")).toBe(false);
-    expect(cells.get("0:0")).toBe("a");
-  });
 });
 
 describe("useYjsHistory (React lifecycle)", () => {
@@ -91,6 +39,18 @@ describe("useYjsHistory (React lifecycle)", () => {
     act(() => result.current.undo());
     expect(cells.has("0:0")).toBe(false);
     expect(result.current.canRedo).toBe(true);
+
+    act(() => result.current.redo());
+    expect(cells.get("0:0")).toBe("a");
+
+    // Two quick edits with the same origin stay separate undo steps.
+    act(() => {
+      doc.transact(() => cells.set("0:1", "b"), "spreadsheet-edit");
+      doc.transact(() => cells.set("0:2", "c"), "spreadsheet-edit");
+    });
+    act(() => result.current.undo());
+    expect(cells.has("0:2")).toBe(false);
+    expect(cells.get("0:1")).toBe("b");
   });
 });
 

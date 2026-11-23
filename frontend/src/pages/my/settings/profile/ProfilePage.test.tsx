@@ -33,7 +33,7 @@ vi.mock("@/hooks/useUsers", () => ({
 const user = buildUser({
   username: "jordan",
   discriminator: 1234,
-  custom_status: { emoji: "🎲", text: "Rolling initiative" },
+  custom_status: { emoji: "🎲", text: "Rolling initiative", clear_at: null },
   profile_decorations: {
     banner: null,
     frame: "core.gold",
@@ -94,7 +94,7 @@ describe("the two halves of the page", () => {
     // untouched on the server, so the pick has to survive.
     rerender(
       <ProfilePage
-        user={{ ...user, custom_status: { emoji: null, text: "Back soon" } }}
+        user={{ ...user, custom_status: { emoji: null, text: "Back soon", clear_at: null } }}
         refreshUser={() => Promise.resolve()}
       />
     );

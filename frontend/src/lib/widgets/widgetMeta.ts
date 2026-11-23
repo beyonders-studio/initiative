@@ -16,12 +16,8 @@
  * parts rather than trusting the shape.
  */
 
-import contract from "@/contract/manifest.contract.json";
-
-/** Language code → text. No locale is required: resolution falls back through
- *  the base language, then English, then whatever the widget did supply, so a
- *  widget that ships one language still renders everywhere. */
-export type LocalizedText = Record<string, string>;
+import { caps, charsets } from "@/contract/manifest.contract.json";
+import { type LocalizedText, localized } from "@/ui/lib/localized";
 
 export interface WidgetOptionMeta {
   label: LocalizedText;
@@ -47,20 +43,20 @@ export interface WidgetMeta {
  * Refresh the vendored contract with `backend/scripts/refresh_plugin_kit.py`.
  */
 export const META_LIMITS = {
-  maxTextLength: contract.caps.textLength,
-  maxDescriptionLength: contract.caps.widgetDescriptionLength,
+  maxTextLength: caps.textLength,
+  maxDescriptionLength: caps.widgetDescriptionLength,
   /** Languages one string may be supplied in. Generous — the cap only stops a
    *  module from shipping a dictionary. */
-  maxLocales: contract.caps.locales,
-  maxOptions: contract.caps.widgetOptions,
-  maxValuesPerOption: contract.caps.valuesPerOption,
+  maxLocales: caps.locales,
+  maxOptions: caps.widgetOptions,
+  maxValuesPerOption: caps.valuesPerOption,
   /** `en`, `en-GB`, `pt-BR` — a language tag, not free text. */
-  maxLocaleTagLength: contract.caps.localeTagLength,
+  maxLocaleTagLength: caps.localeTagLength,
 } as const;
 
 // --- validation ------------------------------------------------------------
 
-const LOCALE_TAG_CHARS = contract.charsets.localeTag;
+const LOCALE_TAG_CHARS = charsets.localeTag;
 
 /** An explicit character check rather than a pattern: the set of things a
  *  language tag may contain is short enough to state outright. */
@@ -74,7 +70,7 @@ const isLocaleTag = (value: string): boolean => {
 
 const localizedText = (raw: unknown, maxLength: number): LocalizedText | null => {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;
-  const out: LocalizedText = {};
+  const out: Record<string, string> = {};
   let count = 0;
   for (const [tag, value] of Object.entries(raw as Record<string, unknown>)) {
     if (++count > META_LIMITS.maxLocales) break;
@@ -136,19 +132,6 @@ export function validateWidgetMeta(raw: unknown): WidgetMeta | null {
 }
 
 // --- resolution ------------------------------------------------------------
-
-/**
- * Pick the best string for a language.
- *
- * `de-AT` → `de-AT`, then `de`, then `en`, then whatever the widget shipped —
- * so a widget that supports one language is still readable to everyone, and one
- * that supports many needs no coordination with us.
- */
-export function localized(text: LocalizedText | undefined, language: string): string | undefined {
-  if (!text) return undefined;
-  const base = language.split("-")[0];
-  return text[language] ?? text[base] ?? text.en ?? Object.values(text)[0] ?? undefined;
-}
 
 /** A widget's display name, falling back to its type id so a module with no
  *  meta still shows something stable rather than a blank tile header. */

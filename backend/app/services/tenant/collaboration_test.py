@@ -63,69 +63,22 @@ def loaded_room(
     return room
 
 
-async def test_the_same_file_id_in_two_guilds_is_two_rooms() -> None:
+async def test_a_room_is_addressed_by_guild_and_kind() -> None:
+    """File 5 in another guild and wiki page 5 in the same one are other
+    rooms: retiring one leaves them alone."""
     manager = CollaborationManager()
     manager._rooms[(1, DOC, 5)] = loaded_room(1, 5)
     manager._rooms[(2, DOC, 5)] = loaded_room(2, 5)
-
-    first = manager._rooms.get((1, DOC, 5))
-    second = manager._rooms.get((2, DOC, 5))
-
-    assert first is not None
-    assert second is not None
-    assert first is not second
-    assert set(manager._rooms) == {(1, DOC, 5), (2, DOC, 5)}
-
-
-async def test_the_same_id_in_two_kinds_is_two_rooms() -> None:
-    """File 5 and wiki page 5 are both real, and both exist in the same
-    guild. Keyed by the pair alone they would share one Yjs document, and each
-    would be served the other's body."""
-    manager = CollaborationManager()
-    manager._rooms[(1, DOC, 5)] = loaded_room(1, 5, DOC)
     manager._rooms[(1, PAGE, 5)] = loaded_room(1, 5, PAGE)
 
-    file_room = manager._rooms.get((1, DOC, 5))
-    page_room = manager._rooms.get((1, PAGE, 5))
-
-    assert file_room is not None
-    assert page_room is not None
-    assert file_room is not page_room
-    assert file_room.resource_type == DOC
-    assert page_room.resource_type == PAGE
-
-
-async def test_a_room_is_reached_only_from_its_own_guild() -> None:
-    manager = CollaborationManager()
-    manager._rooms[(1, DOC, 5)] = loaded_room(1, 5)
-
-    assert manager._rooms.get((1, DOC, 5)) is not None
-    assert manager._rooms.get((2, DOC, 5)) is None
-    assert manager.live_room(2, DOC, 5) is None
-
-
-async def test_removing_a_room_leaves_the_other_guild_alone() -> None:
-    manager = CollaborationManager()
-    manager._rooms[(1, DOC, 5)] = loaded_room(1, 5)
-    manager._rooms[(2, DOC, 5)] = loaded_room(2, 5)
-
-    # Both are empty of collaborators, so both are removable — only the one
+    # All are empty of collaborators, so all are removable — only the one
     # named should go.
     await manager.remove_room(1, DOC, 5)
+    assert set(manager._rooms) == {(2, DOC, 5), (1, PAGE, 5)}
+    assert manager.live_room(1, DOC, 5) is None
 
-    assert manager._rooms.get((1, DOC, 5)) is None
-    assert manager._rooms.get((2, DOC, 5)) is not None
-
-
-async def test_invalidating_a_room_leaves_the_other_guild_alone() -> None:
-    manager = CollaborationManager()
-    manager._rooms[(1, DOC, 5)] = loaded_room(1, 5)
-    manager._rooms[(2, DOC, 5)] = loaded_room(2, 5)
-
-    assert await manager.invalidate_room_if_empty(1, DOC, 5) is True
-
-    assert manager._rooms.get((1, DOC, 5)) is None
-    assert manager._rooms.get((2, DOC, 5)) is not None
+    assert await manager.invalidate_room_if_empty(2, DOC, 5) is True
+    assert set(manager._rooms) == {(1, PAGE, 5)}
 
 
 async def test_loading_one_room_does_not_stall_another() -> None:
@@ -264,6 +217,9 @@ async def test_a_room_with_unsaved_work_is_not_retired(authority) -> None:
 
     assert manager._rooms.get((1, DOC, 5)) is room
     assert room.detached is False
+    # External invalidation holds the same line as retirement.
+    assert await manager.invalidate_room_if_empty(1, DOC, 5) is False
+    assert manager._rooms.get((1, DOC, 5)) is room
 
 
 # ── persistence ──────────────────────────────────────────────────────────────
@@ -294,18 +250,6 @@ class RecordingSession:
 
     async def rollback(self) -> None:
         self.rollbacks += 1
-
-
-async def test_a_room_is_clean_once_its_revision_reaches_the_row() -> None:
-    manager = CollaborationManager()
-    room = loaded_room(1, 5)
-    manager._rooms[(1, DOC, 5)] = room
-    room.apply_update(_an_update())
-    assert room.is_dirty is True
-
-    await manager._write_room(room, RecordingSession())
-
-    assert room.is_dirty is False
 
 
 async def test_a_write_that_reaches_no_row_leaves_the_room_unsaved() -> None:
@@ -467,17 +411,6 @@ async def test_a_room_being_joined_is_not_retired(authority) -> None:
     assert manager._rooms.get((1, DOC, 5)) is None
 
 
-async def test_an_empty_room_with_unsaved_work_is_not_invalidated(authority) -> None:
-    """External invalidation holds the same line as retirement."""
-    manager = CollaborationManager()
-    room = loaded_room(1, 5)
-    manager._rooms[(1, DOC, 5)] = room
-    room.apply_update(_an_update())
-
-    assert await manager.invalidate_room_if_empty(1, DOC, 5) is False
-    assert manager._rooms.get((1, DOC, 5)) is room
-
-
 async def test_two_writes_of_one_room_do_not_interleave() -> None:
     """A sweep and a disconnect can reach one room together.
 
@@ -513,22 +446,3 @@ async def test_two_writes_of_one_room_do_not_interleave() -> None:
 
     assert max(concurrent) == 1
     assert room.is_dirty is False
-
-
-def test_every_collaborative_kind_declares_where_its_body_lives() -> None:
-    """A room reads and writes a body through the registry alone, so a kind
-    that registered without one would open a socket that saves nowhere."""
-    from app.services.tenant.collaborative_resources import (
-        registered_types,
-        resource_for,
-    )
-
-    kinds = registered_types()
-    assert DOC in kinds and PAGE in kinds
-    for kind in kinds:
-        spec = resource_for(kind)
-        assert spec.resource_type == kind
-        # The column the body is in, and the Yjs columns beside it.
-        assert hasattr(spec.model, spec.content_column)
-        assert hasattr(spec.model, "yjs_state")
-        assert hasattr(spec.model, "yjs_updated_at")

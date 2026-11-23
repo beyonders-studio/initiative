@@ -262,18 +262,6 @@ describe("NotificationBell polling fallback", () => {
     streamConnected = false;
   });
 
-  it("stops polling on the fast interval while the push channel is open", async () => {
-    streamConnected = true;
-    const requests = countInboxRequests();
-    renderWithProviders(<NotificationBell />);
-    await waitFor(() => expect(requests()).toBe(1));
-
-    await vi.advanceTimersByTimeAsync(120_000);
-
-    // The socket refetches this query itself; a 30s timer would only duplicate it.
-    expect(requests()).toBe(1);
-  });
-
   it("holds no timer at all while the push channel is open", async () => {
     streamConnected = true;
     const requests = countInboxRequests();
@@ -282,8 +270,9 @@ describe("NotificationBell polling fallback", () => {
 
     await vi.advanceTimersByTimeAsync(601_000);
 
-    // The channel reaches every worker, and says so when it has been quiet —
-    // so there is nothing left for a timer to catch that it would not.
+    // The socket refetches this query itself, and the channel reaches every
+    // worker and says so when it has been quiet — so there is nothing left for
+    // a timer to catch that it would not.
     expect(requests()).toBe(1);
   });
 

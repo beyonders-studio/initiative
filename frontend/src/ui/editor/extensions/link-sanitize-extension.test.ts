@@ -107,51 +107,20 @@ async function importAndReadLinkUrl(
 }
 
 describe("LinkSanitizeExtension", () => {
-  it("neutralizes a stored javascript: link on import", async () => {
+  it.each([
+    ["a stored javascript: link", "javascript:alert(document.domain)", "link", "about:blank"],
+    ["a stored data: link", "data:text/html,<script>alert(1)</script>", "link", "about:blank"],
+    ["a javascript: AutoLinkNode", "javascript:alert(1)", "autolink", "about:blank"],
+    ["an https link", "https://example.com/safe", "link", "https://example.com/safe"],
+    ["a mailto link", "mailto:user@example.com", "link", "mailto:user@example.com"],
+  ] as const)("imports %s as %s", async (_case, url, kind, expected) => {
     const editor = makeEditor();
     const { storedUrl, renderedHref } = await importAndReadLinkUrl(
       editor,
-      buildLinkDocument("javascript:alert(document.domain)")
+      buildLinkDocument(url, kind)
     );
-    expect(storedUrl).toBe("about:blank");
-    expect(renderedHref).toBe("about:blank");
-  });
-
-  it("neutralizes a stored data: link on import", async () => {
-    const editor = makeEditor();
-    const { storedUrl } = await importAndReadLinkUrl(
-      editor,
-      buildLinkDocument("data:text/html,<script>alert(1)</script>")
-    );
-    expect(storedUrl).toBe("about:blank");
-  });
-
-  it("neutralizes a javascript: AutoLinkNode on import", async () => {
-    const editor = makeEditor();
-    const { storedUrl } = await importAndReadLinkUrl(
-      editor,
-      buildLinkDocument("javascript:alert(1)", "autolink")
-    );
-    expect(storedUrl).toBe("about:blank");
-  });
-
-  it("leaves an https link untouched", async () => {
-    const editor = makeEditor();
-    const { storedUrl, renderedHref } = await importAndReadLinkUrl(
-      editor,
-      buildLinkDocument("https://example.com/safe")
-    );
-    expect(storedUrl).toBe("https://example.com/safe");
-    expect(renderedHref).toBe("https://example.com/safe");
-  });
-
-  it("leaves a mailto link untouched", async () => {
-    const editor = makeEditor();
-    const { storedUrl } = await importAndReadLinkUrl(
-      editor,
-      buildLinkDocument("mailto:user@example.com")
-    );
-    expect(storedUrl).toBe("mailto:user@example.com");
+    expect(storedUrl).toBe(expected);
+    expect(renderedHref).toBe(expected);
   });
 
   it("neutralizes a javascript: URL applied programmatically (paste/edit path)", async () => {

@@ -16,6 +16,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlmodel import col, delete, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.messages import KindMessages
 from app.core.tools import CHILD_KINDS, KINDS, Tool
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.initiative import InitiativeMember
@@ -28,19 +29,18 @@ from app.services.tenant.personal_items import DEFAULT_RECENT_VIEWS, WINDOW
 from app.testing import (
     create_calendar,
     create_child_entity,
-    create_counter_group,
     create_guild,
     create_guild_membership,
-    create_initiative,
     create_initiative_member,
     create_project,
     create_resource_grant,
     create_task,
     create_tool_entity,
-    create_user,
+    create_wiki,
     enable_all_tools,
     route_as,
     route_session_to_guild,
+    switch_tools,
 )
 
 TABS = "/api/v1/me/personal-items?mark=view"
@@ -51,44 +51,16 @@ BOOKMARKS = "/personal-items?mark=bookmark"
 TOOLS = pytest.mark.parametrize("tool", list(Tool), ids=[t.value for t in Tool])
 
 
-async def test_recents_mixed_ordering(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Items from different entity types are ordered by their latest open."""
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    project = await create_project(session, a.initiative, a.user, name="Older project")
-    group = await create_counter_group(
-        session, a.initiative, a.user, name="Newer counter group"
-    )
-
-    r1 = await client.put(
-        a.g(f"/personal-items/view/project/{project.id}"), headers=a.headers
-    )
-    assert r1.status_code == 200
-    # Small delay so timestamps differ deterministically.
-    await asyncio.sleep(0.05)
-    r2 = await client.put(
-        a.g(f"/personal-items/view/counter_group/{group.id}"), headers=a.headers
-    )
-    assert r2.status_code == 200
-
-    r = await client.get(TABS, headers=a.headers)
-    items = r.json()
-    # Newer counter group must come first.
-    assert items[0]["entity_type"] == "counter_group"
-    assert items[0]["entity_id"] == group.id
-    assert items[1]["entity_type"] == "project"
-    assert items[1]["entity_id"] == project.id
-
-
 async def test_recents_are_cross_guild_names_only(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
     """The tabs bar shows entities from ANY of the user's guilds, from any
-    context — render metadata only, tagged with the owning guild. Another
-    user never sees them."""
+    context — render metadata only, tagged with the owning guild, latest open
+    first. Another user never sees them, and closing a tab works from any
+    context via the guild path segment."""
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
     project_a = await create_project(session, a.initiative, a.user, name="A's project")
+    wiki = await create_wiki(session, a.initiative, a.user, name="Newer wiki")
 
     # The same user also belongs to a second guild.
     guild_b = await create_guild(session)
@@ -108,20 +80,34 @@ async def test_recents_are_cross_guild_names_only(
         a.g(f"/personal-items/view/project/{project_a.id}"), headers=a.headers
     )
     assert r.status_code == 200
+    # Small delay so timestamps differ deterministically.
+    await asyncio.sleep(0.05)
+    r = await client.put(a.g(f"/personal-items/view/wiki/{wiki.id}"), headers=a.headers)
+    assert r.status_code == 200
 
-    # ...then enter guild B: the tab still renders (name + owning guild).
+    # ...then enter guild B: the tabs still render (name + owning guild).
     r = await client.get(TABS, headers=a.headers)
     assert r.status_code == 200
     items = r.json()
     assert [(i["entity_type"], i["entity_id"], i["community_id"]) for i in items] == [
-        ("project", project_a.id, a.guild.id)
+        ("wiki", wiki.id, a.guild.id),
+        ("project", project_a.id, a.guild.id),
     ]
-    assert items[0]["name"] == "A's project"
+    assert items[1]["name"] == "A's project"
 
     # The list is the user's own: another member of guild A sees nothing.
     r = await client.get(TABS, headers=other.headers)
     assert r.status_code == 200
     assert r.json() == []
+
+    # Close guild A's tabs while in guild B — addressed by the guild path.
+    for kind, row in (("project", project_a), ("wiki", wiki)):
+        r = await client.delete(
+            f"/api/v1/c/{a.guild.id}/personal-items/view/{kind}/{row.id}",
+            headers=a.headers,
+        )
+        assert r.status_code == 204
+    assert (await client.get(TABS, headers=a.headers)).json() == []
 
 
 async def test_a_recent_view_is_its_owners_row(
@@ -215,7 +201,12 @@ async def test_recent_tabs_limit_caps_list_and_prune(
     assert await kept(b) == newest[:DEFAULT_RECENT_VIEWS]
     assert await kept(c) == newest[:4]
 
-    # Lower the user's recents cap to 2 via self-update.
+    # The cap is validated to [1, 100]; lower it to 2 via self-update.
+    for out_of_range in (0, 101):
+        r = await client.patch(
+            "/api/v1/me", json={"recent_tabs_limit": out_of_range}, headers=a.headers
+        )
+        assert r.status_code == 422
     r = await client.patch(
         "/api/v1/me", json={"recent_tabs_limit": 2}, headers=a.headers
     )
@@ -286,57 +277,13 @@ async def test_recent_tabs_limit_caps_list_and_prune(
     )
 
 
-async def test_recent_tabs_limit_rejects_out_of_range(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """The cap is validated to [1, 100]."""
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-
-    r = await client.patch(
-        "/api/v1/me", json={"recent_tabs_limit": 0}, headers=a.headers
-    )
-    assert r.status_code == 422
-    r = await client.patch(
-        "/api/v1/me", json={"recent_tabs_limit": 101}, headers=a.headers
-    )
-    assert r.status_code == 422
-
-
-async def test_clear_recent_is_guild_addressed(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Closing a tab works from any context via the guild path segment."""
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    project = await create_project(session, a.initiative, a.user, name="P")
-
-    other_guild = await create_guild(session)
-    await create_guild_membership(session, user=a.user, guild=other_guild)
-
-    await client.put(
-        a.g(f"/personal-items/view/project/{project.id}"), headers=a.headers
-    )
-
-    # Close guild A's tab while in guild B — addressed by the guild path.
-    r = await client.delete(
-        f"/api/v1/c/{a.guild.id}/personal-items/view/project/{project.id}",
-        headers=a.headers,
-    )
-    assert r.status_code == 204
-
-    r = await client.get(TABS, headers=a.headers)
-    assert r.status_code == 200
-    assert r.json() == []
-
-
 async def test_recent_guild_level_calendar_has_no_initiative(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
     """A guild-level calendar reports ``initiative_id: None`` — the tabs bar
     reads that as "address me at the guild route", not as missing data."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    a.initiative.calendars_enabled = True
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.calendar: True})
     calendar = await create_calendar(session, a.initiative, a.user, name="GuildCal")
     calendar.initiative_id = None
     session.add(calendar)
@@ -377,14 +324,20 @@ async def test_opening_a_tab_puts_the_tool_in_the_tabs_bar(
         (tool.value, entity.id)
     ]
 
+    # Viewing, bookmarking and subscribing all take read access, as the
+    # tool's own page does.
     outsider = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
-    refused = await client.put(
-        outsider.g(f"/personal-items/view/{tool.value}/{entity.id}"),
-        headers=outsider.headers,
-    )
-    assert refused.status_code == 404, refused.text
-    assert refused.json() == tool.not_found().body
+    for mark in ("view", "bookmark", "subscribe"):
+        refused = await client.put(
+            outsider.g(f"/personal-items/{mark}/{tool.value}/{entity.id}"),
+            headers=outsider.headers,
+        )
+        assert refused.status_code == 404, refused.text
+        assert refused.json() == tool.not_found().body, mark
     assert (await client.get(TABS, headers=outsider.headers)).json() == []
+    assert (
+        await client.get(outsider.g(BOOKMARKS), headers=outsider.headers)
+    ).json() == []
 
 
 @pytest.mark.parametrize("kind", CHILD_KINDS)
@@ -455,7 +408,8 @@ async def test_opening_something_inside_a_tool_is_recorded_and_never_a_tab(
     bookmark = await client.put(
         a.g(f"/personal-items/bookmark/{kind}/{entity.id}"), headers=a.headers
     )
-    assert bookmark.status_code == 422
+    assert bookmark.status_code == 404, bookmark.text
+    assert bookmark.json()["detail"] == KindMessages.NOT_FOUND
 
 
 async def test_any_tool_can_be_bookmarked_and_listed_newest_first(
@@ -465,7 +419,7 @@ async def test_any_tool_can_be_bookmarked_and_listed_newest_first(
     project = await create_project(
         session, a.initiative, a.user, name="Fete", icon="🎪"
     )
-    group = await create_counter_group(session, a.initiative, a.user, name="Tally")
+    group = await create_wiki(session, a.initiative, a.user, name="Tally")
 
     first = await client.put(
         a.g(f"/personal-items/bookmark/project/{project.id}"), headers=a.headers
@@ -473,7 +427,7 @@ async def test_any_tool_can_be_bookmarked_and_listed_newest_first(
     assert first.status_code == 200, first.text
     await asyncio.sleep(0.02)
     second = await client.put(
-        a.g(f"/personal-items/bookmark/counter_group/{group.id}"), headers=a.headers
+        a.g(f"/personal-items/bookmark/wiki/{group.id}"), headers=a.headers
     )
     assert second.status_code == 200, second.text
     # Bookmarking again keeps the bookmark, and its time.
@@ -486,7 +440,7 @@ async def test_any_tool_can_be_bookmarked_and_listed_newest_first(
     assert listed.status_code == 200, listed.text
     items = listed.json()
     assert [(i["entity_type"], i["entity_id"], i["name"]) for i in items] == [
-        ("counter_group", group.id, "Tally"),
+        ("wiki", group.id, "Tally"),
         ("project", project.id, "Fete"),
     ]
     assert items[1]["icon"] == "🎪"
@@ -569,25 +523,6 @@ async def test_making_or_being_named_on_something_subscribes(
     assert on.json()["subscribed"] is True
 
 
-async def test_a_tool_the_reader_cannot_open_cannot_be_bookmarked_or_subscribed_to(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Both take read access, as the tool's own page does: a counter group in
-    an initiative the reader is not in is not there for them."""
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    owner = await create_user(session)
-    elsewhere = await create_initiative(session, a.guild, owner)
-    hidden = await create_counter_group(session, elsewhere, owner)
-
-    for mark in ("bookmark", "subscribe"):
-        response = await client.put(
-            a.g(f"/personal-items/{mark}/counter_group/{hidden.id}"),
-            headers=a.headers,
-        )
-        assert response.status_code == 404
-    assert (await client.get(a.g(BOOKMARKS), headers=a.headers)).json() == []
-
-
 async def test_my_bookmarks_gather_every_community(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
@@ -601,9 +536,9 @@ async def test_my_bookmarks_gather_every_community(
 
     await create_guild_membership(session, user=a.user, guild=second.guild)
     await create_initiative_member(session, second.initiative, a.user)
-    there = await create_counter_group(session, second.initiative, a.user, name="There")
+    there = await create_wiki(session, second.initiative, a.user, name="There")
     bookmarked = await client.put(
-        f"/api/v1/c/{second.guild.id}/personal-items/bookmark/counter_group/{there.id}",
+        f"/api/v1/c/{second.guild.id}/personal-items/bookmark/wiki/{there.id}",
         headers=a.headers,
     )
     assert bookmarked.status_code == 200, bookmarked.text

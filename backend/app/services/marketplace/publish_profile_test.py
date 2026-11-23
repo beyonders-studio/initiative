@@ -84,20 +84,25 @@ def _project(**task_overrides) -> dict:
 
 
 class TestNobodyIsCarried:
-    def test_a_project_names_nobody(self):
-        stripped = strip_for_listing(Tool.project, _project())
-        task = stripped["tasks"][0]
-        assert stripped["exported_by_handle"] is None
+    def test_a_project_names_nobody_and_keeps_only_its_own_links(self):
+        stored = strip_for_listing(Tool.project, _project())
+        task = stored["tasks"][0]
+        assert stored["exported_by_handle"] is None
         assert task["assignee_handles"] == []
         assert task["comments"] == []
         assert task["mention_handles"] == []
         assert [value["property_name"] for value in task["property_values"]] == [
             "Review"
         ]
-
-    def test_a_mention_keeps_its_words_but_names_no_account(self):
-        task = strip_for_listing(Tool.project, _project())["tasks"][0]
+        # A mention keeps its words but names no account.
         assert task["description"] == "Ask @alice about Budget"
+        # A link inside the item survives and one out of it does not.
+        assert task["links"] == [
+            {"type": "depends_on", "target_external_ref": "task:2"}
+        ]
+        # When it happened is not carried.
+        assert task["created_at"] is None
+        assert task["archived_at"] is None
 
     def test_a_body_mention_and_reference_become_text_and_uploads_go(self):
         file = {
@@ -160,14 +165,6 @@ class TestNobodyIsCarried:
         assert original["tasks"][0]["assignee_handles"] == ["alice#1234"]
 
 
-class TestLinks:
-    def test_a_link_inside_the_item_survives_and_one_out_of_it_does_not(self):
-        task = strip_for_listing(Tool.project, _project())["tasks"][0]
-        assert task["links"] == [
-            {"type": "depends_on", "target_external_ref": "task:2"}
-        ]
-
-
 class TestDates:
     def test_the_earliest_date_lands_on_the_anchor(self):
         anchored = anchor_dates(
@@ -179,11 +176,6 @@ class TestDates:
         assert task["due_date"].startswith("2000-01-05")
         assert task["property_values"][0]["value_text"] == "2000-01-04"
         assert anchored["tasks"][1]["due_date"].startswith("2000-01-13")
-
-    def test_when_it_happened_is_not_carried(self):
-        task = strip_for_listing(Tool.project, _project())["tasks"][0]
-        assert task["created_at"] is None
-        assert task["archived_at"] is None
 
     def test_shifting_moves_every_date_by_the_same_days(self):
         anchored = anchor_dates(Tool.project, _project())
@@ -264,20 +256,17 @@ class TestDates:
         assert odd["original_start"].startswith("2000-01-09T15:00")
 
     def test_an_item_with_no_dates_is_unchanged(self):
-        counters = {"type": "initiative-counter-group", "name": "HP", "counters": []}
-        assert anchor_dates(Tool.counter_group, counters) == counters
+        contact = {"type": "initiative-contact", "name": "HP"}
+        assert anchor_dates(Tool.contact, contact) == contact
 
 
 class TestEveryListingIsStripped:
-    def test_a_listing_from_any_source_names_nobody(self):
+    def test_a_listing_from_any_source_is_stored_stripped_as_a_fixed_point(self):
         # Ingestion applies the profile, so a file that carried people — an
         # upload, a registry manifest — is stored without them.
-        stored = normalize_tool_listing(Tool.project, _project())
-        assert stored["tasks"][0]["assignee_handles"] == []
-        assert stored["exported_by_handle"] is None
-
-    def test_the_stored_form_is_a_fixed_point(self):
         once = normalize_tool_listing(Tool.project, _project())
+        assert once["tasks"][0]["assignee_handles"] == []
+        assert once["exported_by_handle"] is None
         assert normalize_tool_listing(Tool.project, once) == once
 
 

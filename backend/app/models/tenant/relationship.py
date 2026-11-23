@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from datetime import UTC, datetime
 
 from sqlalchemy import (
@@ -21,12 +22,21 @@ from app.core.relationships import (
     SYMMETRIC_TYPES,
     RelationshipType,
 )
-from app.db.registry_checks import FROM_REGISTRY
+from app.core.tools import CONTENT_KINDS
+from app.db.registry_checks import FROM_REGISTRY, listed
 from app.models.tenant._mixins import CreatedByMixin
 
 #: Vocabularies frozen into CHECK constraints from the registries, so a column
 #: can never hold a value nothing knows how to read or authorize.
-_KIND_VALUES = ", ".join(f"'{value}'" for value in ENDPOINT_KIND_VALUES)
+#: What may sit on an end beside the tools and the kinds inside them: the
+#: guild's vocabulary, and a person.
+_NOT_CONTENT = set(ENDPOINT_KIND_VALUES) - set(CONTENT_KINDS)
+
+
+def _end_check(side: str, kinds: Iterable[str]) -> str:
+    return f"{side}_type IN ({listed(sorted({*kinds, *_NOT_CONTENT}))})"
+
+
 _TYPE_VALUES = ", ".join(f"'{t.value}'" for t in RelationshipType)
 _PROVENANCE_VALUES = ", ".join(f"'{p.value}'" for p in PROVENANCES)
 _SYMMETRIC_VALUES = ", ".join(f"'{t.value}'" for t in sorted(SYMMETRIC_TYPES))
@@ -46,8 +56,10 @@ def _node_expression(side: str) -> str:
     ``public.relationship_kind_code`` is an IMMUTABLE function rather than an
     inlined CASE, which is what makes admitting a new kind a
     ``CREATE OR REPLACE FUNCTION`` instead of a table rewrite in every guild
-    schema. Existing rows keep their values because a kind's code never changes
-    — the permanence rule in ``app.core.relationships`` is what makes that safe.
+    schema. Boot renders it from the kinds (``app.db.kind_codes``), so a new
+    kind needs no migration. Existing rows keep their values because a kind's
+    code never changes — the permanence rule in ``app.core.relationships`` is
+    what makes that safe.
     """
     return f"(public.relationship_kind_code({side}_type) << 32) | {side}_id::bigint"
 
@@ -81,14 +93,18 @@ class EntityRelationship(CreatedByMixin, table=True):
     __tablename__ = "relationships"
     __table_args__ = (
         CheckConstraint(
-            f"source_type IN ({_KIND_VALUES})",
+            _end_check("source", CONTENT_KINDS),
             name="ck_relationships_source_type",
-            info={FROM_REGISTRY: True},
+            info={
+                FROM_REGISTRY: lambda tools: _end_check("source", tools.content_kinds)
+            },
         ),
         CheckConstraint(
-            f"target_type IN ({_KIND_VALUES})",
+            _end_check("target", CONTENT_KINDS),
             name="ck_relationships_target_type",
-            info={FROM_REGISTRY: True},
+            info={
+                FROM_REGISTRY: lambda tools: _end_check("target", tools.content_kinds)
+            },
         ),
         CheckConstraint(
             f"relationship_type IN ({_TYPE_VALUES})", name="ck_relationships_type"

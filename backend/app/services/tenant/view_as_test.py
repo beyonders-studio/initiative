@@ -7,10 +7,19 @@ tasks.
 
 from __future__ import annotations
 
+import sqlalchemy as sa
+
 from app.core.messages import DashboardMessages
+from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserStatus
-from app.testing import create_counter_group, create_project, create_task
+from app.testing import (
+    create_project,
+    create_task,
+    create_wiki,
+    route_session_to_guild,
+    switch_tools,
+)
 
 COUNT_TASKS = "SELECT count(*) AS n FROM tasks"
 
@@ -34,10 +43,7 @@ def dashboard_body(*statements: str) -> dict:
 async def dashboards_on(session, initiative) -> None:
     """The tool switch. A role permission gates creating one, and the switch
     gates the tool existing at all."""
-    initiative.dashboards_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.dashboard: True})
 
 
 async def make_dashboard(client, actor, sql: str = COUNT_TASKS) -> int:
@@ -119,14 +125,6 @@ async def a_role_that_may(client, admin, *, may: bool) -> str:
     return "leads"
 
 
-async def canvas_rows(client, actor, dashboard_id: int):
-    response = await client.get(
-        actor.g(f"/dashboards/{dashboard_id}/data"), headers=actor.headers
-    )
-    assert response.status_code == 200, response.text
-    return response.json()["widgets"]["w1"]["result"]["rows"]
-
-
 class TestWhatAReaderSees:
     async def test_everyone_sees_the_whole_initiative(
         self, client, session, acting_user
@@ -140,7 +138,6 @@ class TestWhatAReaderSees:
         assert response.json()["view_mode"] == "initiative"
 
         assert await widget_rows(client, reader, dashboard_id) == [[2]]
-        assert await canvas_rows(client, reader, dashboard_id) == [[2]]
 
         back = await set_mode(client, admin, dashboard_id, "individual")
         assert back.status_code == 200
@@ -178,13 +175,22 @@ class TestWhatAReaderSees:
         """Full read means every tool the initiative has switched on, not only
         those the reader's own role may open."""
         admin, reader = await two_people(session, acting_user)
-        admin.initiative.counter_groups_enabled = True
-        session.add(admin.initiative)
+        await switch_tools(session, admin.initiative, {Tool.wiki: True})
+        await create_wiki(session, admin.initiative, admin.user)
+        # The reader's role does not view wikis.
+        await route_session_to_guild(session, admin.guild.id)
+        await session.exec(
+            sa.text(
+                "UPDATE initiative_rules SET enabled = false"
+                " WHERE key = :key AND initiative_role_id = ("
+                "  SELECT id FROM initiative_roles"
+                "  WHERE initiative_id = :i AND name = 'member')"
+            ).bindparams(key=Tool.wiki.view_permission, i=admin.initiative.id)
+        )
         await session.commit()
-        await create_counter_group(session, admin.initiative, admin.user)
 
         dashboard_id = await make_dashboard(
-            client, admin, "SELECT count(*) AS n FROM counter_groups"
+            client, admin, "SELECT count(*) AS n FROM wikis"
         )
         assert await widget_rows(client, reader, dashboard_id) == [[0]]
         await set_mode(client, admin, dashboard_id, "initiative")
@@ -247,6 +253,36 @@ class TestWhoMayChooseIt:
         assert refused.status_code == 403
         assert refused.json()["detail"] == DashboardMessages.VIEW_MODE_NOT_ALLOWED
 
+        # Once it runs as the initiative, its widgets change only with the
+        # permission.
+        await set_mode(client, admin, dashboard_id, "initiative")
+        edit = await client.patch(
+            editor.g(f"/dashboards/{dashboard_id}"),
+            json={"definition": dashboard_body("SELECT title FROM tasks")},
+            headers=editor.headers,
+        )
+        assert edit.status_code == 403
+        assert edit.json()["detail"] == DashboardMessages.VIEW_MODE_EDIT_NOT_ALLOWED
+
+        # A rename is not what the widgets ask, and is allowed.
+        rename = await client.patch(
+            editor.g(f"/dashboards/{dashboard_id}"),
+            json={"name": "Renamed"},
+            headers=editor.headers,
+        )
+        assert rename.status_code == 200, rename.text
+
+        # Anyone who can edit may switch it back, and then edit.
+        assert (
+            await set_mode(client, editor, dashboard_id, "individual")
+        ).status_code == 200
+        edit = await client.patch(
+            editor.g(f"/dashboards/{dashboard_id}"),
+            json={"definition": dashboard_body("SELECT title FROM tasks")},
+            headers=editor.headers,
+        )
+        assert edit.status_code == 200, edit.text
+
     async def test_a_role_holding_the_permission_may(
         self, client, session, acting_user
     ):
@@ -287,45 +323,3 @@ class TestWhoMayChooseIt:
         assert created.json()["can_run_as_initiative"] is True
         response = await set_mode(client, manager, created.json()["id"], "initiative")
         assert response.status_code == 200, response.text
-
-    async def test_widgets_change_only_with_the_permission(
-        self, client, session, acting_user
-    ):
-        admin, _ = await two_people(session, acting_user)
-        role = await a_role_that_may(client, admin, may=False)
-        editor = await acting_user(
-            guild_role=CommunityRole.member,
-            guild=admin.guild,
-            initiative=admin.initiative,
-            initiative_role=role,
-        )
-        dashboard_id = await make_dashboard(client, admin)
-        await share_for_writing(client, admin, dashboard_id, editor)
-        await set_mode(client, admin, dashboard_id, "initiative")
-
-        edit = await client.patch(
-            editor.g(f"/dashboards/{dashboard_id}"),
-            json={"definition": dashboard_body("SELECT title FROM tasks")},
-            headers=editor.headers,
-        )
-        assert edit.status_code == 403
-        assert edit.json()["detail"] == DashboardMessages.VIEW_MODE_EDIT_NOT_ALLOWED
-
-        # A rename is not what the widgets ask, and is allowed.
-        rename = await client.patch(
-            editor.g(f"/dashboards/{dashboard_id}"),
-            json={"name": "Renamed"},
-            headers=editor.headers,
-        )
-        assert rename.status_code == 200, rename.text
-
-        # Anyone who can edit may switch it back, and then edit.
-        assert (
-            await set_mode(client, editor, dashboard_id, "individual")
-        ).status_code == 200
-        edit = await client.patch(
-            editor.g(f"/dashboards/{dashboard_id}"),
-            json={"definition": dashboard_body("SELECT title FROM tasks")},
-            headers=editor.headers,
-        )
-        assert edit.status_code == 200, edit.text

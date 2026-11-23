@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 
 from sqlalchemy import MetaData, text
 from sqlalchemy.dialects import postgresql
@@ -34,10 +34,9 @@ from sqlalchemy.schema import CheckConstraint, CreateTable
 
 from app.core.plugin_scopes import PluginScopeResource, tool_resource
 from app.core.rules import SURFACE_CUSTOM_ROLES, SetBy
+from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.core.tools import (
     INSTALL_METADATA_KIND,
-    KINDS,
-    PROPERTY_TARGETS,
     Tool,
 )
 from app.db import gucs
@@ -52,11 +51,12 @@ from app.db.authorization import (
     sql_values,
 )
 from app.db.frozen import (
-    FROZEN_TABLES,
     LIFECYCLE_COLUMNS,
     freeze_leg,
     frozen_guard_trigger,
+    frozen_tables,
     frozen_write_triggers,
+    own_frozen,
     render_frozen_ancestor_fn,
     render_frozen_guard_fn,
     render_frozen_parent_guard_fn,
@@ -66,26 +66,28 @@ from app.db.frozen import (
 from app.db.guild_migrations import split_sql_statements
 from app.db.initiative_rls import (
     ANSWERED,
-    COMMENT_PARENTS,
     ENTITY_INITIATIVE_FN,
-    INITIATIVE_PATHS,
     INITIATIVE_SCOPED_TABLES,
-    NAMED_PEOPLE,
     InitiativePath,
     NamedPerson,
+    comment_parents,
     dac_asks_at_write,
-    governing_path,
+    governing_walk,
     initiative_of,
     managed_write,
+    named_people,
+    paths_for,
+    plugin_entry_written,
     render_content_item_fn,
     render_entity_access_fn,
     render_entity_initiative_fn,
 )
+from app.db.names import object_name
 from app.db.plugin_rls import (
     PLUGIN_REFUSED_TABLES,
-    PLUGIN_TABLE_ACCESS,
     SEARCH_ENTRY_READ_SCOPE,
     PluginTableKind,
+    plugin_table_access,
 )
 from app.db.presence import VIEW as PRESENCE_VIEW
 from app.db.soft_delete_filter import SOFT_DELETE_TABLES
@@ -104,6 +106,7 @@ from app.db.tenancy import (
     SEAT_TABLES,
 )
 from app.models.platform.guild import AdminSurface, CommunityRole
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.batched_notice import BatchedNoticeKind
 from app.models.tenant.initiative import InitiativeJoinPolicy
 from app.models.tenant.resource_grant import ResourceAccessLevel
@@ -191,11 +194,56 @@ def _trash_read_policy(table: str) -> list[str]:
         f"CREATE POLICY trashed_read ON {table} AS RESTRICTIVE FOR SELECT",
         f"  USING ({_TRASH_READ_PREDICATE});",
         (
-            f"CREATE OR REPLACE TRIGGER tr_{table}_stamp_deleted_by"
+            f"CREATE OR REPLACE TRIGGER {object_name('tr', table, 'stamp_deleted_by')}"
             f" BEFORE INSERT OR UPDATE OF deleted_at ON {table} FOR EACH ROW"
             " EXECUTE FUNCTION public.fn_stamp_deleted_by();"
         ),
     ]
+
+
+def tool_table_rules(
+    table: str, columns: Collection[str], kind: str | None
+) -> tuple[dict[str, str], list[str]]:
+    """What a tool's table carries beside its columns, read off the columns it
+    has: who made a row and who put it in the trash, each held to its kind,
+    the author stamped as the row goes in, and, on a tool's own table
+    (``kind``), the owner grant a plug-in's new row takes. As ``(CHECKs by
+    name, trigger statements)``, schema-relative. A built-in tool's tables
+    have them from their migrations and a tool plug-in's from here;
+    ``tool_table_rules_test`` holds the two to each other."""
+    actors = ", ".join(f"'{actor.value}'" for actor in ActorKind)
+    system = ActorKind.system.value
+    checks: dict[str, str] = {}
+    triggers: list[str] = []
+    if "created_by_kind" in columns:
+        checks[object_name("ck", table, "created_by")] = (
+            f"(created_by_kind = '{system}') = (created_by IS NULL)"
+        )
+        checks[object_name("ck", table, "created_by_kind")] = (
+            f"created_by_kind IN ({actors})"
+        )
+        triggers.append(
+            f"CREATE OR REPLACE TRIGGER {object_name('tr', table, 'set_created_by')}"
+            f" BEFORE INSERT ON {table} FOR EACH ROW"
+            " EXECUTE FUNCTION public.fn_set_author()"
+        )
+    if "deleted_by_kind" in columns:
+        checks[object_name("ck", table, "deleted_by")] = (
+            "CASE WHEN deleted_at IS NULL"
+            " THEN deleted_by IS NULL AND deleted_by_kind IS NULL"
+            " ELSE deleted_by_kind IS NOT NULL"
+            f" AND (deleted_by_kind = '{system}') = (deleted_by IS NULL) END"
+        )
+        checks[object_name("ck", table, "deleted_by_kind")] = (
+            f"deleted_by_kind IN ({actors})"
+        )
+    if kind is not None:
+        triggers.append(
+            f"CREATE OR REPLACE TRIGGER {object_name('tr', table, 'install_owns')}"
+            f" AFTER INSERT ON {table} FOR EACH ROW"
+            f" EXECUTE FUNCTION public.fn_install_owns_what_it_creates('{kind}')"
+        )
+    return checks, triggers
 
 
 # Reader-written SQL reports on live content only.
@@ -457,6 +505,10 @@ _COMMANDS = (
     ("delete", "DELETE", "USING", True),
 )
 
+#: What writes the search index besides the community admin: its refresh
+#: trigger and the system engine.
+_INDEXERS = f"pg_trigger_depth() > 0 OR {IN_POLICY.system}"
+
 # Tables written only by a trigger or the system engine: the policy for each
 # command named here admits that writer instead of re-deciding the writer's
 # access.
@@ -471,9 +523,7 @@ _WRITTEN_BY: dict[str, dict[str, str]] = {
     # The search index is derived: rows arrive from the refresh trigger as a
     # consequence of a content write that already cleared its own table's gate.
     # The reindex sweep routes as the guild admin, which is the second leg.
-    "search_entries": {
-        "INSERT": f"pg_trigger_depth() > 0 OR {IN_POLICY.system} OR {IN_POLICY.admin}"
-    },
+    "search_entries": {"INSERT": f"{_INDEXERS} OR {IN_POLICY.admin}"},
     # A plug-in's events are written by the system engine, on the plug-in's behalf.
     "plugin_event_outbox": {"INSERT": IN_POLICY.system},
     # Levels are the hourly pass's alone to write, whatever the command: no
@@ -484,7 +534,7 @@ _WRITTEN_BY: dict[str, dict[str, str]] = {
 }
 
 
-def _table_block(table: str, path: InitiativePath) -> str:
+def _table_block(table: str, path: InitiativePath, tools: ToolSet) -> str:
     lines = [
         f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;",
         f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY;",
@@ -510,6 +560,11 @@ def _table_block(table: str, path: InitiativePath) -> str:
                 pred = f"{pred} AND {sharing}"
         if (writer := _WRITTEN_BY.get(table, {}).get(command)) is not None:
             pred = writer
+            if table == "search_entries" and tools.installed:
+                pred = (
+                    f"{_INDEXERS} OR ({IN_POLICY.admin}"
+                    f" AND {plugin_entry_written(table, tools)})"
+                )
         name = f"initiative_member_{suffix}"
         lines.append(f"DROP POLICY IF EXISTS {name} ON {table};")
         lines.append(f"CREATE POLICY {name} ON {table} AS PERMISSIVE FOR {command}")
@@ -519,13 +574,16 @@ def _table_block(table: str, path: InitiativePath) -> str:
             lines.append(f"  WITH CHECK ({pred});")
         else:  # USING
             lines.append(f"  USING ({pred});")
-    lines.extend(_freeze_policies(table))
-    if table in SOFT_DELETE_TABLES:
+    lines.extend(_freeze_policies(table, tools))
+    trashable = table in SOFT_DELETE_TABLES or table in tools.tables_carrying(
+        "deleted_at"
+    )
+    if trashable:
         lines.extend(_trash_read_policy(table))
         lines.extend(_query_trash_policy(table))
     if table in _QUERY_TOMBSTONES:
         lines.extend(_query_trash_policy(table, _QUERY_TOMBSTONES[table]))
-    if table in _PURGE_GUARD_TABLES:
+    if table in _PURGE_GUARD_TABLES or table in tools.tables_carrying("deleted_at"):
         # Admin-only hard delete (purge), AND-combined with the PERMISSIVE delete
         # policy above. RESTRICTIVE, so a write-member who clears the permissive
         # leg is still refused unless they are the routed guild admin.
@@ -537,7 +595,7 @@ def _table_block(table: str, path: InitiativePath) -> str:
     return "\n".join(lines)
 
 
-def _freeze_policies(table: str) -> list[str]:
+def _freeze_policies(table: str, tools: ToolSet) -> list[str]:
     """The lifecycle freeze for one table on INSERT: a RESTRICTIVE policy
     refusing a row whose ancestors are archived or trashed.
 
@@ -549,7 +607,7 @@ def _freeze_policies(table: str) -> list[str]:
     """
     lines: list[str] = []
     for command in ("INSERT",):
-        leg = freeze_leg(table, command)
+        leg = freeze_leg(table, command, tools)
         name = f"frozen_ancestor_{command.lower()}"
         lines.append(f"DROP POLICY IF EXISTS {name} ON {table};")
         if leg is None:
@@ -672,13 +730,27 @@ def _trashed_with(table: str, column: str) -> str:
     )
 
 
-_COMMENT_TRASH_FOLLOWS_FN = f"""
-CREATE OR REPLACE FUNCTION public.fn_comment_trash_follows() RETURNS trigger
+def _subject_trashed_with(tools: ToolSet) -> str:
+    """Whether what the comment is said on went to the trash with it: one arm
+    for each kind a comment is said on in the community."""
+    arms = " ".join(
+        f"WHEN '{p.kind}' THEN EXISTS (SELECT 1 FROM {p.table} c"
+        " WHERE c.id = NEW.subject_id AND c.deleted_at = NEW.deleted_at)"
+        for p in comment_parents(tools).values()
+    )
+    return f"COALESCE((CASE NEW.subject_type {arms} END), false)"
+
+
+def _comment_trash_follows_fn(tools: ToolSet) -> str:
+    """``fn_comment_trash_follows``, in the community's schema, since its arms
+    are the community's tools."""
+    return f"""
+CREATE OR REPLACE FUNCTION fn_comment_trash_follows() RETURNS trigger
     LANGUAGE plpgsql AS $trash_follows$
 BEGIN
     IF {IN_POLICY.system} OR {_OLD_AUTHOR_IS_ME}
        OR {_trashed_with("comments", "parent_comment_id")}
-       OR {" OR ".join(_trashed_with(p.table, p.column) for p in COMMENT_PARENTS.values())} THEN
+       OR {_subject_trashed_with(tools)} THEN
         RETURN NULL;
     END IF;
     RAISE EXCEPTION 'a comment goes to the trash with what it is on'
@@ -703,7 +775,7 @@ $answer_owner$;
 """
 
 
-def _authored_block() -> str:
+def _authored_block(tools: ToolSet) -> str:
     queue = managed_write("initiative_id")
     return "\n".join(
         [
@@ -729,13 +801,13 @@ def _authored_block() -> str:
                 " BEFORE UPDATE ON comments FOR EACH ROW"
                 " EXECUTE FUNCTION public.fn_comment_author_guard();"
             ),
-            _COMMENT_TRASH_FOLLOWS_FN,
+            _comment_trash_follows_fn(tools),
             "DROP TRIGGER IF EXISTS tr_comments_trash_follows ON comments;",
             (
                 "CREATE CONSTRAINT TRIGGER tr_comments_trash_follows"
                 " AFTER UPDATE ON comments DEFERRABLE INITIALLY DEFERRED FOR EACH ROW"
                 " WHEN (OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL)"
-                " EXECUTE FUNCTION public.fn_comment_trash_follows();"
+                " EXECUTE FUNCTION fn_comment_trash_follows();"
             ),
             "DROP POLICY IF EXISTS owner_insert ON calendar_event_answers;",
             (
@@ -1276,43 +1348,51 @@ _PLUGIN_CREATED_COMMUNITY_CONTACT_ROW = (
     " AND all_initiative_members AND plugin_install_id IS NULL)))"
 )
 
-#: The write scope of the tool a grant row is about: the row names its tool
-#: by value, and the scope by the tool's plural.
-_GRANT_TOOL_SCOPE = (
-    "(CASE resource_grants.resource_type "
-    + " ".join(
-        f"WHEN '{tool.value}' THEN '{tool_resource(tool).value}'" for tool in Tool
-    )
-    + " END)"
-)
+
+def _grant_tool_scope(tools: ToolSet) -> str:
+    """The write scope of the tool a grant row is about: the row names its tool
+    by kind, and the scope by the tool's plural."""
+    arms = " ".join(f"WHEN '{tool.kind}' THEN '{tool.scope}'" for tool in tools)
+    return f"(CASE resource_grants.resource_type {arms} END)"
+
 
 #: The rungs a share gives; owner is held, never shared.
 _SHARED_LEVELS = (ResourceAccessLevel.read, ResourceAccessLevel.write)
+
 
 #: A sharing row an installed plug-in with ``sharing:write`` changes, as a person
 #: with its rung changes one: it holds the scope and the tool's write scope,
 #: and the rung that lets a person share (``resource_shares``). The row
 #: shares with a person, a role or all initiative members at read or write;
 #: owner rows and plug-in grants are not a share.
-_PLUGIN_SHARE_ROW = (
-    f"('{PluginScopeResource.sharing.value}' = ANY ({IN_POLICY.field('install_write')})"
-    f" AND COALESCE({_GRANT_TOOL_SCOPE}"
-    f" = ANY ({IN_POLICY.field('install_write')}), false)"
-    f" AND level IN ({sql_values(level.value for level in _SHARED_LEVELS)})"
-    " AND plugin_install_id IS NULL"
-    " AND resource_shares(resource_grants.resource_type, resource_grants.resource_id,"
-    f" {_PLUGIN_MEMBER}, resource_grants.initiative_id, {STANDING}))"
-)
+def _plugin_share_row(tools: ToolSet) -> str:
+    return (
+        f"('{PluginScopeResource.sharing.value}' = ANY ({IN_POLICY.field('install_write')})"
+        f" AND COALESCE({_grant_tool_scope(tools)}"
+        f" = ANY ({IN_POLICY.field('install_write')}), false)"
+        f" AND level IN ({sql_values(level.value for level in _SHARED_LEVELS)})"
+        " AND plugin_install_id IS NULL"
+        " AND resource_shares(resource_grants.resource_type, resource_grants.resource_id,"
+        f" {_PLUGIN_MEMBER}, resource_grants.initiative_id, {STANDING}))"
+    )
+
 
 #: What an installed plug-in's request writes on ``resource_grants``: the owner
 #: row on what it creates (and a community contact's two rows), and, with
-#: ``sharing:write``, the sharing rows of a resource it may share. A share is
-#: rewritten by deleting and inserting rows, so an install updates none.
-_PLUGIN_GRANT_INSERT = (
-    f"({_IID} IS NULL OR {_PLUGIN_CREATED_OWNER_ROW}"
-    f" OR {_PLUGIN_CREATED_COMMUNITY_CONTACT_ROW} OR {_PLUGIN_SHARE_ROW})"
-)
-_PLUGIN_GRANT_DELETE = f"({_IID} IS NULL OR {_PLUGIN_SHARE_ROW})"
+#: ``sharing:write``, the sharing rows of a resource it may share
+#: (:func:`_plugin_share_row`). A share is rewritten by deleting and inserting
+#: rows, so an install updates none.
+def _plugin_grant_writes(tools: ToolSet) -> dict[str, str]:
+    share = _plugin_share_row(tools)
+    return {
+        "INSERT": (
+            f"({_IID} IS NULL OR {_PLUGIN_CREATED_OWNER_ROW}"
+            f" OR {_PLUGIN_CREATED_COMMUNITY_CONTACT_ROW} OR {share})"
+        ),
+        "UPDATE": plugin_refused(IN_POLICY),
+        "DELETE": f"({_IID} IS NULL OR {share})",
+    }
+
 
 #: What a member token's standing reads of the member's own place in their
 #: initiatives, whatever its scopes: their roster rows, and the roles those
@@ -1332,7 +1412,7 @@ _PLUGIN_MEMBER_OWN_READ: dict[str, str] = {
 _PLUGIN_CONSENT_READ = f"({_IID} IS NULL OR plugin_member_consents.install_id = {_IID})"
 
 
-def _plugin_search_read() -> str:
+def _plugin_search_read(tools: ToolSet) -> str:
     """What an installed plug-in asks to read one search entry.
 
     The read scope of the entry's kind (``SEARCH_ENTRY_READ_SCOPE``), and of
@@ -1344,36 +1424,38 @@ def _plugin_search_read() -> str:
     """
     held = IN_POLICY.field("install_read")
     kinds = " ".join(
-        f"WHEN '{kind.value}' THEN '{resource.value}'"
+        f"WHEN '{kind}' THEN '{resource.value}'"
         for kind, resource in sorted(
-            SEARCH_ENTRY_READ_SCOPE.items(), key=lambda item: item[0].value
+            SEARCH_ENTRY_READ_SCOPE.items(), key=lambda item: item[0]
         )
     )
-    tools = " ".join(
-        f"WHEN '{tool.value}' THEN '{tool_resource(tool).value}'" for tool in Tool
-    )
+    scopes = " ".join(f"WHEN '{tool.kind}' THEN '{tool.scope}'" for tool in tools)
     return (
         f"(COALESCE((CASE search_entries.entity_type {kinds} END) = ANY ({held}), false)"
         " AND (search_entries.dac_tool IS NULL"
-        f" OR COALESCE((CASE search_entries.dac_tool {tools} END) = ANY ({held}), false))"
+        f" OR COALESCE((CASE search_entries.dac_tool {scopes} END) = ANY ({held}), false))"
         f" AND ({IN_POLICY.scope} IS NULL OR search_entries.dac_tool IS NULL"
         " OR search_entries.initiative_id IS NOT NULL))"
     )
 
 
-def _entity_tool_scope(table: str, kinds: tuple[str, ...]) -> str:
+def _entity_tool_scope(table: str, tools: ToolSet) -> str:
     """The scope resource of the tool that governs the thing a ``table`` row
     names by ``(entity_type, entity_id)`` — a task's is ``projects`` — read
     from one constant map, which parses far smaller than a branch per kind;
-    a kind it does not hold reads as ``NULL``."""
+    a kind that is no tool or nothing inside one reads as ``NULL``."""
+    inside = {kind.value: tool for tool in tools for kind in tool.children}
     resources = json.dumps(
-        {kind: tool_resource(KINDS[kind].tool).value for kind in kinds},
+        {
+            **{tool.kind: tool.scope for tool in tools},
+            **{kind.value: inside[kind.value].scope for kind in tools.child_kinds},
+        },
         separators=(",", ":"),
     )
     return f"(CAST('{resources}' AS jsonb) ->> {table}.entity_type::text)"
 
 
-def _metadata_values_scope(write: bool) -> str:
+def _metadata_values_scope(write: bool, tools: ToolSet) -> str:
     """What an installed plug-in reaches of a metadata value, by its
     definition's owner. A value no plug-in owns takes the scope of the tool
     that governs the row it is on, a task's ``projects``. A plug-in's own
@@ -1383,7 +1465,7 @@ def _metadata_values_scope(write: bool) -> str:
     reaches."""
     held = IN_POLICY.field("install_write" if write else "install_read")
     read = IN_POLICY.field("install_read")
-    scope = _entity_tool_scope("metadata_values", PROPERTY_TARGETS)
+    scope = _entity_tool_scope("metadata_values", tools)
     hold = f" AND NOT {IN_POLICY.content_hold}" if write else ""
     # The tool's scope is named once: the one a value no plug-in owns is
     # written with, or the read scope an install keeps its own with.
@@ -1398,16 +1480,12 @@ def _metadata_values_scope(write: bool) -> str:
     )
 
 
-def _plugin_predicates(table: str) -> dict[str, str]:
+def _plugin_predicates(table: str, tools: ToolSet) -> dict[str, str]:
     """What each command asks of an installed plug-in on ``table``, beside what
     the table's own policies ask. Empty where a tool's gate already asks it."""
     refused = plugin_refused(IN_POLICY)
     if table == "resource_grants":
-        return {
-            "INSERT": _PLUGIN_GRANT_INSERT,
-            "UPDATE": refused,
-            "DELETE": _PLUGIN_GRANT_DELETE,
-        }
+        return _plugin_grant_writes(tools)
     if table == "plugin_member_consents":
         return {
             "SELECT": _PLUGIN_CONSENT_READ,
@@ -1418,14 +1496,14 @@ def _plugin_predicates(table: str) -> dict[str, str]:
     if table in PLUGIN_REFUSED_TABLES:
         return dict.fromkeys(("SELECT", "INSERT", "UPDATE", "DELETE"), refused)
     if table == "metadata_values":
-        write = _metadata_values_scope(True)
+        write = _metadata_values_scope(True, tools)
         return {
-            "SELECT": _metadata_values_scope(False),
+            "SELECT": _metadata_values_scope(False, tools),
             "INSERT": write,
             "UPDATE": write,
             "DELETE": write,
         }
-    access = PLUGIN_TABLE_ACCESS[table]
+    access = plugin_table_access(tools)[table]
     if access.kind is PluginTableKind.subscriptions:
         own = f"({_IID} IS NULL OR plugin_install_id = {_IID})"
         return dict.fromkeys(("SELECT", "INSERT", "UPDATE", "DELETE"), own)
@@ -1454,10 +1532,11 @@ def _plugin_predicates(table: str) -> dict[str, str]:
         predicates = dict.fromkeys(("SELECT", "INSERT", "UPDATE", "DELETE"), by_trigger)
         if table == "search_entries":
             predicates["SELECT"] = (
-                f"({_IID} IS NULL OR pg_trigger_depth() > 0 OR {_plugin_search_read()})"
+                f"({_IID} IS NULL OR pg_trigger_depth() > 0"
+                f" OR {_plugin_search_read(tools)})"
             )
         return predicates
-    if governing_path(table) is not None or access.resource is None:
+    if governing_walk(table, paths_for(tools)) is not None or access.resource is None:
         return {}
     read = plugin_scope(access.resource, False, IN_POLICY)
     if table == "initiatives":
@@ -1466,11 +1545,11 @@ def _plugin_predicates(table: str) -> dict[str, str]:
         # A value is set with the scope of the tool its item belongs to, and
         # any item in the initiative may carry any of its definitions. An
         # install reads its own definitions and no other install's.
-        tools = ", ".join(f"'{tool_resource(tool).value}'" for tool in Tool)
+        scopes = ", ".join(f"'{tool.scope}'" for tool in tools)
         held = IN_POLICY.field("install_read")
         read = (
             f"(CASE WHEN metadata_definitions.install_id IS NULL"
-            f" THEN ({read} OR {held} && ARRAY[{tools}]::text[])"
+            f" THEN ({read} OR {held} && ARRAY[{scopes}]::text[])"
             f" ELSE ({_IID} IS NULL OR metadata_definitions.install_id = {_IID}) END)"
         )
     elif table in _PLUGIN_MEMBER_OWN_READ:
@@ -1495,24 +1574,29 @@ def _plugin_predicates(table: str) -> dict[str, str]:
     return {"SELECT": read, "INSERT": write, "UPDATE": write, "DELETE": write}
 
 
-#: Every table carrying the policies above.
-PLUGIN_POLICY_TABLES: frozenset[str] = frozenset(
-    t
-    for t in (
-        *PLUGIN_TABLE_ACCESS,
-        *PLUGIN_REFUSED_TABLES,
-        "resource_grants",
-        "plugin_member_consents",
+def plugin_policy_tables(tools: ToolSet) -> frozenset[str]:
+    """Every table carrying the policies above."""
+    return frozenset(
+        t
+        for t in (
+            *plugin_table_access(tools),
+            *PLUGIN_REFUSED_TABLES,
+            "resource_grants",
+            "plugin_member_consents",
+        )
+        if _plugin_predicates(t, tools)
     )
-    if _plugin_predicates(t)
-)
 
 
-def _plugin_block(table: str) -> str:
+#: :func:`plugin_policy_tables` of the built-in tools.
+PLUGIN_POLICY_TABLES: frozenset[str] = plugin_policy_tables(BUILTIN_TOOLS)
+
+
+def _plugin_block(table: str, tools: ToolSet) -> str:
     """The installed-plugin policies on one table: RESTRICTIVE, one per command
     it asks something of, and the others dropped wherever an earlier render
     left them."""
-    predicates = _plugin_predicates(table)
+    predicates = _plugin_predicates(table, tools)
     lines: list[str] = []
     for suffix, command, clause, _write in _COMMANDS:
         name = f"{_PLUGIN_POLICY_PREFIX}_{suffix}"
@@ -1808,28 +1892,45 @@ _DEPARTURE_SECTION = """\
 -- ==========================================================================="""
 
 
-def _departs(named: NamedPerson) -> str:
+def _quoted(name: str) -> str:
+    """``name`` as an identifier, quoted where Postgres needs it: a tool
+    plug-in's field key may be a word SQL reserves."""
+    return _DIALECT.identifier_preparer.quote(name)
+
+
+def _departs(named: NamedPerson, tools: ToolSet) -> str:
     """One statement of ``member_departs``: take the person off ``named``'s
     rows in the initiative. Outside a trigger (the community's own content,
-    on leaving it), archived or trashed content is left as it is."""
-    initiative = initiative_of(named.table, "t", qualify="%1$I.")
+    on leaving it), archived or trashed content is left as it is, and a
+    ``frozen_kept`` column's always is."""
+    initiative = initiative_of(
+        named.table, "t", qualify="%1$I.", paths=paths_for(tools)
+    )
+    column = _quoted(named.column)
     if named.clear:
-        head = f"UPDATE %1$I.{named.table} t SET {named.column} = NULL"
-        frozen = freeze_leg(named.table, "UPDATE", alias="t")
+        head = f"UPDATE %1$I.{named.table} t SET {column} = NULL"
+        frozen = freeze_leg(named.table, "UPDATE", tools, alias="t")
     else:
         head = f"DELETE FROM %1$I.{named.table} t"
-        frozen = freeze_leg(named.table, "DELETE", alias="t")
+        frozen = freeze_leg(named.table, "DELETE", tools, alias="t")
     kept = f" AND NOT ({named.kept})" if named.kept else ""
+    inside = "pg_trigger_depth() > 0 OR "
+    if named.frozen_kept:
+        # Archived or trashed by its own stamp as well as by what it is under.
+        own = own_frozen("t", named.table, tools)
+        frozen = " OR ".join(f"({leg})" for leg in (own, frozen) if leg is not None)
+        inside = ""
     return (
-        f"    EXECUTE format($q${head} WHERE t.{named.column} = $1"
+        f"    EXECUTE format($q${head} WHERE t.{column} = $1"
         f" AND {initiative} IS NOT DISTINCT FROM $2{kept}"
-        f" AND (pg_trigger_depth() > 0 OR NOT COALESCE({frozen}, false))$q$,"
+        f" AND ({inside}NOT COALESCE({frozen}, false))$q$,"
         " p_schema) USING p_user_id, p_initiative_id;"
     )
 
 
-def render_departure_fns() -> str:
-    """``public.member_departs`` and the trigger function that calls it."""
+def render_departure_fns(tools: ToolSet) -> str:
+    """``member_departs`` and the trigger function that calls it, in the
+    community's schema, since what it clears is the community's tools'."""
     grants = (
         "    EXECUTE format($q$DELETE FROM %1$I.resource_grants t"
         " WHERE t.user_id = $1 AND t.initiative_id IS NOT DISTINCT FROM $2"
@@ -1837,9 +1938,9 @@ def render_departure_fns() -> str:
         "t.resource_type, t.resource_id, true), false))$q$, p_schema)"
         " USING p_user_id, p_initiative_id;"
     )
-    body = "\n".join([grants, *(_departs(n) for n in NAMED_PEOPLE)])
+    body = "\n".join([grants, *(_departs(n, tools) for n in named_people(tools))])
     return f"""
-CREATE OR REPLACE FUNCTION public.member_departs(
+CREATE OR REPLACE FUNCTION member_departs(
     p_schema text, p_user_id integer, p_initiative_id integer
 ) RETURNS void LANGUAGE plpgsql AS $member_departs$
 BEGIN
@@ -1847,10 +1948,11 @@ BEGIN
 END;
 $member_departs$;
 
-CREATE OR REPLACE FUNCTION public.fn_initiative_departure() RETURNS trigger
+CREATE OR REPLACE FUNCTION fn_initiative_departure() RETURNS trigger
     LANGUAGE plpgsql AS $departure$
 BEGIN
-    PERFORM public.member_departs(TG_TABLE_SCHEMA, OLD.user_id, OLD.initiative_id);
+    EXECUTE format('SELECT %I.member_departs($1, $2, $3)', TG_TABLE_SCHEMA)
+        USING TG_TABLE_SCHEMA, OLD.user_id, OLD.initiative_id;
     RETURN NULL;
 END;
 $departure$;
@@ -1860,24 +1962,37 @@ $departure$;
 INITIATIVE_DEPARTURE_TRIGGER = (
     "CREATE OR REPLACE TRIGGER tr_initiative_members_departure"
     " AFTER DELETE ON initiative_members FOR EACH ROW"
-    " EXECUTE FUNCTION public.fn_initiative_departure();"
+    " EXECUTE FUNCTION fn_initiative_departure();"
 )
 
 
-def _departure_policies() -> str:
+def _departure_policies(tools: ToolSet) -> str:
+    paths = paths_for(tools)
+    by_table: dict[str, list[NamedPerson]] = {}
+    for named in named_people(tools):
+        by_table.setdefault(named.table, []).append(named)
     lines: list[str] = []
-    for named in NAMED_PEOPLE:
-        t, col = named.table, named.column
-        initiative = initiative_of(t, t)
-        departed = (
-            f"pg_trigger_depth() > 0 AND {initiative} IS NOT NULL AND NOT EXISTS"
+    for t, columns in by_table.items():
+        initiative = initiative_of(t, t, paths=paths)
+        gone = [
             " (SELECT 1 FROM initiative_members m"
-            f" WHERE m.user_id = {t}.{col} AND m.initiative_id = {initiative})"
+            f" WHERE m.user_id = {t}.{_quoted(n.column)}"
+            f" AND m.initiative_id = {initiative})"
+            for n in columns
+        ]
+        departed = f"pg_trigger_depth() > 0 AND {initiative} IS NOT NULL AND " + (
+            f"NOT EXISTS{gone[0]}"
+            if len(gone) == 1
+            else "(" + " OR ".join(f"NOT EXISTS{g}" for g in gone) + ")"
         )
+        emptied = " OR ".join(f"{_quoted(n.column)} IS NULL" for n in columns)
         write = (
             f"departure_update ON {t} AS PERMISSIVE FOR UPDATE"
-            f"  USING ({departed}) WITH CHECK ({col} IS NULL);"
-            if named.clear
+            f"  USING ({departed})"
+            f" WITH CHECK (pg_trigger_depth() > 0 AND "
+            + (emptied if len(columns) == 1 else f"({emptied})")
+            + ");"
+            if columns[0].clear
             else f"departure_delete ON {t} AS PERMISSIVE FOR DELETE"
             f"  USING ({departed});"
         )
@@ -1920,30 +2035,31 @@ _FREEZE_SECTION = """\
 -- ==========================================================================="""
 
 
-def render_guild_rls_ddl() -> str:
+def render_guild_rls_ddl(tools: ToolSet) -> str:
     from app.db.guest_access import render_guest_rls_ddl
     from app.db.holds import render_holds_ddl
     from app.db.moderation_log import render_moderation_log_ddl
     from app.db.presence import render_presence_policies
 
-    blocks = [_table_block(t, INITIATIVE_PATHS[t]) for t in sorted(INITIATIVE_PATHS)]
+    paths = paths_for(tools)
+    blocks = [_table_block(t, paths[t], tools) for t in sorted(paths)]
     # Shared, and written before the policies that call it. Re-rendered on every
     # provisioning run from the same registry the policies come from, so a kind
     # added to the graph reaches the gate the moment its entry does.
     out = (
         _HEADER
         + "\n"
-        + render_guild_authorization_functions()
+        + render_guild_authorization_functions(tools)
         + "\n"
-        + render_entity_access_fn()
+        + render_entity_access_fn(tools)
         + "\n"
-        + render_entity_initiative_fn()
+        + render_entity_initiative_fn(tools)
         + "\n"
-        + render_content_item_fn()
+        + render_content_item_fn(tools)
         + "\n"
-        + render_resource_frozen_fn()
+        + render_resource_frozen_fn(tools)
         + "\n"
-        + render_resource_frozen_for_grant_fn()
+        + render_resource_frozen_for_grant_fn(tools)
         + "\n"
         + render_frozen_guard_fn()
         + "\n"
@@ -1968,7 +2084,7 @@ def render_guild_rls_ddl() -> str:
         out += "\n\n" + _OWN_ROW_SECTION + "\n\n" + "\n\n".join(own_rows)
     private = [_private_row_block(t, c) for t, c in sorted(PRIVATE_ROW_TABLES.items())]
     out += "\n\n" + _PRIVATE_ROW_SECTION + "\n\n" + "\n\n".join(private)
-    out += "\n\n" + _AUTHORED_SECTION + "\n" + _authored_block()
+    out += "\n\n" + _AUTHORED_SECTION + "\n" + _authored_block(tools)
     credentials = [
         _member_credential_block(t, owner)
         for t, owner in sorted(MEMBER_CREDENTIAL_TABLES.items())
@@ -1996,31 +2112,35 @@ def render_guild_rls_ddl() -> str:
     out += "\n\n" + "\n".join(_open_lines("timer_marks"))
     # After every block above, so each table's RLS is on before its plug-in
     # policies join the ones already there.
-    plugin_blocks = [_plugin_block(t) for t in sorted(PLUGIN_POLICY_TABLES)]
+    plugin_blocks = [
+        _plugin_block(t, tools) for t in sorted(plugin_policy_tables(tools))
+    ]
     out += "\n\n" + _PLUGIN_SECTION + "\n\n" + "\n\n".join(plugin_blocks)
-    out += "\n\n" + render_guest_rls_ddl()
-    out += "\n\n" + render_presence_policies()
+    out += "\n\n" + render_guest_rls_ddl(tools)
+    out += "\n\n" + render_presence_policies(tools)
     out += "\n\n" + _SHARING_SECTION + "\n\n" + _sharing_block()
     out += "\n\n" + _SHARE_REQUESTS_SECTION + "\n\n" + _share_requests_block()
     out += "\n\n" + _DRAFT_SECTION + "\n\n" + _draft_block()
     out += "\n\n" + _DEFINITIONS_SECTION + "\n\n" + _definitions_block()
-    out += "\n\n" + render_holds_ddl()
+    out += "\n\n" + render_holds_ddl(tools)
     out += "\n\n" + render_moderation_log_ddl()
     out += (
         "\n\n"
         + _DEPARTURE_SECTION
         + "\n"
-        + render_departure_fns()
+        + render_departure_fns(tools)
         + "\n"
         + INITIATIVE_DEPARTURE_TRIGGER
         + "\n"
-        + _departure_policies()
+        + _departure_policies(tools)
     )
-    guards = [f"{frozen_guard_trigger(t)};" for t in sorted(FROZEN_TABLES)]
+    guards = [
+        f"{frozen_guard_trigger(t, tools)};" for t in sorted(frozen_tables(tools))
+    ]
     guards += [
         f"{trigger};"
-        for table in sorted(INITIATIVE_PATHS)
-        for trigger in frozen_write_triggers(table)
+        for table in sorted(paths)
+        for trigger in frozen_write_triggers(table, tools)
     ]
     out += "\n\n" + _FREEZE_SECTION + "\n" + "\n".join(guards)
     return out + "\n"
@@ -2160,10 +2280,10 @@ def _registry_ddl() -> str:
 
     return "\n".join(
         (
-            render_guild_registry_check_ddl(),
-            render_guild_rls_ddl(),
+            render_guild_registry_check_ddl(BUILTIN_TOOLS),
+            render_guild_rls_ddl(BUILTIN_TOOLS),
             render_guild_capture_ddl(),
-            render_guild_search_ddl(None),
+            render_guild_search_ddl(None, BUILTIN_TOOLS),
             render_guild_timer_ddl(),
             render_guild_timer_ddl(operations=True),
         )

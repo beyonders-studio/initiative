@@ -5,23 +5,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildCommunity, communityCan } from "@/__tests__/factories";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import type { CommunityBillingSummaryRead } from "@/api/generated/initiativeAPI.schemas";
+import type { CommunityEntry } from "@/hooks/useCommunities";
 import { dateTimeFormat } from "@/ui/lib/intl";
 
 // Mutable state the mocked hooks read, so each test can vary billing config,
 // the active community, and what the summary route answered.
 const state = vi.hoisted(() => ({
-  community: null as ReturnType<typeof Object> | null,
+  community: null as unknown as CommunityEntry,
   billing: null as { url: string } | null,
   summary: undefined as CommunityBillingSummaryRead | undefined,
   summaryError: false,
 }));
 
-vi.mock("@/hooks/useCommunities", async () => {
-  const actual =
-    await vi.importActual<typeof import("@/hooks/useCommunities")>("@/hooks/useCommunities");
-  // Keep CommunityContext (the render helper's provider imports it); override the hook.
-  return { ...actual, useCommunities: () => ({ activeCommunity: state.community }) };
-});
 vi.mock("@/hooks/useAppConfig", () => ({
   useAppConfig: () => ({ billing: state.billing }),
 }));
@@ -38,6 +33,12 @@ vi.mock("@/hooks/useCommunityBillingSummary", () => ({
 import { asPhoneThatMayNotSell } from "@/__tests__/helpers/storeSelling";
 
 import { CommunityBillingPanel } from "./CommunityBillingPanel";
+
+const render = (options: Parameters<typeof renderWithProviders>[1] = {}) =>
+  renderWithProviders(<CommunityBillingPanel />, {
+    communities: { activeCommunity: state.community },
+    ...options,
+  });
 
 const EMPTY: CommunityBillingSummaryRead = {
   available: true,
@@ -75,60 +76,45 @@ describe("CommunityBillingPanel", () => {
     mintMock.mockReset();
   });
 
-  it("renders nothing without a billing portal", () => {
-    state.billing = null;
-    const { container } = renderWithProviders(<CommunityBillingPanel />);
+  const grantee = (configure: boolean): CommunityEntry => ({
+    ...buildCommunity({
+      id: 42,
+      role: "superadmin",
+      can: communityCan("superadmin", { configure }),
+    }),
+    accessType: "grant",
+    grantSettingsLevel: "superadmin",
+  });
+
+  it.each<[string, () => void]>([
+    ["without a billing portal", () => (state.billing = null)],
+    ["for support whose grant only reads", () => (state.community = grantee(false))],
+    [
+      "for a seat whose session only reads",
+      () =>
+        (state.community = buildCommunity({
+          id: 42,
+          role: "superadmin",
+          can: communityCan("superadmin", { configure: false }),
+        })),
+    ],
+    ["for an ordinary admin", () => (state.community = buildCommunity({ id: 42, role: "admin" }))],
+  ])("renders nothing %s", (_label, arrange) => {
+    arrange();
+    const { container } = render();
     expect(container).toBeEmptyDOMElement();
   });
 
   it("shows support the plan when they hold the seat with write access", () => {
     // A superadmin settings grant beside a read_write content grant: what
     // support does with it happens in the billing portal, under its controls.
-    state.community = {
-      ...buildCommunity({
-        id: 42,
-        role: "superadmin",
-        can: communityCan("superadmin", { configure: true }),
-      }),
-      accessType: "grant",
-      grantSettingsLevel: "superadmin",
-    };
-    renderWithProviders(<CommunityBillingPanel />);
+    state.community = grantee(true);
+    render();
     expect(screen.getByText("Plan")).toBeInTheDocument();
   });
 
-  it("renders nothing for support whose grant only reads", () => {
-    state.community = {
-      ...buildCommunity({
-        id: 42,
-        role: "superadmin",
-        can: communityCan("superadmin", { configure: false }),
-      }),
-      accessType: "grant",
-      grantSettingsLevel: "superadmin",
-    };
-    const { container } = renderWithProviders(<CommunityBillingPanel />);
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it("renders nothing for a seat whose session only reads", () => {
-    state.community = buildCommunity({
-      id: 42,
-      role: "superadmin",
-      can: communityCan("superadmin", { configure: false }),
-    });
-    const { container } = renderWithProviders(<CommunityBillingPanel />);
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it("renders nothing for an ordinary admin", () => {
-    state.community = buildCommunity({ id: 42, role: "admin" });
-    const { container } = renderWithProviders(<CommunityBillingPanel />);
-    expect(container).toBeEmptyDOMElement();
-  });
-
   it("shows just the plan name on a free plan, with plans above it and nothing to cancel", () => {
-    renderWithProviders(<CommunityBillingPanel />);
+    render();
     expect(screen.getByText("Tin")).toBeInTheDocument();
     expect(screen.queryByText(/Renews|Trial|Ends|Payment failed/)).not.toBeInTheDocument();
     expect(screen.getByText("Upgrade")).toBeInTheDocument();
@@ -139,27 +125,18 @@ describe("CommunityBillingPanel", () => {
 
   it("offers no upgrade and no cancel on the top plan", () => {
     state.summary = { ...EMPTY, tier_name: "Enterprise", can_upgrade: false };
-    renderWithProviders(<CommunityBillingPanel />);
+    render();
     expect(screen.getByText("Enterprise")).toBeInTheDocument();
     expect(screen.queryByText("Upgrade")).not.toBeInTheDocument();
     expect(screen.getByText("Manage billing")).toBeInTheDocument();
     expect(screen.queryByText(CANCEL_NOTE)).not.toBeInTheDocument();
   });
 
-  it("shows when a running trial ends", () => {
-    const end = dayFromToday(3);
+  it.each([3, 0])("shows when a running trial ends, %s days from today", (days) => {
+    const end = dayFromToday(days);
     state.summary = { ...EMPTY, tier_name: "Gold", trial_ends_on: end };
-    renderWithProviders(<CommunityBillingPanel />);
+    render();
     expect(screen.getByText("Gold")).toBeInTheDocument();
-    expect(
-      screen.getByText(`Trial ends on ${longDate(end)}; billing starts then.`)
-    ).toBeInTheDocument();
-  });
-
-  it("says so on a trial's last day", () => {
-    const end = dayFromToday(0);
-    state.summary = { ...EMPTY, trial_ends_on: end };
-    renderWithProviders(<CommunityBillingPanel />);
     expect(
       screen.getByText(`Trial ends on ${longDate(end)}; billing starts then.`)
     ).toBeInTheDocument();
@@ -174,7 +151,7 @@ describe("CommunityBillingPanel", () => {
       next_charge: { total: 1250, currency: "USD" },
       can_cancel: true,
     };
-    renderWithProviders(<CommunityBillingPanel />);
+    render();
     expect(screen.getByText(`Renews ${longDate(renews)} · $12.50`)).toBeInTheDocument();
     // A card subscription is running, so the portal can cancel it.
     expect(screen.getByText(CANCEL_NOTE)).toBeInTheDocument();
@@ -183,7 +160,7 @@ describe("CommunityBillingPanel", () => {
   it("reads minor units by the currency's fraction digits", () => {
     const renews = dayFromToday(20);
     state.summary = { ...EMPTY, renews_on: renews, next_charge: { total: 1200, currency: "JPY" } };
-    renderWithProviders(<CommunityBillingPanel />);
+    render();
     expect(screen.getByText(`Renews ${longDate(renews)} · ¥1,200`)).toBeInTheDocument();
   });
 
@@ -195,7 +172,7 @@ describe("CommunityBillingPanel", () => {
       next_charge: { total: 1250, currency: "USD" },
       scheduled_change: { action: "cancel", on: ends },
     };
-    renderWithProviders(<CommunityBillingPanel />);
+    render();
     expect(
       screen.getByText(
         `Your plan ends on ${longDate(ends)}. After that the community is read-only for 30 days, then put on hold.`
@@ -215,7 +192,7 @@ describe("CommunityBillingPanel", () => {
     const tab = { location: { href: "" }, opener: {} as unknown };
     const openSpy = vi.spyOn(window, "open").mockReturnValue(tab as unknown as Window);
 
-    renderWithProviders(<CommunityBillingPanel />);
+    render();
     expect(screen.getByText("Payment failed")).toBeInTheDocument();
     expect(screen.getByText(/read-only 14 days after the payment failed/)).toBeInTheDocument();
     expect(screen.queryByText(/Renews/)).not.toBeInTheDocument();
@@ -233,7 +210,7 @@ describe("CommunityBillingPanel", () => {
     const phone = { server: { isNativePlatform: true } };
     const trialEnd = dayFromToday(3);
     state.summary = { ...EMPTY, tier_name: "Gold", trial_ends_on: trialEnd };
-    const { unmount } = renderWithProviders(<CommunityBillingPanel />, phone);
+    const { unmount } = render(phone);
     expect(screen.getByText("Gold")).toBeInTheDocument();
     expect(
       screen.getByText(`Trial ends on ${longDate(trialEnd)}; billing starts then.`)
@@ -250,13 +227,13 @@ describe("CommunityBillingPanel", () => {
       renews_on: renews,
       next_charge: { total: 1250, currency: "USD" },
     };
-    const renewal = renderWithProviders(<CommunityBillingPanel />, phone);
+    const renewal = render(phone);
     expect(screen.getByText(`Renews ${longDate(renews)}`)).toBeInTheDocument();
     expect(screen.queryByText(/\$12\.50/)).toBeNull();
     renewal.unmount();
 
     state.summary = { ...EMPTY, payment_failed: true };
-    renderWithProviders(<CommunityBillingPanel />, phone);
+    render(phone);
     expect(
       screen.getByText("The community becomes read-only 14 days after the payment failed.")
     ).toBeInTheDocument();
@@ -266,7 +243,7 @@ describe("CommunityBillingPanel", () => {
 
   it("says billing is unavailable, and still offers the portal", () => {
     state.summary = { ...EMPTY, available: false };
-    renderWithProviders(<CommunityBillingPanel />);
+    render();
     expect(screen.getByText("Billing details are unavailable right now.")).toBeInTheDocument();
     // The plan name falls back to what the community itself carries.
     expect(screen.getByText("Tin")).toBeInTheDocument();
@@ -276,7 +253,7 @@ describe("CommunityBillingPanel", () => {
   it("treats a refused summary as unavailable", () => {
     state.summary = undefined;
     state.summaryError = true;
-    renderWithProviders(<CommunityBillingPanel />);
+    render();
     expect(screen.getByText("Billing details are unavailable right now.")).toBeInTheDocument();
   });
 
@@ -285,7 +262,7 @@ describe("CommunityBillingPanel", () => {
     const tab = { location: { href: "" }, opener: {} as unknown };
     const openSpy = vi.spyOn(window, "open").mockReturnValue(tab as unknown as Window);
 
-    renderWithProviders(<CommunityBillingPanel />);
+    render();
     await userEvent.click(screen.getByText("Upgrade"));
 
     await waitFor(() =>

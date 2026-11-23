@@ -5,10 +5,7 @@ older release wrote, rows written that way, then up again, the way
 
 from __future__ import annotations
 
-import importlib.util
 import json
-from pathlib import Path
-from types import ModuleType
 from typing import Any
 
 from alembic.migration import MigrationContext
@@ -17,17 +14,7 @@ from sqlalchemy import text
 
 from app.core.file_types import FileType
 from app.testing import create_file, create_guild, create_initiative, create_user
-
-_VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
-
-
-def _load(name: str) -> ModuleType:
-    path = _VERSIONS / name
-    spec = importlib.util.spec_from_file_location(path.stem, path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+from app.testing.later_revisions import load_revision
 
 
 async def _types(session, schema: str) -> dict[int, tuple[str, Any]]:
@@ -67,8 +54,8 @@ async def test_a_file_s_type_becomes_its_format(session, tmp_path, monkeypatch) 
     archive = await create_file(
         session, initiative, user, file_url=f"/uploads/{guild.id}/bundle.zip"
     )
-    formats = _load("20261026_0540_files_take_their_formats.py")
-    public = _load("20261026_0541_files_take_their_formats_in_public.py")
+    formats = load_revision("20261026_0540_files_take_their_formats.py")
+    public = load_revision("20261026_0541_files_take_their_formats_in_public.py")
 
     def run(step):
         def apply(sync_session) -> None:
@@ -163,7 +150,7 @@ async def test_a_listed_file_names_its_format(session) -> None:
         },
     )
     await session.commit()
-    public = _load("20261026_0541_files_take_their_formats_in_public.py")
+    public = load_revision("20261026_0541_files_take_their_formats_in_public.py")
 
     def run(step):
         def apply(sync_session) -> None:

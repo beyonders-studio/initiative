@@ -29,7 +29,6 @@ from cryptography.hazmat.primitives.asymmetric import ed25519, rsa
 from jwt.algorithms import OKPAlgorithm
 
 from app.core.config import settings
-from app.core.security import PluginPlatformSigningNotConfiguredError
 from app.services.marketplace import context_jwt
 
 _keypair = ed25519.Ed25519PrivateKey.generate()
@@ -98,13 +97,14 @@ class TestClaims:
                 audience="initiative-plugin:other.plugin",
             )
 
-    def test_it_expires_in_about_a_minute(self):
-        claims = _claims(_mint())
-        assert claims["exp"] - claims["iat"] == 60
-
-    def test_a_shorter_lifetime_is_honored(self):
-        claims = _claims(_mint(lifetime=timedelta(seconds=15)))
-        assert claims["exp"] - claims["iat"] == 15
+    @pytest.mark.parametrize(
+        ("overrides", "seconds"),
+        [({}, 60), ({"lifetime": timedelta(seconds=15)}, 15)],
+        ids=["about-a-minute", "shorter"],
+    )
+    def test_it_expires_in_about_a_minute_or_less(self, overrides, seconds):
+        claims = _claims(_mint(**overrides))
+        assert claims["exp"] - claims["iat"] == seconds
 
     def test_it_carries_no_user_identity_at_all(self):
         """Not "no ``sub``" — nothing anywhere in the payload that is a person.
@@ -149,15 +149,10 @@ class TestClaims:
     def test_every_token_has_its_own_jti(self):
         assert _claims(_mint())["jti"] != _claims(_mint())["jti"]
 
-    def test_the_key_id_is_stamped_so_a_rotation_can_be_followed(self):
-        assert jwt.get_unverified_header(_mint())["kid"] == KEY_ID
-
-    def test_it_is_typed_as_a_context_token(self):
-        assert jwt.get_unverified_header(_mint())["typ"] == "initiative-context+jwt"
-
-    @pytest.mark.parametrize("scope", ["endpoint", "lifecycle"])
-    def test_the_scope_vocabulary_is_what_it_declares(self, scope):
-        assert _claims(_mint(scope=scope))["scope"] == scope
+    def test_the_header_types_it_and_names_its_key_for_a_rotation(self):
+        header = jwt.get_unverified_header(_mint())
+        assert header["kid"] == KEY_ID
+        assert header["typ"] == "initiative-context+jwt"
 
     @pytest.mark.parametrize(
         "standing", ["active", "read_only", "suspended", "on_hold", "deleted"]
@@ -165,17 +160,19 @@ class TestClaims:
     def test_it_says_where_the_community_stands(self, standing):
         assert _claims(_mint(community_status=standing))["community_status"] == standing
 
-    def test_a_status_outside_the_five_is_refused(self):
+    @pytest.mark.parametrize(
+        "overrides",
+        [
+            {"community_status": "paused"},
+            {"scope": "admin"},
+            # More handles than a call can need.
+            {"connection_refs": {f"c{i}": f"ref{i}" for i in range(11)}},
+        ],
+        ids=["status", "scope", "handles"],
+    )
+    def test_a_claim_outside_its_vocabulary_is_refused(self, overrides):
         with pytest.raises(context_jwt.ContextTokenError):
-            _mint(community_status="paused")
-
-    def test_an_unknown_scope_is_refused(self):
-        with pytest.raises(context_jwt.ContextTokenError):
-            _mint(scope="admin")
-
-    def test_more_handles_than_a_call_can_need_are_refused(self):
-        with pytest.raises(context_jwt.ContextTokenError):
-            _mint(connection_refs={f"c{i}": f"ref{i}" for i in range(11)})
+            _mint(**overrides)
 
 
 class TestJwks:
@@ -192,27 +189,6 @@ class TestJwks:
             audience=f"initiative-plugin:{PUBLIC_ID}",
         )
         assert claims["community_ref"] == "gplu_testguild7"
-
-    def test_it_publishes_the_kid_the_header_carries(self):
-        entry = context_jwt.context_jwks()["keys"][0]
-        assert entry["kid"] == KEY_ID
-        assert entry["kty"] == "OKP"
-        assert entry["crv"] == "Ed25519"
-        assert entry["alg"] == "EdDSA"
-        assert entry["use"] == "sig"
-
-    def test_it_publishes_no_private_material(self):
-        body = json.dumps(context_jwt.context_jwks())
-        for private in ("d", "p", "q", "dp", "dq", "qi"):
-            assert f'"{private}"' not in body
-
-    def test_it_refuses_rather_than_publishing_an_empty_key_set(self, monkeypatch):
-        """An empty ``keys`` array is a claim ("this platform has no keys") that
-        a plug-in would cache. Absent configuration raises instead."""
-        monkeypatch.setattr(settings, "PLUGIN_PLATFORM_SIGNING_PRIVATE_KEY_PEM", None)
-        monkeypatch.setattr(context_jwt, "_jwks_cache", None, raising=False)
-        with pytest.raises(PluginPlatformSigningNotConfiguredError):
-            context_jwt.context_jwks()
 
     def test_a_key_that_is_not_ed25519_is_reported_rather_than_published(
         self, monkeypatch

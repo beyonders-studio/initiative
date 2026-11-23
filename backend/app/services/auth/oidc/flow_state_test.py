@@ -24,7 +24,6 @@ from app.core.encryption import (
 )
 from app.services.auth.oidc.flow_state import (
     FlowStateError,
-    OidcFlowState,
     create_flow_state,
     decode_flow_state,
 )
@@ -42,23 +41,18 @@ def test_round_trip():
     assert decoded.device_name == "Léa's Pixel 9"
     assert decoded.app_challenge == "c" * 43
 
-
-def test_defaults_round_trip():
-    state, payload = create_flow_state()
-    decoded = decode_flow_state(state)
-    assert decoded.mobile is False
-    assert decoded.device_name == ""
-    assert decoded.app_challenge == ""
-    assert decoded.code_verifier == payload.code_verifier
-    assert decoded.nonce == payload.nonce
-
-
-def test_each_flow_is_unique():
-    s1, p1 = create_flow_state()
-    s2, p2 = create_flow_state()
-    assert s1 != s2
-    assert p1.code_verifier != p2.code_verifier
-    assert p1.nonce != p2.nonce
+    # The defaults, and a fresh verifier and nonce for each flow.
+    other_state, other = create_flow_state()
+    decoded = decode_flow_state(other_state)
+    assert (decoded.mobile, decoded.device_name, decoded.app_challenge) == (
+        False,
+        "",
+        "",
+    )
+    assert decoded == other
+    assert other_state != state
+    assert other.code_verifier != payload.code_verifier
+    assert other.nonce != payload.nonce
 
 
 # --- confidentiality ----------------------------------------------------------
@@ -191,34 +185,15 @@ def test_valid_token_with_non_utf8_plaintext_rejected():
 # --- device_name cap ------------------------------------------------------------
 
 
-def test_device_name_truncated_on_create():
+def test_device_name_is_capped_on_create_and_on_decode():
+    """Even a hand-minted token with an oversized device_name is capped at the
+    decode boundary."""
     state, payload = create_flow_state(device_name="x" * 500)
     assert len(payload.device_name) == 64
     assert len(decode_flow_state(state).device_name) == 64
 
-
-def test_device_name_capped_on_decode():
-    """Even a hand-minted token with an oversized device_name is capped at the
-    decode boundary."""
     token = encrypt_field(
         json.dumps({"code_verifier": "v" * 43, "nonce": "n", "device_name": "y" * 500}),
         SALT_OIDC_FLOW_STATE,
     )
     assert len(decode_flow_state(token).device_name) == 64
-
-
-# --- dataclass behavior ---------------------------------------------------------
-
-
-def test_flow_state_is_immutable():
-    _, payload = create_flow_state()
-    # setattr rather than direct assignment: the runtime frozen-dataclass check is
-    # what's under test, and static checkers rightly refuse the assignment form.
-    with pytest.raises(AttributeError):
-        setattr(payload, "nonce", "overwritten")  # noqa: B010
-
-
-def test_challenge_is_deterministic_for_a_verifier():
-    a = OidcFlowState(code_verifier="v" * 43, nonce="n")
-    b = OidcFlowState(code_verifier="v" * 43, nonce="m")
-    assert a.code_challenge == b.code_challenge

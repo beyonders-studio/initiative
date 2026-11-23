@@ -1,6 +1,6 @@
 /**
  * THE index page a tool's entities are browsed from — one initiative's shelf of
- * projects, files, wikis, counter groups or dashboards.
+ * projects, files, wikis or dashboards.
  *
  * Each of those pages carried its own copy of the same thing: the view toggle,
  * the filter panel, the create button and its dialog, the loading, error,
@@ -54,6 +54,7 @@ import { CollectionFilterField } from "@/components/tools/files/collections/Coll
 import { useFileColumns } from "@/components/tools/files/fileColumns";
 import {
   readToolListFilters,
+  SearchTagFields,
   ToolFilterFields,
   type ToolListFilters,
 } from "@/components/tools/ToolFilterFields";
@@ -62,6 +63,7 @@ import { ToolListToolbar } from "@/components/tools/ToolListToolbar";
 import { ToolViewFilter } from "@/components/tools/ToolViewFilter";
 import { TOOL_HOOKS } from "@/hooks/toolHooks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
 import { useCreateFromSearchParam } from "@/hooks/useCreateFromSearchParam";
 import { useGridSelection } from "@/hooks/useGridSelection";
 import { useToolCreateAccess } from "@/hooks/useInitiativeAccess";
@@ -80,6 +82,16 @@ import { useToolCounts } from "@/hooks/useToolCounts";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
 import { useCommunityPath } from "@/lib/communityUrl";
 import {
+  type InstalledTool,
+  selectInstalledTools,
+  type ToolRow,
+  type ToolTable,
+  toolOfKind,
+  toolPluginRowRoute,
+  toolText,
+} from "@/lib/toolPlugins";
+import {
+  isBuiltInTool,
   isToolView,
   TOOL_ICONS,
   type ToolView,
@@ -92,12 +104,14 @@ import {
   toolViews,
 } from "@/lib/tools";
 import { useContactColumns } from "@/pages/community/tools/contacts/contactColumns";
-import { CounterGroupCard } from "@/pages/community/tools/counterGroups/CounterGroupCard";
 import { DashboardCard } from "@/pages/community/tools/dashboards/DashboardCard";
 import { FileCard } from "@/pages/community/tools/files/FileCard";
 import { CreateProjectDialog } from "@/pages/community/tools/projects/CreateProjectDialog";
 import { ProjectCard } from "@/pages/community/tools/projects/ProjectCard";
 import { useProjectColumns } from "@/pages/community/tools/projects/projectColumns";
+import { useToolLists } from "@/pages/community/tools/toolPlugins/ItemRows";
+import { pluginIndexEntry } from "@/pages/community/tools/toolPlugins/pluginIndexEntry";
+import { ToolRows } from "@/pages/community/tools/toolPlugins/ToolRows";
 import { WikiCard } from "@/pages/community/tools/wikis/WikiCard";
 import type { DialogProps } from "@/types/dialog";
 import type { TranslateFn } from "@/types/i18n";
@@ -184,7 +198,7 @@ export type ToolIndexEntry = {
   /**
    * The keys this tool spells its own way — the page's and its create
    * dialog's. Kept per tool rather than folded into one generic string: "No
-   * counter groups match your filters" is written in four locales already, and
+   * dashboards match your filters" is written in four locales already, and
    * a shared wording would be a fifth thing to translate that says less.
    * They are in the tool's own namespace, `toolCamelPlural(tool)`.
    */
@@ -196,6 +210,11 @@ export type ToolIndexEntry = {
     noMatches: string;
     emptyTitle: string;
     emptyBody: string;
+    /** The empty list's add button; `createFirst` otherwise. */
+    createFirst?: string;
+    /** The search box's placeholder, for a tool without filter fields of its
+     *  own. */
+    search?: string;
   };
   /** The tool's card draws its bookmark among controls of its own, so the list
    *  puts none on its corner. */
@@ -248,6 +267,10 @@ export type ToolIndexEntry = {
   reorder?: {
     useReorder: () => { mutate: (orderedIds: number[], options?: ReorderOptions) => void };
   };
+  /** A tool plug-in's tool: its rows drawn in the lists its table declares,
+   *  each picked as a layout is, and opened at its own route. Its words are
+   *  the `plugins` namespace's, read with the name of one of its rows. */
+  laidOut?: { tool: InstalledTool; table: ToolTable };
 };
 
 /** What the page asks of a reorder it sends. */
@@ -403,21 +426,6 @@ const TOOL_INDEX: Record<Tool, ToolIndexEntry | ToolIndexOwnPage> = {
     ),
   },
 
-  [Tool.counter_group]: {
-    useList: makeRows(
-      TOOL_HOOKS[Tool.counter_group].useList,
-      (group) => <CounterGroupCard group={group} />,
-      WITH_PREVIEW
-    ),
-    text: {
-      create: "createGroup",
-      createDescription: "noGroupsDescription",
-      noMatches: "filters.noMatchingGroups",
-      emptyTitle: "noGroups",
-      emptyBody: "noGroupsDescription",
-    },
-  },
-
   [Tool.dashboard]: {
     useList: makeRows(
       TOOL_HOOKS[Tool.dashboard].useList,
@@ -478,7 +486,7 @@ const TOOL_INDEX: Record<Tool, ToolIndexEntry | ToolIndexOwnPage> = {
  * Which view and which page of the list is showing, kept in the URL so a deep
  * link lands on them and the back button walks through the ones that were read.
  */
-const useListPage = (tool: Tool) => {
+const useListPage = (tool: string) => {
   const router = useRouter();
   const search = useSearch({ strict: false }) as { page?: number; status?: string };
 
@@ -548,23 +556,25 @@ const BY_NAME: SortingState = [{ id: "name", desc: false }];
  * on the device) is carried over.
  */
 const toolListViewSpec = (
-  tool: Tool,
+  tool: string,
   communityId: number,
   initiativeId: number | null,
   entry: ToolIndexEntry
 ): ListViewSpec<ToolListFilters> => ({
   key:
     initiativeId === null
-      ? viewKey("community", toolRouteSegment(tool))
-      : viewKey("initiative", initiativeId, toolRouteSegment(tool)),
+      ? viewKey("community", toolSegment(tool))
+      : viewKey("initiative", initiativeId, toolSegment(tool)),
   communityId,
   read: readToolListFilters,
   defaults: {
     filters: {},
     ...NO_PART_VIEW,
-    sorting: entry.reorder ? [] : entry.byName ? BY_NAME : NEWEST_FIRST,
+    // A tool plug-in's rows and a reader's own order open in their order.
+    sorting: entry.reorder || entry.laidOut ? [] : entry.byName ? BY_NAME : NEWEST_FIRST,
   },
   carryOver: (_items, account) => {
+    if (!isBuiltInTool(tool)) return null;
     const layout = account[`${tool}:view-mode`];
     const order = deviceJSON(toolTableStorageKey(tool, "order")) as { sorting?: unknown } | null;
     const columns = deviceJSON(toolTableStorageKey(tool, "columns"));
@@ -581,6 +591,10 @@ const toolListViewSpec = (
   },
 });
 
+/** A tool's segment in the keys a reader's views are kept by: a built-in
+ *  tool's route segment, a tool plug-in's kind. */
+const toolSegment = (tool: string): string => (isBuiltInTool(tool) ? toolRouteSegment(tool) : tool);
+
 /** The list's own narrowing, as the counts endpoint takes it for the tag tree:
  *  tags aside, since the tree counts every one. */
 const countFilters = ({ tag_ids: _tags, ...narrowing }: ToolIndexFilters["list"]) => {
@@ -591,7 +605,8 @@ const countFilters = ({ tag_ids: _tags, ...narrowing }: ToolIndexFilters["list"]
 };
 
 export type ToolIndexPageProps = {
-  tool: Tool;
+  /** A built-in tool, or a tool plug-in's kind. */
+  tool: string;
   /** The initiative this list belongs to, as the URL says. Null lists the
    *  community's own rows, for a tool whose entry has `community`. */
   fixedInitiativeId: number | null;
@@ -603,11 +618,18 @@ export type ToolIndexPageProps = {
 type ToolIndexBodyProps = ToolIndexPageProps & { entry: ToolIndexEntry };
 
 const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexBodyProps) => {
+  const plugin = entry.laidOut;
+  // Read only where the tool is a built-in one: a tool plug-in's entry says
+  // what it has instead.
+  const builtIn = tool as Tool;
   // The namespace and most of the keys come from the table, so the loose
   // translate signature rather than the statically-typed one.
-  const ns = toolCamelPlural(tool) as FlatNamespace;
-  const { t: translate } = useTranslation([ns, "common", "tags"]);
+  const ns = (plugin ? "plugins" : toolCamelPlural(builtIn)) as FlatNamespace;
+  const { t: translate, i18n } = useTranslation([ns, "common", "tags"]);
   const t = translate as TranslateFn;
+  // A tool plug-in's words name one of its rows.
+  const named = plugin ? { name: toolText(plugin.table.name, i18n.language) } : undefined;
+  const tx = (key: string) => t(key, named);
   const router = useRouter();
   const gp = useCommunityPath();
   const communityId = useActiveCommunityId();
@@ -645,8 +667,10 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
   // drawn as cards or rows.
   const community = fixedInitiativeId === null;
   const kept = isLayout(listView.layout) ? listView.layout : defaultLayout;
-  const layout: ToolIndexLayout = community && kept === "tags" ? defaultLayout : kept;
+  const layout: ToolIndexLayout = plugin || (community && kept === "tags") ? defaultLayout : kept;
   const setLayout = listView.rememberLayout;
+  // A tool plug-in's lists, as its initiative laid them out.
+  const laid = useToolLists(plugin?.table ?? null, fixedInitiativeId ?? 0, null, listView);
   const tagTree = useTagTreeSelection(layout === "tags");
 
   // The order a reader picks in a tool's table outlives the visit, and is the
@@ -656,7 +680,7 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
   const { setSorting } = listView;
   const [sorted] = tableState.sorting;
   const sort =
-    entry.table && sorted && TABLE_SORT_FIELDS.has(sorted.id)
+    sorted && (plugin || (entry.table && TABLE_SORT_FIELDS.has(sorted.id)))
       ? { sort_by: sorted.id, sort_dir: sorted.desc ? ("desc" as const) : ("asc" as const) }
       : {};
 
@@ -682,7 +706,7 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
   // and the list beside it agree.
   const tagCountFilters = layout === "tags" ? countFilters(listFilters) : undefined;
   const countsQuery = useToolCounts(
-    tool,
+    builtIn,
     {
       initiative_id: fixedInitiativeId,
       ...(layout === "tags"
@@ -690,8 +714,8 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
         : {}),
     },
     // Counted across the community's initiatives, which the community's own
-    // rows are not.
-    { enabled: !community }
+    // rows are not, for the built-in tools.
+    { enabled: !community && !plugin }
   );
 
   // A page past the end (its rows deleted, a link to one that is gone) has
@@ -707,9 +731,9 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
   // Canonical create answer: this initiative's server-computed create flag. An
   // explicit canCreate prop (e.g. from InitiativeDetailPage) wins, and is the
   // only answer for the community's own rows.
-  const { canCreate: canCreateDerived } = useToolCreateAccess(tool, {
+  const { canCreate: canCreateDerived } = useToolCreateAccess(builtIn, {
     initiativeId: fixedInitiativeId,
-    enabled: !community,
+    enabled: !community && !plugin,
   });
   // Nothing is made into the archive: its view offers no way to create.
   const canCreateHere = (canCreate ?? (!community && canCreateDerived)) && view !== "archived";
@@ -722,7 +746,7 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
 
   // Drive the app-wide bottom-nav add button for this route.
   useRegisterPrimaryCreateAction(
-    canCreateHere ? { run: () => setCreateOpen(true), label: t(entry.text.create) } : null
+    canCreateHere ? { run: () => setCreateOpen(true), label: tx(entry.text.create) } : null
   );
 
   const selection = useGridSelection<ToolIndexRow>(list.rows);
@@ -747,8 +771,8 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
 
   // An import lands in an initiative.
   const importAction = useToolImportAction({
-    tool,
-    canImport: canCreateHere && !community,
+    tool: builtIn,
+    canImport: canCreateHere && !community && !plugin,
     fixedInitiativeId: fixedInitiativeId ?? undefined,
   });
   // A spreadsheet lands where the list is, the community's own included.
@@ -772,7 +796,13 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
     handleCreateOpenChange(open);
   };
   const openCreated = (created: { id: number }) => {
-    void router.navigate({ to: gp(toolDetailRoute(tool, fixedInitiativeId, created.id)) });
+    void router.navigate({
+      to: gp(
+        plugin && fixedInitiativeId !== null
+          ? toolPluginRowRoute(fixedInitiativeId, tool, created.id)
+          : toolDetailRoute(builtIn, fixedInitiativeId, created.id)
+      ),
+    });
   };
 
   // Counted from the fields as set rather than from the debounced search, so
@@ -804,7 +834,7 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
     tagTree.selectedPaths.size === 0 &&
     !selection.active;
 
-  const ToolIcon = TOOL_ICONS[tool];
+  const ToolIcon = plugin ? plugin.tool.icon : TOOL_ICONS[builtIn];
   const cardGrid = entry.tiles
     ? layout === "tags"
       ? "grid grid-cols-fill-36/4 gap-4"
@@ -818,7 +848,7 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
       {row.card}
       {entry.cardHasBookmark ? null : (
         <BookmarkButton
-          tool={tool}
+          tool={builtIn}
           entityId={row.id}
           name={row.name}
           initiativeId={row.initiative_id}
@@ -868,12 +898,15 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
       ) : null}
       <ToolListToolbar
         leading={
-          <ToolViewFilter
-            tool={tool}
-            value={view}
-            counts={countsQuery.data?.views}
-            onChange={setView}
-          />
+          <div className="flex items-center gap-2">
+            <ToolViewFilter
+              tool={tool}
+              value={view}
+              counts={countsQuery.data?.views}
+              onChange={setView}
+            />
+            {laid.presetSelect}
+          </div>
         }
         filters={{
           open: filtersOpen,
@@ -884,29 +917,37 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
           canCreateHere ? (
             <Button size="sm" className="h-9" onClick={() => setCreateOpen(true)}>
               <Plus className="h-4 w-4" />
-              {t(entry.text.create)}
+              {tx(entry.text.create)}
             </Button>
           ) : null
         }
-        view={{
-          value: layout,
-          onChange: (next) => {
-            setLayout(next);
-            setPage(1);
-          },
-          options: [
-            { value: "grid", label: t("common:toolbar.viewGrid"), icon: LayoutGrid },
-            { value: "list", label: t("common:toolbar.viewList"), icon: List },
-            ...(community
-              ? []
-              : [{ value: "tags" as const, label: t("common:toolbar.viewTags"), icon: Tags }]),
-          ],
-          label: t("common:toolbar.view"),
-        }}
+        view={
+          plugin
+            ? laid.view
+            : {
+                value: layout,
+                onChange: (next) => {
+                  setLayout(next);
+                  setPage(1);
+                },
+                options: [
+                  { value: "grid", label: t("common:toolbar.viewGrid"), icon: LayoutGrid },
+                  { value: "list", label: t("common:toolbar.viewList"), icon: List },
+                  ...(community
+                    ? []
+                    : [
+                        { value: "tags" as const, label: t("common:toolbar.viewTags"), icon: Tags },
+                      ]),
+                ],
+                label: t("common:toolbar.view"),
+              }
+        }
         menuItems={
-          (canCreateHere && toolListingKind(tool)) || importAction.menuItem || csvImport ? (
+          plugin ? (
+            laid.menuItem
+          ) : (canCreateHere && toolListingKind(builtIn)) || importAction.menuItem || csvImport ? (
             <>
-              {canCreateHere ? <BrowseMarketplaceMenuItem tool={tool} /> : null}
+              {canCreateHere ? <BrowseMarketplaceMenuItem tool={builtIn} /> : null}
               {importAction.menuItem}
               {csvImport ? (
                 <DropdownMenuItem onSelect={() => setCsvImportOpen(true)}>
@@ -917,7 +958,12 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
             </>
           ) : null
         }
-        onEnterSelection={!selection.active && list.rows.length > 0 ? selection.enter : undefined}
+        onEnterSelection={
+          // A tool plug-in's table picks no rows.
+          !selection.active && list.rows.length > 0 && laid.list?.kind !== "table"
+            ? selection.enter
+            : undefined
+        }
       />
       {importAction.dialog}
       {csvImport ? (
@@ -934,20 +980,30 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
         onClear={() => changeFilters({})}
         activeCount={activeFilterCount}
       >
-        <ToolFilterFields
-          tool={tool}
-          value={filters}
-          onChange={changeFilters}
-          initiativeId={fixedInitiativeId ?? undefined}
-        >
-          {entry.FilterField && fixedInitiativeId !== null ? (
-            <entry.FilterField
-              value={filters}
-              onChange={changeFilters}
-              initiativeId={fixedInitiativeId}
-            />
-          ) : null}
-        </ToolFilterFields>
+        {plugin ? (
+          <SearchTagFields
+            ns="plugins"
+            placeholder={entry.text.search ?? ""}
+            properties={false}
+            value={filters}
+            onChange={changeFilters}
+          />
+        ) : (
+          <ToolFilterFields
+            tool={builtIn}
+            value={filters}
+            onChange={changeFilters}
+            initiativeId={fixedInitiativeId ?? undefined}
+          >
+            {entry.FilterField && fixedInitiativeId !== null ? (
+              <entry.FilterField
+                value={filters}
+                onChange={changeFilters}
+                initiativeId={fixedInitiativeId}
+              />
+            ) : null}
+          </ToolFilterFields>
+        )}
       </ToolFilterPanel>
 
       {list.isLoading ? (
@@ -964,7 +1020,7 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
           <BulkAccessSection
             selection={selection}
             tool={tool}
-            invalidate={() => invalidate(q.toolList(tool))}
+            invalidate={() => invalidate(plugin ? q.pluginToolRows() : q.toolList(builtIn))}
             actions={
               entry.BulkActions && fixedInitiativeId !== null ? (
                 <entry.BulkActions
@@ -975,7 +1031,24 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
               ) : null
             }
           />
-          {layout === "tags" ? (
+          {plugin ? (
+            laid.list && fixedInitiativeId !== null ? (
+              <ToolRows
+                tool={plugin.tool}
+                table={plugin.table}
+                list={laid.list}
+                // The rows a tool plug-in's entry lists are its rows.
+                rows={list.rows as (ToolIndexRow & ToolRow)[]}
+                initiativeId={fixedInitiativeId}
+                sorting={listView.sorting}
+                onSortingChange={(next) => {
+                  setSorting(next);
+                  setPage(1);
+                }}
+                selection={selection}
+              />
+            ) : null
+          ) : layout === "tags" ? (
             <TagBrowseLayout
               allTags={tagTree.allTags}
               tagCounts={countsQuery.data?.tag_counts ?? {}}
@@ -990,13 +1063,13 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
                 cards
               ) : (
                 <p className="py-8 text-center text-muted-foreground text-sm">
-                  {t(entry.text.noMatches)}
+                  {tx(entry.text.noMatches)}
                 </p>
               )}
             </TagBrowseLayout>
           ) : layout === "list" && entry.table ? (
             <ToolIndexTable
-              tool={tool}
+              tool={builtIn}
               initiativeId={fixedInitiativeId}
               rows={list.rows}
               useColumns={entry.table.useColumns}
@@ -1021,7 +1094,7 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
                   >
                     <div className="flex items-center hover:bg-accent/50">
                       <Link
-                        to={gp(toolDetailRoute(tool, row.initiative_id, row.id))}
+                        to={gp(toolDetailRoute(builtIn, row.initiative_id, row.id))}
                         className="flex min-w-0 flex-1 items-center gap-3 py-2.5 pl-3"
                       >
                         {row.mark ?? (
@@ -1039,7 +1112,7 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
                       </Link>
                       {/* Beside the row's link rather than in it. */}
                       <BookmarkButton
-                        tool={tool}
+                        tool={builtIn}
                         entityId={row.id}
                         name={row.name}
                         initiativeId={row.initiative_id}
@@ -1068,7 +1141,7 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
           />
         </>
       ) : activeFilterCount > 0 ? (
-        <p className="text-muted-foreground text-sm">{t(entry.text.noMatches)}</p>
+        <p className="text-muted-foreground text-sm">{tx(entry.text.noMatches)}</p>
       ) : view !== "active" ? (
         // Nothing is made here: rows arrive in the archive when they are put
         // away, and a template is made by marking an existing one as one.
@@ -1093,8 +1166,8 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>{t(entry.text.emptyTitle)}</CardTitle>
-            <CardDescription>{t(entry.text.emptyBody)}</CardDescription>
+            <CardTitle>{tx(entry.text.emptyTitle)}</CardTitle>
+            <CardDescription>{tx(entry.text.emptyBody)}</CardDescription>
           </CardHeader>
           {/* The other ways to end up with one, said where the answer is
               needed: an initiative with none of them yet. Each reads the
@@ -1102,15 +1175,15 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
           <CardContent className="flex flex-wrap gap-2">
             <Button onClick={() => setCreateOpen(true)} disabled={!canCreateHere}>
               <Plus className="h-4 w-4" />
-              {t("createFirst")}
+              {tx(entry.text.createFirst ?? "createFirst")}
             </Button>
             <ToolImportAction
-              tool={tool}
-              canImport={canCreateHere && !community}
+              tool={builtIn}
+              canImport={canCreateHere && !community && !plugin}
               fixedInitiativeId={fixedInitiativeId ?? undefined}
               variant="button"
             />
-            {canCreateHere ? <BrowseMarketplaceButton tool={tool} /> : null}
+            {canCreateHere && !plugin ? <BrowseMarketplaceButton tool={builtIn} /> : null}
           </CardContent>
         </Card>
       )}
@@ -1136,21 +1209,31 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
         <CreateToolDialog
           open={createOpen}
           onOpenChange={handleCreateOpenChange}
-          tool={tool}
+          tool={builtIn}
           text={{ ...entry.text, ns }}
           initiativeId={fixedInitiativeId}
           onSuccess={openCreated}
         />
       )}
+      {laid.dialog}
     </div>
   );
 };
 
 export const ToolIndexPage = ({ tool, ...rest }: ToolIndexPageProps) => {
-  const entry = TOOL_INDEX[tool];
+  const installed = useCommunityPlugins({
+    select: selectInstalledTools,
+    enabled: !isBuiltInTool(tool),
+  }).data;
+  const found = installed ? toolOfKind(installed, tool) : null;
+  const entry = isBuiltInTool(tool)
+    ? TOOL_INDEX[tool]
+    : found && found.table.parent === null
+      ? pluginIndexEntry(found.tool, found.table)
+      : null;
   // A tool with a page of its own is never routed here; the table names which
-  // those are.
-  if (isOwnPage(entry)) return null;
+  // those are. A tool plug-in's is listed once its installs are read.
+  if (!entry || isOwnPage(entry)) return null;
 
   // Keyed on the tool: the table supplies the list hook, so a different tool is
   // a different set of hooks. Remounting is what makes that sound — and it is

@@ -103,6 +103,7 @@
       "assets": "{{restored}} archivos restaurados, {{deduped}} ya presentes",
       "unmatchedHandles": "Algunas personas no se asignaron. Nadie aquí coincide con ellas, o no puedes añadirlas a esta iniciativa: {{handles}}",
       "failedEntries": "Elementos que no se importaron:",
+      "skippedEntries": "Elementos omitidos:",
       "nothing": "No se importó nada.",
       "failedRows_one": "Se dejó fuera {{count}} fila:",
       "failedRows_other": "Se dejaron fuera {{count}} filas:",
@@ -303,7 +304,6 @@
       "initiative-post": "Publicación",
       "initiative-wiki": "Wiki",
       "initiative-contact": "Contacto",
-      "initiative-counter-group": "Grupo de contadores",
       "initiative-dashboard": "Panel",
       "contacts-csv": "Contactos de una hoja de cálculo"
     },

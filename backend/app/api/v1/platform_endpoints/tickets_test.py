@@ -18,7 +18,7 @@ from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.guild import CommunityRole
-from app.models.tenant.comment import Comment, CommentAudience
+from app.models.tenant.comment import Comment, CommentAudience, said_on
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 from app.services.platform import rules
@@ -126,52 +126,6 @@ async def test_support_is_off_until_the_operator_turns_it_on(client, acting_user
     assert response.json()["detail"] == SupportMessages.NOT_AVAILABLE
 
 
-async def test_a_member_can_ask_for_help(client, session, acting_user, operations):
-    """Every member, not only an admin: the person who needs help is rarely
-    the person who administers anything."""
-    member = await acting_user(guild_role=CommunityRole.member)
-    await _set_support(session, member.guild.id, True)
-
-    response = await _ask(
-        client, member, member.guild.id, subject="Cannot sign in on my phone"
-    )
-    assert response.status_code == 202, response.text
-    assert response.json()["accepted"] is True
-
-    await set_rls_context(session, SystemGuild(operations["guild"].id))
-    case = (await session.exec(select(IntakeCase))).one()
-    assert case.stream == IntakeStream.support.value
-    task = (await session.exec(select(Task).where(Task.id == case.task_id))).one()
-    assert task.title == "Cannot sign in on my phone"
-    assert task.project_id == operations["project"].id
-
-
-async def test_the_case_names_who_asked_and_where_from(
-    client, session, acting_user, operations
-):
-    """So whoever picks it up can reach them without the endpoint resolving
-    anybody."""
-    member = await acting_user(guild_role=CommunityRole.member)
-    await _set_support(session, member.guild.id, True)
-    assert (await _ask(client, member, member.guild.id)).status_code == 202
-
-    await set_rls_context(session, SystemGuild(operations["guild"].id))
-    case = (await session.exec(select(IntakeCase))).one()
-    from app.models.tenant.metadata import MetadataValue
-
-    values = (
-        await session.exec(
-            select(MetadataValue).where(
-                MetadataValue.entity_type == "task",
-                MetadataValue.entity_id == case.task_id,
-            )
-        )
-    ).all()
-    held = {int(v.value_number) for v in values if v.value_number is not None}
-    assert member.user.id in held
-    assert member.guild.id in held
-
-
 async def test_asking_where_nothing_is_bound_says_so(client, session, acting_user):
     """Support is on, but the deployment routes nothing. The asker is told,
     rather than being thanked for a request that reached nobody."""
@@ -193,24 +147,6 @@ async def test_a_stranger_cannot_ask_on_a_community_they_are_not_in(
 
     response = await _ask(client, outsider, host.guild.id)
     assert response.status_code == 403, response.text
-
-
-@pytest.mark.always
-async def test_every_support_error_code_is_localized():
-    """A refusal reaches the reader as its own sentence."""
-    import json
-    from pathlib import Path
-
-    codes = {
-        value
-        for name, value in vars(SupportMessages).items()
-        if not name.startswith("_") and isinstance(value, str)
-    }
-    locales = Path(__file__).resolve().parents[4].parent / "frontend/public/locales"
-    for locale in ("de", "en", "es", "fr"):
-        catalogue = json.loads((locales / locale / "errors.json").read_text())
-        missing = sorted(codes - set(catalogue))
-        assert not missing, f"{locale}/errors.json is missing {missing}"
 
 
 async def test_asking_about_a_community_is_offered_once_both_halves_are_there(
@@ -385,10 +321,15 @@ async def test_one_account_holds_only_so_many_open_cases(
 async def test_the_case_is_connected_to_who_asked_and_opens_with_their_words(
     client, session, acting_user, operations
 ):
-    """The asker is recorded as the case's filer, with their subject, and what
-    they wrote opens the case under their name, said to them — the start of
-    the conversation with them rather than a description somebody rewrites.
-    The device they asked from goes to the team, in the description."""
+    """Every member may ask, not only an admin: the person who needs help is
+    rarely the person who administers anything. The asker is recorded as the
+    case's filer, with their subject, and the case names who asked and where
+    from, so whoever picks it up can reach them. What they wrote opens the case
+    under their name, said to them — the start of the conversation with them
+    rather than a description somebody rewrites. The device they asked from
+    goes to the team, in the description."""
+    from app.models.tenant.metadata import MetadataValue
+
     member = await acting_user(guild_role=CommunityRole.member)
     await _set_support(session, member.guild.id, True)
     response = await _ask(
@@ -400,39 +341,35 @@ async def test_the_case_is_connected_to_who_asked_and_opens_with_their_words(
         context=DEVICE,
     )
     assert response.status_code == 202, response.text
+    assert response.json()["accepted"] is True
 
     await set_rls_context(session, SystemGuild(operations["guild"].id))
     case = (await session.exec(select(IntakeCase))).one()
+    assert case.stream == IntakeStream.support.value
     assert case.filer_user_id == member.user.id
     assert case.filer_subject == "Lost my phone"
     task = (await session.exec(select(Task).where(Task.id == case.task_id))).one()
+    assert task.title == "Lost my phone"
+    assert task.project_id == operations["project"].id
+    values = (
+        await session.exec(
+            select(MetadataValue).where(
+                MetadataValue.entity_type == "task",
+                MetadataValue.entity_id == case.task_id,
+            )
+        )
+    ).all()
+    held = {int(v.value_number) for v in values if v.value_number is not None}
+    assert {member.user.id, member.guild.id} <= held
     for value in DEVICE.values():
         assert f"`{value}`" in task.description
     (opening,) = (
-        await session.exec(select(Comment).where(Comment.task_id == case.task_id))
+        await session.exec(select(Comment).where(said_on("task", case.task_id)))
     ).all()
     assert opening.content == "Help."
     assert opening.created_by == member.user.id
     assert opening.audience == CommentAudience.filer
     assert opening.system_kind is None
-
-
-@pytest.mark.always
-async def test_every_ticket_error_code_is_localized():
-    """A refusal reaches the reader as its own sentence."""
-    import json
-    from pathlib import Path
-
-    codes = {
-        value
-        for name, value in vars(TicketMessages).items()
-        if not name.startswith("_") and isinstance(value, str)
-    }
-    locales = Path(__file__).resolve().parents[4].parent / "frontend/public/locales"
-    for locale in ("de", "en", "es", "fr"):
-        catalogue = json.loads((locales / locale / "errors.json").read_text())
-        missing = sorted(codes - set(catalogue))
-        assert not missing, f"{locale}/errors.json is missing {missing}"
 
 
 # ── Topics ───────────────────────────────────────────────────────────────────

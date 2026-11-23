@@ -194,12 +194,12 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     ),
     # --- Comments -----------------------------------------------------------
     "list_comments": (
-        "The comment thread on one thing — name it with exactly one of the "
-        "`*_id` arguments. Newest conversations first, each with its replies; "
-        "follow `next_cursor` for older ones."
+        "The comment thread on one thing, named by `subject_type` (`task`, "
+        "`project`, `wiki_page`, …) and `subject_id`. Newest conversations "
+        "first, each with its replies; follow `next_cursor` for older ones."
     ),
     "create_comment": (
-        "Comment on one thing, named with exactly one of the `*_id` arguments. "
+        "Comment on one thing, named by `subject_type` and `subject_id`. "
         "`content` is markdown; `parent_comment_id` makes it a reply."
     ),
     "read_comment": "Read one comment by id.",
@@ -218,21 +218,6 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
         "and the file should be read again."
     ),
     "list_file_versions": "The stored versions of an uploaded file, newest first.",
-    # --- Counters -----------------------------------------------------------
-    "add_counter": (
-        "Add a counter to a counter group. `min`, `max` and `step` bound and "
-        "size its moves; `count` is where it starts."
-    ),
-    "read_counter": "Read one counter by id, with its count.",
-    "update_counter": (
-        "Change a counter's name, bounds, step or look. Only the fields sent "
-        "change. Its count moves with `set_counter_count` and `step_counter`."
-    ),
-    "set_counter_count": "Put a counter at a number, held within its bounds.",
-    "step_counter": (
-        "Move a counter `up` or `down` by `amount`, or by its own step, held "
-        "within its bounds."
-    ),
     # --- Calendars ----------------------------------------------------------
     "create_calendar": (
         "Create a calendar in an initiative (`initiative_id`). Without one it "
@@ -351,6 +336,39 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
         "`depends_on`: the source cannot proceed until the target; `part_of`: "
         "the source is a piece of the target; `attached` and `related_to` "
         "belong together. 409 if the link is already there."
+    ),
+    # --- Tool plug-ins ------------------------------------------------------
+    "read_plugin_tool": (
+        "Read what a tool a plug-in brings holds, by its `kind`: the fields of "
+        "its rows and of each of its items (their keys, kinds and options), "
+        "which item sits under which, and its actions. Read it before writing "
+        "a row, to know the keys `fields` takes."
+    ),
+    "list_plugin_tool_rows": (
+        "List the rows of a tool a plug-in brings, by its `kind` "
+        "(`<key>.<id>`): the tool's own rows in an initiative "
+        "(`initiative_id`), or an item's rows under the row they sit in "
+        "(`parent_id`). Each row's declared fields are in `fields`, and the "
+        "people it names in `people`."
+    ),
+    "read_plugin_tool_row": (
+        "Read one row of a tool a plug-in brings, or one of its items, by "
+        "`kind` and id."
+    ),
+    "create_plugin_tool_row": (
+        "Add a row to a tool a plug-in brings: of the tool, in an initiative "
+        "(`initiative_id`), or of an item, under the row it sits in "
+        "(`parent_id`). `fields` holds its declared fields by key, `people` "
+        "the ones naming a person."
+    ),
+    "update_plugin_tool_row": (
+        "Change a row of a tool a plug-in brings. Only the fields sent change; "
+        "a counter is kept within its bounds."
+    ),
+    "step_plugin_tool_row": (
+        "Move one counter field of a row of a tool a plug-in brings, named by "
+        "its key in `field`: by `by` (negative to count down), or by its own "
+        "step, up or `down`. It stays within its bounds."
     ),
 }
 

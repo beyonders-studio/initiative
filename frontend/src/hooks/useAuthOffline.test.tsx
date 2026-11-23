@@ -116,7 +116,7 @@ beforeEach(() => {
 });
 
 describe("bootstrapping with no answer from the server", () => {
-  it("keeps the last-known user, marked unverified", async () => {
+  it("keeps the last-known user, marked unverified, writing nothing and keeping whiteboards", async () => {
     snapshot = buildUser();
     const stored = snapshot;
     get.mockRejectedValue({ request: {}, message: "Network Error" });
@@ -126,19 +126,13 @@ describe("bootstrapping with no answer from the server", () => {
     await waitFor(() => expect(auth.loading).toBe(false));
     expect(auth.user?.id).toBe(stored.id);
     expect(auth.sessionUnverified).toBe(true);
-  });
-
-  it("writes nothing to disk while the session is unverified", async () => {
-    snapshot = buildUser();
-    get.mockRejectedValue({ request: {} });
-
-    renderAuth();
-
-    await waitFor(() => expect(auth.loading).toBe(false));
     // The restore path must not go through the remembering path: re-saving
     // would push the snapshot's expiry out on every offline launch.
     expect(saveOfflineSession).not.toHaveBeenCalled();
     expect(setOfflineWritesAllowed).not.toHaveBeenCalledWith(true);
+    // No signal is not the end of a session, and the unsaved work is the whole
+    // reason those scenes are held.
+    expect(clearWhiteboards).not.toHaveBeenCalled();
   });
 
   it("signs out anyway when there is no snapshot to fall back to", async () => {
@@ -170,68 +164,32 @@ describe("bootstrapping when the server does answer", () => {
     expect(clearWhiteboards).toHaveBeenCalled();
   });
 
-  it("keeps whiteboards on the device when nothing answered", async () => {
-    snapshot = buildUser();
-    get.mockRejectedValue({ request: {} });
-
-    renderAuth();
-
-    await waitFor(() => expect(auth.sessionUnverified).toBe(true));
-    // No signal is not the end of a session, and the unsaved work is the whole
-    // reason those scenes are held.
-    expect(clearWhiteboards).not.toHaveBeenCalled();
-  });
-
-  it("keeps whiteboards through a blip on the web, where there is no fallback", async () => {
-    // No offline cache here, so the snapshot path is unavailable and the
-    // bootstrap does sign the user out. That is not the server refusing the
-    // session, and a moment of bad network must not cost somebody their
-    // unsaved drawing.
+  // On the web there is no offline cache, so every failure signs the user out;
+  // only the server ending the session takes their unsaved drawings with it.
+  it.each([
+    ["a network blip", { request: {} }, false],
+    [
+      "a server error, which is trouble not a refusal",
+      { request: {}, response: { status: 502 } },
+      false,
+    ],
+    [
+      "a deactivated account",
+      { request: {}, response: { status: 400, data: { detail: "INACTIVE_USER" } } },
+      true,
+    ],
+    ["a refused session", { request: {}, response: { status: 401 } }, true],
+  ])("on the web, after %s, clears whiteboards: %s", async (_what, error, clears) => {
     offlineEnabled = false;
     snapshot = buildUser();
-    get.mockRejectedValue({ request: {} });
+    get.mockRejectedValue(error);
 
     renderAuth();
 
     await waitFor(() => expect(auth.loading).toBe(false));
     expect(auth.user).toBeNull();
-    expect(clearWhiteboards).not.toHaveBeenCalled();
-  });
-
-  it("keeps whiteboards through a server error, which is trouble not a refusal", async () => {
-    offlineEnabled = false;
-    get.mockRejectedValue({ request: {}, response: { status: 502 } });
-
-    renderAuth();
-
-    await waitFor(() => expect(auth.loading).toBe(false));
-    expect(auth.user).toBeNull();
-    // A bad gateway is the server having a bad time, not the end of a session.
-    expect(clearWhiteboards).not.toHaveBeenCalled();
-  });
-
-  it("clears whiteboards when the account has been deactivated", async () => {
-    offlineEnabled = false;
-    get.mockRejectedValue({
-      request: {},
-      response: { status: 400, data: { detail: "INACTIVE_USER" } },
-    });
-
-    renderAuth();
-
-    await waitFor(() => expect(auth.loading).toBe(false));
-    // The account is switched off, so the session is over as surely as a 401.
-    expect(clearWhiteboards).toHaveBeenCalled();
-  });
-
-  it("clears whiteboards on the web when the server does refuse the session", async () => {
-    offlineEnabled = false;
-    get.mockRejectedValue({ request: {}, response: { status: 401 } });
-
-    renderAuth();
-
-    await waitFor(() => expect(auth.loading).toBe(false));
-    expect(clearWhiteboards).toHaveBeenCalled();
+    if (clears) expect(clearWhiteboards).toHaveBeenCalled();
+    else expect(clearWhiteboards).not.toHaveBeenCalled();
   });
 
   it("records the confirmed identity and opens the cache for writing", async () => {

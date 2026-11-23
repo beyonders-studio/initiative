@@ -28,19 +28,15 @@ from time import monotonic
 from typing import Any
 
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect, status
-from sqlalchemy.orm import selectinload, undefer
-from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api import resource_access
 from app.api.deps import GuildAccessError, establish_guild_access
 from app.core.errors import CodedError
 from app.core.identify import presented_credential
-from app.core.tools import Tool
 from app.db.cohorts import request_sessionmaker
 from app.db.session import require_guild_context
+from app.db.tool_rows import locate
 from app.models.platform.user import User
-from app.models.tenant._mixins import tool_models
 from app.services.content_sockets import (
     Authorizer,
     Credential,
@@ -51,6 +47,7 @@ from app.services.content_sockets import (
     sockets,
 )
 from app.services.platform.ws_auth import authenticate_ws_token
+from app.services.tenant import plugin_tool_rows
 
 logger = logging.getLogger(__name__)
 
@@ -221,44 +218,37 @@ async def hold_open(
         (sub.register or sockets).leave(sub.websocket)
 
 
-def tool_room(guild_id: int, tool: Tool, resource_id: int) -> RoomKey:
-    return resource_room(guild_id, tool.value, resource_id)
+def tool_room(guild_id: int, kind: str, resource_id: int) -> RoomKey:
+    return resource_room(guild_id, kind, resource_id)
 
 
-def tool_authorizer(guild_id: int, tool: Tool, resource_id: int) -> Authorizer:
-    """May this reader watch one tool row: the row under RLS, the tool's switch
-    on its initiative, and the sharing — ``resource_access.authorize``, the
-    check every REST read of the row makes."""
-    model = tool_models()[tool.plural]
+def tool_authorizer(guild_id: int, kind: str, resource_id: int) -> Authorizer:
+    """May this reader watch one row of a tool plug-in's tool, named by its
+    kind: the row read as its routes read it (``plugin_tool_rows``), from the
+    community's tools as the reader's standing carries them, under RLS, the
+    tool's switch on its initiative, and the sharing."""
 
     async def authorize(session: AsyncSession, user: User) -> frozenset[RoomKey] | None:
-        row = (
-            await session.exec(
-                select(model)
-                .where(model.id == resource_id)  # type: ignore[attr-defined]
-                .options(
-                    selectinload(model.initiative),  # type: ignore[attr-defined]
-                    undefer(model.actions),  # type: ignore[attr-defined]
-                )
-            )
-        ).one_or_none()
-        if row is None:
+        context = require_guild_context(session)
+        located = locate(context.tools, kind)
+        if located is None or located.table is not located.tool.table:
             return None
         try:
-            resource_access.authorize(
-                tool, row, user, context=require_guild_context(session)
+            await plugin_tool_rows.load_authorized(
+                session, context, located, context.tools, resource_id
             )
         except HTTPException, CodedError:
             return None
-        return frozenset({tool_room(guild_id, tool, resource_id)})
+        return frozenset({tool_room(guild_id, kind, resource_id)})
 
     return authorize
 
 
 async def serve_tool_stream(
-    websocket: WebSocket, guild_id: int, tool: Tool, resource_id: int
+    websocket: WebSocket, guild_id: int, kind: str, resource_id: int
 ) -> None:
-    """A tool row's change signal: ``{type, id, timestamp}`` frames, and a beat.
+    """A tool plug-in's row's change signal: ``{type, id, timestamp}`` frames,
+    and a beat.
 
     The frames never carry the row. The client refetches it through REST.
     """
@@ -266,7 +256,7 @@ async def serve_tool_stream(
         websocket,
         guild_id,
         wire=Wire.json,
-        authorize=tool_authorizer(guild_id, tool, resource_id),
+        authorize=tool_authorizer(guild_id, kind, resource_id),
     )
     if sub is not None:
         await hold_open(sub)

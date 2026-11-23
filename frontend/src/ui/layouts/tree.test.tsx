@@ -12,6 +12,8 @@ const TASK_DETAIL = TASK_LAYOUT.tree(undefined);
 
 import type { TranslateFn } from "@/types/i18n";
 
+import { type FieldDef, type LayoutEnv, withDisplays } from "./fields";
+import { fieldSorting, presetName, presetsOf, sortedItems, storedPreset } from "./presets";
 import {
   LAYOUT_PARTS,
   type LayoutContext,
@@ -213,5 +215,131 @@ describe("a task detail's tree", () => {
     // Drawn where the shipped page puts what it starts with on one column.
     expect(page.main).toEqual([{ ...work, props: { ...work.props, order: 1 } }]);
     expect(page.side).toEqual([]);
+  });
+});
+
+/** A row of a laid-out table, as a tool plug-in's: its fields by key. */
+type Row = {
+  properties: [];
+  values: Record<string, unknown>;
+};
+
+const row = (values: Record<string, unknown>): Row => ({ properties: [], values });
+
+/** Each of `keys` a field drawing its value as text. */
+const fieldsOf = (...keys: string[]): ReadonlyMap<string, FieldDef<Row>> =>
+  new Map(
+    keys.map((key) => [
+      key,
+      {
+        id: key,
+        source: "builtin",
+        label: key,
+        hideable: true,
+        requireable: false,
+        value: (item: Row) => item.values[key],
+        render: ({ value }) => <span>{String(value)}</span>,
+      } satisfies FieldDef<Row>,
+    ])
+  );
+
+const env: LayoutEnv<Row> = {
+  t: i18n.getFixedT(null, "layouts") as TranslateFn,
+  communityPath: (path) => path,
+  itemHref: () => "/row",
+};
+
+const drawRow = (node: LayoutNode, item: Row) =>
+  renderWithProviders(
+    <LayoutTree
+      node={node}
+      item={item}
+      view={{ fields: fieldsOf("name", "color"), variant: "card", env }}
+    />
+  );
+
+describe("a tool plug-in's card", () => {
+  it("is drawn in the colour its tint field holds, and plain without one", () => {
+    const card: LayoutNode = { type: "card", props: { tint: "color" }, children: [field("name")] };
+
+    const { unmount } = drawRow(card, row({ name: "Tinted", color: "#5B7FC2" }));
+    expect(screen.getByText("Tinted").parentElement).toHaveStyle({
+      backgroundColor: "#5B7FC2",
+      color: "#FFFFFF",
+    });
+    unmount();
+
+    drawRow(card, row({ name: "Plain", color: "blue" }));
+    expect(screen.getByText("Plain").parentElement).not.toHaveAttribute("style");
+  });
+});
+
+describe("withDisplays", () => {
+  it("draws a field in the look each row's select field names", () => {
+    const fields = withDisplays(fieldsOf("count", "view_mode", "mood"), {
+      count: { from: "view_mode" },
+      mood: "stars",
+    });
+    const count = fields.get("count");
+
+    expect(count?.displayOf?.(row({ view_mode: "clock" }))).toBe("clock");
+    expect(count?.displayOf?.(row({ view_mode: { value: "bar" } }))).toBe("bar");
+    expect(count?.displayOf?.(row({}))).toBeUndefined();
+    expect(fields.get("mood")?.display).toBe("stars");
+  });
+});
+
+describe("a tool plug-in's presets", () => {
+  const kind = { shipped: [], read: () => ({}), sorting: fieldSorting };
+  const definition = {
+    presets: [
+      {
+        slug: "by-count",
+        name: { en: "By count", de: "Nach Zählung" },
+        sort: [{ field: "count", dir: "desc" as const }, { field: "name" }],
+      },
+    ],
+  };
+  const t = (key: string) => key;
+
+  it("are named in the reader's language, else in English, and stored as kept", () => {
+    const [preset] = presetsOf(definition, kind);
+
+    expect(presetName(preset, t, "de-CH")).toBe("Nach Zählung");
+    expect(presetName(preset, t, "fr")).toBe("By count");
+    expect(preset.sorting).toEqual([
+      { id: "count", desc: true },
+      { id: "name", desc: false },
+    ]);
+    expect(storedPreset(preset, kind)).toMatchObject({
+      name: definition.presets[0].name,
+      slug: "by-count",
+      sort: [
+        { field: "count", dir: "desc" },
+        { field: "name", dir: "asc" },
+      ],
+    });
+  });
+
+  it("sort what is shown and leave the rows' own order alone", () => {
+    const rows = [
+      row({ name: "b", count: 2 }),
+      row({ name: "a", count: null }),
+      row({ name: "c", count: 2 }),
+      row({ name: "d", count: 10 }),
+    ];
+    const order = rows.map((each) => each.values.name);
+
+    const sorted = sortedItems(
+      rows,
+      [
+        { id: "count", desc: true },
+        { id: "name", desc: true },
+      ],
+      fieldsOf("name", "count")
+    );
+
+    expect(sorted.map((each) => each.values.name)).toEqual(["d", "c", "b", "a"]);
+    expect(rows.map((each) => each.values.name)).toEqual(order);
   });
 });

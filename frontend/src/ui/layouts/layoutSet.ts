@@ -9,6 +9,7 @@ import type {
   DetailLayoutDefinitionOutput,
   DetailLayoutRead,
   LayoutPreset,
+  LayoutPresetName,
   ListLayoutDefinitionInput,
   ListLayoutRead,
   ListLayoutReadKind,
@@ -16,10 +17,10 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 
 /** A preset as a list's layout keeps it: its name (none for a shipped one no
- *  one renamed), its slug, and its tool's filters and sort, by the tool's own
- *  fields. */
+ *  one renamed; a tool plug-in's shipped one's in each language it ships),
+ *  its slug, and its tool's filters and sort, by the tool's own fields. */
 export interface StoredPreset {
-  name?: string | null;
+  name?: LayoutPresetName;
   slug: string;
   filters?: object;
   sort?: SortField[];
@@ -49,6 +50,40 @@ export interface DetailLayout {
 export interface LayoutSet {
   layouts: (ListView | DetailLayout)[];
 }
+
+/** The lists a tool plug-in declares for a table, as a target's views read:
+ *  each drawn as shipped, the first the one a person starts on. Each person
+ *  picks among them as among a built-in tool's. */
+export const shippedLists = (
+  lists: readonly (ListLayoutDefinition & { kind: ListLayoutReadKind })[]
+): ListView[] =>
+  lists.map(({ kind, ...definition }, index) => ({
+    kind,
+    is_default: index === 0,
+    hidden: false,
+    definition,
+    updated_at: null,
+  }));
+
+/** What a definition sets, without what it leaves unset. */
+export const setOf = <D extends object>(definition: D): Partial<D> =>
+  Object.fromEntries(Object.entries(definition).filter(([, value]) => value != null)) as Partial<D>;
+
+/** Lists drawn as shipped (`shipped`, the first the one a person starts on),
+ *  each as its target's set has it: what a changed one sets over what it
+ *  ships, whether it is hidden, and the one the target opens on. Without a
+ *  set they are as shipped. */
+export const laidOutLists = (shipped: readonly ListView[], set?: LayoutSet): ListView[] =>
+  shipped.map((list) => {
+    const read = listLayouts(set).find((each) => each.kind === list.kind);
+    if (!read) return list;
+    return {
+      ...read,
+      definition: read.updated_at
+        ? { ...list.definition, ...setOf(read.definition) }
+        : list.definition,
+    };
+  });
 
 /** Whether a layout is one of the ways its target lists what it holds, as
  *  against a detail. */

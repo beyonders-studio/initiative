@@ -1,25 +1,40 @@
-import { useState } from "react";
+import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import type { IntakeStream } from "@/api/generated/initiativeAPI.schemas";
 import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
 import { useAuth } from "@/hooks/useAuth";
 import {
   useIntakeOptions,
   useIntakeSettings,
   useUpdateFeedbackSwitch,
+  useUpdateIntakeGeneralContact,
   useUpdateOperationsCommunity,
 } from "@/hooks/useIntakeSettings";
 import { usePlatformCommunities } from "@/hooks/useSettings";
+import { getErrorMessage } from "@/lib/errorMessage";
+import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
+import { Button } from "@/ui/button";
 import { Combobox } from "@/ui/combobox";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
-import { Label } from "@/ui/label";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
 import { StatusMessage } from "@/ui/status-message";
 import { Switch } from "@/ui/switch";
 
-import { ContactsCard } from "./ContactsCard";
-import { NONE, StreamCard } from "./StreamCard";
+import { NONE } from "./StreamDialog";
+import { StreamRow } from "./StreamRow";
 
+/**
+ * Platform → Intake: where each kind of case lands.
+ *
+ * The operations community comes first, then one row per kind of case with
+ * where it lands, who to contact about it and whether it is receiving; each
+ * row's dialog holds the rest. Contacts work without a community: a notice
+ * names one either way. The switch that sends feedback to the Initiative team
+ * is outbound, not intake, so it sits apart at the end.
+ */
 export const IntakePage = () => {
   const { t } = useTranslation("intake");
   const { user } = useAuth();
@@ -53,7 +68,6 @@ export const IntakePage = () => {
   const settled = !failed && !settingsFetching && !optionsFetching;
 
   const [clearing, setClearing] = useState(false);
-
   const updateCommunity = useUpdateOperationsCommunity();
 
   if (!isOwner) {
@@ -78,63 +92,71 @@ export const IntakePage = () => {
 
   return (
     <div className="space-y-6">
-      {settings ? <FeedbackCard enabled={settings.feedback_enabled} settled={settled} /> : null}
-      {settings ? <ContactsCard settings={settings} settled={settled} /> : null}
-
       <SettingsSection
         title={t("community.title")}
         description={t("community.description")}
-        contentClassName="space-y-3"
+        contentClassName="space-y-4"
       >
-        <Label>{t("community.label")}</Label>
-        <Combobox
-          className="max-w-md"
-          aria-label={t("community.label")}
-          value={boundCommunityId === null ? NONE : String(boundCommunityId)}
-          selectedLabel={
-            boundCommunityId === null
-              ? t("community.none")
-              : (settings?.operations_community_name ?? null)
-          }
-          items={[
-            { value: NONE, label: t("community.none") },
-            ...(communitiesQuery.data?.items ?? []).map((community) => ({
-              value: String(community.id),
-              label: community.name,
-            })),
-          ]}
-          onSearchChange={setCommunitySearch}
-          onOpenChange={setPickerOpen}
-          loading={communitiesQuery.isFetching}
-          placeholder={t("community.placeholder")}
-          disabled={isLoading || !settled || updateCommunity.isPending}
-          onValueChange={(value) => {
-            // Clearing it stops every stream at once, so it is confirmed;
-            // choosing a different one is an ordinary change.
-            if (value === NONE) {
-              setClearing(true);
-              return;
+        <Field label={t("community.label")} className="max-w-md">
+          <Combobox
+            aria-label={t("community.label")}
+            value={boundCommunityId === null ? NONE : String(boundCommunityId)}
+            selectedLabel={
+              boundCommunityId === null
+                ? t("community.none")
+                : (settings?.operations_community_name ?? null)
             }
-            updateCommunity.mutate({ community_id: Number(value) });
-          }}
-        />
-        <p className="text-muted-foreground text-sm">{t("community.helpText")}</p>
-      </SettingsSection>
+            items={[
+              { value: NONE, label: t("community.none") },
+              ...(communitiesQuery.data?.items ?? []).map((community) => ({
+                value: String(community.id),
+                label: community.name,
+              })),
+            ]}
+            onSearchChange={setCommunitySearch}
+            onOpenChange={setPickerOpen}
+            loading={communitiesQuery.isFetching}
+            placeholder={t("community.placeholder")}
+            disabled={isLoading || !settled || updateCommunity.isPending}
+            onValueChange={(value) => {
+              // Clearing it stops every stream at once, so it is confirmed;
+              // choosing a different one is an ordinary change.
+              if (value === NONE) {
+                setClearing(true);
+                return;
+              }
+              updateCommunity.mutate({ community_id: Number(value) });
+            }}
+          />
+        </Field>
+        {boundCommunityId === null ? (
+          <p className="text-muted-foreground text-sm">{t("rows.chooseCommunity")}</p>
+        ) : null}
 
-      {boundCommunityId === null ? (
-        <p className="text-muted-foreground text-sm">{t("streams.chooseCommunityFirst")}</p>
-      ) : (
-        <div className="space-y-4">
-          {(settings?.bindings ?? []).map((binding) => (
-            <StreamCard
-              key={binding.stream}
-              binding={binding}
-              initiatives={options?.initiatives ?? []}
+        {settings ? (
+          <>
+            <ul className="divide-y rounded-md border">
+              {settings.bindings.map((binding) => (
+                <StreamRow
+                  key={binding.stream}
+                  binding={binding}
+                  contact={settings.contact_emails?.[binding.stream as IntakeStream] ?? ""}
+                  routable={boundCommunityId !== null}
+                  initiatives={options?.initiatives ?? []}
+                  settled={settled}
+                />
+              ))}
+            </ul>
+            <GeneralContact
+              key={settings.general_contact_email ?? ""}
+              saved={settings.general_contact_email ?? ""}
               settled={settled}
             />
-          ))}
-        </div>
-      )}
+          </>
+        ) : null}
+      </SettingsSection>
+
+      {settings ? <FeedbackCard enabled={settings.feedback_enabled} settled={settled} /> : null}
 
       <ConfirmDialog
         open={clearing}
@@ -145,6 +167,44 @@ export const IntakePage = () => {
         onConfirm={() => updateCommunity.mutate({ community_id: null })}
       />
     </div>
+  );
+};
+
+/** The address a notice names for a kind of case with none of its own. */
+const GeneralContact = ({ saved, settled }: { saved: string; settled: boolean }) => {
+  const { t } = useTranslation("intake");
+  const [email, setEmail] = useState(saved);
+  const update = useUpdateIntakeGeneralContact();
+  const changed = email.trim() !== saved;
+
+  const onSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    try {
+      await update.mutateAsync({ email: email.trim() || null });
+      toast.success(t("contacts.saved"));
+    } catch (err) {
+      toast.error(getErrorMessage(err, "intake:contacts.saveError"));
+    }
+  };
+
+  return (
+    <form className="space-y-2" onSubmit={onSubmit}>
+      <div className="flex flex-wrap items-end gap-2">
+        <Field label={t("contacts.generalLabel")} className="min-w-0 max-w-md grow">
+          <Input
+            type="email"
+            value={email}
+            placeholder={t("contacts.generalPlaceholder")}
+            disabled={!settled || update.isPending}
+            onChange={(event) => setEmail(event.target.value)}
+          />
+        </Field>
+        <Button type="submit" variant="outline" disabled={!settled || update.isPending || !changed}>
+          {update.isPending ? t("contacts.saving") : t("contacts.save")}
+        </Button>
+      </div>
+      <p className="text-muted-foreground text-xs">{t("contacts.generalHelp")}</p>
+    </form>
   );
 };
 

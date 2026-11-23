@@ -37,8 +37,8 @@ import type { QueryOpts } from "@/types/query";
 /** Conversations per page — a top-level comment and every reply under it. */
 const COMMENT_PAGE_SIZE = 20;
 
-/** Which thread: exactly one `{target}_id`. The page size and the cursor are
- *  the query's own, so they stay out of the key. */
+/** Which thread: what it is said on. The page size and the cursor are the
+ *  query's own, so they stay out of the key. */
 export type CommentThreadParams = Omit<ListCommentsParams, "limit" | "cursor">;
 
 type CommentThreadData = InfiniteData<CommentListResponse>;
@@ -172,42 +172,22 @@ export const useCommentsCache = (params: CommentThreadParams) => {
   return { putComment, removeComment };
 };
 
-/**
- * The thread a comment belongs to: the one target it names. A task comment
- * also reports its task's project, so the task is read first, as the backend
- * reads a comment's columns.
- */
-const COMMENT_TARGETS = [
-  "task_id",
-  "wiki_page_id",
-  "collection_id",
-  "file_id",
-  "project_id",
-  "counter_group_id",
-  "calendar_id",
-  "dashboard_id",
-  "post_id",
-  "wiki_id",
-  "contact_id",
-] as const satisfies readonly (keyof CommentThreadParams & keyof CommentRead)[];
-
-const inThread = (comment: CommentRead, params: CommentThreadParams) => {
+const inThread = (comment: CommentRead, params: CommentThreadParams) =>
   // What is said with whoever filed a case is the case's conversation, read
   // on the case, never a comment in the task's thread.
-  if (comment.audience === CommentAudience.filer) return false;
-  const target = COMMENT_TARGETS.find((key) => comment[key] != null);
-  return target !== undefined && params[target] === comment[target];
-};
+  comment.audience !== CommentAudience.filer &&
+  comment.subject_type === params.subject_type &&
+  comment.subject_id === params.subject_id;
 
 /** The cached threads of `parent`. */
 const threadsOf = (communityId: number, parent: { type: string; id: number }) => {
-  const param = `${singularOf(parent.type)}_id` as keyof CommentThreadParams;
+  const kind = singularOf(parent.type);
   return queryClient
     .getQueryCache()
     .findAll({ queryKey: getListCommentsQueryKey(communityId) })
     .filter((query) => {
       const params = query.queryKey[1] as CommentThreadParams | undefined;
-      return params?.[param] === parent.id;
+      return params?.subject_type === kind && params.subject_id === parent.id;
     });
 };
 

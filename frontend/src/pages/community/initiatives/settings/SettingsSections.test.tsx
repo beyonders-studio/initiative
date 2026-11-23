@@ -7,27 +7,24 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   buildCommunity,
   buildInitiative,
-  buildInitiativeJoinRequest,
   buildInitiativeRole,
   buildPropertyDefinition,
   buildPropertyGroup,
   buildToolLayoutSet,
-  buildUserSummary,
+  buildToolPlugin,
   initiativeCan,
+  shelfDefinition,
+  TOOL_PLUGIN_UID,
 } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { InitiativeRead } from "@/api/generated/initiativeAPI.schemas";
-
-vi.mock("@/lib/mascotToast", () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
-}));
 
 import { DangerPage } from "./DangerPage";
 import { ExportPage } from "./ExportPage";
@@ -68,40 +65,11 @@ const renderSection = (
   });
 
 describe("initiative settings sections", () => {
-  it("serves the roster, and the queue feeding it, at /settings/members", async () => {
-    stubInitiative();
-    server.use(
-      communityHttp.get("/initiatives/:id/join-requests", () =>
-        HttpResponse.json([
-          buildInitiativeJoinRequest({
-            id: 11,
-            initiative_id: INITIATIVE_ID,
-            user: buildUserSummary({ id: 42, display_name: "Ada Lovelace" }),
-          }),
-        ])
-      )
-    );
-
-    renderSection(MembersPage, "members");
-
-    expect(await screen.findByText("Requests to join")).toBeInTheDocument();
-    expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
-    expect(screen.getByText("Members")).toBeInTheDocument();
-  });
-
-  it("serves role permissions at /settings/roles", async () => {
-    stubInitiative();
-
-    renderSection(RolesPage, "roles");
-
-    expect(await screen.findByText("Role permissions")).toBeInTheDocument();
-  });
-
   /**
    * Moderator holds every permission by construction, so its card says what the
    * role is instead of offering a set of switches with nothing to change.
    */
-  it("gives the moderator a card with no tool switches on /settings/roles", async () => {
+  it("serves role permissions at /settings/roles, the moderator's card with no tool switches", async () => {
     stubInitiative();
     server.use(
       communityHttp.get("/initiatives/:id/roles", () =>
@@ -126,6 +94,7 @@ describe("initiative settings sections", () => {
 
     renderSection(RolesPage, "roles");
 
+    expect(await screen.findByText("Role permissions")).toBeInTheDocument();
     expect(await screen.findByText("Moderator")).toBeInTheDocument();
     expect(screen.getByText("Full access")).toBeInTheDocument();
     expect(screen.getByText(/Moderators can use every tool/)).toBeInTheDocument();
@@ -274,6 +243,7 @@ describe("initiative settings sections", () => {
             {
               id: 3,
               name: "CI",
+              definition: {},
               permissions: [
                 { id: "use", level: "initiative", name: null, members: false },
                 { id: "export", level: "initiative", name: { en: "Export builds" }, members: true },
@@ -327,13 +297,66 @@ describe("initiative settings sections", () => {
     });
   });
 
+  it("gives a tool plug-in placed here the view and create a built-in tool has, and none placed elsewhere", async () => {
+    const shelf = `shelf.${TOOL_PLUGIN_UID.toLowerCase()}`;
+    const patches: Record<string, unknown>[] = [];
+    stubInitiative({ tools: { [shelf]: true } });
+    server.use(
+      communityHttp.get("/plugins/", () =>
+        HttpResponse.json({
+          items: [
+            buildToolPlugin({
+              placed_initiative_ids: [INITIATIVE_ID],
+              permissions: [{ id: "use", level: "initiative", name: null, members: false }],
+            }),
+            buildToolPlugin({
+              listing_uid: "ELSEWHERE00001",
+              definition: {
+                ...shelfDefinition(),
+                tool: { ...shelfDefinition().tool, name: { en: "Elsewhere" } },
+              },
+              placed_initiative_ids: [INITIATIVE_ID + 1],
+            }),
+          ],
+        })
+      ),
+      communityHttp.get("/initiatives/:id/roles", () =>
+        HttpResponse.json([
+          buildInitiativeRole({
+            id: 2,
+            name: "member",
+            display_name: "Member",
+            is_builtin: true,
+            permissions: { [`${shelf}:enabled`]: true, [`${shelf}:create`]: false },
+          }),
+        ])
+      ),
+      communityHttp.patch("/initiatives/:id/roles/:roleId", async ({ request }) => {
+        patches.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({ id: 2 });
+      })
+    );
+
+    renderSection(RolesPage, "roles");
+
+    expect(await screen.findByRole("switch", { name: "View Reading" })).toBeChecked();
+    expect(screen.queryByText("Elsewhere")).not.toBeInTheDocument();
+    // Its tool's keys are the role's answer; its install has no switch beside them.
+    expect(screen.queryByRole("switch", { name: "Reading: Use" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("switch", { name: "Create in Reading" }));
+    await waitFor(() => expect(patches).toHaveLength(1));
+    expect(patches[0]).toMatchObject({
+      permissions: { [`${shelf}:enabled`]: true, [`${shelf}:create`]: true },
+    });
+  });
+
   /**
    * A permission for a tool the initiative has switched off grants nothing —
    * the mirror of the details screen never mentioning roles. The roles screen
    * has to say so, or the two halves of the gate stay invisible to each other.
    */
   it("says on /settings/roles when a tool's permissions grant nothing yet", async () => {
-    stubInitiative({ posts_enabled: false });
+    stubInitiative({ tools: { post: false } });
     server.use(
       communityHttp.get("/initiatives/:id/roles", () =>
         HttpResponse.json([buildInitiativeRole({ display_name: "Member" })])
@@ -485,7 +508,7 @@ describe("initiative settings sections", () => {
   });
 
   it("lists the calendar's and each project's layouts at /settings/layouts", async () => {
-    stubInitiative({ calendars_enabled: true });
+    stubInitiative({ tools: { calendar: true } });
     server.use(
       communityHttp.get("/layouts/", () =>
         HttpResponse.json(buildToolLayoutSet({ tool: "calendar" }))

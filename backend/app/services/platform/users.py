@@ -219,7 +219,7 @@ async def _erase_in_guild(
 
     ``guild_session`` is a system session routed into ``guild_id``.
     """
-    from app.core.relationships import PERSON, EndpointKind
+    from app.core.relationships import PERSON
     from app.models.platform.identity_ref import IdentityEntity
     from app.models.tenant.calendar_event import CalendarEventAttendee
     from app.models.tenant.custom_role import CustomRoleMember
@@ -270,7 +270,7 @@ async def _erase_in_guild(
         .where(col(BatchedNotice.actor_id) == user_id)
         .values(actor_id=None)
     )
-    # All per-user DAC grants (project, file, counter group, calendar event)
+    # All per-user DAC grants (project, file, calendar, …)
     # live in the polymorphic resource_grants table; one delete clears
     # every resource type for this user in the schema.
     await guild_session.exec(
@@ -321,7 +321,7 @@ async def _erase_in_guild(
     )
     # Every link with them on an end, from either side, tombstones included.
     await relationships_service.purge_for_entities(
-        guild_session, EndpointKind(PERSON.value), [user_id]
+        guild_session, PERSON.code, [user_id]
     )
 
 

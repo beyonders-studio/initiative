@@ -33,34 +33,29 @@ describe("PushPage", () => {
     settings = structuredClone(base);
   });
 
-  it("keeps the saved service account when the field is left blank", () => {
+  // A service account left blank keeps the saved one; a pasted one is sent.
+  it.each([
+    [/project id/i, "other", { project_id: "other" }],
+    [
+      /service account/i,
+      '{"type": "service_account"}',
+      { service_account_json: '{"type": "service_account"}' },
+    ],
+  ])("saves %s typed as %s", (field, value, changed) => {
     renderWithProviders(<PushPage />, { auth: { user: owner } });
 
-    fireEvent.change(screen.getByLabelText(/project id/i), { target: { value: "other" } });
+    fireEvent.change(screen.getByLabelText(field), { target: { value } });
     fireEvent.click(screen.getByRole("button", { name: /save/i }));
 
     expect(mutate).toHaveBeenCalledWith(
       {
         enabled: true,
-        project_id: "other",
+        project_id: "proj",
         application_id: "1:1:android:1",
         api_key: "key",
         sender_id: "1",
+        ...changed,
       },
-      expect.anything()
-    );
-  });
-
-  it("sends a pasted service account", () => {
-    renderWithProviders(<PushPage />, { auth: { user: owner } });
-
-    fireEvent.change(screen.getByLabelText(/service account/i), {
-      target: { value: '{"type": "service_account"}' },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /save/i }));
-
-    expect(mutate).toHaveBeenCalledWith(
-      expect.objectContaining({ service_account_json: '{"type": "service_account"}' }),
       expect.anything()
     );
   });

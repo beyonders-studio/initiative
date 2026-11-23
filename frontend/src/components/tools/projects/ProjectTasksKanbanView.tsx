@@ -24,7 +24,7 @@ import type {
   TaskListRead,
   TaskStatusRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { PropertyTarget } from "@/api/generated/initiativeAPI.schemas";
+import { ContentKind } from "@/api/generated/initiativeAPI.schemas";
 import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
 import { MentionText } from "@/components/user/MentionText";
 import { type ColumnLimits, NO_COLUMN_LIMITS } from "@/hooks/useColumnLimits";
@@ -160,7 +160,7 @@ export const ProjectTasksKanbanView = ({
   // not the values on them.
   const projectEnv = useProjectLayoutEnv(taskHref);
   const stepCounter = useCounterSteps(
-    PropertyTarget.task,
+    ContentKind.task,
     useCallback(() => canEditTasks, [canEditTasks])
   );
   const env = useMemo(

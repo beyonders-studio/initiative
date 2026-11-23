@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
 from sqlmodel import select
 
 from app.core.references import references_in_body, references_in_text
@@ -18,7 +19,14 @@ from app.models.platform.guild import CommunityRole
 from app.models.tenant.relationship import EntityRelationship
 from app.services.tenant import content_references
 from app.services.tenant.relationships import Endpoint
-from app.testing import create_comment, create_file, create_project, create_task
+from app.testing import (
+    add_counter,
+    create_comment,
+    create_file,
+    create_project,
+    create_task,
+    install_tool_plugin,
+)
 
 
 def _doc(*nodes: dict[str, Any]) -> dict[str, Any]:
@@ -38,81 +46,108 @@ TASK = SearchEntityType.task
 # ---------------------------------------------------------------------------
 
 
-def test_a_hash_reference_is_a_reference():
-    assert references_in_body(_doc(_reference("file", 7))) == {(FILE, 7)}
+_GROUP, _COUNTER = "counter_group.tsjvtcm0s7gv2x", "counter.tsjvtcm0s7gv2x"
 
 
-def test_a_reference_to_something_that_is_not_a_file_counts_too():
-    """The whole of what this phase adds: a page about a task refers to that
-    task, and until now only the files were kept."""
-    content = _doc(_reference("task", 12), _reference("counter_group", 4))
-    assert references_in_body(content) == {
-        (TASK, 12),
-        (SearchEntityType.counter_group, 4),
-    }
-
-
-def test_a_chip_refers_to_the_thing_it_reads():
-    """A page showing a task's status is about that task, so "what links here"
-    finds it."""
-    content = _doc({"type": "smart-chip", "chipKind": "task:status", "entityId": 9})
-    assert references_in_body(content) == {(TASK, 9)}
-
-
-def test_an_embed_refers_to_the_thing_it_shows():
-    content = _doc(
-        {"type": "reference-embed", "entityType": "counter_group", "entityId": 4}
-    )
-    assert references_in_body(content) == {(SearchEntityType.counter_group, 4)}
-
-
-def test_references_are_found_however_deep_they_sit():
-    nested = {
-        "root": {
-            "children": [
+@pytest.mark.parametrize(
+    ("content", "expected"),
+    [
+        (_doc(_reference("file", 7)), {(FILE, 7)}),
+        # Not only files: a page about a task refers to that task.
+        (
+            _doc(_reference("task", 12), _reference("calendar_event", 4)),
+            {(TASK, 12), (SearchEntityType.calendar_event, 4)},
+        ),
+        # A chip refers to the thing it reads, so "what links here" finds it.
+        (
+            _doc({"type": "smart-chip", "chipKind": "task:status", "entityId": 9}),
+            {(TASK, 9)},
+        ),
+        # An embed refers to the thing it shows.
+        (
+            _doc(
                 {
-                    "type": "list",
-                    "children": [
-                        {"type": "listitem", "children": [_reference("file", 5)]}
-                    ],
+                    "type": "reference-embed",
+                    "entityType": "calendar_event",
+                    "entityId": 4,
                 }
-            ]
-        }
-    }
-    assert references_in_body(nested) == {(FILE, 5)}
+            ),
+            {(SearchEntityType.calendar_event, 4)},
+        ),
+        # However deep it sits.
+        (
+            {
+                "root": {
+                    "children": [
+                        {
+                            "type": "list",
+                            "children": [
+                                {
+                                    "type": "listitem",
+                                    "children": [_reference("file", 5)],
+                                }
+                            ],
+                        }
+                    ]
+                }
+            },
+            {(FILE, 5)},
+        ),
+        # An editor node names a tool plug-in's kind as it is.
+        (
+            _doc(_reference(_GROUP, 4), _reference(_COUNTER, 5)),
+            {(_GROUP, 4), (_COUNTER, 5)},
+        ),
+        (None, set()),
+        ({}, set()),
+    ],
+)
+def test_what_a_body_refers_to(content, expected):
+    assert references_in_body(content) == expected
 
 
-def test_content_that_is_not_a_body_yields_nothing():
-    assert references_in_body(None) == set()
-    assert references_in_body({}) == set()
-
-
-def test_a_hash_in_running_text_is_a_reference():
-    """What a comment is written in."""
-    assert references_in_text("see #task[Fix the bug](12) first") == {(TASK, 12)}
-
-
-def test_a_hash_reads_every_spelling_the_composer_writes():
-    """The composer kebabs a kind after ``#``, which names the same things the
-    kind's own spelling does."""
-    assert references_in_text(
-        "#wiki-page[Start](3) #counter-group[Tally](4) #file[Spec](5) #wiki_page[A](6)"
-    ) == {
-        (SearchEntityType.wiki_page, 3),
-        (SearchEntityType.counter_group, 4),
-        (SearchEntityType.file, 5),
-        (SearchEntityType.wiki_page, 6),
-    }
-
-
-def test_a_hash_naming_no_known_kind_is_not_a_reference():
-    assert references_in_text("#widget[Nope](3)") == set()
-
-
-def test_a_user_mention_is_not_a_hash_reference():
-    """A person is not a thing ``#`` names: a body's mentions of people are
-    read on their own."""
-    assert references_in_text("thanks @[Ada](4)") == set()
+@pytest.mark.parametrize(
+    ("written", "expected"),
+    [
+        ("see #task[Fix the bug](12) first", {(TASK, 12)}),
+        # The composer kebabs a kind after ``#``, which names the same things
+        # the kind's own spelling does.
+        (
+            (
+                "#wiki-page[Start](3) #calendar-event[Tally](4) #file[Spec](5)"
+                " #wiki_page[A](6)"
+            ),
+            {
+                (SearchEntityType.wiki_page, 3),
+                (SearchEntityType.calendar_event, 4),
+                (SearchEntityType.file, 5),
+                (SearchEntityType.wiki_page, 6),
+            },
+        ),
+        # A tool plug-in's kind is its key kebabed, ``.`` and its uid, as a
+        # ``/go`` link spells it.
+        (
+            (
+                "#counter-group.tsjvtcm0s7gv2x[Tally](4) and"
+                " #counter.tsjvtcm0s7gv2x[Laps](5)"
+            ),
+            {(_GROUP, 4), (_COUNTER, 5)},
+        ),
+        ("#widget[Nope](3)", set()),
+        # Not the shape of a plug-in's kind: the words it was written with.
+        ("#counter.TSJV[A](1)", set()),
+        ("#counter.a.b[A](1)", set()),
+        ("#counter.[A](1)", set()),
+        ("#.abc[A](1)", set()),
+        ("#Counter.abc[A](1)", set()),
+        ("#1counter.abc[A](1)", set()),
+        ("#counter.a-b[A](1)", set()),
+        # A person is not a thing ``#`` names.
+        ("thanks @[Ada](4)", set()),
+    ],
+)
+def test_what_text_refers_to(written, expected):
+    assert references_in_text(written) == expected
 
 
 # ---------------------------------------------------------------------------
@@ -172,19 +207,6 @@ async def test_a_task_showing_its_own_status_does_not_reference_itself(
     assert await _references(session, anchor) == set()
 
 
-async def test_a_body_naming_a_task_records_it(session, acting_user):
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    doc = await create_file(session, a.initiative, a.user)
-    task = await create_task(session, a.project)
-    anchor = Endpoint(FILE, doc.id)
-
-    await content_references.sync_for_entity(
-        session, anchor, body=_doc(_reference("task", task.id)), author_id=a.user.id
-    )
-
-    assert await _references(session, anchor) == {("task", task.id)}
-
-
 async def test_a_reference_to_something_that_is_not_there_is_not_recorded(
     session, acting_user
 ):
@@ -201,48 +223,9 @@ async def test_a_reference_to_something_that_is_not_there_is_not_recorded(
     assert await _references(session, anchor) == set()
 
 
-async def test_editing_the_sentence_out_takes_the_edge_with_it(session, acting_user):
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    doc = await create_file(session, a.initiative, a.user)
-    other = await create_file(session, a.initiative, a.user)
-    anchor = Endpoint(FILE, doc.id)
-
-    await content_references.sync_for_entity(
-        session, anchor, body=_doc(_reference("file", other.id)), author_id=a.user.id
-    )
-    await content_references.sync_for_entity(
-        session, anchor, body=_doc(), author_id=a.user.id
-    )
-
-    assert await _references(session, anchor) == set()
-    remaining = await session.exec(
-        select(EntityRelationship).where(
-            EntityRelationship.source_node == anchor.node,
-            EntityRelationship.relationship_type == RelationshipType.references.value,
-        )
-    )
-    assert remaining.all() == [], (
-        "a link that went away because somebody rewrote a sentence asserts "
-        "nothing, so it is deleted rather than kept as a tombstone"
-    )
-
-
 # ---------------------------------------------------------------------------
 # A comment's `#` belongs to what the comment is about
 # ---------------------------------------------------------------------------
-
-
-async def test_a_comment_records_its_reference_against_its_parent(session, acting_user):
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    doc = await create_file(session, a.initiative, a.user)
-    task = await create_task(session, a.project)
-
-    comment = await create_comment(
-        session, a.user, file=doc, content=f"see #task[Do it]({task.id})"
-    )
-    await content_references.sync_for_comment(session, comment, author_id=a.user.id)
-
-    assert await _references(session, Endpoint(FILE, doc.id)) == {("task", task.id)}
 
 
 async def test_one_comment_going_does_not_drop_what_another_still_says(
@@ -391,28 +374,6 @@ async def test_archiving_the_far_end_leaves_a_reference_standing(session, acting
 # ---------------------------------------------------------------------------
 
 
-async def test_a_task_description_is_read_as_the_task_s_body(session, acting_user):
-    """A description is markdown rather than an editor state, and names things
-    with the same `#` a comment does."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    doc = await create_file(session, a.initiative, a.user)
-    task = await create_task(
-        session, a.project, description=f"see #file[Spec]({doc.id})"
-    )
-
-    assert await content_references.own_body(session, Endpoint(TASK, task.id)) == (
-        f"see #file[Spec]({doc.id})"
-    )
-    await content_references.sync_for_entity(
-        session,
-        Endpoint(TASK, task.id),
-        body=task.description,
-        author_id=a.user.id,
-    )
-
-    assert await _references(session, Endpoint(TASK, task.id)) == {("file", doc.id)}
-
-
 async def test_a_comment_on_a_task_keeps_what_its_description_says(
     session, acting_user
 ):
@@ -432,3 +393,83 @@ async def test_a_comment_on_a_task_keeps_what_its_description_says(
         ("file", doc.id),
         ("task", other.id),
     }
+
+
+async def _referenced(client, actor, entity: str) -> set[tuple[str, int]]:
+    """What the API lists ``entity`` as referring to, for ``actor``."""
+    response = await client.get(
+        actor.g("/relationships/"),
+        headers=actor.headers,
+        params={"entity": entity, "relationship_type": "references"},
+    )
+    assert response.status_code == 200, response.text
+    return {
+        (edge["other"]["type"], edge["other"]["id"])
+        for edge in response.json()
+        if edge["direction"] == "outbound"
+    }
+
+
+async def test_a_tool_plugins_rows_are_referenced_as_a_built_in_tools_are(
+    client, session, acting_user
+):
+    """A ``#`` naming a tool plug-in's row or item in a comment is recorded
+    against what the comment is on, and a ``#`` in the row's own text field
+    is recorded against the row, as a task's description is. Taking the
+    sentence out takes the edge with it, and the system's own resync keeps
+    what the comment says."""
+    seat = await acting_user(
+        guild_role=CommunityRole.superadmin, initiative=True, project=True
+    )
+    await install_tool_plugin(client, session, seat)
+    tools, group, counter = await add_counter(
+        session, seat.guild.id, seat.initiative.id
+    )
+    (tool,) = tools.installed
+    (item_kind,) = (child.value for child in tool.children)
+    task = await create_task(session, seat.project)
+    group_word = tool.kind.replace("_", "-")
+    item_word = item_kind.replace("_", "-")
+
+    response = await client.post(
+        seat.g("/comments/"),
+        headers=seat.headers,
+        json={
+            "subject_type": "task",
+            "subject_id": task.id,
+            "content": f"see #{group_word}[Scores]({group}) "
+            f"and #{item_word}[Laps]({counter})",
+        },
+    )
+    assert response.status_code == 201, response.text
+    assert await _referenced(client, seat, f"task:{task.id}") == {
+        (tool.kind, group),
+        (item_kind, counter),
+    }
+    # The system's own resync (a comment trashed and restored) reads the
+    # community's installs, so it keeps them.
+    await content_references.sync_for_entity(session, Endpoint(TASK, task.id))
+    await session.commit()
+    assert await _referenced(client, seat, f"task:{task.id}") == {
+        (tool.kind, group),
+        (item_kind, counter),
+    }
+
+    written = f"/plugin-tools/{tool.kind}/{group}"
+    response = await client.patch(
+        seat.g(written),
+        headers=seat.headers,
+        json={"fields": {"description": f"for #task[Do it]({task.id})"}},
+    )
+    assert response.status_code == 200, response.text
+    assert await _referenced(client, seat, f"{tool.kind}:{group}") == {
+        ("task", task.id)
+    }
+
+    response = await client.patch(
+        seat.g(written),
+        headers=seat.headers,
+        json={"fields": {"description": "for nothing"}},
+    )
+    assert response.status_code == 200, response.text
+    assert await _referenced(client, seat, f"{tool.kind}:{group}") == set()

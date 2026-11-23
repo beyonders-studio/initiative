@@ -33,16 +33,18 @@ from app.api.deps import (
     get_current_active_user,
     plugin_scope_by,
 )
-from app.core.messages import GuildMessages, InitiativeMessages
+from app.core.messages import GuildMessages, InitiativeMessages, KindMessages
 from app.core.plugin_scopes import PluginScopeAccess, scope_name, tool_resource
-from app.core.tools import ARCHIVE_TARGETS, KINDS, Tool, plural_of
+from app.core.tools import ARCHIVE_TARGETS, KINDS, Tool, kind_refusal, plural_of
 from app.db.base import MODELS_BY_TABLE
+from app.db.session import routed_tools
+from app.db.tool_rows import ToolRow, load_row, locate
 from app.models.platform.guild import AdminSurface
 from app.models.platform.user import User
 from app.models.tenant._mixins import archive_models
 from app.models.tenant.task import Task
 from app.schemas.tenant.archive import ArchivableType, ArchiveResponse
-from app.services.permissions import Action
+from app.services.permissions import Action, DacResource, require_access
 from app.services.tenant import archive as archive_service
 from app.services.tenant import column_limits
 
@@ -90,9 +92,20 @@ async def _load(session: AsyncSession, entity_type: str, entity_id: int) -> Any:
 
     Every tool carries ``initiative`` and ``grants``, so one loader serves them
     all, and a row inside a tool is loaded with its tool's; an initiative is
-    loaded for its own check below. RLS has already decided whether the row is
-    visible at all, so a miss here is a 404 in the ordinary way.
+    loaded for its own check below. A tool plug-in's row is read with what the
+    request may do to its tool. RLS has already decided whether the row is
+    visible at all, so a miss here is a 404 in the ordinary way, as is a kind
+    the community does not have.
     """
+    tools = routed_tools(session)
+    located = locate(tools, entity_type)
+    if located is not None:
+        found = await load_row(session, located, tools, entity_id)
+        if found is None:
+            raise kind_refusal(entity_type, KindMessages.NOT_FOUND, 404)
+        return found
+    if entity_type not in ARCHIVE_REGISTRY:
+        raise kind_refusal(entity_type, KindMessages.NOT_FOUND, 404)
     model = ARCHIVE_REGISTRY[entity_type]
     if entity_type != "initiative" and KINDS[entity_type].standalone:
         # In no one instance of its tool: it answers for itself.
@@ -153,6 +166,16 @@ async def _authorize(
                 detail=GuildMessages.COMMUNITY_ADMIN_REQUIRED,
             )
         return
+    if isinstance(row, ToolRow):
+        # A tool plug-in's row answers to its tool's sharing, as a task does.
+        located = locate(routed_tools(session), entity_type)
+        assert located is not None
+        archived = row.tool["archived_at"] is not None
+        action = Action.unarchive if archived else Action.edit
+        require_access(
+            DacResource(located.tool), row, context=guild_context, action=action
+        )
+        return
     standalone = KINDS[entity_type].standalone
     governing = _governing(entity_type)
     subject = (
@@ -173,7 +196,7 @@ async def _authorize(
 
 @router.post("/archive/{entity_type}/{entity_id}", response_model=ArchiveResponse)
 async def archive_entity(
-    entity_type: ArchivableType,
+    entity_type: str,
     entity_id: int,
     session: ActorSessionDep,
     current_user: ActorUserDep,
@@ -182,8 +205,8 @@ async def archive_entity(
     """Mark a thing finished with, and everything inside it. Idempotent: an
     already-archived row keeps the stamp it has, so the date means when it was
     archived, not when it was last asked about."""
-    row = await _load(session, entity_type.value, entity_id)
-    await _authorize(session, entity_type.value, row, current_user, guild_context)
+    row = await _load(session, entity_type, entity_id)
+    await _authorize(session, entity_type, row, current_user, guild_context)
     # Read the stamp back from the service, not off the row: committing expires
     # the instance, and reaching for the column afterwards would be a lazy load
     # with no async context to run in.
@@ -196,7 +219,7 @@ async def archive_entity(
 
 @router.post("/unarchive/{entity_type}/{entity_id}", response_model=ArchiveResponse)
 async def unarchive_entity(
-    entity_type: ArchivableType,
+    entity_type: str,
     entity_id: int,
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -205,8 +228,8 @@ async def unarchive_entity(
     """Take it back out, and with it everything that archiving took. Anything
     inside that was archived on its own occasion stays archived. Idempotent on a
     live row."""
-    row = await _load(session, entity_type.value, entity_id)
-    await _authorize(session, entity_type.value, row, current_user, guild_context)
+    row = await _load(session, entity_type, entity_id)
+    await _authorize(session, entity_type, row, current_user, guild_context)
     was_archived = getattr(row, "archived_at", None) is not None
     await archive_service.unarchive_entity(session, row)
     # A task back out of the archive goes back into its column.

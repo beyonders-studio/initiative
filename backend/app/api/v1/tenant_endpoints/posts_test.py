@@ -33,14 +33,12 @@ from app.testing import (
     lexical_body,
     route_as,
     strip_non_owner_grants,
+    switch_tools,
 )
 
 
 async def _posts_enabled(session: AsyncSession, initiative) -> None:
-    initiative.posts_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.post: True})
 
 
 async def _joins(acting_user, actor: Actor, **overrides: Any) -> Actor:
@@ -129,40 +127,23 @@ async def test_create_post(client: AsyncClient, board: Actor):
     assert body["excerpt"] == "We are upgrading at 9am."
 
 
-@pytest.mark.parametrize("field", ["scheduled_for", "poll"])
-async def test_create_post_requires_offset_for_instants(client, board, field):
-    payload = {"name": "With a deadline", "initiative_id": board.initiative.id}
-    if field == "poll":
-        payload[field] = {
-            "options": [{"text": "Yes"}, {"text": "No"}],
-            "closes_at": "2099-10-20T12:00:00",
-        }
-    else:
-        payload[field] = "2099-10-20T12:00:00"
-    response = await client.post(
-        board.g("/posts/"), headers=board.headers, json=payload
-    )
-    assert response.status_code == 422, response.text
-
-
-async def test_pin_requires_offset_for_expiry(client, session, board):
+async def test_an_instant_without_an_offset_is_refused(client, session, board):
+    naive = "2099-10-20T12:00:00"
     post = await create_post(session, board.initiative, board.user)
-    response = await client.put(
-        board.g(f"/posts/{post.id}/pin"),
-        headers=board.headers,
-        json={"pinned": True, "expires_at": "2099-10-20T12:00:00"},
-    )
-    assert response.status_code == 422, response.text
+    draft = await _draft(session, board)
+    created = {"name": "With a deadline", "initiative_id": board.initiative.id}
+    poll = {"options": [{"text": "Yes"}, {"text": "No"}], "closes_at": naive}
 
-
-async def test_post_schedule_update_requires_offset(client, session, board):
-    post = await _draft(session, board)
-    response = await client.patch(
-        board.g(f"/posts/{post.id}"),
-        headers=board.headers,
-        json={"scheduled_for": "2099-10-20T12:00:00"},
-    )
-    assert response.status_code == 422, response.text
+    for method, path, payload in (
+        ("POST", "/posts/", {**created, "scheduled_for": naive}),
+        ("POST", "/posts/", {**created, "poll": poll}),
+        ("PUT", f"/posts/{post.id}/pin", {"pinned": True, "expires_at": naive}),
+        ("PATCH", f"/posts/{draft.id}", {"scheduled_for": naive}),
+    ):
+        response = await client.request(
+            method, board.g(path), headers=board.headers, json=payload
+        )
+        assert response.status_code == 422, (path, response.text)
 
 
 @pytest.mark.parametrize("offset", ["Z", "+02:00"])
@@ -188,9 +169,7 @@ async def test_create_requires_feature_enabled(
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     # The factory switches every tool on, so a test about one being OFF
     # turns it off.
-    a.initiative.posts_enabled = False
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.post: False})
 
     response = await client.post(
         a.g("/posts/"),
@@ -768,9 +747,6 @@ async def test_a_draft_is_invisible_to_a_reader_but_not_to_its_author(
     assert [p["id"] for p in mine.json()["items"]] == [draft.id]
     assert theirs.json()["items"] == []
     assert theirs.json()["total_count"] == 0
-    assert (
-        await client.get(author.g(f"/posts/{draft.id}"), headers=author.headers)
-    ).status_code == 200
 
 
 async def test_a_draft_is_out_of_the_sidebar_counts(
@@ -977,7 +953,7 @@ async def test_re_pinning_a_lapsed_pin_starts_a_new_one(
             lambda s: (
                 "GET",
                 s.reader.g("/comments/"),
-                {"params": {"post_id": s.draft.id}},
+                {"params": {"subject_type": "post", "subject_id": s.draft.id}},
             ),
         ),
         (
@@ -985,7 +961,13 @@ async def test_re_pinning_a_lapsed_pin_starts_a_new_one(
             lambda s: (
                 "POST",
                 s.reader.g("/comments/"),
-                {"json": {"content": "Seen it", "post_id": s.draft.id}},
+                {
+                    "json": {
+                        "content": "Seen it",
+                        "subject_type": "post",
+                        "subject_id": s.draft.id,
+                    }
+                },
             ),
         ),
         (

@@ -65,7 +65,7 @@ describe("AnnouncementsPage", () => {
     expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
   });
 
-  it("writes a new announcement with its sections", async () => {
+  it("writes a new announcement with its sections, their page breaks and its audience", async () => {
     const user = userEvent.setup();
     let posted: Record<string, unknown> | null = null;
     listResponds([]);
@@ -82,44 +82,21 @@ describe("AnnouncementsPage", () => {
     await user.type(screen.getByLabelText("Title"), "Filters moved");
     await user.type(screen.getByPlaceholderText(/section heading/i), "Where they went");
     await user.type(screen.getByPlaceholderText(/markdown is supported/i), "Up top now.");
+    await user.click(screen.getByRole("button", { name: /add section/i }));
+    await user.type(screen.getAllByPlaceholderText(/section heading/i)[1], "Page two");
+    await user.click(screen.getByRole("switch", { name: /start a new page/i }));
+    await user.click(screen.getByRole("combobox", { name: /accounts this is for/i }));
+    await user.click(await screen.findByRole("option", { name: /existed when it was published/i }));
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(posted).not.toBeNull());
     expect(posted).toMatchObject({
       title: "Filters moved",
-      sections: [{ heading: "Where they went", body: "Up top now." }],
-    });
-  });
-
-  it("saves the page break a section was given", async () => {
-    const user = userEvent.setup();
-    let posted: Record<string, unknown> | null = null;
-    listResponds([]);
-    server.use(
-      http.post("*/api/v1/announcements/operator", async ({ request }) => {
-        posted = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({ ...live, ...posted }, { status: 201 });
-      })
-    );
-
-    renderWithProviders(<AnnouncementsPage />);
-
-    await user.click(await screen.findByRole("button", { name: /new announcement/i }));
-    await user.type(screen.getByLabelText("Title"), "Two parter");
-    await user.type(screen.getByPlaceholderText(/section heading/i), "Page one");
-    await user.click(screen.getByRole("button", { name: /add section/i }));
-
-    const headings = screen.getAllByPlaceholderText(/section heading/i);
-    await user.type(headings[1], "Page two");
-    await user.click(screen.getByRole("switch", { name: /start a new page/i }));
-    await user.click(screen.getByRole("button", { name: "Save" }));
-
-    await waitFor(() => expect(posted).not.toBeNull());
-    expect(posted).toMatchObject({
       sections: [
-        { heading: "Page one", starts_page: false },
+        { heading: "Where they went", body: "Up top now.", starts_page: false },
         { heading: "Page two", starts_page: true },
       ],
+      audience_accounts: "existing",
     });
   });
 
@@ -152,31 +129,6 @@ describe("AnnouncementsPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(posted).toBe(true));
-  });
-
-  it("saves which accounts a notice is for", async () => {
-    const user = userEvent.setup();
-    let posted: Record<string, unknown> | null = null;
-    listResponds([]);
-    server.use(
-      http.post("*/api/v1/announcements/operator", async ({ request }) => {
-        posted = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({ ...live, ...posted }, { status: 201 });
-      })
-    );
-
-    renderWithProviders(<AnnouncementsPage />);
-
-    await user.click(await screen.findByRole("button", { name: /new announcement/i }));
-    await user.type(screen.getByLabelText("Title"), "Your sidebar changed");
-    await user.type(screen.getByPlaceholderText(/section heading/i), "What moved");
-
-    await user.click(screen.getByRole("combobox", { name: /accounts this is for/i }));
-    await user.click(await screen.findByRole("option", { name: /existed when it was published/i }));
-    await user.click(screen.getByRole("button", { name: "Save" }));
-
-    await waitFor(() => expect(posted).not.toBeNull());
-    expect(posted).toMatchObject({ audience_accounts: "existing" });
   });
 
   it("refuses to save an announcement with no sections", async () => {

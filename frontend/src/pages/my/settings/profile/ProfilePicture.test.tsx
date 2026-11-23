@@ -5,17 +5,13 @@
  */
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { buildUser } from "@/__tests__/factories";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import type { ProfileDecorationsOutput } from "@/api/generated/initiativeAPI.schemas";
 
 import { ProfilePicture } from "./ProfilePicture";
-
-const mocks = vi.hoisted(() => ({ update: vi.fn() }));
-
-vi.mock("@/hooks/useUsers", () => ({ useUpdateCurrentUser: () => mocks.update() }));
 
 const BARE: ProfileDecorationsOutput = {
   banner: null,
@@ -24,11 +20,6 @@ const BARE: ProfileDecorationsOutput = {
   trophies: [],
   grad_year: null,
 };
-
-beforeEach(() => {
-  vi.clearAllMocks();
-  mocks.update.mockReturnValue({ mutate: vi.fn(), isPending: false });
-});
 
 const render = (user: ReturnType<typeof buildUser>) =>
   renderWithProviders(
@@ -39,16 +30,13 @@ describe("the picture editor", () => {
   const openEditor = async () =>
     userEvent.click(await screen.findByRole("button", { name: /avatar/i }));
 
-  it("offers the linked URL it is actually wearing", async () => {
-    render(buildUser({ avatar_url: "https://elsewhere.example/me.png" }));
-    await openEditor();
-
-    expect(screen.getByDisplayValue("https://elsewhere.example/me.png")).toBeInTheDocument();
-  });
-
-  it("forgets that URL once a picture has been uploaded over it", async () => {
+  it("offers the linked URL it is wearing, and forgets it once a picture is uploaded over it", async () => {
+    const user = userEvent.setup();
     const linked = buildUser({ avatar_url: "https://elsewhere.example/me.png" });
     const { rerender } = render(linked);
+    await openEditor();
+    expect(screen.getByDisplayValue("https://elsewhere.example/me.png")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
 
     // The upload writes immediately, and the account comes back pointing at it.
     rerender(

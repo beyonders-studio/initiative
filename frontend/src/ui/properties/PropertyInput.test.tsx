@@ -2,11 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  buildPropertyDefinition,
-  buildPropertyOption,
-  buildPropertySummary,
-} from "@/__tests__/factories/properties";
+import { buildPropertyDefinition, buildPropertyOption } from "@/__tests__/factories/properties";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import { MetadataType, type PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
 
@@ -164,7 +160,7 @@ describe("PropertyInput", () => {
       def({
         type: MetadataType.counter,
         name: "Seats",
-        counter: { step: 2, min: 0, max: 5, initial: 1 },
+        counter: { step: 2, min: 0, max: 5, initial: 1, look: "number" },
       });
 
     it("steps from its initial value within its bounds, takes a count as typed, and resets", async () => {
@@ -187,6 +183,40 @@ describe("PropertyInput", () => {
       expect(onChange).toHaveBeenLastCalledWith(9);
       await userEvent.click(screen.getByRole("button", { name: "Reset Seats" }));
       expect(onChange).toHaveBeenLastCalledWith(1);
+    });
+
+    it("draws its look, and opens full screen stepping the same field", async () => {
+      const onChange = vi.fn();
+      const onStep = vi.fn();
+      const barred = def({
+        type: MetadataType.counter,
+        name: "Seats",
+        counter: { step: 2, min: 0, max: 5, initial: 1, look: "bar" },
+      });
+      renderWithProviders(
+        <PropertyInput definition={barred} value={3} onChange={onChange} onStep={onStep} />
+      );
+      expect(screen.getByText("/ 5")).toBeInTheDocument();
+      fireEvent.change(screen.getByRole("spinbutton", { name: "Seats" }), {
+        target: { value: "4" },
+      });
+      fireEvent.blur(screen.getByRole("spinbutton", { name: "Seats" }));
+      expect(onChange).toHaveBeenLastCalledWith(4);
+      // Escape drops what was typed and not yet sent.
+      onChange.mockClear();
+      const typed = screen.getByRole("spinbutton", { name: "Seats" });
+      fireEvent.change(typed, { target: { value: "2" } });
+      fireEvent.keyDown(typed, { key: "Escape" });
+      fireEvent.blur(typed);
+      expect(onChange).not.toHaveBeenCalled();
+      expect(typed).toHaveValue(4);
+
+      await userEvent.click(screen.getByRole("button", { name: "Open Seats full screen" }));
+      const focus = await screen.findByRole("dialog", { name: "Seats" });
+      await userEvent.click(within(focus).getByRole("button", { name: "Step Seats up" }));
+      expect(onStep).toHaveBeenLastCalledWith(true);
+      await userEvent.click(within(focus).getByRole("button", { name: "Exit full screen" }));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
 
     it("leaves a step to onStep where it is given", async () => {
@@ -217,31 +247,14 @@ describe("PropertyInput", () => {
     });
   });
 
-  describe("date type", () => {
-    it("renders a DateTimePicker (includeTime=false)", () => {
-      renderWithProviders(
-        <PropertyInput
-          definition={def({ type: MetadataType.date, name: "Deadline" })}
-          value=""
-          onChange={vi.fn()}
-        />
-      );
-      // DateTimePicker renders a button with "Pick a date" placeholder when no value.
-      expect(screen.getByRole("button", { name: /pick a date/i })).toBeInTheDocument();
-    });
-  });
-
-  describe("datetime type", () => {
-    it("renders a DateTimePicker with time support", () => {
-      renderWithProviders(
-        <PropertyInput
-          definition={def({ type: MetadataType.datetime, name: "When" })}
-          value=""
-          onChange={vi.fn()}
-        />
-      );
-      expect(screen.getByRole("button", { name: /pick a date and time/i })).toBeInTheDocument();
-    });
+  it.each([
+    [MetadataType.date, /pick a date/i],
+    [MetadataType.datetime, /pick a date and time/i],
+  ])("draws a %s as a date picker", (type, name) => {
+    renderWithProviders(
+      <PropertyInput definition={def({ type, name: "When" })} value="" onChange={vi.fn()} />
+    );
+    expect(screen.getByRole("button", { name })).toBeInTheDocument();
   });
 
   describe("url type", () => {
@@ -277,7 +290,9 @@ describe("PropertyInput", () => {
       // The new picker is a Popover-trigger button (not a Radix combobox).
       const trigger = screen.getByRole("button", { name: /Select/i });
       await userEvent.click(trigger);
-      const liveOption = await screen.findByRole("option", { name: /Live/i });
+      const listbox = await screen.findByRole("listbox");
+      expect(within(listbox).getByRole("option", { name: /Draft/i })).toBeInTheDocument();
+      const liveOption = within(listbox).getByRole("option", { name: /Live/i });
       await userEvent.click(liveOption);
       expect(onChange).toHaveBeenCalledWith("live");
     });
@@ -310,89 +325,21 @@ describe("PropertyInput", () => {
     });
   });
 
-  describe("disabled prop", () => {
-    it("disables a text input", () => {
-      renderWithProviders(
-        <PropertyInput
-          definition={def({ type: MetadataType.text })}
-          value=""
-          onChange={vi.fn()}
-          disabled
-        />
-      );
-      expect(screen.getByPlaceholderText("Empty")).toBeDisabled();
-    });
-
-    it("disables a checkbox", () => {
-      renderWithProviders(
-        <PropertyInput
-          definition={def({ type: MetadataType.checkbox })}
-          value={false}
-          onChange={vi.fn()}
-          disabled
-        />
-      );
-      expect(screen.getByRole("checkbox")).toBeDisabled();
-    });
-
-    it("disables a select trigger", () => {
-      renderWithProviders(
-        <PropertyInput
-          definition={def({
-            type: MetadataType.select,
-            options: [buildPropertyOption({ value: "a", label: "A" })],
-          })}
-          value=""
-          onChange={vi.fn()}
-          disabled
-        />
-      );
-      const trigger = screen.getByRole("button", { name: /Select/i });
-      expect(trigger).toBeDisabled();
-    });
-
-    it("disables a number input", () => {
-      renderWithProviders(
-        <PropertyInput
-          definition={def({ type: MetadataType.number })}
-          value={null}
-          onChange={vi.fn()}
-          disabled
-        />
-      );
-      expect(screen.getByPlaceholderText("0")).toBeDisabled();
-    });
-  });
-
-  describe("summary-shape definitions", () => {
-    it("accepts a PropertySummary (no id/initiative_id) as definition", () => {
-      renderWithProviders(
-        <PropertyInput
-          definition={buildPropertySummary({ name: "Lite", value: null })}
-          value="hello"
-          onChange={vi.fn()}
-        />
-      );
-      expect(screen.getByDisplayValue("hello")).toBeInTheDocument();
-    });
-  });
-
-  describe("select options rendering", () => {
-    it("shows each option label in the dropdown", async () => {
-      const multi = def({
-        type: MetadataType.select,
-        options: [
-          buildPropertyOption({ value: "one", label: "One" }),
-          buildPropertyOption({ value: "two", label: "Two" }),
-        ],
-      });
-      renderWithProviders(<PropertyInput definition={multi} value="" onChange={vi.fn()} />);
-      const trigger = screen.getByRole("button", { name: /Select/i });
-      await userEvent.click(trigger);
-      const listbox = await screen.findByRole("listbox");
-      expect(within(listbox).getByRole("option", { name: /One/i })).toBeInTheDocument();
-      expect(within(listbox).getByRole("option", { name: /Two/i })).toBeInTheDocument();
-    });
+  it.each([
+    [MetadataType.text, "", () => screen.getByPlaceholderText("Empty")],
+    [MetadataType.checkbox, false, () => screen.getByRole("checkbox")],
+    [MetadataType.select, "", () => screen.getByRole("button", { name: /Select/i })],
+    [MetadataType.number, null, () => screen.getByPlaceholderText("0")],
+  ])("disables a %s input", (type, value, control) => {
+    renderWithProviders(
+      <PropertyInput
+        definition={def({ type, options: [buildPropertyOption({ value: "a", label: "A" })] })}
+        value={value}
+        onChange={vi.fn()}
+        disabled
+      />
+    );
+    expect(control()).toBeDisabled();
   });
 
   describe("inline option creation on select", () => {
@@ -404,7 +351,7 @@ describe("PropertyInput", () => {
         name: "Status",
         options: [draft],
       });
-      const appendOption = vi.fn<PropertyInputProps["appendOption"]>(async () => ({
+      const appendOption = vi.fn<NonNullable<PropertyInputProps["appendOption"]>>(async () => ({
         value: "in_review",
         label: "In Review",
         color: null,
@@ -440,6 +387,24 @@ describe("PropertyInput", () => {
       await userEvent.type(searchBox, "live");
       expect(screen.queryByRole("option", { name: /Create "live"/i })).not.toBeInTheDocument();
       expect(screen.getByRole("option", { name: /Live/i })).toBeInTheDocument();
+    });
+
+    it("offers no Create where its options are fixed", async () => {
+      const definition = def({
+        type: MetadataType.select,
+        options: [buildPropertyOption({ value: "live", label: "Live" })],
+      });
+      renderWithProviders(
+        <KitInput
+          definition={definition}
+          value=""
+          onChange={vi.fn()}
+          searchMembers={async () => []}
+        />
+      );
+      await userEvent.click(screen.getByRole("button", { name: /Select/i }));
+      await userEvent.type(await screen.findByPlaceholderText(/Search or create/i), "In Review");
+      expect(screen.queryByRole("option", { name: /Create "In Review"/i })).not.toBeInTheDocument();
     });
   });
 });

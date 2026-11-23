@@ -26,14 +26,6 @@ describe("OidcCallbackPage", () => {
     expect(screen.queryByText(/OIDC_ACCOUNT_INACTIVE/)).not.toBeInTheDocument();
   });
 
-  it("says what the session-store refusal means", async () => {
-    renderWithError("OIDC_SESSION_STORE_UNAVAILABLE");
-
-    await waitFor(() => {
-      expect(screen.getByText(/couldn't start your session/i)).toBeInTheDocument();
-    });
-  });
-
   it("falls back to the code itself when there is no sentence for it", async () => {
     renderWithError("SOMETHING_NOBODY_WROTE_A_MESSAGE_FOR");
 

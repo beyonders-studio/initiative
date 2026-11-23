@@ -20,7 +20,7 @@ import base64
 import functools
 import json
 import uuid
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -38,13 +38,15 @@ from app.core.file_types import FileType, type_of_media
 from app.core.guild_auth_options import CommunityAuthOption
 from app.core.login_methods import LoginMethod
 from app.core.reactions import ReactionTarget
-from app.core.relationships import EndpointKind, Provenance, RelationshipType
+from app.core.relationships import Provenance, RelationshipType
 from app.core.rules import OPTION_RULES, SetBy, SignInRequirement
 from app.core.security import (
     get_password_hash,
     mint_access_token,
 )
+from app.core.tool_set import BUILTIN_TOOLS
 from app.core.tools import CHILD_KINDS, Tool
+from app.db.plugin_tools import tool_set
 from app.models.platform.access_grant import AccessGrant
 from app.models.platform.auth_provider import AuthProvider, AuthProviderKind
 from app.models.platform.federated_identity import FederatedIdentity
@@ -74,7 +76,6 @@ from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
 from app.models.tenant.collection import Collection, CollectionFile
 from app.models.tenant.comment import Comment
 from app.models.tenant.contact import Contact
-from app.models.tenant.counter import Counter, CounterGroup
 from app.models.tenant.dashboard import Dashboard
 from app.models.tenant.data_job import DataJob, DataJobDirection
 from app.models.tenant.file import File
@@ -118,9 +119,12 @@ from app.services.tenant import relationships as relationships_service
 from app.services.tenant.dashboard_definition import (
     normalize_dashboard_definition,
 )
+from app.services.tenant.initiative_tools import (
+    write_installed_tools,
+    write_switches,
+)
 from app.services.tenant.initiatives import create_builtin_roles
 from app.services.tenant.names import slugify
-from app.services.tenant.ownership import tool_for_row
 from app.services.tenant.plugin_config import mint_connection_ref
 from app.services.tenant.task_completion import sync_completed_at
 from app.services.tenant.task_statuses import ensure_default_statuses
@@ -670,6 +674,7 @@ async def create_initiative(
     creator: User,
     commit: bool = True,
     member_tool_access: bool = True,
+    tools: Mapping[Tool, bool] | None = None,
     **overrides: Any,
 ) -> Initiative:
     """
@@ -691,6 +696,8 @@ async def create_initiative(
         creator: User who creates the initiative (will become project manager)
         commit: Whether to commit the transaction (default True)
         member_tool_access: Whether the built-in member role may view each tool
+        tools: Tool switches to set; every tool is switched on otherwise. A
+            test about a tool being OFF says so here (``{Tool.post: False}``).
         **overrides: Override any default field values
 
     Returns:
@@ -701,19 +708,9 @@ async def create_initiative(
     """
     await route_session_to_guild(session, guild.id)
 
-    from app.core.tools import Tool as _Tool
-
     defaults: dict[str, Any] = {
         "name": f"Test Initiative {datetime.now(UTC).timestamp()}",
         "description": "A test initiative",
-        # Every tool the initiative can switch on, switched on — derived from
-        # the enum, so a new tool is usable the day it exists. A test about a
-        # tool being OFF says so by overriding its own switch.
-        **{
-            tool.view_permission: True
-            for tool in _Tool
-            if tool.view_permission in Initiative.model_fields
-        },
     }
 
     initiative_data = {**defaults, **overrides}
@@ -722,23 +719,30 @@ async def create_initiative(
 
     if commit:
         await session.flush()
+        # Every tool switched on, derived from the enum, so a new tool is
+        # usable the day it exists.
+        await write_switches(
+            session, initiative.id, {tool: True for tool in Tool} | dict(tools or {})
+        )
 
         # Create built-in roles (moderator + PM + member)
         builtin_roles = await create_builtin_roles(session, initiative_id=initiative.id)
+        # Every installed tool plug-in's tool too, as an initiative made
+        # through the API has it.
+        await write_installed_tools(session, await tool_set(session))
         pm_role = builtin_roles["project_manager"]
         member_role = builtin_roles["member"]
 
         if member_tool_access:
             from sqlalchemy import update as sa_update
 
-            from app.core.tools import Tool as _Tool
             from app.models.tenant.initiative import InitiativeRule
 
             await session.exec(
                 sa_update(InitiativeRule)
                 .where(
                     InitiativeRule.initiative_role_id == member_role.id,
-                    InitiativeRule.key.in_([tool.view_permission for tool in _Tool]),
+                    InitiativeRule.key.in_([tool.view_permission for tool in Tool]),
                 )
                 .values(enabled=True)
             )
@@ -826,7 +830,7 @@ async def create_resource_grant(
     every member of its initiative, or for an installed plug-in — exactly one."""
     await route_session_to_guild(session, guild_of(resource))
     grant = ResourceGrant(
-        resource_type=tool_for_row(resource),
+        resource_type=BUILTIN_TOOLS.by_table[resource.__tablename__].kind,
         resource_id=resource.id,
         user_id=user.id if user is not None else None,
         role_id=role_id,
@@ -850,7 +854,8 @@ async def strip_non_owner_grants(
     await route_session_to_guild(session, guild_of(resource))
     await session.exec(
         sa_delete(ResourceGrant).where(
-            ResourceGrant.resource_type == tool_for_row(resource),
+            ResourceGrant.resource_type
+            == BUILTIN_TOOLS.by_table[resource.__tablename__].kind,
             ResourceGrant.resource_id == resource.id,
             ResourceGrant.user_id.is_distinct_from(owner_id),
         )
@@ -2125,7 +2130,6 @@ async def create_comment(
     wiki: Wiki | None = None,
     file: File | None = None,
     project: Project | None = None,
-    counter_group: CounterGroup | None = None,
     calendar: Calendar | None = None,
     dashboard: Dashboard | None = None,
     post: Post | None = None,
@@ -2143,7 +2147,6 @@ async def create_comment(
         "collection": collection,
         Tool.project.value: project,
         Tool.file.value: file,
-        Tool.counter_group.value: counter_group,
         Tool.calendar.value: calendar,
         Tool.dashboard.value: dashboard,
         Tool.post.value: post,
@@ -2156,17 +2159,18 @@ async def create_comment(
     missing = [tool.value for tool in Tool if tool.value not in named]
     if missing:
         raise ValueError(f"create_comment has no parent keyword for: {missing}")
-    provided = {f"{name}_id": row for name, row in named.items() if row is not None}
+    provided = {name: row for name, row in named.items() if row is not None}
     if len(provided) != 1:
         raise ValueError("pass exactly one comment parent")
-    column, parent = next(iter(provided.items()))
+    kind, parent = next(iter(provided.items()))
     await route_session_to_guild(session, guild_of(parent))
 
     defaults = {
         "content": content,
         "created_by": author.id,
         "created_by_kind": ActorKind.member,
-        column: parent.id,
+        "subject_type": kind,
+        "subject_id": parent.id,
     }
     comment = Comment(**{**defaults, **overrides})
     session.add(comment)
@@ -2285,63 +2289,6 @@ async def create_task_status(
         await session.refresh(status)
 
     return status
-
-
-async def create_counter_group(
-    session: AsyncSession,
-    initiative: Initiative,
-    creator: User,
-    *,
-    name: str | None = None,
-    commit: bool = True,
-    **overrides: Any,
-) -> CounterGroup:
-    """Create a counter group with an owner grant for ``creator``."""
-    await route_session_to_guild(session, guild_of(initiative))
-
-    defaults = {
-        "initiative_id": initiative.id,
-        "name": name or f"Test Counters {datetime.now(UTC).timestamp()}",
-        "created_by": creator.id,
-        "created_by_kind": ActorKind.member,
-    }
-    group = CounterGroup(**{**defaults, **overrides})
-    session.add(group)
-
-    if commit:
-        await session.commit()
-        await session.refresh(group)
-
-        await create_resource_grant(
-            session, group, level=ResourceAccessLevel.owner, user=creator
-        )
-
-    return group
-
-
-async def create_counter(
-    session: AsyncSession,
-    group: CounterGroup,
-    *,
-    name: str | None = None,
-    commit: bool = True,
-    **overrides: Any,
-) -> Counter:
-    """Create a counter inside ``group``."""
-    await route_session_to_guild(session, guild_of(group))
-
-    defaults = {
-        "counter_group_id": group.id,
-        "name": name or f"Counter {datetime.now(UTC).timestamp()}",
-    }
-    counter = Counter(**{**defaults, **overrides})
-    session.add(counter)
-
-    if commit:
-        await session.commit()
-        await session.refresh(counter)
-
-    return counter
 
 
 async def create_upload(
@@ -2771,7 +2718,6 @@ async def create_contact(
 TOOL_FACTORIES: dict[Tool, Any] = {
     Tool.project: create_project,
     Tool.file: create_file,
-    Tool.counter_group: create_counter_group,
     Tool.calendar: create_calendar,
     Tool.dashboard: create_dashboard,
     Tool.post: create_post,
@@ -2816,9 +2762,6 @@ async def _collection_holding(
 CHILD_FACTORIES: dict[str, Any] = {
     "task": lambda session, project, creator, **kw: create_task(session, project, **kw),
     "calendar_event": create_calendar_event,
-    "counter": lambda session, group, creator, **kw: create_counter(
-        session, group, **kw
-    ),
     "wiki_page": create_wiki_page,
     # A collection is in Files rather than in one file: its tool row is the
     # file it starts with.
@@ -2841,25 +2784,29 @@ async def create_child_entity(
 
 
 async def enable_all_tools(session: AsyncSession, initiative: Initiative) -> Initiative:
-    """Flip on every tool's master switch, derived from the enum so a new tool
-    is enabled here without an edit."""
+    """Flip on every tool's switch, derived from the enum so a new tool is
+    enabled here without an edit."""
+    return await switch_tools(session, initiative, dict.fromkeys(Tool, True))
+
+
+async def switch_tools(
+    session: AsyncSession, initiative: Initiative, tools: Mapping[Tool, bool]
+) -> Initiative:
+    """Set ``initiative``'s own switch for each tool in ``tools``, and return
+    the initiative read again."""
     await route_session_to_guild(session, guild_of(initiative))
-    fresh = await session.get(Initiative, initiative.id)
-    assert fresh is not None
-    for tool in Tool:
-        setattr(fresh, tool.view_permission, True)
-    session.add(fresh)
+    await write_switches(session, initiative.id, tools)
     await session.commit()
-    await session.refresh(fresh)
-    return fresh
+    await session.refresh(initiative)
+    return initiative
 
 
 async def create_relationship(
     session: AsyncSession,
     guild: Guild,
     *,
-    source: tuple[EndpointKind, int],
-    target: tuple[EndpointKind, int],
+    source: tuple[str, int],
+    target: tuple[str, int],
     relationship_type: RelationshipType = RelationshipType.attached,
     provenance: Provenance = Provenance.manual,
     created_by: int | None = None,
@@ -2867,7 +2814,7 @@ async def create_relationship(
 ) -> EntityRelationship:
     """Create one edge between two things.
 
-    Endpoints are ``(kind, id)`` pairs, a person's ``(EndpointKind.user, id)``,
+    Endpoints are ``(kind, id)`` pairs, a person's ``("user", id)``,
     and a symmetric type is stored in the order the constraint requires, so a test may name its two ends in whichever
     order reads better.
     """

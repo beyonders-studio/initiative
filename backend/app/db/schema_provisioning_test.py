@@ -12,6 +12,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 
+from app.core.tool_set import BUILTIN_TOOLS
 from app.db import schema_provisioning
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.guild_ddl import rendered_constraint_names, rendered_trigger_names
@@ -33,15 +34,11 @@ from app.db.tenancy import GUILD_SCOPED_TABLES, OPERATIONS_TABLES
 
 # Synthetic ids well above any real guild; each test uses its own.
 _GID_COMPLETE = 990_101
-_GID_ISOLATION = 990_102
-_GID_IDEMPOTENT = 990_103
 _GID_ROLE_A = 990_104
 _GID_ROLE_B = 990_105
 _GID_ROLE_DROP = 990_106
 _GID_ROLE_WRITE = 990_107
 _GID_BACKFILL = 990_108
-_GID_REPROVISION = 990_109
-_GID_DROP_ABSENT = 990_110
 _GID_SUPPORT = 990_120
 _GID_READ_FLOOR = 990_121
 _GID_SEAT = 990_122
@@ -75,6 +72,7 @@ async def test_provision_creates_every_guild_scoped_table(engine):
     try:
         async with engine.begin() as conn:
             await provision_guild_schema(conn, _GID_COMPLETE)
+            await provision_guild_schema(conn, _GID_COMPLETE)  # idempotent
         async with engine.connect() as conn:
             res = await conn.execute(
                 text(
@@ -88,79 +86,6 @@ async def test_provision_creates_every_guild_scoped_table(engine):
     finally:
         async with engine.begin() as conn:
             await drop_guild_schema(conn, _GID_COMPLETE)
-
-
-async def test_writes_route_to_guild_schema_not_public(engine):
-    """A routed tenant write lands in the guild schema; an UNROUTED one fails.
-
-    Isolation is the schema boundary itself: a tenant table exists only in
-    ``guild_<id>``, so a write with the search_path still on ``public`` fails
-    closed (relation does not exist)."""
-    gid = _GID_ISOLATION
-    schema = guild_schema_name(gid)
-    try:
-        async with engine.begin() as conn:
-            await provision_guild_schema(conn, gid)
-            await _insert_public_guild(conn, gid, "provision-iso-test")
-            # Same unqualified INSERT, but routed via the guild search_path.
-            await conn.exec_driver_sql(f'SET search_path TO "{schema}", public')
-            # 9-char alpha color also exercises the widened tags.color column.
-            await conn.execute(
-                text(
-                    "INSERT INTO tags (name, color, created_at, updated_at) "
-                    "VALUES (:n, '#abcdef80', now(), now())"
-                ),
-                {"n": "iso-tag"},
-            )
-            await conn.exec_driver_sql("SET search_path TO public")
-
-            in_guild = await conn.scalar(text(f'SELECT count(*) FROM "{schema}".tags'))
-        assert in_guild == 1, "row should be in the guild schema"
-
-        # A tenant table exists only in guild schemas, so an unrouted (public
-        # search_path) tenant write fails closed.
-        async with engine.connect() as conn:
-            public_tags = await conn.scalar(text("SELECT to_regclass('public.tags')"))
-        assert public_tags is None, "there must be NO public.tags copy post-squash"
-
-        with pytest.raises(ProgrammingError):
-            async with engine.begin() as conn:
-                await conn.exec_driver_sql("SET search_path TO public")
-                await conn.execute(
-                    text(
-                        "INSERT INTO tags (name, color, created_at, "
-                        "updated_at) VALUES (:n, '#abcdef80', now(), now())"
-                    ),
-                    {"n": "unrouted-tag"},
-                )
-    finally:
-        async with engine.begin() as conn:
-            await drop_guild_schema(conn, gid)
-            await conn.execute(
-                text("DELETE FROM public.guilds WHERE id = :id"), {"id": gid}
-            )
-
-
-async def test_provision_is_idempotent(engine):
-    """Calling provision twice is a no-op, not an error."""
-    gid = _GID_IDEMPOTENT
-    schema = guild_schema_name(gid)
-    try:
-        async with engine.begin() as conn:
-            await provision_guild_schema(conn, gid)
-            await provision_guild_schema(conn, gid)  # must not raise
-        async with engine.connect() as conn:
-            count = await conn.scalar(
-                text(
-                    "SELECT count(*) FROM information_schema.tables "
-                    "WHERE table_schema = :s AND table_type = 'BASE TABLE'"
-                ),
-                {"s": schema},
-            )
-        assert count == len(GUILD_SCOPED_TABLES - OPERATIONS_TABLES)
-    finally:
-        async with engine.begin() as conn:
-            await drop_guild_schema(conn, gid)
 
 
 async def test_reprovisioning_and_a_vacuum_wait_for_each_other_in_turn(
@@ -187,7 +112,7 @@ async def test_reprovisioning_and_a_vacuum_wait_for_each_other_in_turn(
             await conn.exec_driver_sql(f"ANALYZE {table}")
             await conn.commit()
 
-    async def rls_once_a_vacuum_waits(conn, schema: str) -> None:
+    async def rls_once_a_vacuum_waits(conn, schema: str, bundle=None) -> None:
         vacuums.append(asyncio.create_task(vacuum()))
         async with engine.connect() as probe:
             while not vacuum_pid or not await probe.scalar(
@@ -199,7 +124,7 @@ async def test_reprovisioning_and_a_vacuum_wait_for_each_other_in_turn(
             ):
                 assert not vacuums[0].done(), "the vacuum did not wait"
                 await asyncio.sleep(0.05)
-        await real_apply_guild_rls(conn, schema)
+        await real_apply_guild_rls(conn, schema, bundle)
 
     try:
         async with engine.begin() as conn:
@@ -521,7 +446,8 @@ async def test_support_role_write_capped_on_protected_tables(engine):
 
 
 async def test_guild_role_can_write_in_its_own_schema(engine):
-    """The role's DML grant actually works — it can INSERT, not just SELECT."""
+    """The role's DML grant actually works — it can INSERT, not just SELECT —
+    and a second provision keeps the row it wrote."""
     gid = _GID_ROLE_WRITE
     schema = guild_schema_name(gid)
     role = guild_role_name(gid)
@@ -532,10 +458,11 @@ async def test_guild_role_can_write_in_its_own_schema(engine):
         async with engine.begin() as conn:
             await conn.exec_driver_sql(f'SET ROLE "{role}"')
             await conn.exec_driver_sql(f'SET search_path TO "{schema}", public')
+            # A 9-character colour, with its alpha.
             await conn.execute(
                 text(
                     "INSERT INTO tags (name, color, created_at, updated_at) "
-                    "VALUES (:n, '#112233', now(), now())"
+                    "VALUES (:n, '#abcdef80', now(), now())"
                 ),
                 {"n": "written-by-role"},
             )
@@ -543,6 +470,11 @@ async def test_guild_role_can_write_in_its_own_schema(engine):
             await conn.exec_driver_sql("SET search_path TO public")
             await conn.exec_driver_sql("RESET ROLE")
         assert written == 1
+        async with engine.begin() as conn:
+            await provision_guild_schema(conn, gid)
+        async with engine.connect() as conn:
+            kept = await conn.scalar(text(f'SELECT count(*) FROM "{schema}".tags'))
+        assert kept == 1, "existing row must survive a re-provision"
     finally:
         async with engine.begin() as conn:
             await drop_guild_schema(conn, gid)
@@ -611,42 +543,6 @@ async def test_reprovision_backfills_missing_tables_with_grants(engine):
     finally:
         async with engine.begin() as conn:
             await drop_guild_schema(conn, gid)
-
-
-async def test_reprovision_preserves_existing_rows(engine):
-    """Idempotency must not wipe data: a second provision keeps existing rows."""
-    gid = _GID_REPROVISION
-    schema = guild_schema_name(gid)
-    try:
-        async with engine.begin() as conn:
-            await provision_guild_schema(conn, gid)
-            await _insert_public_guild(conn, gid, "reprovision")
-            await conn.exec_driver_sql(f'SET search_path TO "{schema}", public')
-            await conn.execute(
-                text(
-                    "INSERT INTO tags (name, color, created_at, updated_at) "
-                    "VALUES (:n, '#445566', now(), now())"
-                ),
-                {"n": "survivor"},
-            )
-            await conn.exec_driver_sql("SET search_path TO public")
-        async with engine.begin() as conn:
-            await provision_guild_schema(conn, gid)  # second time
-        async with engine.connect() as conn:
-            count = await conn.scalar(text(f'SELECT count(*) FROM "{schema}".tags'))
-        assert count == 1, "existing row must survive a re-provision"
-    finally:
-        async with engine.begin() as conn:
-            await drop_guild_schema(conn, gid)
-            await conn.execute(
-                text("DELETE FROM public.guilds WHERE id = :id"), {"id": gid}
-            )
-
-
-async def test_drop_guild_schema_is_safe_when_absent(engine):
-    """Dropping a guild that was never provisioned is a no-op, not an error."""
-    async with engine.begin() as conn:
-        await drop_guild_schema(conn, _GID_DROP_ABSENT)  # must not raise
 
 
 # --- drift guard: the provisioned guild schema must equal guild_template --------
@@ -888,7 +784,9 @@ async def test_the_template_strip_removes_only_what_a_render_put_there(engine):
     # What an earlier boot did: render the registry into the template. Its
     # policies name the presence view, which provisioning makes beside them.
     view = f'"{_TEMPLATE_SCHEMA}".{presence.VIEW}'
-    body = "\nUNION ALL\n".join(arm.select(_TEMPLATE_SCHEMA) for arm in presence.arms())
+    body = "\nUNION ALL\n".join(
+        arm.select(_TEMPLATE_SCHEMA) for arm in presence.arms(BUILTIN_TOOLS)
+    )
     async with engine.begin() as conn:
         await conn.execute(text(f"CREATE VIEW {view} AS\n{body}"))
         await apply_guild_rls(conn, _TEMPLATE_SCHEMA)

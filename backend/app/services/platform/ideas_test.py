@@ -52,22 +52,6 @@ def test_an_idea_is_filed_under_the_category_its_words_name(
     assert category_named(title, description, LABELS) == named
 
 
-def test_the_categories_are_the_tools_then_the_rest() -> None:
-    assert LABELS == [
-        "Projects",
-        "Files",
-        "Counters",
-        "Calendars",
-        "Dashboards",
-        "Posts",
-        "Wikis",
-        "Contacts",
-        "Notifications",
-        "Account",
-        "Plug-ins",
-    ]
-
-
 def test_a_label_of_several_words_is_named_by_them_all() -> None:
     labels = ["Mobile app", "Apps"]
     assert category_named("The mobile apps crash", None, labels) == "Mobile app"

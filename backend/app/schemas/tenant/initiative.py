@@ -3,17 +3,15 @@ from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
-from pydantic import AliasChoices, ConfigDict, Field, create_model
+from pydantic import AliasChoices, ConfigDict, Field
 
 from app.core.identity_boundary import GuildId
-from app.core.tools import DEFAULT_ENABLED_TOOLS, Tool
 from app.models.platform.user import Presence
 from app.models.tenant.initiative import (
     BUILTIN_MEMBER_ROLE,
-    DEFAULT_PERMISSION_VALUES,
     InitiativeJoinPolicy,
     JoinRequestStatus,
-    PermissionKey,
+    permission_defaults,
 )
 from app.schemas.base import (
     RichMentionStr,
@@ -25,6 +23,7 @@ from app.schemas.platform.user import UserSummary
 from app.schemas.query import PageMeta
 
 if TYPE_CHECKING:  # pragma: no cover
+    from app.core.tool_set import ToolSet
     from app.db.guild_standing import ActorContext
     from app.models.tenant.initiative import (
         Initiative,
@@ -55,26 +54,7 @@ class InitiativeListScope(str, Enum):
     community = "community"
 
 
-# Derived bases: one `{tool.plural}_enabled` master-switch field per Tool. A new
-# Tool member grows these schemas automatically (the SQLModel column itself is
-# still declared on the Initiative model — real DDL stays explicit, pinned by
-# its migration and the drift test).
-#
-# The field default matches the column default, so a create that names no tools
-# gets projects and files rather than an initiative with nothing in it.
-_InitiativeToolSwitches = create_model(
-    "_InitiativeToolSwitches",
-    __base__=SanitizedBaseModel,
-    **{t.view_permission: (bool, t in DEFAULT_ENABLED_TOOLS) for t in Tool},
-)
-_InitiativeToolSwitchesPatch = create_model(
-    "_InitiativeToolSwitchesPatch",
-    __base__=SanitizedBaseModel,
-    **{t.view_permission: (bool | None, None) for t in Tool},
-)
-
-
-class InitiativeBase(_InitiativeToolSwitches):
+class InitiativeBase(SanitizedBaseModel):
     name: str
     description: RichMentionStr | None = None
     color: str | None = Field(default=None, pattern=HEX_COLOR_PATTERN)
@@ -82,12 +62,16 @@ class InitiativeBase(_InitiativeToolSwitches):
 
 class InitiativeCreate(InitiativeBase):
     name: TitleStr
+    #: Each tool's switch, by kind: a built-in tool's, or a tool plug-in's
+    #: the community installed. A tool left out starts as its record says
+    #: (``ToolSpec.on_by_default``).
+    tools: dict[str, bool] = Field(default_factory=dict)
     # Creation is guild-admin only, so the policy is theirs to set from the
     # start; defaulting private keeps "open" an explicit choice.
     join_policy: InitiativeJoinPolicy = InitiativeJoinPolicy.private
 
 
-class InitiativeUpdate(_InitiativeToolSwitchesPatch):
+class InitiativeUpdate(SanitizedBaseModel):
     name: TitleStr | None = None
     description: RichMentionStr | None = None
     color: str | None = Field(default=None, pattern=HEX_COLOR_PATTERN)
@@ -99,14 +83,11 @@ class InitiativeUpdate(_InitiativeToolSwitchesPatch):
     auto_join: bool | None = None
     # Settable by whoever may already update the initiative.
     keep_content_in: bool | None = None
+    #: The tools to switch, by kind; a tool left out stays as it is.
+    #: Settable by whoever may already update the initiative.
+    tools: dict[str, bool] = Field(default_factory=dict)
 
-    _required = reject_null(
-        "name",
-        "join_policy",
-        "auto_join",
-        "keep_content_in",
-        *(t.view_permission for t in Tool),
-    )
+    _required = reject_null("name", "join_policy", "auto_join", "keep_content_in")
 
 
 # Role schemas
@@ -156,7 +137,10 @@ class InitiativeRoleRead(SanitizedBaseModel):
     # sharing and may manage sharing. Carried by the built-in moderator role.
     override_share_restrictions: bool = False
     position: int
-    permissions: dict[PermissionKey, bool] = Field(default_factory=dict)
+    #: What the role may do with each of the community's tools, by key: a
+    #: built-in tool's pair (``PermissionKey``), and a tool plug-in's
+    #: (``<kind>:enabled``, ``<kind>:create``).
+    permissions: dict[str, bool] = Field(default_factory=dict)
     #: What the role holds of each initiative permission of each plug-in
     #: placed in the initiative.
     plugin_permissions: list[PluginPermissionRule] = Field(default_factory=list)
@@ -169,7 +153,7 @@ class InitiativeRoleCreate(SanitizedBaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     display_name: str = Field(..., min_length=1, max_length=100)
     is_manager: bool = False
-    permissions: dict[PermissionKey, bool] | None = None
+    permissions: dict[str, bool] | None = None
 
 
 class InitiativeRoleUpdate(SanitizedBaseModel):
@@ -177,7 +161,7 @@ class InitiativeRoleUpdate(SanitizedBaseModel):
 
     display_name: str | None = Field(default=None, min_length=1, max_length=100)
     is_manager: bool | None = None
-    permissions: dict[PermissionKey, bool] | None = None
+    permissions: dict[str, bool] | None = None
     #: Answers for plug-ins' initiative permissions, each kept as the role's
     #: own. One left out is left as it is.
     plugin_permissions: list[PluginPermissionRule] | None = Field(
@@ -191,20 +175,20 @@ class InitiativeDefaultsRead(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    #: Each tool's switch the community set, by tool.
-    tools: dict[Tool, bool] = Field(default_factory=dict)
+    #: Each tool's switch the community set, by kind.
+    tools: dict[str, bool] = Field(default_factory=dict)
     #: What the built-in member role may do, by permission, where it set it.
-    member_permissions: dict[PermissionKey, bool] = Field(default_factory=dict)
+    member_permissions: dict[str, bool] = Field(default_factory=dict)
     #: What members hold of plug-ins' initiative permissions, where it set it.
     plugin_member_permissions: list[PluginPermissionRule] = Field(default_factory=list)
     #: Whether managers may add roles of their own.
     custom_roles: bool = True
     #: For a community admin: the live initiatives whose own switch has each
-    #: tool on, by tool. What a rule set here would override.
-    own_tools: dict[Tool, list[int]] = Field(default_factory=dict)
+    #: tool on, by kind. What a rule set here would override.
+    own_tools: dict[str, list[int]] = Field(default_factory=dict)
     #: For a community admin: the live initiatives whose own built-in member
     #: role holds each permission, by permission.
-    own_member_permissions: dict[PermissionKey, list[int]] = Field(default_factory=dict)
+    own_member_permissions: dict[str, list[int]] = Field(default_factory=dict)
     #: For a community admin: of the live initiatives each plug-in is placed
     #: in, those whose own built-in member role holds each of its initiative
     #: permissions.
@@ -217,8 +201,8 @@ class InitiativeDefaultsUpdate(SanitizedBaseModel):
     """The defaults to change. A ``null`` hands that tool or permission back
     to each initiative; an omitted one is left as it is."""
 
-    tools: dict[Tool, bool | None] = Field(default_factory=dict)
-    member_permissions: dict[PermissionKey, bool | None] = Field(default_factory=dict)
+    tools: dict[str, bool | None] = Field(default_factory=dict)
+    member_permissions: dict[str, bool | None] = Field(default_factory=dict)
     plugin_member_permissions: list[PluginPermissionDefault] = Field(
         default_factory=list, max_length=1000
     )
@@ -226,12 +210,13 @@ class InitiativeDefaultsUpdate(SanitizedBaseModel):
 
 
 class ToolCountsByInitiativeResponse(SanitizedBaseModel):
-    """Each tool's visible-row counts, by initiative (tool -> initiative_id ->
-    count) — what the sidebar and the initiative directory badge."""
+    """Each tool's visible-row counts, by initiative (kind -> initiative_id ->
+    count): every built-in tool and each installed tool plug-in — what the
+    sidebar and the initiative directory badge."""
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    counts: dict[Tool, dict[int, int]] = Field(default_factory=dict)
+    counts: dict[str, dict[int, int]] = Field(default_factory=dict)
 
 
 class ToolCountsResponse(SanitizedBaseModel):
@@ -307,10 +292,11 @@ class InitiativeCan(SanitizedBaseModel):
     #: Read who is in it: its members, the community's admin and a grantee,
     #: not a guest given items in it.
     roster: bool = False
-    #: The tools the caller may open here.
-    view: list[Tool] = Field(default_factory=list)
-    #: The tools the caller may make a new one of here.
-    create: list[Tool] = Field(default_factory=list)
+    #: The tools the caller may open here, by kind: a built-in tool's, or a
+    #: tool plug-in's the community installed.
+    view: list[str] = Field(default_factory=list)
+    #: The tools the caller may make a new one of here, by kind.
+    create: list[str] = Field(default_factory=list)
 
 
 class InitiativeRead(InitiativeBase):
@@ -339,6 +325,11 @@ class InitiativeRead(InitiativeBase):
     keep_content_in: bool = False
     created_at: datetime
     updated_at: datetime
+    #: Each of the community's tools' switch here, by kind: the community's
+    #: where it set one, the initiative's own otherwise. A tool plug-in's is
+    #: its switch whether or not its install is placed here; its placement
+    #: says where it can be used.
+    tools: dict[str, bool] = Field(default_factory=dict)
     can: InitiativeCan = Field(default_factory=InitiativeCan)
     member_count: int = 0
     #: The caller's role here, when they are a member.
@@ -431,14 +422,16 @@ def serialize_role(
     *,
     defaults: InitiativeDefaultsRead | None = None,
     plugins: Sequence[Any] = (),
+    tools: ToolSet | None = None,
 ) -> InitiativeRoleRead:
     """Serialize a role model to a read schema.
 
-    Every permission key is answered for, not just the ones with a stored row:
-    a role created before a tool shipped has no row for it, and a caller asking
-    "who can see Posts" must not have to know that an absent key means the
-    documented default. The stored row wins wherever there is one, and for the
-    built-in member role what the community set (``defaults``) wins over it.
+    Every permission key of the community's ``tools`` is answered for, not
+    just the ones with a stored row: a role created before a tool shipped has
+    no row for it, and a caller asking "who can see Posts" must not have to
+    know that an absent key means the documented default. The stored row wins
+    wherever there is one, and for the built-in member role what the
+    community set (``defaults``) wins over it.
 
     So is every initiative permission of each install in ``plugins``, those
     placed in the role's initiative: a manager holds every one, and otherwise
@@ -450,10 +443,14 @@ def serialize_role(
         members_hold,
     )
 
-    stored = [perm for perm in (role.permissions or []) if perm.install_id is None]
+    keys = permission_defaults(tools)
     permissions = {
-        **DEFAULT_PERMISSION_VALUES,
-        **{perm.key: perm.enabled for perm in stored},
+        **keys,
+        **{
+            perm.key: perm.enabled
+            for perm in (role.permissions or [])
+            if perm.install_id is None and perm.key in keys
+        },
     }
     community: dict[tuple[int, str], bool] = {}
     if defaults is not None and community_holds_role(role, defaults):
@@ -514,6 +511,13 @@ class InitiativeSummary(SanitizedBaseModel):
     color: str | None = None
 
 
+def _kinds(actions: Any, verb: str) -> list[str]:
+    """The tools ``actions`` lets the caller ``verb``, in the order the
+    community's tools are listed."""
+    prefix = f"{verb}:"
+    return [a.removeprefix(prefix) for a in actions or () if a.startswith(prefix)]
+
+
 def initiative_can(initiative: Initiative) -> InitiativeCan:
     """What the caller may do in ``initiative``, as the schema's
     ``initiative_actions`` answered it in the SELECT that loaded the row."""
@@ -522,8 +526,8 @@ def initiative_can(initiative: Initiative) -> InitiativeCan:
         manage="manage" in held,
         moderate="moderate" in held,
         roster="roster" in held,
-        view=[t for t in Tool if f"view:{t.value}" in held],
-        create=[t for t in Tool if f"create:{t.value}" in held],
+        view=_kinds(initiative.actions, "view"),
+        create=_kinds(initiative.actions, "create"),
     )
 
 
@@ -535,7 +539,7 @@ def serialize_initiative(
     row undefers them."""
     # Here rather than at the top: the switches read the standing's module,
     # which reads these schemas.
-    from app.services.tenant.initiative_tools import tool_on
+    from app.services.tenant.initiative_tools import switch
 
     return InitiativeRead(
         id=initiative.id,
@@ -554,7 +558,7 @@ def serialize_initiative(
         can=initiative_can(initiative),
         member_count=initiative.member_count,
         role_display_name=initiative.role_display_name,
-        **{t.view_permission: tool_on(context, initiative, t) for t in Tool},
+        tools={t.kind: switch(context, initiative, t) for t in context.tools},
     )
 
 

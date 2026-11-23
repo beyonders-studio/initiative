@@ -14,17 +14,21 @@ from sqlalchemy.exc import DBAPIError
 from sqlmodel import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.post_poll import PostPoll, PostPollVote
 from app.models.tenant.post_read import PostRead
-from app.testing import create_post, create_post_poll, lexical_body, route_as
+from app.testing import (
+    create_post,
+    create_post_poll,
+    lexical_body,
+    route_as,
+    switch_tools,
+)
 
 
 async def _posts_enabled(session: AsyncSession, initiative) -> None:
-    initiative.posts_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.post: True})
 
 
 def _poll_payload(**overrides):
@@ -84,11 +88,9 @@ async def test_a_post_without_a_poll_serializes_none(
     assert response.json()["poll"] is None
 
 
-async def test_poll_needs_two_distinct_choices(
-    client: AsyncClient, acting_user, session
-):
-    """One choice is not a question, and two that say the same thing are one
-    choice wearing two labels."""
+async def test_poll_needs_two_choices(client: AsyncClient, acting_user, session):
+    """One choice is not a question (two that say the same thing are one choice
+    wearing two labels: see the duplicate-choice case below)."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     await _posts_enabled(session, a.initiative)
     post = await create_post(session, a.initiative, a.user)
@@ -99,13 +101,6 @@ async def test_poll_needs_two_distinct_choices(
         json=_poll_payload(options=[{"text": "Tuesday"}]),
     )
     assert single.status_code == 422
-
-    duplicate = await client.put(
-        a.g(f"/posts/{post.id}/poll"),
-        headers=a.headers,
-        json=_poll_payload(options=[{"text": "Tuesday"}, {"text": "tuesday"}]),
-    )
-    assert duplicate.status_code == 422
 
 
 async def test_poll_cannot_be_born_closed(client: AsyncClient, acting_user, session):
@@ -163,18 +158,9 @@ async def test_deleting_the_poll_leaves_the_notice(
     ).all()
     assert remaining == []
 
-
-async def test_deleting_a_poll_that_is_not_there(
-    client: AsyncClient, acting_user, session
-):
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    await _posts_enabled(session, a.initiative)
-    post = await create_post(session, a.initiative, a.user)
-
-    response = await client.delete(a.g(f"/posts/{post.id}/poll"), headers=a.headers)
-
-    assert response.status_code == 404
-    assert response.json()["detail"] == "POST_POLL_NOT_FOUND"
+    again = await client.delete(a.g(f"/posts/{post.id}/poll"), headers=a.headers)
+    assert again.status_code == 404
+    assert again.json()["detail"] == "POST_POLL_NOT_FOUND"
 
 
 # ---------------------------------------------------------------------------
@@ -255,30 +241,45 @@ async def test_reordering_the_choices_is_a_change(
     assert response.json()["detail"] == "POST_POLL_HAS_VOTES"
 
 
-async def test_anonymity_can_be_turned_on_but_never_off(
-    client: AsyncClient, acting_user, session
+@pytest.mark.parametrize(
+    ("setting", "detail"),
+    [
+        # People answered on the understanding their names were not attached,
+        # and that cannot be revoked afterwards.
+        ("is_anonymous", "POST_POLL_ANONYMITY_LOCKED"),
+        # Somebody who ticked two answers would otherwise be left holding two
+        # ballots on a poll that takes one, and the roster would list them
+        # twice.
+        ("allows_multiple", "POST_POLL_MULTIPLE_LOCKED"),
+    ],
+)
+async def test_a_setting_can_be_turned_on_but_never_off(
+    client: AsyncClient, acting_user, session, setting, detail
 ):
-    """People answered on the understanding their names were not attached, and
-    that cannot be revoked afterwards."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     await _posts_enabled(session, a.initiative)
     post = await create_post(session, a.initiative, a.user)
-    poll = await create_post_poll(session, post, is_anonymous=True)
-    session.add(PostPollVote(poll_id=poll.id, option_id=poll.options[0].id, user_id=1))
-    await session.commit()
+    poll = await create_post_poll(session, post, **{setting: True})
+    ids = [option.id for option in poll.options]
+    voted = await client.put(
+        a.g(f"/posts/{post.id}/poll/vote"),
+        headers=a.headers,
+        json={"option_ids": ids if setting == "allows_multiple" else ids[:1]},
+    )
+    assert voted.status_code == 200, voted.text
 
-    revealed = await client.put(
+    turned_off = await client.put(
         a.g(f"/posts/{post.id}/poll"),
         headers=a.headers,
-        json=_poll_payload(is_anonymous=False),
+        json=_poll_payload(**{setting: False}),
     )
-    assert revealed.status_code == 409
-    assert revealed.json()["detail"] == "POST_POLL_ANONYMITY_LOCKED"
+    assert turned_off.status_code == 409
+    assert turned_off.json()["detail"] == detail
 
     kept = await client.put(
         a.g(f"/posts/{post.id}/poll"),
         headers=a.headers,
-        json=_poll_payload(is_anonymous=True),
+        json=_poll_payload(**{setting: True}),
     )
     assert kept.status_code == 200, kept.text
 
@@ -773,37 +774,6 @@ async def test_the_unread_filter_skips_your_own_notices(
     ids = [item["id"] for item in response.json()["items"]]
     assert theirs.id in ids
     assert mine.id not in ids
-
-
-async def test_multiple_choice_can_be_turned_on_but_never_off(
-    client: AsyncClient, acting_user, session
-):
-    """Somebody who ticked two answers would otherwise be left holding two
-    ballots on a poll that takes one, and the roster would list them twice."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    await _posts_enabled(session, a.initiative)
-    post = await create_post(session, a.initiative, a.user)
-    poll = await create_post_poll(session, post, allows_multiple=True)
-    ids = [option.id for option in poll.options]
-    voted = await client.put(
-        a.g(f"/posts/{post.id}/poll/vote"), headers=a.headers, json={"option_ids": ids}
-    )
-    assert voted.status_code == 200, voted.text
-
-    narrowed = await client.put(
-        a.g(f"/posts/{post.id}/poll"),
-        headers=a.headers,
-        json=_poll_payload(allows_multiple=False),
-    )
-    assert narrowed.status_code == 409
-    assert narrowed.json()["detail"] == "POST_POLL_MULTIPLE_LOCKED"
-
-    kept = await client.put(
-        a.g(f"/posts/{post.id}/poll"),
-        headers=a.headers,
-        json=_poll_payload(allows_multiple=True),
-    )
-    assert kept.status_code == 200, kept.text
 
 
 async def test_two_choices_that_say_the_same_thing_answer_with_a_code(

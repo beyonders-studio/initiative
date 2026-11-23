@@ -14,7 +14,7 @@
 import { Archive, ArchiveRestore } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import type { ArchivableType, ToolCan } from "@/api/generated/initiativeAPI.schemas";
+import type { ToolCan } from "@/api/generated/initiativeAPI.schemas";
 import { useArchiveEntity, useUnarchiveEntity } from "@/hooks/useArchive";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
@@ -40,7 +40,7 @@ export const ToolArchiveCard = () => {
 
   const isArchived = entity.archived_at !== null;
   const action = isArchived ? unarchive : archive;
-  const target = { entityType: tool as ArchivableType, entityId: entity.id };
+  const target = { entityType: tool, entityId: entity.id };
 
   if (!canUseArchiveCard(entity)) {
     return null;

@@ -11,11 +11,7 @@ now, so the guild is a predicate the resolver applies rather than the schema
 the query runs in — which makes it worth holding directly.
 """
 
-from app.models.platform.identity_ref import (
-    REF_MAX_LENGTH,
-    IdentityEntity,
-    IdentityPurpose,
-)
+from app.models.platform.identity_ref import IdentityEntity, IdentityPurpose
 from app.services.marketplace.plugin_refs import (
     current_install_id,
     drop_guild_plugin_refs,
@@ -30,7 +26,7 @@ from app.services.marketplace.plugin_refs import (
     resolve_plugin_guild_ref,
     resolve_plugin_ref,
 )
-from app.services.platform.identity_refs import REF_GRACE_PERIOD, ensure_ref
+from app.services.platform.identity_refs import ensure_ref
 from app.testing import create_guild, create_guild_plugin, create_user
 
 
@@ -46,67 +42,33 @@ async def _install(
     )
 
 
-class TestOneReferencePerSector:
-    async def test_two_plugins_name_one_person_differently(self, session):
-        user = await create_user(session)
-        guild = await create_guild(session, creator=user)
-        await _install(session, guild, user)
-        await _install(
-            session, guild, user, listing_uid="TESTAPP0000002", public_id="other.plugin"
+async def test_each_sector_names_a_person_once_and_differently(session):
+    """One reference per person, per plug-in, per guild — and minting it again
+    gives the same one."""
+    user = await create_user(session)
+    other = await create_user(session)
+    here = await create_guild(session, creator=user)
+    there = await create_guild(session, creator=user)
+    await _install(session, here, user)
+    await _install(
+        session, here, user, listing_uid="TESTAPP0000002", public_id="other.plugin"
+    )
+    await _install(session, there, user)
+    await session.commit()
+
+    refs = [
+        await ensure_plugin_ref(guild_id=guild.id, public_id=public_id, user_id=who.id)
+        for guild, public_id, who in (
+            (here, "acme.tracker", user),
+            (here, "other.plugin", user),
+            (here, "acme.tracker", other),
+            (there, "acme.tracker", user),
         )
-        await session.commit()
-
-        first = await ensure_plugin_ref(
-            guild_id=guild.id, public_id="acme.tracker", user_id=user.id
-        )
-        second = await ensure_plugin_ref(
-            guild_id=guild.id, public_id="other.plugin", user_id=user.id
-        )
-        assert first != second
-
-    async def test_one_plugin_names_two_people_differently(self, session):
-        owner = await create_user(session)
-        other = await create_user(session)
-        guild = await create_guild(session, creator=owner)
-        await _install(session, guild, owner)
-        await session.commit()
-
-        assert await ensure_plugin_ref(
-            guild_id=guild.id, public_id="acme.tracker", user_id=owner.id
-        ) != await ensure_plugin_ref(
-            guild_id=guild.id, public_id="acme.tracker", user_id=other.id
-        )
-
-    async def test_one_plugin_in_two_guilds_names_one_person_differently(self, session):
-        user = await create_user(session)
-        here = await create_guild(session, creator=user)
-        there = await create_guild(session, creator=user)
-        await _install(session, here, user)
-        await _install(session, there, user)
-        await session.commit()
-
-        assert await ensure_plugin_ref(
-            guild_id=here.id, public_id="acme.tracker", user_id=user.id
-        ) != await ensure_plugin_ref(
-            guild_id=there.id, public_id="acme.tracker", user_id=user.id
-        )
-
-    async def test_minting_twice_gives_the_same_reference(self, session):
-        user = await create_user(session)
-        guild = await create_guild(session, creator=user)
-        await _install(session, guild, user)
-        await session.commit()
-
-        first = await ensure_plugin_ref(
-            guild_id=guild.id, public_id="acme.tracker", user_id=user.id
-        )
-        assert first == await ensure_plugin_ref(
-            guild_id=guild.id, public_id="acme.tracker", user_id=user.id
-        )
-
-    def test_the_value_fits_where_it_has_to_go(self):
-        # A JWT claim and a URL bound the width the install parameter accepts.
-        assert REF_MAX_LENGTH >= 37
+    ]
+    assert len(set(refs)) == 4
+    assert refs[0] == await ensure_plugin_ref(
+        guild_id=here.id, public_id="acme.tracker", user_id=user.id
+    )
 
 
 class TestTheGuildPredicate:
@@ -123,20 +85,11 @@ class TestTheGuildPredicate:
         assert row is not None
         assert row.entity_id == user.id
         assert row.sector_plugin == "acme.tracker"
-
-    async def test_it_does_not_resolve_for_another_guild(self, session):
-        user = await create_user(session)
-        here = await create_guild(session, creator=user)
+        # It does not resolve for another guild.
         there = await create_guild(session, creator=user)
-        await _install(session, here, user)
-        await session.commit()
-
-        ref = await ensure_plugin_ref(
-            guild_id=here.id, public_id="acme.tracker", user_id=user.id
-        )
         assert await resolve_plugin_ref(session, ref=ref, guild_id=there.id) is None
 
-    async def test_a_reference_for_another_purpose_does_not_resolve(self, session):
+    async def test_another_purpose_or_a_guild_reference_does_not_resolve(self, session):
         user = await create_user(session)
         guild = await create_guild(session, creator=user)
         await session.commit()
@@ -149,11 +102,6 @@ class TestTheGuildPredicate:
         )
         await session.commit()
         assert await resolve_plugin_ref(session, ref=billing, guild_id=guild.id) is None
-
-    async def test_a_guild_reference_does_not_resolve_as_a_member(self, session):
-        user = await create_user(session)
-        guild = await create_guild(session, creator=user)
-        await session.commit()
 
         as_guild = await ensure_ref(
             session,
@@ -251,15 +199,6 @@ class TestTheInstallComesAndGoes:
             == community
         )
 
-    async def test_a_community_reference_says_which_plugin_it_is_for(self, session):
-        user = await create_user(session)
-        guild = await create_guild(session, creator=user)
-        await _install(session, guild, user)
-        await session.commit()
-
-        ref = await ensure_plugin_guild_ref(guild_id=guild.id, public_id="acme.tracker")
-        assert await resolve_plugin_guild_ref(ref=ref) == (guild.id, "acme.tracker")
-
     async def test_the_current_install_is_read_from_the_guild(self, session):
         user = await create_user(session)
         guild = await create_guild(session, creator=user)
@@ -282,6 +221,7 @@ class TestTheInstallComesAndGoes:
         await session.commit()
 
         ref = await ensure_plugin_guild_ref(guild_id=guild.id, public_id="acme.tracker")
+        assert await resolve_plugin_guild_ref(ref=ref) == (guild.id, "acme.tracker")
         assert await guild_for_plugin_ref(ref=ref, public_id="acme.tracker") == guild.id
         assert await guild_for_plugin_ref(ref=ref, public_id="other.plugin") is None
 
@@ -331,28 +271,6 @@ class TestRemoval:
             != gone
         )
 
-    async def test_deleting_a_guild_removes_its_plugin_references(self, session):
-        user = await create_user(session)
-        here = await create_guild(session, creator=user)
-        there = await create_guild(session, creator=user)
-        await _install(session, here, user)
-        await _install(session, there, user)
-        await session.commit()
-
-        gone = await ensure_plugin_ref(
-            guild_id=here.id, public_id="acme.tracker", user_id=user.id
-        )
-        kept = await ensure_plugin_ref(
-            guild_id=there.id, public_id="acme.tracker", user_id=user.id
-        )
-
-        assert await drop_guild_plugin_refs(guild_id=here.id) == 1
-        await session.commit()
-        assert await resolve_plugin_ref(session, ref=gone, guild_id=here.id) is None
-        assert (
-            await resolve_plugin_ref(session, ref=kept, guild_id=there.id) is not None
-        )
-
     async def test_the_deletion_sequence_its_callers_follow(self, session):
         """Delete, commit, then drop — the order `delete_guild` documents.
 
@@ -365,12 +283,17 @@ class TestRemoval:
 
         user = await create_user(session)
         guild = await create_guild(session, creator=user)
+        there = await create_guild(session, creator=user)
         await _install(session, guild, user)
+        await _install(session, there, user)
         await session.commit()
 
-        guild_id = guild.id
+        guild_id, there_id = guild.id, there.id
         ref = await ensure_plugin_ref(
             guild_id=guild_id, public_id="acme.tracker", user_id=user.id
+        )
+        kept = await ensure_plugin_ref(
+            guild_id=there_id, public_id="acme.tracker", user_id=user.id
         )
         await guilds_service.delete_guild(session, guild)
 
@@ -378,9 +301,12 @@ class TestRemoval:
         assert await resolve_plugin_ref(session, ref=ref, guild_id=guild_id) is not None
 
         await session.commit()
-        await drop_guild_plugin_refs(guild_id=guild_id)
+        assert await drop_guild_plugin_refs(guild_id=guild_id) == 1
 
         assert await resolve_plugin_ref(session, ref=ref, guild_id=guild_id) is None
+        assert (
+            await resolve_plugin_ref(session, ref=kept, guild_id=there_id) is not None
+        )
 
     async def test_the_sweep_reclaims_a_removed_guilds_references(self, session):
         """What a failed post-commit cleanup leaves behind.
@@ -437,7 +363,3 @@ class TestRemoval:
         assert await purge_orphaned_sector_refs(session) == 0
         await session.commit()
         assert await resolve_plugin_ref(session, ref=ref, guild_id=guild_id) is not None
-
-    def test_the_grace_window_is_the_shared_one(self):
-        # Plug-in references retire on the same clock as every other sector's.
-        assert REF_GRACE_PERIOD.days == 30

@@ -2,10 +2,10 @@ import { Link } from "@tanstack/react-router";
 import type { ComponentPropsWithoutRef } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
 import { useCommentReferences } from "@/components/comments/CommentReferences";
 import { MENTION_BADGE, UserMention } from "@/components/user/UserMention";
 import { useCommunities } from "@/hooks/useCommunities";
+import { useReferenceKinds } from "@/hooks/useReferenceKinds";
 import { communityPath } from "@/lib/communityUrl";
 import { entityRefTypeFor } from "@/lib/entityResolver";
 import { referenceRef } from "@/lib/smartChips";
@@ -24,9 +24,10 @@ type SpanProps = ComponentPropsWithoutRef<"span"> & { node?: unknown };
  *  surface that renders mentions sits under one. */
 const buildMentionSpan = (linked: boolean) =>
   function MentionSpan({ children, node: _node, ...props }: SpanProps) {
-    const { t } = useTranslation(["comments", "search"]);
+    const { t } = useTranslation("comments");
     const { activeCommunityId } = useCommunities();
     const references = useCommentReferences();
+    const kinds = useReferenceKinds();
 
     const attrs = props as Record<string, string | undefined>;
     const type = attrs["data-mention-type"] as MentionType | undefined;
@@ -53,11 +54,8 @@ const buildMentionSpan = (linked: boolean) =>
       return <span>{label}</span>;
     }
 
-    const live = references.titles.get(referenceRef(type as SearchEntityType, Number(id)));
-    const text = t("contextPrefix", {
-      type: t(`search:types.${type}` as never, { defaultValue: type }),
-      name: live ?? label,
-    });
+    const live = references.titles.get(referenceRef(type, Number(id)));
+    const text = t("contextPrefix", { type: kinds.label(type), name: live ?? label });
     // Nothing came back for it once the answer has arrived: deleted, or never
     // shared with this reader. It keeps its words and stops being a link.
     if (references.ready && live === undefined) {

@@ -3,15 +3,16 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
 import { host } from "@/ui/host";
 import {
   type DetailLayout,
   isListLayout,
   type LayoutChange,
-  type ListLayoutDefinition,
   type ListView,
   type SaveLayouts,
   type StoredPreset,
+  setOf,
 } from "@/ui/layouts/layoutSet";
 import { type LayoutLook, listLayoutLooks } from "@/ui/layouts/looks";
 import { formatDateTime } from "@/ui/lib/formatDate";
@@ -40,12 +41,6 @@ const useSaving = (save: SaveLayouts) => {
   };
   return { pending, run };
 };
-
-/** A definition as it is written back: what it sets, and nothing left unset. */
-const setOf = (definition: ListLayoutDefinition) =>
-  Object.fromEntries(
-    Object.entries(definition).filter(([, value]) => value != null)
-  ) as ListLayoutDefinition;
 
 /**
  * A target's layouts, each with when it was last changed, or a dash while it
@@ -82,14 +77,16 @@ export const LayoutList = ({
   const typed = pages.filter((page) => "task_type_id" in page && page.task_type_id).length;
 
   const row = (layout: Layout) => {
-    const { icon: Icon, labelKey } = isListLayout(layout)
-      ? listLayoutLooks[layout.kind]
-      : pageLooks[layout.kind];
+    const {
+      icon: Icon,
+      labelKey,
+      label,
+    } = isListLayout(layout) ? listLayoutLooks[layout.kind] : pageLooks[layout.kind];
     const typeId = "task_type_id" in layout ? layout.task_type_id : null;
     const name =
       typeId && "task_type_name" in layout
         ? t("typedTaskLayout", { name: layout.task_type_name })
-        : t(labelKey as never);
+        : (label ?? t(labelKey as never));
     const view = isListLayout(layout) ? layout : null;
     // What the editor's `?layout=` names it by.
     const key = typeId ? `${layout.kind}:${typeId}` : layout.kind;
@@ -224,6 +221,30 @@ export const LayoutsOverview = ({
         <p className="text-muted-foreground text-sm">{t("compact")}</p>
       )}
     </div>
+  );
+};
+
+/** A place's layouts, from its list's menu: each shown or hidden, the one
+ *  it opens on, and the way into the layout editor. */
+export const LayoutsDialog = ({
+  open,
+  onOpenChange,
+  ...overview
+}: Parameters<typeof LayoutsOverview>[0] & {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) => {
+  const { t } = useTranslation("layouts");
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{t("tab")}</DialogTitle>
+          <DialogDescription>{t("settingsDescription")}</DialogDescription>
+        </DialogHeader>
+        <LayoutsOverview {...overview} />
+      </DialogContent>
+    </Dialog>
   );
 };
 

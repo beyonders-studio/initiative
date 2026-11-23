@@ -9,6 +9,10 @@
     "installed": "Instalado",
     "version": "v{{version}}",
     "beta": "Beta",
+    "paid": "De pago",
+    "subscription": "Suscripción",
+    "oneTime": "Pago único",
+    "included": "Incluido con Initiative",
     "needsUpdate": "Necesita una app más reciente",
     "unavailable": "Aún no disponible",
     "request": "Bajo solicitud"
@@ -26,6 +30,8 @@
     "description": "Nada en el mercado coincide con «{{query}}»."
   },
   "detail": {
+    "screenshots": "Capturas de pantalla",
+    "screenshot": "{{name}}, captura {{number}}",
     "installs_one": "{{count}} instalación",
     "installs_other": "{{count}} instalaciones",
     "minimumAge": "Mayores de {{age}} años",
@@ -71,5 +77,32 @@
   },
   "installedUnknown": "No se pudo comprobar cuáles de estos ya tienes, así que nada de lo siguiente aparece como instalado.",
   "subtitlePlugins": "Los complementos añaden algo que comparte toda la comunidad. Solo el superadministrador de la comunidad puede añadirlos.",
-  "subtitleAuto": "Las automatizaciones se ejecutan en segundo plano para todo la comunidad."
+  "subtitleAuto": "Las automatizaciones se ejecutan en segundo plano para todo la comunidad.",
+  "tag": {
+    "tool": "Herramienta nueva",
+    "community_tool": "Toda la comunidad",
+    "page": "Página propia",
+    "connection": "Conecta una cuenta",
+    "add_on": "Amplía tus herramientas"
+  },
+  "contents": {
+    "title": "Qué añade",
+    "tool": "Herramienta",
+    "toolInitiatives": "{{name}}, dentro de las iniciativas",
+    "toolCommunity": "{{name}}, para toda la comunidad",
+    "pages": "Páginas",
+    "pagesCommunity": "para toda la comunidad",
+    "pagesInitiatives": "dentro de las iniciativas",
+    "pagesBoth": "para toda la comunidad y dentro de las iniciativas",
+    "dashboards": "Paneles",
+    "widgets": "Widgets",
+    "widgetsNote": "para cualquier panel",
+    "fields": "Campos",
+    "parts": "Secciones",
+    "actions": "Acciones",
+    "on": "en {{kinds}}",
+    "connections": "Conexiones",
+    "connectionCommunity": "un administrador la conecta una vez",
+    "connectionMember": "cada miembro conecta la suya"
+  }
 }

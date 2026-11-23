@@ -21,7 +21,9 @@
  *    does not have, so this is where that question comes up.
  *
  * The server installs, grants and places in one transaction, under the same
- * checks the plug-in's settings apply afterwards.
+ * checks the plug-in's settings apply afterwards. A plug-in that declares
+ * something to connect then asks for it on a second screen, the one its
+ * "Needs setup" badge and its gear in the sidebar open later.
  *
  * Community admins only. The server enforces that; this hides the action rather
  * than offering one that would be refused.
@@ -32,7 +34,11 @@ import { Download } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { MarketplaceListingDetail } from "@/api/generated/initiativeAPI.schemas";
+import type {
+  CommunityPluginRead,
+  MarketplaceListingDetail,
+} from "@/api/generated/initiativeAPI.schemas";
+import { PluginConnectBody } from "@/components/plugins/PluginSettingsDialog";
 import { useInstallCommunityPlugin } from "@/hooks/useCommunityPlugins";
 import { useCommunityInitiatives } from "@/hooks/useInitiatives";
 import { useCommunityPath } from "@/lib/communityUrl";
@@ -42,10 +48,13 @@ import { STANDING_SCOPES, scopeSentence, toggleScope } from "@/lib/pluginScopes"
 import {
   communityPluginPath,
   declaredPages,
+  isToolPlugin,
   permissionName,
+  pluginHasConnections,
   pluginPermissions,
 } from "@/lib/pluginSurfaces";
 import type { DialogProps } from "@/types/dialog";
+import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
 import {
   Dialog,
@@ -55,8 +64,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
-import { Field } from "@/ui/field";
-import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { SkeletonLines, SkeletonRegion } from "@/ui/page-skeletons";
 import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
@@ -90,7 +97,8 @@ export function InstallPluginDialog({
   const placeable = placesInInitiatives || requested.length > 0;
   const permissions = pluginPermissions(listing.definition);
 
-  const [name, setName] = useState(listing.name);
+  // Installed, and waiting on what it needs connected.
+  const [installed, setInstalled] = useState<CommunityPluginRead | null>(null);
   // Every scope the server allows starts ticked, bar a standing; the seat
   // unticks, and ticks a standing itself.
   const [scopes, setScopes] = useState<string[]>(() =>
@@ -108,7 +116,6 @@ export function InstallPluginDialog({
     install.mutate(
       {
         listing_uid: listing.uid,
-        name: name.trim() || listing.name,
         granted_scopes: scopes,
         placements: !placeable ? [] : where === "all" ? "all" : picked,
         callers: allowedCallers,
@@ -116,17 +123,39 @@ export function InstallPluginDialog({
       {
         onSuccess: (plugin) => {
           toast.success(t("plugins:install.done", { name: plugin.name }));
-          onOpenChange(false);
-          if (next) {
-            navigate({ href: next });
-            return;
-          }
-          // Straight to what it created, when it created something reachable.
-          const path = communityPluginPath(plugin);
-          if (path) navigate({ to: gp(path) });
+          if (pluginHasConnections(plugin.definition)) setInstalled(plugin);
+          else finish(plugin);
         },
       }
     );
+
+  const finish = (plugin: CommunityPluginRead) => {
+    onOpenChange(false);
+    if (next) {
+      navigate({ href: next });
+      return;
+    }
+    // Straight to what it created, when it created something reachable.
+    const path = communityPluginPath(plugin);
+    if (path) navigate({ to: gp(path) });
+  };
+
+  if (installed) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("plugins:install.connectTitle", { name: installed.name })}</DialogTitle>
+            <DialogDescription>{t("plugins:install.connectDescription")}</DialogDescription>
+          </DialogHeader>
+          <PluginConnectBody pluginId={installed.id} />
+          <DialogFooter>
+            <Button onClick={() => finish(installed)}>{t("common:done")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   // Only the catalogue this app shows can be installed from it.
   if (!listingShownHere(listing)) return null;
@@ -142,14 +171,6 @@ export function InstallPluginDialog({
         {/* A plug-in reaches the whole community, so who wrote it is said here too —
             the same sentence the card and the listing page showed. */}
         <ListingProvenance listing={listing} />
-
-        <Field label={t("plugins:install.name")} className="space-y-1.5">
-          <Input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder={listing.name}
-          />
-        </Field>
 
         {requested.length > 0 && (
           <section className="space-y-2" aria-labelledby="install-plugin-reach">
@@ -197,9 +218,11 @@ export function InstallPluginDialog({
               </h3>
               <p className="text-muted-foreground text-xs">
                 {t(
-                  hasPage
-                    ? "plugins:install.whereDescription"
-                    : "plugins:install.whereDescriptionNoPage"
+                  isToolPlugin(listing.definition)
+                    ? "plugins:install.whereDescriptionTool"
+                    : hasPage
+                      ? "plugins:install.whereDescription"
+                      : "plugins:install.whereDescriptionNoPage"
                 )}
               </p>
             </div>

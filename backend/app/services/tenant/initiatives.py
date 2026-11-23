@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, datetime
 
 from sqlalchemy import case, desc, func, or_
@@ -14,21 +14,18 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.audit_events import AuditEventType
 from app.core.errors import CodedError
 from app.core.messages import GuildPluginMessages, InitiativeMessages
-from app.core.tools import Tool
 from app.db.query import ids_in
-from app.db.session import routed_context, routed_guild_id
+from app.db.session import routed_context, routed_guild_id, routed_tools
 from app.models.platform.guild import GUILD_ADMIN_ROLES, GuildMembership
 from app.models.platform.user import User
 from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.initiative import (
     BUILTIN_MEMBER_ROLE,
-    BUILTIN_ROLE_PERMISSIONS,
     BUILTIN_ROLES,
-    DEFAULT_PERMISSION_VALUES,
     INITIATIVE_CUSTOM_ROLES,
     INITIATIVE_MEMBER_PREFIX,
-    INITIATIVE_TOOL_KEYS,
+    INITIATIVE_TOOL_PREFIX,
     Initiative,
     InitiativeJoinPolicy,
     InitiativeJoinRequest,
@@ -36,7 +33,7 @@ from app.models.tenant.initiative import (
     InitiativeRoleModel,
     InitiativeRule,
     JoinRequestStatus,
-    PermissionKey,
+    permission_defaults,
 )
 from app.models.tenant.resource_grant import ResourceGrant
 from app.schemas.platform.user import UserInitiativeRole, UserSummary
@@ -49,6 +46,11 @@ from app.schemas.tenant.initiative import (
     PluginPermissionRule,
 )
 from app.services import audit as audit_service
+from app.services.tenant.initiative_tools import (
+    own_switch,
+    switches,
+    write_switches,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -229,8 +231,9 @@ async def create_builtin_roles(
         roles[spec.name] = role
     await session.flush()
 
+    tools = routed_tools(session)
     for spec in BUILTIN_ROLES:
-        for perm_key, enabled in spec.permissions.items():
+        for perm_key, enabled in spec.holds(tools).items():
             session.add(
                 InitiativeRule(
                     initiative_id=initiative_id,
@@ -345,7 +348,7 @@ async def remove_user_from_guild_initiatives(
     from app.services.tenant import personal_items
 
     schema = guild_schema_name(guild_id)
-    await session.exec(select(func.public.member_departs(schema, user_id, None)))
+    await session.exec(select(func.member_departs(schema, user_id, None)))
     # An initiative they reached only through items shared with them has no
     # membership row to delete, so its departure is run here.
     shared_only = (
@@ -363,9 +366,7 @@ async def remove_user_from_guild_initiatives(
     )
     shared_only_ids = list((await session.exec(shared_only)).all())
     for initiative_id in shared_only_ids:
-        await session.exec(
-            select(func.public.member_departs(schema, user_id, initiative_id))
-        )
+        await session.exec(select(func.member_departs(schema, user_id, initiative_id)))
     if shared_only_ids:
         # Outside a trigger the departure leaves archived content as it is,
         # its grants included. A grant goes whatever state its item is in.
@@ -425,9 +426,10 @@ async def create_custom_role(
     name: str,
     display_name: str,
     is_manager: bool = False,
-    permissions: dict[PermissionKey, bool] | None = None,
+    permissions: Mapping[str, bool] | None = None,
 ) -> InitiativeRoleModel:
-    """Create a custom role for an initiative."""
+    """Create a custom role for an initiative, holding what the member role
+    holds of every tool in its community where ``permissions`` does not say."""
     # Get next position
     stmt = select(func.max(InitiativeRoleModel.position)).where(
         InitiativeRoleModel.initiative_id == initiative_id
@@ -446,8 +448,8 @@ async def create_custom_role(
     session.add(role)
     await session.flush()
 
-    # Add permissions (default to member permissions if not specified)
-    perms = permissions or dict(BUILTIN_ROLE_PERMISSIONS["member"])
+    member = next(spec for spec in BUILTIN_ROLES if spec.name == BUILTIN_MEMBER_ROLE)
+    perms = {**member.holds(routed_tools(session)), **(permissions or {})}
     for perm_key, enabled in perms.items():
         session.add(
             InitiativeRule(
@@ -467,7 +469,7 @@ async def update_role_permissions(
     session: AsyncSession,
     *,
     role: InitiativeRoleModel,
-    permissions: dict[PermissionKey, bool],
+    permissions: Mapping[str, bool],
     plugin_permissions: Iterable[PluginPermissionRule] = (),
 ) -> InitiativeRoleModel:
     """Update permissions for a role: tools' keys, and plug-ins' initiative
@@ -1154,7 +1156,7 @@ async def create_imported_initiative(
     name: str,
     description: str | None,
     color: str | None,
-    tool_flags: dict[str, bool],
+    tools: Mapping[str, bool],
     manager_id: int,
     join_policy: InitiativeJoinPolicy | None = None,
     member_ids: Sequence[int] = (),
@@ -1162,10 +1164,9 @@ async def create_imported_initiative(
     """Create an initiative for a backup import: the exact create-endpoint
     sequence (row → built-in roles → creator as PM), with the name suffixed
     on collision (always-create policy) instead of 409ing, and the tool
-    master switches and join policy taken from the backup manifest.
+    switches and join policy taken from the backup manifest.
     ``member_ids`` join it with the built-in member role. Flush-only — the
     backup orchestrator owns its per-chunk transaction."""
-    from app.core.tools import DEFAULT_ENABLED_TOOLS
     from app.services.import_engine.common import unique_name
 
     existing = {row for row in (await session.exec(select(Initiative.name))).all()}
@@ -1174,19 +1175,14 @@ async def create_imported_initiative(
         description=description,
         color=color,
         join_policy=(join_policy or InitiativeJoinPolicy.private).value,
-        **{
-            # A manifest that says nothing about a tool falls back to that
-            # tool's own default rather than to off: a backup written before
-            # projects and files had switches names no state for them, and
-            # restoring it must not produce an initiative with neither.
-            t.view_permission: bool(
-                tool_flags.get(t.view_permission, t in DEFAULT_ENABLED_TOOLS)
-            )
-            for t in Tool
-        },
     )
     session.add(initiative)
     await session.flush()
+    # A manifest that says nothing about a tool falls back to that tool's own
+    # default rather than to off: a backup written before projects and files
+    # had switches names no state for them, and restoring it must not produce
+    # an initiative with neither.
+    await write_switches(session, initiative.id, switches(tools, routed_tools(session)))
 
     roles = await create_builtin_roles(session, initiative_id=initiative.id)
     session.add(
@@ -1213,8 +1209,12 @@ async def create_imported_initiative(
     return initiative
 
 
-def _member_key(key: PermissionKey) -> str:
-    return f"{INITIATIVE_MEMBER_PREFIX}{key.value}"
+def _member_key(key: str) -> str:
+    return f"{INITIATIVE_MEMBER_PREFIX}{key}"
+
+
+def _tool_key(kind: str) -> str:
+    return f"{INITIATIVE_TOOL_PREFIX}{kind}"
 
 
 async def _community_rows(session: AsyncSession) -> dict[str, InitiativeRule]:
@@ -1234,18 +1234,21 @@ async def community_defaults(
 ) -> InitiativeDefaultsRead:
     """What the community sets for every initiative in it. ``with_own`` adds,
     for whoever sets it, which live initiatives have each tool and each member
-    permission on of their own, beneath anything the community set."""
+    permission on of their own, beneath anything the community set. Every tool
+    of the community is answered for, its tool plug-ins' too."""
     rows = await _community_rows(session)
+    tools = routed_tools(session)
+    keys = permission_defaults(tools)
     custom_roles = rows.get(INITIATIVE_CUSTOM_ROLES)
     defaults = InitiativeDefaultsRead(
         tools={
-            tool: rows[key].enabled
-            for tool, key in INITIATIVE_TOOL_KEYS.items()
-            if key in rows
+            tool.kind: rows[_tool_key(tool.kind)].enabled
+            for tool in tools
+            if _tool_key(tool.kind) in rows
         },
         member_permissions={
             key: rows[_member_key(key)].enabled
-            for key in PermissionKey
+            for key in keys
             if _member_key(key) in rows
         },
         custom_roles=custom_roles is None or custom_roles.enabled,
@@ -1297,16 +1300,12 @@ async def community_defaults(
         for rule in member_rules
     }
     defaults.own_tools = {
-        tool: [iid for iid, i in live.items() if getattr(i, tool.view_permission)]
-        for tool in Tool
+        tool.kind: [iid for iid, i in live.items() if own_switch(i, tool)]
+        for tool in tools
     }
     defaults.own_member_permissions = {
-        key: [
-            iid
-            for iid in live
-            if member.get((iid, None, key.value), DEFAULT_PERMISSION_VALUES[key])
-        ]
-        for key in PermissionKey
+        key: [iid for iid in live if member.get((iid, None, key), default)]
+        for key, default in keys.items()
     }
     from app.services.marketplace.service_plugins import (
         declared_permissions,
@@ -1348,6 +1347,12 @@ async def set_community_defaults(
     keeps its own values beneath, which apply again where the community hands
     a tool or a permission back. Written on the admin's own session: the
     community's rows have no initiative, so no manager's policy admits them."""
+    tools = routed_tools(session)
+    if not (
+        changes.tools.keys() <= tools.by_kind.keys()
+        and changes.member_permissions.keys() <= permission_defaults(tools).keys()
+    ):
+        raise CodedError(InitiativeMessages.TOOL_UNKNOWN, 422)
     before = await community_defaults(session)
     if changes.plugin_member_permissions:
         from app.services.tenant.guild_plugins import declared_permission_ids
@@ -1378,7 +1383,7 @@ async def set_community_defaults(
                     )
                 )
     stored: dict[str, bool | None] = {
-        **{INITIATIVE_TOOL_KEYS[tool]: on for tool, on in changes.tools.items()},
+        **{_tool_key(kind): on for kind, on in changes.tools.items()},
         **{_member_key(key): on for key, on in changes.member_permissions.items()},
     }
     if changes.custom_roles is not None:

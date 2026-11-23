@@ -6,7 +6,6 @@ import { useTranslation } from "react-i18next";
 
 import {
   ContentKind,
-  PropertyTarget,
   SearchEntityType,
   Tool,
   WikiPageKind,
@@ -593,7 +592,7 @@ export const PageView = () => {
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
             {page && propertiesInitiativeId !== null ? (
               <PropertiesField
-                saves={itemSaves(propertySaves[PropertyTarget.wiki_page], page.id)}
+                saves={itemSaves(propertySaves[ContentKind.wiki_page], page.id)}
                 env={propertyEnv}
                 id={page.id}
                 properties={page.properties ?? []}

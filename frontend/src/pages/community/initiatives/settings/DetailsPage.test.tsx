@@ -7,8 +7,10 @@ import {
   buildCommunity,
   buildInitiative,
   buildInitiativeRole,
+  buildToolPlugin,
   buildUser,
   initiativeCan,
+  TOOL_PLUGIN_UID,
 } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
@@ -20,6 +22,7 @@ vi.mock("@/lib/mascotToast", () => ({
 }));
 
 import { toast } from "@/lib/mascotToast";
+import { TOOLS } from "@/lib/tools";
 
 import { DetailsPage } from "./DetailsPage";
 
@@ -30,6 +33,11 @@ const MANAGER_ID = 42;
 function stubInitiative(overrides: Partial<InitiativeRead> = {}, patchFails?: [number, string]) {
   const patches: unknown[] = [];
   server.use(
+    // The community sets nothing, unless a test says otherwise; declared
+    // before `:id`, which would also match it.
+    communityHttp.get("/initiatives/defaults", () =>
+      HttpResponse.json({ tools: {}, member_permissions: {}, custom_roles: true })
+    ),
     communityHttp.get("/initiatives/:id", () =>
       HttpResponse.json(
         buildInitiative({
@@ -115,30 +123,20 @@ describe("DetailsPage", () => {
    * answered, and reported.
    */
   describe("tool switches", () => {
-    it("asks who a tool is for instead of turning it straight on", async () => {
-      const patches = stubInitiative();
-      stubRoles([managerRole(), memberRole()]);
-
-      renderDetails();
-
-      await userEvent.click(await screen.findByRole("switch", { name: /Posts/ }));
-
-      expect(await screen.findByRole("dialog")).toHaveTextContent("Turn on Posts");
-      // Nothing is saved until the audience question is answered.
-      expect(patches).toHaveLength(0);
-    });
-
-    it("grants the tool to every ordinary role when it is for everyone", async () => {
+    it("asks who a tool is for, and grants it to every ordinary role when it is for everyone", async () => {
       const initiativePatches = stubInitiative();
       const rolePatches = stubRoles([managerRole(), memberRole()]);
 
       renderDetails();
 
       await userEvent.click(await screen.findByRole("switch", { name: /Posts/ }));
+      expect(await screen.findByRole("dialog")).toHaveTextContent("Turn on Posts");
+      // Nothing is saved until the audience question is answered.
+      expect(initiativePatches).toHaveLength(0);
       await userEvent.click(await screen.findByRole("radio", { name: /Everyone in this/ }));
       await userEvent.click(screen.getByRole("button", { name: "Turn it on" }));
 
-      await waitFor(() => expect(initiativePatches).toEqual([{ posts_enabled: true }]));
+      await waitFor(() => expect(initiativePatches).toEqual([{ tools: { post: true } }]));
       await waitFor(() => expect(rolePatches).toHaveLength(1));
       // The member role, not the manager one — a manager already sees everything.
       expect(rolePatches[0].roleId).toBe("2");
@@ -161,28 +159,12 @@ describe("DetailsPage", () => {
       await userEvent.click(await screen.findByRole("radio", { name: /Managers only/ }));
       await userEvent.click(screen.getByRole("button", { name: "Turn it on" }));
 
-      await waitFor(() => expect(initiativePatches).toEqual([{ posts_enabled: true }]));
+      await waitFor(() => expect(initiativePatches).toEqual([{ tools: { post: true } }]));
       expect(rolePatches).toHaveLength(0);
     });
 
-    it("says who can see a tool that is already on", async () => {
-      stubInitiative({ posts_enabled: true } as Partial<InitiativeRead>);
-      stubRoles([managerRole(), memberRole({ posts_enabled: true })]);
-
-      renderDetails();
-
-      // Scoped to the Posts row: projects and files are switched on too
-      // now, so the page says "Visible to Member" in several places and only
-      // this one is the answer under test.
-      const postsRow = (await screen.findByRole("switch", { name: /Posts/ })).closest(
-        "[data-slot='tool-card']"
-      );
-      expect(postsRow).not.toBeNull();
-      expect(within(postsRow as HTMLElement).getByText(/Visible to Member/)).toBeInTheDocument();
-    });
-
     it("shows a switch the community set as set, and offers no change", async () => {
-      stubInitiative({ posts_enabled: true } as Partial<InitiativeRead>);
+      stubInitiative({ tools: { post: true } });
       stubRoles([managerRole(), memberRole({ posts_enabled: true })]);
       server.use(
         communityHttp.get("/initiatives/defaults", () =>
@@ -198,21 +180,13 @@ describe("DetailsPage", () => {
       expect(within(postsRow).getByText(/sets this for every initiative/)).toBeInTheDocument();
     });
 
-    it("warns when a tool is on but no ordinary role has been given it", async () => {
-      stubInitiative({ posts_enabled: true } as Partial<InitiativeRead>);
-      stubRoles([managerRole(), memberRole()]);
-
-      renderDetails();
-
-      expect(await screen.findByText(/Only managers can see this/)).toBeInTheDocument();
-    });
-
-    it("grants it to everyone from that warning, without touching the switch", async () => {
-      const initiativePatches = stubInitiative({ posts_enabled: true } as Partial<InitiativeRead>);
+    it("warns when no ordinary role has a tool that is on, and grants it from there without touching the switch", async () => {
+      const initiativePatches = stubInitiative({ tools: { post: true } });
       const rolePatches = stubRoles([managerRole(), memberRole()]);
 
       renderDetails();
 
+      expect(await screen.findByText(/Only managers can see this/)).toBeInTheDocument();
       await userEvent.click(
         (await screen.findAllByRole("button", { name: "Give it to everyone" }))[0]
       );
@@ -238,18 +212,23 @@ describe("DetailsPage", () => {
 
       // The switch still moves — that half succeeded — but the grant that
       // could not read the roster reports failure rather than success.
-      await waitFor(() => expect(initiativePatches).toEqual([{ posts_enabled: true }]));
+      await waitFor(() => expect(initiativePatches).toEqual([{ tools: { post: true } }]));
       await waitFor(() => expect(toast.error).toHaveBeenCalled());
       expect(toast.success).not.toHaveBeenCalledWith(expect.stringContaining("can now see"));
     });
 
-    it("says what turning a tool off hides before it hides it", async () => {
-      const patches = stubInitiative({ posts_enabled: true } as Partial<InitiativeRead>);
+    it("says who can see a tool that is on, and what turning it off hides before it hides it", async () => {
+      const patches = stubInitiative({ tools: { post: true } });
       stubRoles([managerRole(), memberRole({ posts_enabled: true })]);
 
       renderDetails();
 
-      await userEvent.click(await screen.findByRole("switch", { name: /Posts/ }));
+      const posts = await screen.findByRole("switch", { name: /Posts/ });
+      // Scoped to the Posts row: other tools are on too, so the page says
+      // "Visible to Member" in several places.
+      const postsRow = posts.closest("[data-slot='tool-card']") as HTMLElement;
+      expect(within(postsRow).getByText(/Visible to Member/)).toBeInTheDocument();
+      await userEvent.click(posts);
 
       expect(await screen.findByRole("alertdialog")).toHaveTextContent(
         /hides Posts and everything in it from everyone/
@@ -257,7 +236,45 @@ describe("DetailsPage", () => {
       expect(patches).toHaveLength(0);
 
       await userEvent.click(screen.getByRole("button", { name: "Turn it off" }));
-      await waitFor(() => expect(patches).toEqual([{ posts_enabled: false }]));
+      await waitFor(() => expect(patches).toEqual([{ tools: { post: false } }]));
+    });
+
+    it("switches a tool plug-in placed here as it does a built-in tool, after them", async () => {
+      const shelf = `shelf.${TOOL_PLUGIN_UID.toLowerCase()}`;
+      const patches = stubInitiative({ tools: { post: true, [shelf]: true } });
+      stubRoles([managerRole(), memberRole({ [`${shelf}:enabled`]: true })]);
+      server.use(
+        communityHttp.get("/plugins/", () =>
+          HttpResponse.json({
+            items: [
+              buildToolPlugin({ placed_initiative_ids: [INITIATIVE_ID] }),
+              // Placed elsewhere: not one of this initiative's tools.
+              buildToolPlugin({
+                listing_uid: "ELSEWHERE00001",
+                definition: { ...buildToolPlugin().definition, default_name: "Elsewhere" },
+                placed_initiative_ids: [INITIATIVE_ID + 1],
+              }),
+            ],
+          })
+        )
+      );
+
+      renderDetails();
+
+      const reading = await screen.findByRole("switch", { name: /Reading/ });
+      expect(reading).toHaveAttribute("aria-checked", "true");
+      const cards = screen.getAllByRole("switch");
+      expect(cards.at(-1)).toBe(reading);
+      // Every built-in tool, then the plug-in placed here and not the other.
+      expect(cards).toHaveLength(TOOLS.length + 1);
+      const row = reading.closest("[data-slot='tool-card']") as HTMLElement;
+      expect(within(row).getByText("A tool from the Reading plug-in.")).toBeInTheDocument();
+      expect(within(row).getByText(/Visible to Member/)).toBeInTheDocument();
+
+      await userEvent.click(reading);
+      expect(await screen.findByRole("alertdialog")).toHaveTextContent(/hides Reading/);
+      await userEvent.click(screen.getByRole("button", { name: "Turn it off" }));
+      await waitFor(() => expect(patches).toEqual([{ tools: { [shelf]: false } }]));
     });
   });
 });

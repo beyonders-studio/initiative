@@ -20,7 +20,7 @@ import type { TFunction } from "i18next";
 
 import type { PluginPermissionRead } from "@/api/generated/initiativeAPI.schemas";
 import { initiativeRoute, TOOLS, toolListRoute } from "@/lib/tools";
-import { localized } from "@/lib/widgets/widgetMeta";
+import { localized } from "@/ui/lib/localized";
 
 export interface PluginPage {
   id: string;
@@ -109,14 +109,26 @@ export const pluginPages = (
 export const pluginHasConnections = (definition?: Record<string, unknown> | null): boolean =>
   Array.isArray(definition?.connections) && definition.connections.length > 0;
 
+/** Whether the plug-in asks each member to connect an account of their own. */
+export const pluginHasMemberConnections = (definition?: Record<string, unknown> | null): boolean =>
+  Array.isArray(definition?.connections) &&
+  definition.connections.some(
+    (connection) => (connection as { scope?: string } | null)?.scope === "interactive"
+  );
+
+/** Whether a plug-in adds a tool of its own to the community. */
+export const isToolPlugin = (definition?: Record<string, unknown> | null): boolean =>
+  definition?.plugin_kind === "tool";
+
 /**
- * Whether a plug-in has anything to place in an initiative: a page rendering
- * there, or fields, sections or actions on items, which the server draws in
- * the item's initiative to whoever holds the permission each names there, as it
- * opens a page. The same rule as a listing's `has_initiative_surfaces`, read
- * off the pinned definition.
+ * Whether a plug-in has anything to place in an initiative: a tool, a page
+ * rendering there, or fields, sections or actions on items, which the server
+ * draws in the item's initiative to whoever holds the permission each names
+ * there, as it opens a page. The same rule as a listing's
+ * `has_initiative_surfaces`, read off the pinned definition.
  */
 export const hasInitiativeSurfaces = (definition?: Record<string, unknown> | null): boolean =>
+  isToolPlugin(definition) ||
   declaredPages(definition, "initiative").length > 0 ||
   (Array.isArray(definition?.fields) && definition.fields.length > 0) ||
   (Array.isArray(definition?.parts) && definition.parts.length > 0) ||

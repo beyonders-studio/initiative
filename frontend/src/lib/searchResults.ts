@@ -13,7 +13,6 @@
 import {
   CalendarClock,
   FileText,
-  Hash,
   type LucideIcon,
   MessageSquare,
   SquareCheckBig,
@@ -25,7 +24,6 @@ import { SearchEntityType, Tool, ViewSource } from "@/api/generated/initiativeAP
 import { COLLECTION_ICON } from "@/lib/collections";
 import {
   collectionRoute,
-  counterRoute,
   eventRoute,
   TOOL_ICONS,
   taskRoute,
@@ -61,7 +59,6 @@ const TOOL_CHILDREN: Partial<Record<SearchEntityType, ToolChild>> = {
     icon: CalendarClock,
     path: eventRoute,
   },
-  [SearchEntityType.counter]: { icon: Hash, path: counterRoute },
   [SearchEntityType.collection]: {
     icon: COLLECTION_ICON,
     path: (initiativeId, _parentId, collectionId) => collectionRoute(initiativeId, collectionId),
@@ -127,17 +124,17 @@ export const categoryEntityTypes = (category: SearchCategory): SearchEntityType[
 /** The icon a hit renders with — its own where it lives inside a tool, its
  *  tool's where it is one. */
 export const hitIcon = (target: SearchTarget): LucideIcon => {
-  const child = TOOL_CHILDREN[target.entity_type];
+  const child = TOOL_CHILDREN[target.entity_type as SearchEntityType];
   if (child) return child.icon;
   // A tool's own row names its tool twice — as the tool and as the kind — so a
   // caller that filled in only the kind still gets the right mark. The community's
   // vocabulary is the one thing that sits outside a tool, and falls through.
-  const tool = target.tool ?? (target.entity_type as unknown as Tool);
+  const tool = (target.tool ?? target.entity_type) as Tool;
   return TOOL_ICONS[tool] ?? Tag;
 };
 
 /** The mark for a kind of thing, where there is no search hit to read it from. */
-export const entityIcon = (entityType: SearchEntityType): LucideIcon =>
+export const entityIcon = (entityType: string): LucideIcon =>
   hitIcon({
     entity_type: entityType,
     entity_id: 0,
@@ -158,14 +155,19 @@ export const FROM_FEED = { viewSource: ViewSource.feed };
  */
 export const searchHitPath = (target: SearchTarget): string | null => {
   if (target.entity_type === TAG_ENTITY_TYPE) return `/tags/${target.entity_id}`;
-  const child = TOOL_CHILDREN[target.entity_type];
+  const child = TOOL_CHILDREN[target.entity_type as SearchEntityType];
   if (child?.standalone) {
     return child.path(target.initiative_id ?? null, 0, target.entity_id, Tool.file);
   }
   if (child) {
     if (target.tool_id == null || !target.tool) return null;
-    return child.path(target.initiative_id ?? null, target.tool_id, target.entity_id, target.tool);
+    return child.path(
+      target.initiative_id ?? null,
+      target.tool_id,
+      target.entity_id,
+      target.tool as Tool
+    );
   }
   if (!target.tool) return null;
-  return toolDetailRoute(target.tool, target.initiative_id ?? null, target.entity_id);
+  return toolDetailRoute(target.tool as Tool, target.initiative_id ?? null, target.entity_id);
 };

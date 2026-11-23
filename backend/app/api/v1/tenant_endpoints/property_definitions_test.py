@@ -45,83 +45,30 @@ from app.testing.factories import grant_role_permission
 # ---------------------------------------------------------------------------
 
 
-async def test_list_property_definitions_returns_union_across_initiatives(
+async def test_list_property_definitions_is_the_union_or_one_initiative(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
     """Without ``initiative_id`` the list endpoint returns the caller's
-    accessible union — definitions across every initiative they're in."""
+    accessible union — definitions across every initiative they're in; with it,
+    that initiative's alone, even for a guild admin who sees them all."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    init_a = a.initiative
     init_b = await create_initiative(session, a.guild, a.user, name="B")
-
-    defn_a = await create_property_definition(session, init_a, name="In A")
+    defn_a = await create_property_definition(session, a.initiative, name="In A")
     defn_b = await create_property_definition(session, init_b, name="In B")
 
-    response = await client.get(
-        a.g("/property-definitions/"),
-        headers=a.headers,
-    )
-    assert response.status_code == 200
-    ids = {item["id"] for item in response.json()}
-    assert defn_a.id in ids
-    assert defn_b.id in ids
-
-
-async def test_list_property_definitions_filtered_by_initiative_id(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """``?initiative_id=X`` filters to that initiative's definitions only."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    init_a = a.initiative
-    init_b = await create_initiative(session, a.guild, a.user, name="B")
-
-    defn_a = await create_property_definition(session, init_a, name="In A")
-    defn_b = await create_property_definition(session, init_b, name="In B")
-
-    response = await client.get(
-        a.g(f"/property-definitions/?initiative_id={init_a.id}"),
-        headers=a.headers,
-    )
-    assert response.status_code == 200
-    ids = {item["id"] for item in response.json()}
-    assert defn_a.id in ids
-    assert defn_b.id not in ids
-
-
-async def test_list_property_definitions_scoped_by_initiative_id_query(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Requesting a specific ``initiative_id`` scopes the result even when
-    the caller technically has visibility across multiple initiatives
-    (guild-admin visibility still respects explicit
-    filtering through the query param).
-    """
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    init_a = a.initiative
-    init_b = await create_initiative(session, a.guild, a.user, name="B")
-
-    defn_a = await create_property_definition(session, init_a, name="In A")
-    defn_b = await create_property_definition(session, init_b, name="In B")
-
-    # Scoped to A
-    response_a = await client.get(
-        a.g(f"/property-definitions/?initiative_id={init_a.id}"),
-        headers=a.headers,
-    )
-    assert response_a.status_code == 200
-    ids_a = {item["id"] for item in response_a.json()}
-    assert defn_a.id in ids_a
-    assert defn_b.id not in ids_a
-
-    # Scoped to B
-    response_b = await client.get(
-        a.g(f"/property-definitions/?initiative_id={init_b.id}"),
-        headers=a.headers,
-    )
-    assert response_b.status_code == 200
-    ids_b = {item["id"] for item in response_b.json()}
-    assert defn_b.id in ids_b
-    assert defn_a.id not in ids_b
+    for initiative_id, expected in (
+        (None, {defn_a.id, defn_b.id}),
+        (a.initiative.id, {defn_a.id}),
+        (init_b.id, {defn_b.id}),
+    ):
+        response = await client.get(
+            a.g("/property-definitions/"),
+            headers=a.headers,
+            params={"initiative_id": initiative_id} if initiative_id else {},
+        )
+        assert response.status_code == 200
+        ids = {item["id"] for item in response.json()}
+        assert ids & {defn_a.id, defn_b.id} == expected, initiative_id
 
 
 # ---------------------------------------------------------------------------
@@ -129,195 +76,99 @@ async def test_list_property_definitions_scoped_by_initiative_id_query(
 # ---------------------------------------------------------------------------
 
 
-async def test_create_text_property_definition(client: AsyncClient, acting_user):
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-
-    payload = {
-        "name": "Status",
-        "type": "text",
-        "position": 1.0,
-        "initiative_id": a.initiative.id,
-    }
-    response = await client.post(
-        a.g("/property-definitions/"), headers=a.headers, json=payload
-    )
-
-    assert response.status_code == 201
-    data = response.json()
-    assert data["name"] == "Status"
-    assert data["type"] == "text"
-    assert data["initiative_id"] == a.initiative.id
-
-
-async def test_create_rejected_when_not_initiative_member(
-    client: AsyncClient, acting_user
-):
-    """A plain (non-admin) guild member can't create definitions on an
-    initiative they don't belong to.
-    """
-    # Alice owns the initiative; Bob is a guild member but NOT an initiative member.
-    alice = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    bob = await acting_user(guild_role=CommunityRole.member, guild=alice.guild)
-
-    payload = {
-        "name": "Foo",
-        "type": "text",
-        "initiative_id": alice.initiative.id,
-    }
-    response = await client.post(
-        bob.g("/property-definitions/"), headers=bob.headers, json=payload
-    )
-    assert response.status_code == 403
-    assert response.json()["detail"] == "PROPERTY_NOT_INITIATIVE_MEMBER"
-
-
-async def test_create_allowed_for_initiative_member(client: AsyncClient, acting_user):
-    """A plain (non-admin) guild member who belongs to the initiative can
-    create a definition on it.
-
-    This is the schema-per-guild regression case: the membership check runs on
-    the routed request session against the active guild's schema, so a
-    legitimate member is not false-403'd by a lookup in the wrong schema.
-    """
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+async def test_who_may_create_a_definition(client: AsyncClient, acting_user):
+    """A member of the initiative may — the membership check runs on the
+    routed request session against the active guild's schema, so a legitimate
+    member is not false-403'd by a lookup in the wrong schema. A guild member
+    outside it may not, and a guild admin may without an initiative-member
+    row."""
+    creator = await acting_user(guild_role=CommunityRole.member, initiative=True)
     member = await acting_user(
         guild_role=CommunityRole.member,
-        guild=admin.guild,
-        initiative=admin.initiative,
+        guild=creator.guild,
+        initiative=creator.initiative,
         initiative_role="member",
     )
-
-    payload = {
-        "name": "Owner Tag",
-        "type": "text",
-        "initiative_id": admin.initiative.id,
-    }
-    response = await client.post(
-        member.g("/property-definitions/"), headers=member.headers, json=payload
-    )
-
-    assert response.status_code == 201
-    data = response.json()
-    assert data["name"] == "Owner Tag"
-    assert data["initiative_id"] == admin.initiative.id
-
-
-async def test_create_rejected_for_guild_member_not_in_initiative(
-    client: AsyncClient, acting_user
-):
-    """A guild member who is NOT in the target initiative is rejected with
-    the canonical NOT_INITIATIVE_MEMBER code."""
-    # Admin's initiative; outsider is a guild member but not an initiative member.
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    outsider = await acting_user(guild_role=CommunityRole.member, guild=admin.guild)
-
-    payload = {
-        "name": "Foo",
-        "type": "text",
-        "initiative_id": admin.initiative.id,
-    }
-    response = await client.post(
-        outsider.g("/property-definitions/"), headers=outsider.headers, json=payload
-    )
-
-    assert response.status_code == 403
-    assert response.json()["detail"] == "PROPERTY_NOT_INITIATIVE_MEMBER"
-
-
-async def test_create_allowed_for_guild_admin_not_in_initiative(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """A guild admin can create a definition on any initiative in their
-    guild even without an explicit initiative-member row — mirroring the
-    restrictive RLS policy's admin bypass, now resolved off
-    ``GuildContext.role``."""
-    # The creator owns the initiative; the guild admin is not a member of it.
-    creator = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    outsider = await acting_user(guild_role=CommunityRole.member, guild=creator.guild)
     guild_admin = await acting_user(guild_role=CommunityRole.admin, guild=creator.guild)
 
-    payload = {
-        "name": "Admin Field",
-        "type": "text",
-        "initiative_id": creator.initiative.id,
-    }
-    response = await client.post(
-        guild_admin.g("/property-definitions/"),
-        headers=guild_admin.headers,
-        json=payload,
+    async def create(actor, name: str):
+        return await client.post(
+            actor.g("/property-definitions/"),
+            headers=actor.headers,
+            json={
+                "name": name,
+                "type": "text",
+                "position": 1.0,
+                "initiative_id": creator.initiative.id,
+            },
+        )
+
+    made = await create(member, "Owner Tag")
+    assert made.status_code == 201
+    data = made.json()
+    assert (data["name"], data["type"], data["initiative_id"]) == (
+        "Owner Tag",
+        "text",
+        creator.initiative.id,
     )
+    refused = await create(outsider, "Foo")
+    assert refused.status_code == 403
+    assert refused.json()["detail"] == "PROPERTY_NOT_INITIATIVE_MEMBER"
+    admin_made = await create(guild_admin, "Admin Field")
+    assert admin_made.status_code == 201
+    assert admin_made.json()["initiative_id"] == creator.initiative.id
 
-    assert response.status_code == 201
-    assert response.json()["initiative_id"] == creator.initiative.id
 
-
-async def test_create_select_requires_options(client: AsyncClient, acting_user):
+@pytest.mark.parametrize(
+    ("options", "code"),
+    [
+        (None, "PROPERTY_OPTIONS_REQUIRED"),
+        (
+            [
+                {"value": "draft", "label": "Draft"},
+                {"value": "draft", "label": "Also Draft"},
+            ],
+            "PROPERTY_DUPLICATE_OPTION_VALUE",
+        ),
+    ],
+)
+async def test_a_select_needs_distinct_options(
+    client: AsyncClient, acting_user, options, code
+):
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
 
     payload = {"name": "State", "type": "select", "initiative_id": a.initiative.id}
+    if options:
+        payload["options"] = options
     response = await client.post(
         a.g("/property-definitions/"), headers=a.headers, json=payload
     )
 
     assert response.status_code == 422
-    detail = response.json()["detail"]
-    assert any("PROPERTY_OPTIONS_REQUIRED" in str(err) for err in detail)
+    assert any(code in str(err) for err in response.json()["detail"])
 
 
-async def test_create_duplicate_name_case_insensitive_conflicts(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-
-    await create_property_definition(session, a.initiative, name="Priority")
-
-    payload = {"name": "priority", "type": "text", "initiative_id": a.initiative.id}
-    response = await client.post(
-        a.g("/property-definitions/"), headers=a.headers, json=payload
-    )
-
-    assert response.status_code == 409
-    assert response.json()["detail"] == "PROPERTY_NAME_ALREADY_EXISTS"
-
-
-async def test_create_same_name_in_different_initiatives_allowed(
+async def test_a_name_is_unique_within_its_initiative(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
     """The uniqueness index is on (initiative_id, lower(name)) — two
     initiatives can each have their own 'Priority' without clashing."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    init_a = a.initiative
     init_b = await create_initiative(session, a.guild, a.user, name="B")
+    await create_property_definition(session, a.initiative, name="Priority")
 
-    await create_property_definition(session, init_a, name="Priority")
+    async def create(initiative_id: int):
+        return await client.post(
+            a.g("/property-definitions/"),
+            headers=a.headers,
+            json={"name": "priority", "type": "text", "initiative_id": initiative_id},
+        )
 
-    payload = {"name": "Priority", "type": "text", "initiative_id": init_b.id}
-    response = await client.post(
-        a.g("/property-definitions/"), headers=a.headers, json=payload
-    )
-    assert response.status_code == 201
-
-
-async def test_create_select_duplicate_option_values_rejected(
-    client: AsyncClient, acting_user
-):
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-
-    payload = {
-        "name": "Phase",
-        "type": "select",
-        "initiative_id": a.initiative.id,
-        "options": [
-            {"value": "draft", "label": "Draft"},
-            {"value": "draft", "label": "Also Draft"},
-        ],
-    }
-    response = await client.post(
-        a.g("/property-definitions/"), headers=a.headers, json=payload
-    )
-
-    assert response.status_code == 422
-    detail = response.json()["detail"]
-    assert any("PROPERTY_DUPLICATE_OPTION_VALUE" in str(err) for err in detail)
+    response = await create(a.initiative.id)
+    assert response.status_code == 409
+    assert response.json()["detail"] == "PROPERTY_NAME_ALREADY_EXISTS"
+    assert (await create(init_b.id)).status_code == 201
 
 
 # ---------------------------------------------------------------------------
@@ -620,7 +471,7 @@ async def test_a_counter_keeps_its_settings_and_no_other_type_does(
 ):
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     payload = {"name": "Seats", "type": "counter", "initiative_id": a.initiative.id}
-    defaults = {"step": 1, "min": None, "max": None, "initial": 0}
+    defaults = {"step": 1, "min": None, "max": None, "initial": 0, "look": "number"}
 
     created = await client.post(
         a.g("/property-definitions/"), headers=a.headers, json=payload
@@ -634,6 +485,12 @@ async def test_a_counter_keeps_its_settings_and_no_other_type_does(
     )
     assert inverted.status_code == 422
     assert "PROPERTY_COUNTER_MIN_GREATER_THAN_MAX" in str(inverted.json()["detail"])
+    unknown_look = await client.post(
+        a.g("/property-definitions/"),
+        headers=a.headers,
+        json={**payload, "name": "Laps", "counter": {"look": "dial"}},
+    )
+    assert unknown_look.status_code == 422
     number = await client.post(
         a.g("/property-definitions/"),
         headers=a.headers,
@@ -644,15 +501,19 @@ async def test_a_counter_keeps_its_settings_and_no_other_type_does(
     changed = await client.patch(
         a.g(f"/property-definitions/{created.json()['id']}"),
         headers=a.headers,
-        json={"counter": {"step": 5, "min": 0, "max": 100, "initial": 10}},
+        json={
+            "counter": {"step": 5, "min": 0, "max": 100, "initial": 10, "look": "clock"}
+        },
     )
     assert changed.status_code == 200, changed.text
-    assert changed.json()["definition"]["counter"] == {
-        "step": 5,
-        "min": 0,
-        "max": 100,
-        "initial": 10,
-    }
+    settings = {"step": 5, "min": 0, "max": 100, "initial": 10, "look": "clock"}
+    assert changed.json()["definition"]["counter"] == settings
+    listed = await client.get(
+        a.g("/property-definitions/"),
+        headers=a.headers,
+        params={"initiative_id": a.initiative.id},
+    )
+    assert [d["counter"] for d in listed.json() if d["name"] == "Seats"] == [settings]
 
 
 # ---------------------------------------------------------------------------

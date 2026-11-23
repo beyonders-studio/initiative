@@ -20,10 +20,6 @@ const mocks = vi.hoisted(() => ({
   revokeOthers: vi.fn(),
 }));
 
-vi.mock("@/lib/mascotToast", () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
-}));
-
 vi.mock("@/hooks/useSecurity", () => ({
   useMySessions: () => mocks.sessions(),
   useEndSignedIn: () => ({ mutate: mocks.endSignedIn, isPending: false }),
@@ -93,39 +89,28 @@ beforeEach(() => {
 });
 
 describe("SignedInSection", () => {
-  it("shows the app and a device that is not signed in, then the browsers", () => {
+  it("shows the devices, the app and one not signed in, then the browsers, each in order", () => {
     renderWithProviders(<SignedInSection />);
 
-    expect(screen.getByText("Chrome on macOS")).toBeInTheDocument();
-    expect(screen.getByText("Firefox on Windows")).toBeInTheDocument();
-    expect(screen.getByText("Lee's iPhone")).toBeInTheDocument();
     expect(within(row("Android")).getByText(/not signed in/)).toBeInTheDocument();
     expect(
       screen.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)
     ).toEqual(["Devices", "Browsers"]);
-  });
-
-  it("marks the session doing the reading and offers it no way out", () => {
-    // Signing the current session out is what the sign-out button is for; a
-    // row that did it here would be a second, stranger way to do the same.
-    renderWithProviders(<SignedInSection />);
-
-    const current = row("Chrome on macOS");
-    expect(within(current).getByText("This browser")).toBeInTheDocument();
-    expect(within(current).queryByRole("button")).toBeNull();
-
-    // Every other row keeps one: a browser is signed out, a device removed.
-    expect(screen.getAllByRole("button", { name: "Sign out" })).toHaveLength(1);
-    expect(screen.getAllByRole("button", { name: "Remove device" })).toHaveLength(2);
-  });
-
-  it("puts the current session first in its group, then the most recently active", () => {
-    renderWithProviders(<SignedInSection />);
-
+    // The current session first in its group, then the most recently active.
     const labels = screen
       .getAllByText(/Chrome on macOS|Firefox on Windows|Lee's iPhone|Android/)
       .map((node) => node.textContent?.replace("This browser", "").trim());
     expect(labels).toEqual(["Lee's iPhone", "Android", "Chrome on macOS", "Firefox on Windows"]);
+
+    // The session doing the reading is marked and offered no way out: signing
+    // it out is what the sign-out button is for, and a row that did it here
+    // would be a second, stranger way to do the same.
+    const current = row("Chrome on macOS");
+    expect(within(current).getByText("This browser")).toBeInTheDocument();
+    expect(within(current).queryByRole("button")).toBeNull();
+    // Every other row keeps one: a browser is signed out, a device removed.
+    expect(screen.getAllByRole("button", { name: "Sign out" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Remove device" })).toHaveLength(2);
   });
 
   it("signs a browser out and removes a device, each by its own row", async () => {

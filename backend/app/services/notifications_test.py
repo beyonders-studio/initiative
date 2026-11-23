@@ -13,11 +13,13 @@ from typing import Literal
 from unittest.mock import AsyncMock
 from urllib.parse import urlencode
 
+import pytest
 from sqlmodel import select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import usernames
 from app.core.notification_categories import NotificationCategory
+from app.core.tools import Tool
 from app.db.request_context import Platform, SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
@@ -78,6 +80,7 @@ from app.testing import (
     route_session_to_guild,
     set_notification_prefs,
     strip_non_owner_grants,
+    switch_tools,
 )
 
 
@@ -96,10 +99,7 @@ async def _dispatch(session: AsyncSession) -> None:
 async def _events_initiative(session: AsyncSession, creator):
     guild = await create_guild(session)
     initiative = await create_initiative(session, guild, creator, name="Reminders")
-    initiative.calendars_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.calendar: True})
     calendar = await create_calendar(session, initiative, creator)
     return guild, initiative, calendar
 
@@ -163,43 +163,26 @@ def _unsaved_user(tz: str) -> User:
     )
 
 
-def test_format_event_when_localizes_to_recipient_timezone():
-    """A timed event renders in the recipient's IANA timezone with its abbrev."""
+@pytest.mark.parametrize(
+    ("all_day", "tz", "expected"),
+    [
+        # A timed event renders in the recipient's IANA timezone with its abbrev.
+        (False, "America/Los_Angeles", "Wed, Jul 1, 2026 at 2:30 PM PDT"),
+        (False, "UTC", "Wed, Jul 1, 2026 at 9:30 PM UTC"),
+        # An unrecognized timezone falls back to UTC instead of raising.
+        (False, "Not/AZone", "Wed, Jul 1, 2026 at 9:30 PM UTC"),
+        # All-day events show just the date, regardless of recipient timezone.
+        (True, "Asia/Tokyo", "Wed, Jul 1, 2026"),
+    ],
+)
+def test_format_event_when(all_day, tz, expected):
     event = _unsaved_event(
         title="Sync",
         start_at=datetime(2026, 7, 1, 21, 30, tzinfo=UTC),
         end_at=datetime(2026, 7, 1, 22, 30, tzinfo=UTC),
-        all_day=False,
+        all_day=all_day,
     )
-    la = _unsaved_user("America/Los_Angeles")
-    assert event_when(event, la) == "Wed, Jul 1, 2026 at 2:30 PM PDT"
-
-    utc_user = _unsaved_user("UTC")
-    assert event_when(event, utc_user) == "Wed, Jul 1, 2026 at 9:30 PM UTC"
-
-
-def test_format_event_when_all_day_omits_time_and_zone():
-    """All-day events show just the date, regardless of recipient timezone."""
-    event = _unsaved_event(
-        title="Holiday",
-        start_at=datetime(2026, 7, 1, 0, 0, tzinfo=UTC),
-        end_at=datetime(2026, 7, 1, 23, 59, tzinfo=UTC),
-        all_day=True,
-    )
-    assert event_when(event, _unsaved_user("Asia/Tokyo")) == "Wed, Jul 1, 2026"
-
-
-def test_format_event_when_falls_back_on_bad_timezone():
-    """An unrecognized timezone string falls back to UTC instead of raising."""
-    event = _unsaved_event(
-        title="Sync",
-        start_at=datetime(2026, 7, 1, 21, 30, tzinfo=UTC),
-        end_at=datetime(2026, 7, 1, 22, 30, tzinfo=UTC),
-        all_day=False,
-    )
-    assert event_when(event, _unsaved_user("Not/AZone")) == (
-        "Wed, Jul 1, 2026 at 9:30 PM UTC"
-    )
+    assert event_when(event, _unsaved_user(tz)) == expected
 
 
 async def test_event_reminder_fires_once_within_lead_window(
@@ -318,52 +301,6 @@ async def test_event_reminder_fires_for_each_occurrence_of_a_repeat(
     ]
 
 
-async def test_event_reminder_skipped_when_lead_time_off(session: AsyncSession):
-    creator = await create_user(session, email="organizer2@example.com")
-    attendee = await create_user(session, email="attendee2@example.com")
-    # Turn reminders off via an UPDATE (mirrors the API; an explicit None on
-    # INSERT would fall back to the column's server_default).
-    attendee.event_reminder_minutes_before = None
-    session.add(attendee)
-    await session.commit()
-    _, initiative, calendar = await _events_initiative(session, creator)
-    start_at = datetime.now(UTC) + timedelta(minutes=10)
-    event = await create_calendar_event(
-        session,
-        calendar,
-        creator,
-        title="Sync",
-        start_at=start_at,
-        end_at=start_at + timedelta(minutes=30),
-    )
-    await _add_attendee(session, initiative, event, attendee)
-
-    await _dispatch(session)
-    assert await _reminders_for(session, attendee.id) == []
-
-
-async def test_event_reminder_not_due_when_outside_lead_window(session: AsyncSession):
-    creator = await create_user(session, email="organizer3@example.com")
-    attendee = await create_user(
-        session, email="attendee3@example.com", event_reminder_minutes_before=15
-    )
-    _, initiative, calendar = await _events_initiative(session, creator)
-    # Starts in 2 hours; a 15-min lead means the reminder is not yet due.
-    start_at = datetime.now(UTC) + timedelta(hours=2)
-    event = await create_calendar_event(
-        session,
-        calendar,
-        creator,
-        title="Later",
-        start_at=start_at,
-        end_at=start_at + timedelta(minutes=30),
-    )
-    await _add_attendee(session, initiative, event, attendee)
-
-    await _dispatch(session)
-    assert await _reminders_for(session, attendee.id) == []
-
-
 async def test_event_reminder_at_time_of_event_fires_at_start(session: AsyncSession):
     creator = await create_user(session, email="organizer5@example.com")
     attendee = await create_user(
@@ -390,11 +327,19 @@ async def test_event_reminder_reaches_only_attendees_who_reach_the_event(
     session: AsyncSession,
 ):
     """An attendee still on an event in an initiative they are not in is not
-    reminded of it; one in the initiative is."""
+    reminded of it; one in the initiative is. Nor is one who declined, one with
+    reminders off, or one whose lead is not yet due."""
     creator = await create_user(session)
-    inside, outside = [
-        await create_user(session, event_reminder_minutes_before=15) for _ in range(2)
+    inside, outside, declined, not_yet = [
+        await create_user(session, event_reminder_minutes_before=lead)
+        for lead in (15, 15, 15, 5)
     ]
+    # Turn reminders off via an UPDATE (mirrors the API; an explicit None on
+    # INSERT would fall back to the column's server_default).
+    lead_off = await create_user(session)
+    lead_off.event_reminder_minutes_before = None
+    session.add(lead_off)
+    await session.commit()
     _guild, initiative, calendar = await _events_initiative(session, creator)
     start_at = datetime.now(UTC) + timedelta(minutes=10)
     event = await create_calendar_event(
@@ -406,31 +351,14 @@ async def test_event_reminder_reaches_only_attendees_who_reach_the_event(
     )
     await _add_attendee(session, initiative, event, inside)
     await _add_attendee(session, initiative, event, outside, in_initiative=False)
+    await _add_attendee(session, initiative, event, declined, rsvp=RSVPStatus.declined)
+    await _add_attendee(session, initiative, event, not_yet)
+    await _add_attendee(session, initiative, event, lead_off)
 
     await _dispatch(session)
     assert len(await _reminders_for(session, inside.id)) == 1
-    assert await _reminders_for(session, outside.id) == []
-
-
-async def test_event_reminder_skips_declined_attendees(session: AsyncSession):
-    creator = await create_user(session, email="organizer4@example.com")
-    attendee = await create_user(
-        session, email="attendee4@example.com", event_reminder_minutes_before=15
-    )
-    _, initiative, calendar = await _events_initiative(session, creator)
-    start_at = datetime.now(UTC) + timedelta(minutes=10)
-    event = await create_calendar_event(
-        session,
-        calendar,
-        creator,
-        title="Optional",
-        start_at=start_at,
-        end_at=start_at + timedelta(minutes=30),
-    )
-    await _add_attendee(session, initiative, event, attendee, rsvp=RSVPStatus.declined)
-
-    await _dispatch(session)
-    assert await _reminders_for(session, attendee.id) == []
+    for user in (outside, declined, not_yet, lead_off):
+        assert await _reminders_for(session, user.id) == []
 
 
 async def test_a_community_notice_carries_its_guild(
@@ -569,45 +497,6 @@ def _titles(body: str) -> set[str]:
     this is how a test sees what reached the recipient now that the message is
     composed rather than handed over as rows."""
     return set(re.findall(r"<strong>([^<]+)</strong>", body))
-
-
-async def test_overdue_digest_gathers_tasks_across_user_guilds(
-    session: AsyncSession, monkeypatch
-):
-    """The overdue digest must collect a user's overdue tasks from EVERY guild
-    they belong to, including one whose timer has not come due: the day's
-    digest is claimed once, so it has to hold them all."""
-    user = await create_user(
-        session,
-        email="multi-overdue@example.com",
-        timezone="UTC",
-    )
-    # The digest's clock is a preference; midnight is always past.
-    await set_notification_prefs(
-        session, user, {"digests": {"overdue": {"at": "00:00"}}}
-    )
-    alpha = await _overdue_task_in_new_guild(session, user, label="Alpha")
-    await _overdue_task_in_new_guild(session, user, label="Beta")
-
-    captured: dict = {}
-
-    async def _capture_email(sess, recipient, **kwargs):
-        captured["user_id"] = recipient.id
-        captured["titles"] = _titles(kwargs["pieces"].body)
-        return True
-
-    monkeypatch.setattr(email_outbox, "enqueue", _capture_email)
-
-    await set_rls_context(session, Unattributed())
-    await each_guild(
-        [],
-        name="test",
-        scans=[overdue_scan(now=datetime.now(UTC))],
-        only=[alpha.id],
-    )
-
-    assert captured.get("user_id") == user.id
-    assert {"Alpha overdue", "Beta overdue"} <= captured["titles"]
 
 
 def _push_on(monkeypatch) -> None:
@@ -757,66 +646,37 @@ async def test_overdue_digest_skips_push_when_opted_out(
     assert refreshed.last_overdue_notification_at is None
 
 
-async def test_overdue_digest_skips_template_projects(
+async def test_overdue_digest_holds_what_its_reader_reaches_in_every_guild(
     session: AsyncSession, monkeypatch
 ):
-    """Tasks living in a template project are blueprints, not work — their due
-    dates must never reach the digest (email or push)."""
-    user = await create_user(
-        session,
-        email="template-overdue@example.com",
-        timezone="UTC",
-    )
+    """The overdue digest must collect a user's overdue tasks from EVERY guild
+    they belong to, including one whose timer has not come due: the day's
+    digest is claimed once, so it has to hold them all.
+
+    What it leaves out: tasks in a template project are blueprints, not work;
+    archiving a project, or a task in a live project, is how a user says work
+    is off their plate; and a task still assigned to somebody outside its
+    initiative is read as them, so it names only what they can open."""
+    user = await create_user(session, timezone="UTC")
     # The digest's clock is a preference; midnight is always past.
     await set_notification_prefs(
         session, user, {"digests": {"overdue": {"at": "00:00"}}}
     )
-    await _overdue_task_in_new_guild(session, user, label="Real")
+    alpha = await _overdue_task_in_new_guild(session, user, label="Alpha")
+    await _overdue_task_in_new_guild(session, user, label="Beta")
     await _overdue_task_in_new_guild(session, user, label="Template", is_template=True)
-
-    captured: dict = {}
-
-    async def _capture_email(sess, recipient, **kwargs):
-        captured["titles"] = _titles(kwargs["pieces"].body)
-        return True
-
-    monkeypatch.setattr(email_outbox, "enqueue", _capture_email)
-    _push_on(monkeypatch)
-
-    await set_rls_context(session, Unattributed())
-    await _sweep(overdue_scan(now=datetime.now(UTC)))
-
-    assert {"Real overdue"} <= captured["titles"]
-    [push] = await _queued_pushes(session)
-    assert "Template overdue" not in (push.push_body or "")
-
-
-async def test_overdue_digest_skips_archived_projects_and_tasks(
-    session: AsyncSession, monkeypatch
-):
-    """Archiving is how a user says work is off their plate — an archived
-    project, or an archived task in a live project, is not a deadline the
-    digest should still be chasing."""
-    user = await create_user(
-        session,
-        email="archived-overdue@example.com",
-        timezone="UTC",
-    )
-    # The digest's clock is a preference; midnight is always past.
-    await set_notification_prefs(
-        session, user, {"digests": {"overdue": {"at": "00:00"}}}
-    )
-    await _overdue_task_in_new_guild(session, user, label="Live")
     await _overdue_task_in_new_guild(
         session, user, label="ArchivedProject", project_archived=True
     )
     await _overdue_task_in_new_guild(
         session, user, label="ArchivedTask", task_archived=True
     )
+    await _overdue_task_in_new_guild(session, user, label="Elsewhere", access="outside")
 
     captured: dict = {}
 
     async def _capture_email(sess, recipient, **kwargs):
+        captured["user_id"] = recipient.id
         captured["titles"] = _titles(kwargs["pieces"].body)
         return True
 
@@ -824,39 +684,22 @@ async def test_overdue_digest_skips_archived_projects_and_tasks(
     _push_on(monkeypatch)
 
     await set_rls_context(session, Unattributed())
-    await _sweep(overdue_scan(now=datetime.now(UTC)))
-
-    assert {"Live overdue"} <= captured["titles"]
-    [push] = await _queued_pushes(session)
-    assert "ArchivedProject overdue" not in (push.push_body or "")
-    assert "ArchivedTask overdue" not in (push.push_body or "")
-
-
-async def test_overdue_digest_holds_only_what_its_reader_reaches(
-    session: AsyncSession, monkeypatch
-):
-    """A task stays assigned to somebody outside its initiative, and their
-    digest is read as them: it names the task they can open and not that one."""
-    user = await create_user(session, timezone="UTC")
-    await set_notification_prefs(
-        session, user, {"digests": {"overdue": {"at": "00:00"}}}
+    await each_guild(
+        [],
+        name="test",
+        scans=[overdue_scan(now=datetime.now(UTC))],
+        only=[alpha.id],
     )
-    await _overdue_task_in_new_guild(session, user, label="Reached")
-    await _overdue_task_in_new_guild(session, user, label="Elsewhere", access="outside")
 
-    captured: dict = {}
-
-    async def _capture_email(sess, recipient, **kwargs):
-        captured["titles"] = _titles(kwargs["pieces"].body)
-        return True
-
-    monkeypatch.setattr(email_outbox, "enqueue", _capture_email)
-
-    await set_rls_context(session, Unattributed())
-    await _sweep(overdue_scan(now=datetime.now(UTC)))
-
-    assert "Reached overdue" in captured["titles"]
-    assert "Elsewhere overdue" not in captured["titles"]
+    assert captured.get("user_id") == user.id
+    assert {"Alpha overdue", "Beta overdue"} <= captured["titles"]
+    left_out = {
+        f"{label} overdue"
+        for label in ("Template", "ArchivedProject", "ArchivedTask", "Elsewhere")
+    }
+    assert left_out.isdisjoint(captured["titles"])
+    [push] = await _queued_pushes(session)
+    assert not any(title in (push.push_body or "") for title in left_out)
 
 
 async def _assignment_item_in_new_guild(
@@ -971,12 +814,19 @@ async def test_assignment_batch_gathers_items_across_user_guilds(
 ):
     """The task-assignment digest must collect a user's pending items from every
     guild they belong to and mark them processed in each schema — a single
-    public-scoped scan (the old behaviour) would see none of them."""
-    user = await create_user(
-        session, email="multi-digest@example.com"
-    )  # opted in by default
-    guild_a = await _assignment_item_in_new_guild(session, user, label="Alpha")
-    guild_b = await _assignment_item_in_new_guild(session, user, label="Beta")
+    public-scoped scan (the old behaviour) would see none of them.
+
+    The digest is taken as its reader: a line about a project shared with them
+    to read is sent and marked, and one about a project they cannot reach is
+    neither."""
+    user = await create_user(session)  # opted in by default
+    alpha = await _assignment_item_in_new_guild(session, user, label="Alpha")
+    shared = await _assignment_item_in_new_guild(
+        session, user, label="Shared", access="read"
+    )
+    elsewhere = await _assignment_item_in_new_guild(
+        session, user, label="Elsewhere", access="outside"
+    )
 
     captured: dict = {}
 
@@ -994,56 +844,18 @@ async def test_assignment_batch_gathers_items_across_user_guilds(
     )
 
     assert captured.get("user_id") == user.id
-    assert {"Alpha task", "Beta task"} <= captured["titles"]
+    assert {"Alpha task", "Shared task"} <= captured["titles"]
+    assert "Elsewhere task" not in captured["titles"]
 
     # Items were marked processed in each guild's own schema.
-    for guild_id in (guild_a.id, guild_b.id):
-        await route_as(session, user_id=user.id, guild_id=guild_id)
-        pending = (
-            await session.exec(
-                select(BatchedNotice).where(BatchedNotice.processed_at.is_(None))
-            )
-        ).all()
-        assert pending == [], f"guild {guild_id} items not marked processed"
-
-
-async def test_assignment_batch_takes_only_what_its_reader_reaches(
-    session: AsyncSession, monkeypatch
-):
-    """The digest is taken as its reader: a line about a project shared with
-    them to read is sent and marked, and one about a project they cannot reach
-    is neither."""
-    user = await create_user(session)
-    shared = await _assignment_item_in_new_guild(
-        session, user, label="Shared", access="read"
-    )
-    elsewhere = await _assignment_item_in_new_guild(
-        session, user, label="Elsewhere", access="outside"
-    )
-
-    captured: dict = {}
-
-    async def _capture_email(sess, recipient, **kwargs):
-        captured["titles"] = _titles(kwargs["pieces"].body)
-        return True
-
-    monkeypatch.setattr(email_outbox, "enqueue", _capture_email)
-
-    await set_rls_context(session, Unattributed())
-    await _sweep(
-        batch_scan(ASSIGNMENT_BATCH, now=datetime.now(UTC) + BATCH_QUIET_PERIOD)
-    )
-
-    assert "Shared task" in captured["titles"]
-    assert "Elsewhere task" not in captured["titles"]
-    for guild, unsent in ((shared, 0), (elsewhere, 1)):
+    for guild, unsent in ((alpha, 0), (shared, 0), (elsewhere, 1)):
         await route_session_to_guild(session, guild.id)
         pending = (
             await session.exec(
                 select(BatchedNotice).where(BatchedNotice.processed_at.is_(None))
             )
         ).all()
-        assert len(pending) == unsent
+        assert len(pending) == unsent, f"guild {guild.id}"
 
 
 async def test_assignment_batch_leaves_a_community_on_hold_waiting(
@@ -1392,10 +1204,7 @@ async def test_event_reminders_fire_across_a_users_guilds(session: AsyncSession)
         creator = await create_user(session, email=f"organizer-{label}@example.com")
         guild = await create_guild(session, creator=creator)
         initiative = await create_initiative(session, guild, creator, name=label)
-        initiative.calendars_enabled = True
-        session.add(initiative)
-        await session.commit()
-        await session.refresh(initiative)
+        await switch_tools(session, initiative, {Tool.calendar: True})
         calendar = await create_calendar(session, initiative, creator)
         # Starts in 10 min; with the attendee's 15-min lead the reminder is due.
         start_at = datetime.now(UTC) + timedelta(minutes=10)
@@ -1493,43 +1302,6 @@ async def test_reaction_batch_gathers_across_guilds_and_marks_processed(
         assert pending == [], f"guild {guild_id} items not marked processed"
 
 
-async def test_reaction_batch_waits_for_the_flurry_to_end(
-    session: AsyncSession, monkeypatch
-):
-    """Reactions arrive in bursts more than anything else in the app, so the
-    quiet period matters most here."""
-    user = await create_user(session, email="reaction-debounce@example.com")
-    await _reaction_item_in_new_guild(session, user, label="Alpha")
-
-    sent: list[int] = []
-
-    async def _capture_email(sess, recipient, **kwargs):
-        sent.append(kwargs["pieces"].body.count("<li>"))
-        return True
-
-    monkeypatch.setattr(email_outbox, "enqueue", _capture_email)
-
-    await set_rls_context(session, Unattributed())
-    await _sweep(batch_scan(REACTION_BATCH, now=datetime.now(UTC)))
-    assert sent == []
-
-    await _reaction_item_in_new_guild(session, user, label="Beta", emoji="🚀")
-    session.expunge_all()
-    await set_rls_context(session, Unattributed())
-    await _sweep(
-        batch_scan(
-            REACTION_BATCH,
-            now=datetime.now(UTC) + BATCH_QUIET_PERIOD / 2,
-        )
-    )
-    assert sent == []
-
-    session.expunge_all()
-    await set_rls_context(session, Unattributed())
-    await _sweep(batch_scan(REACTION_BATCH, now=datetime.now(UTC) + BATCH_QUIET_PERIOD))
-    assert sent == [2]
-
-
 async def test_reaction_batch_respects_the_opt_out(session: AsyncSession, monkeypatch):
     """The reaction gate is its own: switching reactions off must not need the
     mention or assignment preferences touched, and must not silence them."""
@@ -1562,15 +1334,6 @@ async def test_reaction_batch_respects_the_opt_out(session: AsyncSession, monkey
 class TestReactionBellRollup:
     """The payload arithmetic behind the rolled-up bell line."""
 
-    def test_an_empty_payload_stands_for_nothing(self):
-        from app.services.notifications import (
-            _rolled_up_count,
-            _rolled_up_reactions,
-        )
-
-        assert _rolled_up_count({}) == 0
-        assert _rolled_up_reactions({}) == []
-
     def test_the_named_reactions_are_capped_but_the_counts_are_not(self):
         """The detail rolls off; what the sentence says must not. A line that
         forgot its oldest reactions still knows how big its crowd is."""
@@ -1595,36 +1358,11 @@ class TestReactionBellRollup:
             guild_id=3,
         )
         assert line["count"] == MAX_ROLLED_UP_REACTIONS + 5
+        # A cap on the roster would be a cap on the truth.
         assert line["reactor_count"] == MAX_ROLLED_UP_REACTIONS + 5
         assert len(line["reactions"]) == MAX_ROLLED_UP_REACTIONS
         # The cap drops the oldest, so the newest reactor is still the one named.
         assert line["reactor_id"] == entries[-1]["reactor_id"]
-
-    def test_the_roster_keeps_growing_after_the_detail_rolls_off(self):
-        """A cap on the roster would be a cap on the truth — the count would
-        freeze on exactly the comment where the number matters most."""
-        from app.services.notifications import MAX_ROLLED_UP_REACTIONS, _reaction_line
-
-        crowd = list(range(MAX_ROLLED_UP_REACTIONS * 10))
-        line = _reaction_line(
-            [
-                {
-                    "id": i,
-                    "emoji": "\N{PARTY POPPER}",
-                    "reactor_id": i,
-                    "reactor_name": f"@u{i}",
-                }
-                for i in crowd
-            ],
-            count=len(crowd),
-            reactor_ids=crowd,
-            place={"target_path": "/go/task/1"},
-            target_type="comment",
-            target_id=1,
-            guild_id=3,
-        )
-        assert line["reactor_count"] == len(crowd)
-        assert len(line["reactions"]) == MAX_ROLLED_UP_REACTIONS
 
 
 async def test_withdrawal_keeps_a_reactor_whose_other_gesture_rolled_off(

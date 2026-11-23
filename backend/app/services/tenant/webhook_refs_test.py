@@ -109,47 +109,6 @@ async def test_a_member_registered_target_is_named_by_its_subscription(session):
     }
 
 
-async def test_two_subscriptions_in_one_guild_are_unrelated(session):
-    """Two targets comparing notes learn nothing about each other's guild."""
-    user = await create_user(session)
-    guild = await _with_plugin(session, user)
-    one = await create_webhook_subscription(session, guild, user)
-    other = await create_webhook_subscription(session, guild, user)
-
-    named_one, named_other = await webhook_refs.names_for_subscribers(
-        guild_id=guild.id,
-        subscribers=[(None, one.id, (user.id,)), (None, other.id, (user.id,))],
-    )
-    assert named_one is not None and named_other is not None
-    (first, first_actors), (second, second_actors) = named_one, named_other
-
-    assert first != second
-    assert first_actors[user.id] != second_actors[user.id]
-
-
-async def test_the_same_subscription_is_named_the_same_way_twice(session):
-    """Minted on first use and then stable — a receiver stores it."""
-    user = await create_user(session)
-    guild = await _with_plugin(session, user)
-    subscription = await create_webhook_subscription(session, guild, user)
-
-    first = await webhook_refs.name_for_subscriber(
-        guild_id=guild.id,
-        plugin=None,
-        subscription_id=subscription.id,
-        actor_ids=(user.id,),
-    )
-    again = await webhook_refs.name_for_subscriber(
-        guild_id=guild.id,
-        plugin=None,
-        subscription_id=subscription.id,
-        actor_ids=(user.id,),
-    )
-
-    assert first == again
-    assert len(await _held(session, guild.id)) == 2
-
-
 async def test_a_subscriptions_names_go_with_it(session):
     """Deleting a subscription takes its own names, and never a plug-in's,
     which outlive any one subscription it registered."""

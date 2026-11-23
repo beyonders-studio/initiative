@@ -254,6 +254,8 @@ describe("TaskPage", () => {
       expect(await screen.findByRole("menuitem", { name })).toBeInTheDocument();
     }
     expect(screen.queryByRole("button", { name: /^save/i })).not.toBeInTheDocument();
+    // Only a moderator gets a shield.
+    expect(screen.queryByRole("button", { name: "Moderate" })).toBeNull();
   });
 
   describe("what a new page requires", () => {
@@ -431,12 +433,6 @@ describe("TaskPage", () => {
     }
     // The lock is on the comment thread, where every kind of thread has one.
     expect(screen.queryByRole("menuitem", { name: /lock comments/i })).toBeNull();
-  });
-
-  it("gives nobody else a shield", async () => {
-    renderTaskPage();
-    await screen.findByRole("button", { name: /more actions/i });
-    expect(screen.queryByRole("button", { name: "Moderate" })).toBeNull();
   });
 
   it("saves a status as it is chosen, and offers to undo the move", async () => {
@@ -1250,19 +1246,6 @@ describe("TaskPage", () => {
     }
   );
 
-  it("returns to the task's project after deleting it", async () => {
-    const { router, deleted } = renderTaskPage();
-
-    await deleteTheTask();
-
-    await waitFor(() => expect(deleted).toHaveBeenCalled());
-    await waitFor(() =>
-      expect(router.state.location.pathname).toBe(
-        `/c/${COMMUNITY_ID}/i/${INITIATIVE_ID}/projects/${PROJECT_ID}`
-      )
-    );
-  });
-
   it("asks which tasks of a repeating series a delete is for", async () => {
     const { router, deleted } = renderTaskPage({ recurrence: "RRULE:FREQ=DAILY" });
 
@@ -1294,7 +1277,7 @@ describe("TaskPage", () => {
     );
   });
 
-  it("follows the task's own project, not the one left in the path", async () => {
+  it("returns to the task's own project after deleting it, not the one left in the path", async () => {
     // Moving the open task rewrites its project without touching the URL, so
     // the path still names the project it came from.
     const MOVED_TO = PROJECT_ID + 1;

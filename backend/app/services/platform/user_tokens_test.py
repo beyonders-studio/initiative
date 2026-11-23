@@ -17,31 +17,21 @@ from app.services.platform.user_tokens import _hash_token
 from app.testing.factories import create_user
 
 
-async def test_create_token_stores_hash_not_plaintext(session: AsyncSession):
-    """create_token returns the raw token but persists only its SHA-256 hash."""
-    user = await create_user(session)
-    raw = await user_tokens.create_token(
-        session,
-        user_id=user.id,
-        purpose=UserTokenPurpose.password_reset,
-    )
-
-    row = (
-        await session.exec(select(UserToken).where(UserToken.user_id == user.id))
-    ).one()
-    assert row.token != raw
-    assert row.token == _hash_token(raw)
-
-
 async def test_get_valid_token_matches_hashed_value(session: AsyncSession):
-    """Lookup hashes the presented value and finds the stored hash; a wrong
-    token does not match."""
+    """create_token returns the raw token but persists only its SHA-256 hash.
+    Lookup hashes the presented value and finds the stored hash; a wrong token
+    does not match."""
     user = await create_user(session)
     raw = await user_tokens.create_token(
         session,
         user_id=user.id,
         purpose=UserTokenPurpose.email_verification,
     )
+    row = (
+        await session.exec(select(UserToken).where(UserToken.user_id == user.id))
+    ).one()
+    assert row.token != raw
+    assert row.token == _hash_token(raw)
 
     found = await user_tokens.get_valid_token(
         session, token=raw, purpose=UserTokenPurpose.email_verification

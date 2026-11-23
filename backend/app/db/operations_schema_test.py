@@ -28,7 +28,7 @@ from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.db.tenancy import OPERATIONS_TABLES
 from app.models.tenant._mixins import ActorKind
-from app.models.tenant.comment import Comment, CommentAudience
+from app.models.tenant.comment import Comment, CommentAudience, said_on
 from app.models.tenant.evidence import Evidence
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.metadata import MetadataDefinition, MetadataType, MetadataValue
@@ -78,7 +78,8 @@ async def operations(session):
     await set_rls_context(session, SystemGuild(guild.id))
     session.add(
         Comment(
-            task_id=mine.task_id,
+            subject_type="task",
+            subject_id=mine.task_id,
             content="Staff only.",
             created_by=staff.id,
             created_by_kind=ActorKind.member,
@@ -86,7 +87,8 @@ async def operations(session):
     )
     session.add(
         Comment(
-            task_id=mine.task_id,
+            subject_type="task",
+            subject_id=mine.task_id,
             content="Have you tried a recovery code?",
             created_by=staff.id,
             created_by_kind=ActorKind.member,
@@ -150,7 +152,7 @@ async def test_a_filer_reads_what_is_said_to_them_and_nothing_else(
     said = await _read_as_filer(
         role_session,
         operations["asker"],
-        select(Comment.content).where(Comment.task_id == operations["mine"]),
+        select(Comment.content).where(said_on("task", operations["mine"])),
     )
     assert sorted(said) == ["Have you tried a recovery code?", "Help."]
 

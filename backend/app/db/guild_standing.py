@@ -41,8 +41,9 @@ routing of one community and the standing of another.
 
 from __future__ import annotations
 
+import functools
 import json
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, fields, replace
 from typing import TYPE_CHECKING, Any
 
@@ -54,6 +55,7 @@ from app.core.plugin_scopes import (
     InstallLevel,
 )
 from app.core.rules import SetBy
+from app.core.tool_set import BUILTIN_TOOLS, KEPT_TOOL_SETS, ToolSet
 from app.core.tools import Tool
 from app.db import gucs
 from app.db.authorization import LIVE_GRANT, live_membership, sql_values
@@ -80,16 +82,16 @@ from app.models.platform.member_moderation import live_timeout_sql
 from app.models.platform.plugin_install import PluginInstallStatus
 from app.models.platform.plugin_service_registration import (
     RegistrationKind,
+    in_reach_sql,
     registration_live_sql,
 )
 from app.models.platform.user import UserRole, UserStatus
 from app.models.tenant.initiative import (
     BUILTIN_MEMBER_ROLE,
-    DEFAULT_PERMISSION_VALUES,
     INITIATIVE_CUSTOM_ROLES,
     INITIATIVE_MEMBER_PREFIX,
     INITIATIVE_TOOL_PREFIX,
-    PermissionKey,
+    permission_defaults,
 )
 from app.models.tenant.plugin_member_consent import ConsentAccess
 
@@ -110,6 +112,7 @@ __all__ = [
     "compute_install_standing",
     "named_ref_candidates",
     "standing_values",
+    "tools_on_sql",
 ]
 
 
@@ -128,20 +131,34 @@ _SETTINGS_RUNG_CASE = "\n".join(
 )
 
 
-def _tool_switch_values() -> str:
-    """The per-initiative tool switches as a ``VALUES`` list.
+def _tool_switches(tools: ToolSet) -> str:
+    """Each tool's own switch in the initiative ``i`` names, as rows of
+    ``(tool, enabled)``: its ``initiative_rules`` row with no role and no
+    install, and ``NULL`` (off) where it has none.
 
-    Rendered from the ``Tool`` enum, the way the switch column names already
-    are, so a new tool reaches the standing the moment it reaches the enum.
+    Rendered from the community's tools, so a new tool reaches the standing
+    the moment it is one of them.
     """
-    return ", ".join(f"('{tool.value}', i.{tool.plural}_enabled)" for tool in Tool)
+    keys = ", ".join(f"('{tool.kind}', '{tool.view_permission}')" for tool in tools)
+    return f"""(
+        SELECT k.tool, sw.enabled
+        FROM (VALUES {keys}) AS k(tool, key)
+        LEFT JOIN initiative_rules sw
+          ON sw.initiative_id = i.id AND sw.key = k.key
+         AND sw.initiative_role_id IS NULL AND sw.install_id IS NULL
+      )"""
 
 
-def _writes(values: dict[gucs.Guc, str]) -> str:
+#: A key's expression, or how one reads the community's tools.
+_Expr = str | Callable[[ToolSet], str]
+
+
+def _writes(values: dict[gucs.Guc, _Expr], tools: ToolSet) -> str:
     """A standing statement's select list: each key written with its
     expression, and returned under its name."""
     return ",\n".join(
-        f"  set_config('{guc.name}', {expr}, true) AS {guc.bind}"
+        f"  set_config('{guc.name}', {expr(tools) if callable(expr) else expr}, true)"
+        f" AS {guc.bind}"
         for guc, expr in values.items()
     )
 
@@ -200,12 +217,14 @@ _TOOL_ON = (
     f" WHERE cd.key = '{INITIATIVE_TOOL_PREFIX}' || t.tool), t.enabled)"
 )
 
-#: The reader's own rows the person statement reads, each table once. Every
-#: key below is an aggregate over one of these, so a new key picks a row set
-#: rather than reading its table again. ``my_items`` is a guest's: the
-#: initiatives of the items shared with them by name, read only when the
-#: membership row is a guest's.
-_PERSON_ROWS = f"""
+
+def _person_rows(tools: ToolSet) -> str:
+    """The reader's own rows the person statement reads, each table once.
+    Every key below is an aggregate over one of these, so a new key picks a
+    row set rather than reading its table again. ``my_items`` is a guest's:
+    the initiatives of the items shared with them by name, read only when the
+    membership row is a guest's."""
+    return f"""
 WITH my_row AS MATERIALIZED (
   SELECT m.role, m.joined_at,
          (m.role <> '{CommunityRole.guest.value}' OR {_ROUTED_AS_GUEST}) AS routed
@@ -275,7 +294,93 @@ my_grants AS MATERIALIZED (
     AND g.user_id = {gucs.USER_ID}
     AND {LIVE_GRANT}
     AND {_GRANT_HELD}
+){_tool_states(tools)}"""
+
+
+def _tool_states(tools: ToolSet) -> str:
+    """Each installed tool plug-in's state in the community, as ``tool_states``
+    rows of ``(kind, install_id, opens, writes, switched_on)``: its tool is there unless
+    its install is suspended (by staff, by the platform suspending the
+    plug-in, or by the community falling out of its reach), on hold or
+    deleted; written unless its install is read-only too; and on in an
+    initiative only while the community has the install switched on. The
+    states are the platform's, read from its rows for this community, as
+    ``registration_lookup`` reads them. Nothing for a community with none."""
+    if not tools.installed:
+        return ""
+    installs = ", ".join(
+        f"('{record.listing_uid}', '{record.kind}')" for record in tools.installed
+    )
+    hidden = sql_values(
+        status.value
+        for status in (PluginInstallStatus.on_hold, PluginInstallStatus.deleted)
+    )
+    return f""",
+tool_states AS MATERIALIZED (
+  SELECT t.kind, a.id AS install_id, s.opens, s.opens AND s.status <> '{PluginInstallStatus.read_only.value}' AS writes,
+         s.opens AND a.enabled AS switched_on
+  FROM (VALUES {installs}) AS t(listing_uid, kind)
+  JOIN guild_plugins a ON a.listing_uid = t.listing_uid
+  LEFT JOIN public.plugin_installs pi
+    ON pi.guild_id = {gucs.ROUTED_GUILD_ID} AND pi.install_id = a.id
+  CROSS JOIN LATERAL (
+    SELECT COALESCE(pi.status, '{PluginInstallStatus.active.value}') AS status,
+           COALESCE(pi.status NOT IN ({hidden}), true)
+             AND pi.suspended_at IS NULL
+             AND NOT EXISTS (
+               SELECT 1 FROM public.plugin_service_registrations r
+               WHERE r.listing_uid = a.listing_uid
+                 AND r.kind = '{RegistrationKind.TOOL}'
+                 AND (r.suspended_at IS NOT NULL
+                   OR NOT COALESCE({in_reach_sql("r", gucs.ROUTED_GUILD_ID)}, false))
+             ) AS opens
+  ) s
 )"""
+
+
+def _enabled_tools(tools: ToolSet, initiatives: str) -> str:
+    """``app.enabled_tools``: each ``<initiative>:<tool>`` pair whose switch is
+    on in an initiative of ``initiatives`` (a sub-select of ids). A tool
+    plug-in's has one only where its install is placed, its install is
+    switched on and its state leaves its tool there."""
+    placed = ""
+    if tools.installed:
+        installed = sql_values(record.kind for record in tools.installed)
+        placed = f"""
+        AND (t.tool NOT IN ({installed}) OR (t.tool, i.id) IN (
+          SELECT ts.kind, pp.initiative_id FROM tool_states ts
+          JOIN plugin_placements pp ON pp.install_id = ts.install_id
+          WHERE ts.switched_on AND pp.initiative_id IN ({initiatives})))"""
+    return f"""COALESCE((
+      SELECT string_agg(DISTINCT i.id || ':' || t.tool, ',')
+      FROM initiatives i
+      CROSS JOIN LATERAL {_tool_switches(tools)} AS t(tool, enabled)
+      WHERE {_TOOL_ON}
+        AND i.id IN ({initiatives}){placed}
+    ), '')"""
+
+
+def _tool_kinds(state: str) -> _Expr:
+    """``app.open_tools`` or ``app.writable_tools``: the kinds of the tool
+    plug-ins whose ``tool_states`` row says ``state``."""
+    return lambda tools: (
+        f"""COALESCE((
+      SELECT string_agg(ts.kind, ',' ORDER BY ts.kind) FROM tool_states ts
+      WHERE ts.{state}
+    ), '')"""
+        if tools.installed
+        else "''"
+    )
+
+
+def tools_on_sql(tools: ToolSet) -> str:
+    """Each ``<initiative>:<tool>`` pair where a tool is on in the routed
+    community, among the initiatives ``:initiatives`` (an array of ids) names,
+    by the terms ``app.enabled_tools`` is written by: one string, as that key
+    holds it. Read with no person, by what reads the community as itself (the
+    delivery of its webhooks)."""
+    return f"""WITH {_COMMUNITY_DEFAULTS_CTE}{_tool_states(tools)}
+SELECT {_enabled_tools(tools, "SELECT unnest(CAST(:initiatives AS integer[]))")}"""
 
 
 def _held_surfaces(membership: str) -> str:
@@ -298,7 +403,7 @@ def _held_surfaces(membership: str) -> str:
 
 
 #: What the person statement writes: each standing key and its expression.
-_PERSON_STANDING: dict[gucs.Guc, str] = {
+_PERSON_STANDING: dict[gucs.Guc, _Expr] = {
     gucs.STANDING_GUILD_ID: f"""COALESCE({gucs.ROUTED_COMMUNITY}, '')""",
     gucs.GUILD_ADMIN: f"""COALESCE((
       SELECT (m.role IN ({_ADMIN_RUNGS_SQL}))::text FROM my_membership m
@@ -410,17 +515,16 @@ _PERSON_STANDING: dict[gucs.Guc, str] = {
       FROM community_defaults cd
       WHERE cd.key LIKE 'initiative\\_tool.%'
     ), '')""",
-    gucs.ENABLED_TOOLS: f"""COALESCE((
-      SELECT string_agg(DISTINCT i.id || ':' || t.tool, ',')
-      FROM initiatives i
-      CROSS JOIN LATERAL (VALUES {_tool_switch_values()}) AS t(tool, enabled)
-      WHERE {_TOOL_ON}
-        AND i.id IN (
+    gucs.ENABLED_TOOLS: lambda tools: _enabled_tools(
+        tools,
+        """
           SELECT mi.initiative_id FROM my_initiatives mi
           UNION ALL
           SELECT it.initiative_id FROM my_items it
-        )
-    ), '')""",
+        """,
+    ),
+    gucs.OPEN_TOOLS: _tool_kinds("opens"),
+    gucs.WRITABLE_TOOLS: _tool_kinds("writes"),
     gucs.OVERRIDE_INITIATIVES: """COALESCE((
       SELECT string_agg(DISTINCT mi.initiative_id::text, ',')
       FROM my_initiatives mi
@@ -455,16 +559,23 @@ _PERSON_STANDING: dict[gucs.Guc, str] = {
     ), 'false')""",
 }
 
+
 #: The one statement. Runs as the routed role, after ``SET ROLE``, so the
 #: reads of the shared tables go through those tables' own policies and the
 #: routed role's grants (``app_guild_base`` holds ``SELECT`` on
 #: ``guild_memberships`` and ``access_grants``, and the read-only floor is
 #: derived from it), and the read of ``initiative_members`` resolves in the
 #: community's own schema.
-STANDING_SQL = f"""{_PERSON_ROWS}
+def standing_sql(tools: ToolSet) -> str:
+    """The person statement of a community with ``tools``."""
+    return f"""{_person_rows(tools)}
 SELECT
-{_writes(_PERSON_STANDING)}
+{_writes(_PERSON_STANDING, tools)}
 """
+
+
+#: :func:`standing_sql` of the built-in tools.
+STANDING_SQL = standing_sql(BUILTIN_TOOLS)
 
 
 # --- An installed plug-in's standing -----------------------------------------
@@ -493,13 +604,13 @@ _IN_INSTALL_SECTOR = (
 _GRACE_INTERVAL = f"interval '{int(REF_GRACE_PERIOD.total_seconds())} seconds'"
 
 
-def _tool_permission_values() -> str:
+def _tool_permission_values(tools: ToolSet) -> str:
     """Each tool's two role keys as a ``VALUES`` list of ``(resource, key,
     for_write)``: viewing it answers to the tool's read scope, creating it to
-    its write scope. Rendered from the ``Tool`` enum, as the switches are."""
+    its write scope. Rendered from the community's tools, as the switches are."""
     return ", ".join(
-        f"('{tool.plural}', '{key}', {str(for_write).lower()})"
-        for tool in Tool
+        f"('{tool.scope}', '{key}', {str(for_write).lower()})"
+        for tool in tools
         for key, for_write in (
             (tool.view_permission, False),
             (tool.create_permission, True),
@@ -507,18 +618,18 @@ def _tool_permission_values() -> str:
     )
 
 
-def _permission_key_values() -> str:
+def _permission_key_values(tools: ToolSet) -> str:
     """Every initiative role key, as a one-column ``VALUES`` list."""
-    return ", ".join(f"('{key.value}')" for key in PermissionKey)
+    return ", ".join(f"('{key}')" for key in permission_defaults(tools))
 
 
-def _permission_default_values() -> str:
+def _permission_default_values(tools: ToolSet) -> str:
     """Every initiative role key with the answer it gets where a role has no
     row for it, as a ``VALUES`` list of ``(key, is_default)``: the defaults
     the content policies hand ``initiative_role_permits``."""
     return ", ".join(
-        f"('{key.value}', {str(DEFAULT_PERMISSION_VALUES.get(key, False)).lower()})"
-        for key in PermissionKey
+        f"('{key}', {str(on).lower()})"
+        for key, on in permission_defaults(tools).items()
     )
 
 
@@ -551,7 +662,7 @@ _INSTALL_HOLD = f"""(g.status = '{CommunityStatus.read_only.value}' OR EXISTS (
 
 
 #: What the install statement writes: each key and its expression.
-_INSTALL_STANDING: dict[gucs.Guc, str] = {
+_INSTALL_STANDING: dict[gucs.Guc, _Expr] = {
     gucs.STANDING_GUILD_ID: f"""COALESCE({gucs.GUILD_ID.text}, '')""",
     gucs.GUILD_ADMIN: """COALESCE((
       SELECT lv.administers::text FROM standing_level lv
@@ -600,13 +711,11 @@ _INSTALL_STANDING: dict[gucs.Guc, str] = {
       FROM community_defaults cd
       WHERE cd.key LIKE 'initiative\\_tool.%'
     ), '')""",
-    gucs.ENABLED_TOOLS: f"""COALESCE((
-      SELECT string_agg(DISTINCT i.id || ':' || t.tool, ',')
-      FROM initiatives i
-      JOIN placed p ON p.initiative_id = i.id
-      CROSS JOIN LATERAL (VALUES {_tool_switch_values()}) AS t(tool, enabled)
-      WHERE {_TOOL_ON}
-    ), '')""",
+    gucs.ENABLED_TOOLS: lambda tools: _enabled_tools(
+        tools, "SELECT p.initiative_id FROM placed p"
+    ),
+    gucs.OPEN_TOOLS: _tool_kinds("opens"),
+    gucs.WRITABLE_TOOLS: _tool_kinds("writes"),
     gucs.OVERRIDE_INITIATIVES: """COALESCE((
       SELECT string_agg(DISTINCT o.initiative_id::text, ',')
       FROM (
@@ -652,6 +761,7 @@ _INSTALL_STANDING: dict[gucs.Guc, str] = {
           AND EXISTS (SELECT 1 FROM install)
       )"""),
 }
+
 
 #: An installed plug-in's standing, in one statement. Runs as
 #: ``guild_<id>_plugin`` after the install routing. The community, the install, the client the token
@@ -711,7 +821,9 @@ _INSTALL_STANDING: dict[gucs.Guc, str] = {
 #: name. A replaced reference still
 #: resolves for its grace window, as ``identity_refs.resolve_ref`` has it. The
 #: array chooses which rows are looked up; the sector is the routing's.
-INSTALL_STANDING_SQL = f"""
+def install_standing_sql(tools: ToolSet) -> str:
+    """The install statement of a community with ``tools``."""
+    return f"""
 WITH {_COMMUNITY_DEFAULTS_CTE},
 consent AS (
   SELECT c.initiative_id,
@@ -822,7 +934,7 @@ permitted AS (
   SELECT p.initiative_id, k.key
   FROM placed p
   JOIN member_role mr ON mr.initiative_id = p.initiative_id
-  CROSS JOIN (VALUES {_permission_default_values()}) AS k(key, is_default)
+  CROSS JOIN (VALUES {_permission_default_values(tools)}) AS k(key, is_default)
   LEFT JOIN community_defaults cd
     ON {_HELD_FOR_MEMBERS.replace("m.", "mr.")}
    AND cd.key = '{INITIATIVE_MEMBER_PREFIX}' || k.key
@@ -844,7 +956,7 @@ permitted AS (
 granted AS (
   SELECT DISTINCT p.initiative_id || ':' || k.key AS pair
   FROM placed p
-  CROSS JOIN (VALUES {_tool_permission_values()}) AS k(resource, key, for_write)
+  CROSS JOIN (VALUES {_tool_permission_values(tools)}) AS k(resource, key, for_write)
   JOIN held h ON h.resource = k.resource AND (h.writes OR NOT k.for_write)
   WHERE {gucs.USER_ID} IS NULL OR EXISTS (
     SELECT 1 FROM permitted pm
@@ -854,14 +966,15 @@ granted AS (
 denied AS (
   SELECT DISTINCT p.initiative_id || ':' || k.key AS pair
   FROM placed p
-  CROSS JOIN (VALUES {_permission_key_values()}) AS k(key)
+  CROSS JOIN (VALUES {_permission_key_values(tools)}) AS k(key)
   WHERE NOT EXISTS (
     SELECT 1 FROM granted gr WHERE gr.pair = p.initiative_id || ':' || k.key
   )
-)
+){_tool_states(tools)}
 SELECT
   (SELECT EXISTS (SELECT 1 FROM install)) AS live,
-{_writes(_INSTALL_STANDING)},
+  obj_description(to_regnamespace(current_schema()), 'pg_namespace') AS schema_stamp,
+{_writes(_INSTALL_STANDING, tools)},
   (
     SELECT r.ref
     FROM public.identity_refs r
@@ -888,6 +1001,10 @@ SELECT
         AND EXISTS (SELECT 1 FROM install)
     ), '{{}}'::jsonb) AS named_refs
 """
+
+
+#: :func:`install_standing_sql` of the built-in tools.
+INSTALL_STANDING_SQL = install_standing_sql(BUILTIN_TOOLS)
 
 
 def _standing_fields(context: Any, row: dict[str, Any]) -> dict[str, Any]:
@@ -972,6 +1089,10 @@ class GuildContext:
     role_denies: tuple[str, ...] = ()
     #: ``"<initiative_id>:<tool>"`` where the initiative's switch is on.
     enabled_tools: tuple[str, ...] = ()
+    #: The tool plug-ins' kinds whose tool is there for the community, and
+    #: those of them that may be written.
+    open_tools: tuple[str, ...] = ()
+    writable_tools: tuple[str, ...] = ()
     #: ``"<tool>=on"`` / ``"<tool>=off"`` where the community set a tool's
     #: switch for every initiative (:meth:`community_tool`).
     community_tools: tuple[str, ...] = ()
@@ -993,6 +1114,11 @@ class GuildContext:
     #: reached by membership). The routing already chose ``guild_<id>_ro``
     #: from the same fact; the gates read it here.
     content_hold: bool = False
+    #: The community's tools, which its rules were rendered from.
+    tools: ToolSet = BUILTIN_TOOLS
+    #: What its schema's stamp names those tools by (its ``tools=`` item), read
+    #: with the membership; None for a community with no tool plug-in.
+    rendered_tools: str | None = None
 
     # --- Identity ------------------------------------------------------------
 
@@ -1245,6 +1371,10 @@ class InstallContext:
     role_denies: tuple[str, ...] = ()
     #: ``"<initiative_id>:<tool>"`` where the initiative's switch is on.
     enabled_tools: tuple[str, ...] = ()
+    #: The tool plug-ins' kinds whose tool is there for the community, and
+    #: those of them that may be written.
+    open_tools: tuple[str, ...] = ()
+    writable_tools: tuple[str, ...] = ()
     #: ``"<tool>=on"`` / ``"<tool>=off"`` where the community set a tool's
     #: switch for every initiative (:meth:`community_tool`).
     community_tools: tuple[str, ...] = ()
@@ -1279,6 +1409,9 @@ class InstallContext:
     named_refs: tuple[tuple[str, str, int], ...] = ()
     #: The members of the community among the people those references name.
     named_members: frozenset[int] = frozenset()
+    #: The community's tools, which its rules and this standing were rendered
+    #: from, as its schema's stamp names them.
+    tools: ToolSet = BUILTIN_TOOLS
 
     @property
     def guild_auth_ok(self) -> bool:
@@ -1428,8 +1561,16 @@ def standing_values(
     return {guc: getattr(context, guc.bind, None) for guc in gucs.STANDING}
 
 
-async def compute_guild_standing(session: AsyncSession) -> dict[str, Any]:
-    """Run :data:`STANDING_SQL` and return the row it wrote.
+@functools.lru_cache(KEPT_TOOL_SETS)
+def _community_standing_sql(tools: ToolSet) -> str:
+    return standing_sql(tools)
+
+
+async def compute_guild_standing(
+    session: AsyncSession, tools: ToolSet = BUILTIN_TOOLS
+) -> dict[str, Any]:
+    """Run :data:`STANDING_SQL`, or the community's own where it has tool
+    plug-ins, and return the row it wrote.
 
     The routed session has just had every standing key cleared, so what this
     writes is the whole of it. It binds nothing: the user and the community are
@@ -1437,7 +1578,8 @@ async def compute_guild_standing(session: AsyncSession) -> dict[str, Any]:
     """
     from sqlalchemy import text
 
-    row = (await session.exec(text(STANDING_SQL))).one()
+    statement = STANDING_SQL if not tools.installed else _community_standing_sql(tools)
+    row = (await session.exec(text(statement))).one()
     return dict(row._mapping)
 
 
@@ -1458,10 +1600,19 @@ def named_ref_candidates(values: Sequence[str]) -> list[str]:
     )
 
 
+@functools.lru_cache(KEPT_TOOL_SETS)
+def _community_install_standing_sql(tools: ToolSet) -> str:
+    return install_standing_sql(tools)
+
+
 async def compute_install_standing(
-    session: AsyncSession, named_refs: Sequence[str] = ()
+    session: AsyncSession,
+    named_refs: Sequence[str] = (),
+    tools: ToolSet = BUILTIN_TOOLS,
 ) -> dict[str, Any]:
-    """Run :data:`INSTALL_STANDING_SQL` and return the row it wrote.
+    """Run :data:`INSTALL_STANDING_SQL`, or the community's own where it has
+    tool plug-ins, and return the row it wrote, with its schema's stamp
+    (``schema_stamp``), which names the tools its rules were rendered from.
 
     The install and its community are read back from the routing, as
     :func:`compute_guild_standing` reads the person back. ``named_refs`` is
@@ -1470,11 +1621,14 @@ async def compute_install_standing(
     """
     from sqlalchemy import text
 
+    statement = (
+        INSTALL_STANDING_SQL
+        if not tools.installed
+        else _community_install_standing_sql(tools)
+    )
     row = (
         await session.exec(
-            text(INSTALL_STANDING_SQL).bindparams(
-                named_refs=named_ref_candidates(named_refs)
-            )
+            text(statement).bindparams(named_refs=named_ref_candidates(named_refs))
         )
     ).one()
     return dict(row._mapping)

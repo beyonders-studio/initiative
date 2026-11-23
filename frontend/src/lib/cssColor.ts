@@ -35,10 +35,10 @@ const DIRECT = /^(#[0-9a-f]{3,8}|rgba?\([^)]*\))$/i;
 const paint = (colour: string): [number, number, number, number] | null => {
   const context = canvas();
   if (!context) return null;
-  // Cleared first, so a colour the browser rejects leaves the pixel empty
-  // rather than showing whatever was painted last.
+  // Cleared, and the fill set to transparent, so a colour the browser rejects
+  // (which leaves `fillStyle` as it was) paints nothing rather than black.
   context.clearRect(0, 0, 1, 1);
-  context.fillStyle = "#000000";
+  context.fillStyle = "rgba(0, 0, 0, 0)";
   context.fillStyle = colour;
   context.fillRect(0, 0, 1, 1);
   try {

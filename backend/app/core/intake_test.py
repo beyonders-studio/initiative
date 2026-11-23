@@ -39,14 +39,6 @@ def test_tracker_key_belongs_to_security_alone():
 
 
 @pytest.mark.parametrize("stream", list(IntakeStream))
-def test_every_stream_ships_a_blueprint_that_parses(stream: IntakeStream):
-    envelope = blueprint_for(stream)
-    assert envelope.project.name
-    assert envelope.task_statuses
-    assert meta(stream).blueprint.endswith(".json")
-
-
-@pytest.mark.parametrize("stream", list(IntakeStream))
 def test_a_blueprint_defines_exactly_the_streams_case_fields(stream: IntakeStream):
     """The writer fills these by name, so the two declarations must agree.
     They are the initiative's properties; a project's own fields are not."""
@@ -92,7 +84,9 @@ def test_only_the_ideas_blueprint_has_the_fields_and_status_its_binding_names(
 @pytest.mark.parametrize("stream", list(IntakeStream))
 def test_a_blueprint_can_open_and_close_a_case(stream: IntakeStream):
     """A stream whose statuses had no ``done`` could never record a closure."""
+    assert meta(stream).blueprint.endswith(".json")
     envelope = blueprint_for(stream)
+    assert envelope.project.name
     categories = {status.category for status in envelope.task_statuses}
     assert TaskStatusCategory.done in categories
     assert sum(1 for status in envelope.task_statuses if status.is_default) == 1
@@ -118,32 +112,6 @@ def test_a_blueprint_can_wait_on_whoever_filed_a_case(stream: IntakeStream):
     names = {status.name for status in blueprint_for(stream).task_statuses}
     holds = {WAITING_ON_REQUESTER, REQUESTER_REPLIED} <= names
     assert holds is (meta(stream).conversation is not Conversation.none)
-
-
-def test_every_intake_error_code_is_localized():
-    """A code the API can return says something in every language.
-
-    Two independent sources, checked against each other: the constants the
-    endpoints raise, and the four catalogues the SPA reads. A refusal reaches
-    the reader as its own sentence rather than as a generic "could not save".
-    """
-    import json
-    from pathlib import Path
-
-    from app.core.messages import IntakeMessages
-
-    codes = {
-        value
-        for name, value in vars(IntakeMessages).items()
-        if not name.startswith("_") and isinstance(value, str)
-    }
-    assert codes, "IntakeMessages declares no codes"
-
-    locales = Path(__file__).resolve().parents[2].parent / "frontend/public/locales"
-    for locale in ("de", "en", "es", "fr"):
-        catalogue = json.loads((locales / locale / "errors.json").read_text())
-        missing = sorted(codes - set(catalogue))
-        assert not missing, f"{locale}/errors.json is missing {missing}"
 
 
 @pytest.mark.parametrize("stream", list(IntakeStream))

@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,23 +7,49 @@ import { buildFileSummary } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { createTestQueryClient, renderPage } from "@/__tests__/helpers/render";
+import { getReadFileQueryKey } from "@/api/generated/files/files";
 import { queryClient as appQueryClient } from "@/lib/queryClient";
+import { CollaborationError } from "@/lib/yjs/CollaborationProvider";
 
 const collaborating = { value: false };
+const network = { online: true };
+const collaboration: { onError?: (error: Error) => void } = {};
+const toasts = vi.hoisted(() => ({ warning: vi.fn(), error: vi.fn() }));
+
+vi.mock("@/lib/mascotToast", () => ({
+  toast: Object.assign(vi.fn(), {
+    success: vi.fn(),
+    info: vi.fn(),
+    error: toasts.error,
+    warning: toasts.warning,
+    dismiss: vi.fn(),
+  }),
+}));
+
+vi.mock("@/hooks/useNetworkStatus", () => ({
+  useNetworkStatus: () => ({ isOnline: network.online }),
+}));
 
 vi.mock("@/hooks/useCollaboration", () => ({
-  useCollaboration: () => ({
-    providerFactory: null,
-    connectionStatus: collaborating.value ? "connected" : "disconnected",
-    isSynced: collaborating.value,
-    collaborators: [],
-    collaboratorsReady: collaborating.value,
-    isCollaborating: collaborating.value,
-    isReady: true,
-    connect: vi.fn(),
-    resume: vi.fn(),
-    disconnect: vi.fn(),
-  }),
+  useCollaboration: (options: { onError?: (error: Error) => void }) => {
+    collaboration.onError = options.onError;
+    return {
+      providerFactory: null,
+      connectionStatus: collaborating.value ? "connected" : "disconnected",
+      isSynced: collaborating.value,
+      collaborators: [],
+      collaboratorsReady: collaborating.value,
+      isCollaborating: collaborating.value,
+      isReady: true,
+      connect: vi.fn(),
+      resume: vi.fn(),
+      disconnect: vi.fn(),
+    };
+  },
+}));
+
+vi.mock("@/components/tools/files/WhiteboardFileEditor", () => ({
+  WhiteboardFileEditor: () => <div>whiteboard canvas</div>,
 }));
 
 const editedBody = { root: { children: [{ type: "edited" }] } };
@@ -51,6 +77,9 @@ beforeEach(() => {
   patches.length = 0;
   stored = { ...seed };
   collaborating.value = false;
+  network.online = true;
+  toasts.warning.mockClear();
+  toasts.error.mockClear();
   server.use(
     communityHttp.get("/files/:fileId", () => HttpResponse.json(stored)),
     communityHttp.patch("/files/:fileId", async ({ request }) => {
@@ -101,7 +130,11 @@ describe("renaming a file", () => {
     expect(patches[0]).toMatchObject({ name: "Renamed" });
   });
 
-  it("autosaves the name once the field is let go", async () => {
+  it.each([
+    [false, 3000],
+    [true, 11_000],
+  ])("autosaves the name once the field is let go (collaborating: %s)", async (live, wait) => {
+    collaborating.value = live;
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderDoc();
@@ -111,7 +144,7 @@ describe("renaming a file", () => {
     await user.type(input, "Renamed");
     await user.tab();
 
-    await vi.advanceTimersByTimeAsync(3000);
+    await vi.advanceTimersByTimeAsync(wait);
 
     await waitFor(() => expect(patches).toHaveLength(1));
     expect(patches[0]).toMatchObject({ name: "Renamed" });
@@ -164,39 +197,27 @@ describe("renaming a file", () => {
     expect(patches).toEqual([]);
   });
 
-  it("saves a rename with the Save button while collaborating", async () => {
-    // The room owns the body while it is live and refuses one sent by PATCH,
-    // so the Save button sends only the name; the room renders the body.
-    collaborating.value = true;
-    const user = userEvent.setup();
-    renderDoc();
+  // The room owns the body while it is live and refuses one sent by PATCH, so
+  // a save sends only the name; the room renders the body.
+  it.each(["the Save button", "Ctrl+S"])(
+    "saves a rename with %s while collaborating",
+    async (how) => {
+      collaborating.value = true;
+      const user = userEvent.setup();
+      renderDoc();
 
-    const input = await screen.findByDisplayValue("Original");
-    await user.click(await screen.findByRole("button", { name: "edit the body" }));
-    await user.clear(input);
-    await user.type(input, "Renamed");
-    await user.click(screen.getByRole("button", { name: "Save" }));
+      const input = await screen.findByDisplayValue("Original");
+      await user.click(await screen.findByRole("button", { name: "edit the body" }));
+      await user.clear(input);
+      await user.type(input, "Renamed");
+      if (how === "Ctrl+S") await user.keyboard("{Control>}s{/Control}");
+      else await user.click(screen.getByRole("button", { name: "Save" }));
 
-    await waitFor(() => expect(patches).toHaveLength(1));
-    expect(patches[0]).toMatchObject({ name: "Renamed" });
-    expect(patches[0]).not.toHaveProperty("content");
-  });
-
-  it("saves a rename with Ctrl+S while collaborating", async () => {
-    collaborating.value = true;
-    const user = userEvent.setup();
-    renderDoc();
-
-    const input = await screen.findByDisplayValue("Original");
-    await user.click(await screen.findByRole("button", { name: "edit the body" }));
-    await user.clear(input);
-    await user.type(input, "Renamed");
-    await user.keyboard("{Control>}s{/Control}");
-
-    await waitFor(() => expect(patches).toHaveLength(1));
-    expect(patches[0]).toMatchObject({ name: "Renamed" });
-    expect(patches[0]).not.toHaveProperty("content");
-  });
+      await waitFor(() => expect(patches).toHaveLength(1));
+      expect(patches[0]).toMatchObject({ name: "Renamed" });
+      expect(patches[0]).not.toHaveProperty("content");
+    }
+  );
 
   it("saves a rename with Ctrl+S when not collaborating", async () => {
     const user = userEvent.setup();
@@ -210,23 +231,6 @@ describe("renaming a file", () => {
 
     await waitFor(() => expect(patches).toHaveLength(1));
     expect(patches[0]).toMatchObject({ name: "Renamed", content: editedBody });
-  });
-
-  it("still autosaves a rename while collaborating", async () => {
-    collaborating.value = true;
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    renderDoc();
-
-    const input = await screen.findByDisplayValue("Original");
-    await user.clear(input);
-    await user.type(input, "Renamed");
-    await user.tab();
-
-    await vi.advanceTimersByTimeAsync(11_000);
-
-    await waitFor(() => expect(patches).toHaveLength(1));
-    expect(patches[0]).toMatchObject({ name: "Renamed" });
   });
 });
 
@@ -267,5 +271,54 @@ describe("switching files", () => {
     arrive();
     expect(await screen.findByDisplayValue("Second")).toBeInTheDocument();
     expect(patches).toEqual([]);
+  });
+});
+
+describe("opening a whiteboard", () => {
+  it("draws the canvas from the read the route made on the way in", async () => {
+    // The route's loader fetches the file before the page mounts. Still fresh,
+    // it is not fetched again on mount, and the canvas must not wait for a
+    // fetch that never comes.
+    const whiteboard = {
+      ...seed,
+      file_type: "excalidraw",
+      content: { elements: [], appState: {}, files: {} },
+    };
+    stored = whiteboard;
+    const queryClient = createTestQueryClient();
+    queryClient.setDefaultOptions({
+      queries: { ...queryClient.getDefaultOptions().queries, staleTime: 30_000, gcTime: 60_000 },
+    });
+    queryClient.setQueryData(getReadFileQueryKey(1, 7), whiteboard);
+
+    renderDoc({ queryClient });
+
+    expect(await screen.findByText("whiteboard canvas")).toBeInTheDocument();
+  });
+});
+
+describe("losing the connection to a room", () => {
+  it("tells an offline reader their edits will sync, and leaves a lost room to that", async () => {
+    network.online = false;
+    renderDoc();
+    await screen.findByRole("button", { name: "edit the body" });
+
+    expect(toasts.warning).toHaveBeenCalledWith(
+      "You're offline — edits will sync when you reconnect.",
+      expect.objectContaining({ id: "editor-offline" })
+    );
+
+    act(() => collaboration.onError?.(new CollaborationError("Connection lost.", true)));
+
+    expect(toasts.error).not.toHaveBeenCalled();
+  });
+
+  it("says so when the room is lost while the device is online", async () => {
+    renderDoc();
+    await screen.findByRole("button", { name: "edit the body" });
+
+    act(() => collaboration.onError?.(new CollaborationError("Connection lost.", true)));
+
+    expect(toasts.error).toHaveBeenCalledTimes(1);
   });
 });

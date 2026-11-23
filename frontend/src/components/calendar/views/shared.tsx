@@ -58,6 +58,8 @@ export const SPAN_BAR_GAP = 2;
 const ROW_HEIGHT = 40; // px per hour row in day/week views
 const MIN_BLOCK_HEIGHT = 20;
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 /** Hours shown in the day and week time grids. */
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 
@@ -67,6 +69,16 @@ export function dateKey(d: Date): string {
 
 export function parseEntry(entry: CalendarEntry): { start: Date; end: Date } {
   return { start: parseISO(entry.startAt), end: parseISO(entry.endAt) };
+}
+
+/**
+ * The first moment of the last day an entry is on. A timed entry's end is the
+ * moment it stops, so one ending at midnight is not on the day that midnight
+ * begins; an all-day entry's end is a moment on its own last day.
+ */
+export function lastDayOf(entry: CalendarEntry, start: Date, end: Date): Date {
+  if (Number.isNaN(end.getTime()) || end <= start) return startOfDay(start);
+  return startOfDay(entry.allDay ? end : new Date(end.getTime() - 1));
 }
 
 /** i18n key for a task entry's start/due marker label. */
@@ -125,7 +137,7 @@ function assignLanes<T extends { lane: number }>(
   return laneEnds.length;
 }
 
-/** Every entry, placed on each day it spans (start through end inclusive). */
+/** Every entry, placed on each day it is on (see `lastDayOf`). */
 export function buildEntriesByDate(
   entries: CalendarEntry[],
   visible: { start: Date; end: Date }
@@ -135,12 +147,11 @@ export function buildEntriesByDate(
     const { start, end } = parseEntry(entry);
     if (Number.isNaN(start.getTime())) continue;
 
-    const endDay = Number.isNaN(end.getTime()) ? start : end;
     const cursor = new Date(
       Math.max(startOfDay(start).getTime(), startOfDay(visible.start).getTime())
     );
     const last = new Date(
-      Math.min(startOfDay(endDay).getTime(), startOfDay(visible.end).getTime())
+      Math.min(lastDayOf(entry, start, end).getTime(), startOfDay(visible.end).getTime())
     );
     while (cursor <= last) {
       const key = dateKey(cursor);
@@ -189,9 +200,14 @@ export function computeSpanPlacements(
     const { start, end } = parseEntry(entry);
     if (Number.isNaN(start.getTime())) continue;
     const entryStart = startOfDay(start);
-    const entryEnd = startOfDay(Number.isNaN(end.getTime()) ? start : end);
+    const entryEnd = lastDayOf(entry, start, end);
 
-    if (entryEnd <= entryStart) {
+    // A timed entry shorter than a day is a chip with its time on the day it
+    // starts, however late it runs; a bar is for an all-day entry, or a timed
+    // one of a day or more.
+    const spansDays =
+      entryEnd > entryStart && (entry.allDay || end.getTime() - start.getTime() >= DAY_MS);
+    if (!spansDays) {
       // Single-day entry — collect for per-cell rendering
       const key = dateKey(start);
       if (weekDays.some((d) => dateKey(d) === key)) {

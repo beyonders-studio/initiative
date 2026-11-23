@@ -9,6 +9,10 @@
     "installed": "Installiert",
     "version": "v{{version}}",
     "beta": "Beta",
+    "paid": "Kostenpflichtig",
+    "subscription": "Abonnement",
+    "oneTime": "Einmalkauf",
+    "included": "In Initiative enthalten",
     "needsUpdate": "Benötigt neuere App",
     "unavailable": "Noch nicht verfügbar",
     "request": "Auf Anfrage"
@@ -26,6 +30,8 @@
     "description": "Nichts im Marktplatz passt zu „{{query}}“."
   },
   "detail": {
+    "screenshots": "Bildschirmfotos",
+    "screenshot": "{{name}}, Bildschirmfoto {{number}}",
     "installs_one": "{{count}} Installation",
     "installs_other": "{{count}} Installationen",
     "minimumAge": "Ab {{age}} Jahren",
@@ -71,5 +77,32 @@
   },
   "installedUnknown": "Es konnte nicht geprüft werden, welche davon du bereits hast – deshalb ist unten nichts als installiert markiert.",
   "subtitlePlugins": "Plug-ins ergänzen etwas, das die ganze Community teilt. Nur der Superadmin der Community kann sie hinzufügen.",
-  "subtitleAuto": "Automatisierungen laufen im Hintergrund für die ganze Community."
+  "subtitleAuto": "Automatisierungen laufen im Hintergrund für die ganze Community.",
+  "tag": {
+    "tool": "Neues Werkzeug",
+    "community_tool": "Ganze Community",
+    "page": "Eigene Seite",
+    "connection": "Verbindet ein Konto",
+    "add_on": "Ergänzt deine Werkzeuge"
+  },
+  "contents": {
+    "title": "Was es hinzufügt",
+    "tool": "Werkzeug",
+    "toolInitiatives": "{{name}}, in Initiativen",
+    "toolCommunity": "{{name}}, für die ganze Community",
+    "pages": "Seiten",
+    "pagesCommunity": "für die ganze Community",
+    "pagesInitiatives": "in Initiativen",
+    "pagesBoth": "für die ganze Community und in Initiativen",
+    "dashboards": "Dashboards",
+    "widgets": "Widgets",
+    "widgetsNote": "für jedes Dashboard",
+    "fields": "Felder",
+    "parts": "Abschnitte",
+    "actions": "Aktionen",
+    "on": "bei {{kinds}}",
+    "connections": "Verbindungen",
+    "connectionCommunity": "ein Admin verbindet es einmal",
+    "connectionMember": "jedes Mitglied verbindet sein eigenes"
+  }
 }

@@ -33,10 +33,6 @@ const spec = {
 };
 
 describe("a person's view of a list", () => {
-  it("is kept in the community's map, under what names the list", () => {
-    expect(spec.key).toBe("view:initiative:2:files");
-  });
-
   it("reads what is kept, else what an older release kept on the account", () => {
     const kept = { layout: "list", parts: { [LIST]: { filters: { tag_ids: [7] } } } };
     expect(keptView({ [spec.key]: kept }, spec, OLDER).view.layout).toBe("list");

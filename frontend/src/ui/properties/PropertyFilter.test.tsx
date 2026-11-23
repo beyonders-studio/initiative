@@ -6,27 +6,13 @@ import { buildPropertyDefinition, buildPropertyOption } from "@/__tests__/factor
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import { MetadataType } from "@/api/generated/initiativeAPI.schemas";
 
-import { opsForType, PropertyFilter, type PropertyFilterCondition } from "./PropertyFilter";
+import { PropertyFilter, type PropertyFilterCondition } from "./PropertyFilter";
 
 // What a value's input adds or looks up; none of these filters asks either.
 const INPUT = {
   appendOption: vi.fn(),
   searchMembers: vi.fn(async () => []),
 };
-
-describe("opsForType", () => {
-  it("returns the expected operators for each property type", () => {
-    expect(opsForType(MetadataType.text)).toEqual(["ilike", "eq", "is_null"]);
-    expect(opsForType(MetadataType.url)).toEqual(["ilike", "eq", "is_null"]);
-    expect(opsForType(MetadataType.number)).toEqual(["eq", "lt", "lte", "gt", "gte", "is_null"]);
-    expect(opsForType(MetadataType.date)).toEqual(["eq", "lt", "lte", "gt", "gte", "is_null"]);
-    expect(opsForType(MetadataType.datetime)).toEqual(["eq", "lt", "lte", "gt", "gte", "is_null"]);
-    expect(opsForType(MetadataType.checkbox)).toEqual(["eq", "is_null"]);
-    expect(opsForType(MetadataType.select)).toEqual(["eq", "in_", "is_null"]);
-    expect(opsForType(MetadataType.multi_select)).toEqual(["eq"]);
-    expect(opsForType(MetadataType.user_reference)).toEqual(["eq", "in_", "is_null"]);
-  });
-});
 
 describe("PropertyFilter", () => {
   const textDef = buildPropertyDefinition({
@@ -56,15 +42,58 @@ describe("PropertyFilter", () => {
     expect(container.querySelector("button")).toBeNull();
   });
 
-  it("adds a new filter row when the Add button is clicked", async () => {
+  it.each([
+    [
+      "a text property, matched loosely",
+      () => textDef,
+      { property_id: 1, op: "ilike", value: null },
+    ],
+    [
+      "a multi_select, holding an empty array",
+      () =>
+        buildPropertyDefinition({
+          id: 10,
+          name: "Tags",
+          type: MetadataType.multi_select,
+          options: [buildPropertyOption({ value: "a", label: "A" })],
+        }),
+      { property_id: 10, op: "eq", value: [] },
+    ],
+  ])("adds a filter row on Add for %s", async (_case, definition, row) => {
     const onChange = vi.fn();
     renderWithProviders(
-      <PropertyFilter {...INPUT} definitions={[textDef]} value={[]} onChange={onChange} />
+      <PropertyFilter {...INPUT} definitions={[definition()]} value={[]} onChange={onChange} />
     );
     const addBtn = await screen.findByRole("button", { name: /Add filter/i });
     expect(addBtn).toBeEnabled();
     await userEvent.click(addBtn);
-    expect(onChange).toHaveBeenCalledWith([{ property_id: 1, op: "ilike", value: null }], []);
+    expect(onChange).toHaveBeenCalledWith([row], []);
+  });
+
+  const COMPARISONS = ["is", "<", "≤", ">", "≥", "is empty"];
+  it.each([
+    [MetadataType.text, ["contains", "is", "is empty"]],
+    [MetadataType.url, ["contains", "is", "is empty"]],
+    [MetadataType.number, COMPARISONS],
+    [MetadataType.date, COMPARISONS],
+    [MetadataType.datetime, COMPARISONS],
+    [MetadataType.checkbox, ["is", "is empty"]],
+    [MetadataType.select, ["is", "in", "is empty"]],
+    [MetadataType.multi_select, ["is"]],
+    [MetadataType.user_reference, ["is", "in", "is empty"]],
+  ])("offers a %s property its own operators", async (type, labels) => {
+    const definition = buildPropertyDefinition({ id: 20, name: "Field", type });
+    renderWithProviders(
+      <PropertyFilter
+        {...INPUT}
+        definitions={[definition]}
+        value={[{ property_id: 20, op: "eq", value: null }]}
+        onChange={vi.fn()}
+      />
+    );
+    await userEvent.click(await screen.findByRole("combobox", { name: "Op" }));
+    const options = await screen.findAllByRole("option");
+    expect(options.map((option) => option.textContent)).toEqual(labels);
   });
 
   it("caps the number of filters at the configured max (default 5)", async () => {
@@ -143,7 +172,7 @@ describe("PropertyFilter", () => {
     expect(onChange).toHaveBeenLastCalledWith([{ property_id: 1, op: "eq", value: "x" }], []);
   });
 
-  it("removes a row when the remove button is clicked", async () => {
+  it("removes a row, and disables a property another row already uses", async () => {
     const onChange = vi.fn();
     const existing: PropertyFilterCondition[] = [
       { property_id: 1, op: "eq", value: "a" },
@@ -163,24 +192,9 @@ describe("PropertyFilter", () => {
     expect(removeButtons).toHaveLength(2);
     await userEvent.click(removeButtons[0]);
     expect(onChange).toHaveBeenCalledWith([{ property_id: 2, op: "eq", value: 1 }], []);
-  });
 
-  it("disables already-used property options in the property dropdown", async () => {
-    const existing: PropertyFilterCondition[] = [
-      { property_id: 1, op: "eq", value: "a" },
-      { property_id: 2, op: "eq", value: 1 },
-    ];
-    renderWithProviders(
-      <PropertyFilter
-        {...INPUT}
-        definitions={[textDef, numberDef]}
-        value={existing}
-        onChange={vi.fn()}
-      />
-    );
-    // Open the first row's property dropdown. "Hours" is used in the other
-    // row, so when enumerating options here it must be disabled (and the
-    // currently-selected "Owner" must stay enabled).
+    // "Hours" is used in the other row, so the first row's dropdown disables it
+    // (and the currently-selected "Owner" stays enabled).
     const propertyCombos = await screen.findAllByLabelText(/Filter by/i);
     await userEvent.click(propertyCombos[0]);
     const hoursOption = await screen.findByRole("option", { name: "Hours" });
@@ -210,21 +224,5 @@ describe("PropertyFilter", () => {
       [{ property_id: 1, op: "ilike", value: "ada" }],
       [{ field: "plugin:3:ci.issue", op: "eq", value: null }]
     );
-  });
-
-  it("gives a multi_select filter a sensible default array value", async () => {
-    const multiDef = buildPropertyDefinition({
-      id: 10,
-      name: "Tags",
-      type: MetadataType.multi_select,
-      options: [buildPropertyOption({ value: "a", label: "A" })],
-    });
-    const onChange = vi.fn();
-    renderWithProviders(
-      <PropertyFilter {...INPUT} definitions={[multiDef]} value={[]} onChange={onChange} />
-    );
-    const addBtn = await screen.findByRole("button", { name: /Add filter/i });
-    await userEvent.click(addBtn);
-    expect(onChange).toHaveBeenCalledWith([{ property_id: 10, op: "eq", value: [] }], []);
   });
 });

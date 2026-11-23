@@ -30,7 +30,9 @@
     "plugins": "Plug-ins",
     "pluginFallback": "Plug-in {{id}}",
     "pluginGrantHint": "Les paramètres de la communauté décident de ce qu'un plug-in peut atteindre, cela ne se modifie donc pas ici.",
-    "settingsDescription": "Choisissez qui peut consulter et modifier ceci."
+    "settingsDescription": "Choisissez qui peut consulter et modifier ceci.",
+    "noteLabel": "Note aux personnes que vous ajoutez",
+    "notePlaceholder": "Envoyée avec la prochaine personne que vous ajoutez (facultatif)"
   },
   "bulkAccess": {
     "title": "Modifier l'accès",
@@ -98,8 +100,6 @@
     "resource_project_other": "projets",
     "resource_file_one": "fichier",
     "resource_file_other": "fichiers",
-    "resource_counter_group_one": "groupe de compteurs",
-    "resource_counter_group_other": "groupes de compteurs",
     "resource_calendar_one": "calendrier",
     "resource_calendar_other": "calendriers",
     "resource_dashboard_one": "tableau de bord",
@@ -109,7 +109,9 @@
     "resource_wiki_one": "wiki",
     "resource_wiki_other": "wikis",
     "resource_contact_one": "contact",
-    "resource_contact_other": "contacts"
+    "resource_contact_other": "contacts",
+    "resource_item_one": "élément",
+    "resource_item_other": "éléments"
   },
   "request": {
     "needAccess": "Vous avez besoin d'un accès",
@@ -157,5 +159,21 @@
     "answered": "Déjà traitée",
     "answeredDescription": "Il n'y a plus rien à traiter ici.",
     "error": "Impossible d'envoyer votre réponse. Veuillez réessayer."
+  },
+  "send": {
+    "button": "Envoyer à…",
+    "copyLink": "Copier le lien",
+    "title": "Envoyer à…",
+    "description": "Ils le reçoivent dans leurs notifications et l’ouvrent sur l’appareil qu’ils utilisent.",
+    "people": "Personnes",
+    "addPeople": "Ajouter des personnes",
+    "remove": "Retirer {{name}}",
+    "letIn": "Si quelqu’un ne peut pas encore l’ouvrir",
+    "letAsk": "Le laisser demander",
+    "submit": "Envoyer",
+    "sent": "Envoyé",
+    "sentSomeMayAsk_one": "Envoyé. {{count}} personne ne peut pas encore l’ouvrir et peut demander l’accès.",
+    "sentSomeMayAsk_other": "Envoyé. {{count}} personnes ne peuvent pas encore l’ouvrir et peuvent demander l’accès.",
+    "error": "Impossible de l’envoyer. Veuillez réessayer."
   }
 }

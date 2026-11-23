@@ -10,9 +10,7 @@ views stay in ``public``, and a view of a community that is gone leaves it.
 
 from __future__ import annotations
 
-import importlib.util
 from datetime import UTC, datetime
-from pathlib import Path
 from types import ModuleType
 from typing import Any
 
@@ -22,21 +20,7 @@ from sqlalchemy import text
 
 from app.models.tenant.view_preference import ViewPreference
 from app.testing import create_guild, create_user, route_session_to_guild
-
-_MIGRATION = (
-    Path(__file__).resolve().parents[2]
-    / "alembic"
-    / "versions"
-    / "20261031_0576_a_persons_views_of_a_community_are_its.py"
-)
-
-
-def _load() -> ModuleType:
-    spec = importlib.util.spec_from_file_location(_MIGRATION.stem, _MIGRATION)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+from app.testing.later_revisions import load_revision
 
 
 async def _rows(session, sql: str, **params: Any) -> list[tuple]:
@@ -75,7 +59,7 @@ async def test_the_views_move_into_the_community_unchanged(session) -> None:
     in_public = (
         "SELECT user_id, scope_key FROM public.user_view_preferences ORDER BY 1, 2"
     )
-    migration = _load()
+    migration = load_revision("20261031_0576_a_persons_views_of_a_community_are_its")
 
     try:
         views = await _rows(session, held)

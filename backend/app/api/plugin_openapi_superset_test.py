@@ -127,14 +127,6 @@ def _document() -> dict[str, Any]:
     }
 
 
-def _changed(change) -> list[str]:
-    """What the comparator finds when the served document is changed by
-    ``change`` and the published one is not."""
-    served = _document()
-    change(served)
-    return missing_from(served, _document())
-
-
 def _schemas(document: dict[str, Any]) -> dict[str, Any]:
     return document["components"]["schemas"]
 
@@ -143,175 +135,156 @@ def _list_operation(document: dict[str, Any]) -> dict[str, Any]:
     return document["paths"]["/projects/"]["get"]
 
 
-class TestTheComparator:
-    def test_the_same_document_serves_itself(self):
-        assert missing_from(_document(), _document()) == []
+def _add(document):
+    document["paths"]["/tasks/"] = {"get": {"responses": {}}}
+    document["paths"]["/projects/"]["delete"] = {"responses": {}}
+    _list_operation(document)["parameters"].append(
+        {"name": "q", "in": "query", "schema": {"type": "string"}}
+    )
+    _schemas(document)["Project"]["properties"]["color"] = {"type": "string"}
+    _schemas(document)["ProjectCreate"]["properties"]["color"] = {"type": "string"}
+    _schemas(document)["ProjectCreate"]["properties"]["kind"]["enum"].append("c")
+    _list_operation(document)["responses"]["404"] = {"description": "no"}
 
-    def test_additions_are_fine(self):
-        def add(document):
-            document["paths"]["/tasks/"] = {"get": {"responses": {}}}
-            document["paths"]["/projects/"]["delete"] = {"responses": {}}
-            _list_operation(document)["parameters"].append(
-                {"name": "q", "in": "query", "schema": {"type": "string"}}
-            )
-            _schemas(document)["Project"]["properties"]["color"] = {"type": "string"}
-            _schemas(document)["ProjectCreate"]["properties"]["color"] = {
-                "type": "string"
-            }
-            _schemas(document)["ProjectCreate"]["properties"]["kind"]["enum"].append(
-                "c"
-            )
-            _list_operation(document)["responses"]["404"] = {"description": "no"}
 
-        assert _changed(add) == []
+def _rename_and_inline(document):
+    schemas = _schemas(document)
+    schemas["Owner"] = schemas.pop("Person")
+    text = json.dumps(document).replace(f"{_REF}Person", f"{_REF}Owner")
+    document.clear()
+    document.update(json.loads(text))
+    create = document["paths"]["/projects/"]["post"]["requestBody"]
+    create["content"]["application/json"]["schema"] = copy.deepcopy(
+        _schemas(document)["ProjectCreate"]
+    )
 
-    def test_a_removed_path_fails(self):
-        assert _changed(lambda d: d["paths"].pop("/projects/")) == [
-            "GET /projects/: removed",
-            "POST /projects/: removed",
-        ]
 
-    def test_a_removed_method_fails(self):
-        assert _changed(lambda d: d["paths"]["/projects/"].pop("post")) == [
-            "POST /projects/: removed"
-        ]
+def _project(**properties):
+    return lambda d: _schemas(d)["Project"]["properties"].update(properties)
 
-    def test_a_removed_property_fails_through_its_references(self):
-        found = _changed(lambda d: _schemas(d)["Person"]["properties"].pop("id"))
-        assert (
-            "GET /projects/ response 200 application/json.items[].owner.id: removed"
-            in found
-        )
 
-    def test_a_changed_type_fails(self):
-        def change(document):
-            _schemas(document)["Project"]["properties"]["name"] = {"type": "integer"}
+def _parameter(index: int, **changes):
+    return lambda d: _list_operation(d)["parameters"][index].update(changes)
 
-        assert (
-            "GET /projects/ response 200 application/json.items[].name: "
-            "type string is now integer"
-        ) in _changed(change)
 
-    def test_a_response_field_that_may_now_be_null_fails(self):
-        def change(document):
-            _schemas(document)["Project"]["properties"]["name"] = {
-                "anyOf": [{"type": "string"}, {"type": "null"}]
-            }
+_LIST = "GET /projects/ response 200 application/json.items[]"
 
+
+@pytest.mark.parametrize(
+    ("change", "found"),
+    [
+        pytest.param(lambda d: None, [], id="the-same-document"),
+        pytest.param(_add, [], id="additions"),
+        pytest.param(
+            lambda d: d["paths"].pop("/projects/"),
+            ["GET /projects/: removed", "POST /projects/: removed"],
+            id="removed-path",
+        ),
+        pytest.param(
+            lambda d: d["paths"]["/projects/"].pop("post"),
+            ["POST /projects/: removed"],
+            id="removed-method",
+        ),
+        pytest.param(
+            lambda d: _schemas(d)["Person"]["properties"].pop("id"),
+            [f"{_LIST}.owner.id: removed"],
+            id="removed-property-through-its-references",
+        ),
+        pytest.param(
+            _project(name={"type": "integer"}),
+            [f"{_LIST}.name: type string is now integer"],
+            id="changed-type",
+        ),
         # A component is compared once, where it is first reached.
-        assert _changed(change) == [
-            (
-                "GET /projects/ response 200 application/json.items[].name: "
-                "type string is now null|string"
-            )
-        ]
-
-    def test_a_response_field_no_longer_always_sent_fails(self):
-        def change(document):
-            _schemas(document)["Project"]["required"].remove("name")
-
-        assert _changed(change) == [
-            (
-                "GET /projects/ response 200 application/json.items[].name: "
-                "no longer always sent"
-            )
-        ]
-
-    def test_a_narrower_response_type_is_fine(self):
-        def change(document):
-            _schemas(document)["Project"]["properties"]["count"] = {"type": "integer"}
-            _schemas(document)["Project"]["properties"]["owner"] = {
-                "$ref": f"{_REF}Person"
-            }
-
-        assert _changed(change) == []
-
-    def test_a_removed_parameter_fails(self):
-        def change(document):
-            _list_operation(document)["parameters"].pop(0)
-
-        assert _changed(change) == ["GET /projects/ query parameter page: removed"]
-
-    def test_a_parameter_moved_to_another_location_fails(self):
-        def change(document):
-            _list_operation(document)["parameters"][0]["in"] = "header"
-
-        assert _changed(change) == ["GET /projects/ query parameter page: removed"]
-
-    def test_a_parameter_of_another_type_fails(self):
-        def change(document):
-            _list_operation(document)["parameters"][0]["schema"] = {"type": "string"}
-
-        assert _changed(change) == [
-            "GET /projects/ query parameter page: type integer is now string"
-        ]
-
-    def test_a_parameter_that_no_longer_takes_null_fails(self):
-        def change(document):
-            _list_operation(document)["parameters"][1]["schema"] = {"type": "boolean"}
-
-        assert _changed(change) == [
-            "GET /projects/ query parameter archived: type boolean|null is now boolean"
-        ]
-
-    def test_a_parameter_that_takes_more_is_fine(self):
-        def change(document):
-            _list_operation(document)["parameters"][0]["schema"] = {"type": "number"}
-
-        assert _changed(change) == []
-
-    def test_a_new_required_parameter_fails(self):
-        def change(document):
-            _list_operation(document)["parameters"].append(
+        pytest.param(
+            _project(name={"anyOf": [{"type": "string"}, {"type": "null"}]}),
+            [f"{_LIST}.name: type string is now null|string"],
+            id="response-field-may-now-be-null",
+        ),
+        pytest.param(
+            lambda d: _schemas(d)["Project"]["required"].remove("name"),
+            [f"{_LIST}.name: no longer always sent"],
+            id="response-field-no-longer-always-sent",
+        ),
+        pytest.param(
+            _project(count={"type": "integer"}, owner={"$ref": f"{_REF}Person"}),
+            [],
+            id="narrower-response-type",
+        ),
+        pytest.param(
+            lambda d: _list_operation(d)["parameters"].pop(0),
+            ["GET /projects/ query parameter page: removed"],
+            id="removed-parameter",
+        ),
+        pytest.param(
+            _parameter(0, **{"in": "header"}),
+            ["GET /projects/ query parameter page: removed"],
+            id="parameter-moved",
+        ),
+        pytest.param(
+            _parameter(0, schema={"type": "string"}),
+            ["GET /projects/ query parameter page: type integer is now string"],
+            id="parameter-of-another-type",
+        ),
+        pytest.param(
+            _parameter(1, schema={"type": "boolean"}),
+            [
+                (
+                    "GET /projects/ query parameter archived: "
+                    "type boolean|null is now boolean"
+                )
+            ],
+            id="parameter-no-longer-takes-null",
+        ),
+        pytest.param(
+            _parameter(0, schema={"type": "number"}), [], id="parameter-takes-more"
+        ),
+        pytest.param(
+            lambda d: _list_operation(d)["parameters"].append(
                 {
                     "name": "scope",
                     "in": "query",
                     "required": True,
                     "schema": {"type": "string"},
                 }
-            )
-
-        assert _changed(change) == [
-            "GET /projects/ query parameter scope: new and required"
-        ]
-
-    def test_a_request_property_now_required_fails(self):
-        def change(document):
-            _schemas(document)["ProjectCreate"]["required"].append("kind")
-
-        assert _changed(change) == [
-            "POST /projects/ request body application/json.kind: now required"
-        ]
-
-    def test_a_request_value_no_longer_taken_fails(self):
-        def change(document):
-            _schemas(document)["ProjectCreate"]["properties"]["kind"]["enum"] = ["a"]
-
-        assert _changed(change) == [
-            "POST /projects/ request body application/json.kind: no longer takes ['b']"
-        ]
-
-    def test_a_removed_response_fails(self):
-        def change(document):
-            document["paths"]["/projects/"]["post"]["responses"] = {
-                "200": document["paths"]["/projects/"]["post"]["responses"]["201"]
-            }
-
-        assert _changed(change) == ["POST /projects/ response 201: removed"]
-
-    def test_a_component_inlined_or_renamed_compares_by_what_it_holds(self):
-        def change(document):
-            schemas = _schemas(document)
-            schemas["Owner"] = schemas.pop("Person")
-            text = json.dumps(document).replace(f"{_REF}Person", f"{_REF}Owner")
-            document.clear()
-            document.update(json.loads(text))
-            create = document["paths"]["/projects/"]["post"]["requestBody"]
-            create["content"]["application/json"]["schema"] = copy.deepcopy(
-                _schemas(document)["ProjectCreate"]
-            )
-
-        assert _changed(change) == []
+            ),
+            ["GET /projects/ query parameter scope: new and required"],
+            id="new-required-parameter",
+        ),
+        pytest.param(
+            lambda d: _schemas(d)["ProjectCreate"]["required"].append("kind"),
+            ["POST /projects/ request body application/json.kind: now required"],
+            id="request-property-now-required",
+        ),
+        pytest.param(
+            lambda d: _schemas(d)["ProjectCreate"]["properties"]["kind"].update(
+                enum=["a"]
+            ),
+            [
+                (
+                    "POST /projects/ request body application/json.kind: "
+                    "no longer takes ['b']"
+                )
+            ],
+            id="request-value-no-longer-taken",
+        ),
+        pytest.param(
+            lambda d: d["paths"]["/projects/"]["post"].update(
+                responses={"200": d["paths"]["/projects/"]["post"]["responses"]["201"]}
+            ),
+            ["POST /projects/ response 201: removed"],
+            id="removed-response",
+        ),
+        pytest.param(_rename_and_inline, [], id="component-inlined-or-renamed"),
+    ],
+)
+def test_the_comparator_finds_what_the_served_document_no_longer_serves(change, found):
+    """What it finds when the served document is changed and the published one
+    is not: additions and narrower answers are fine, and a component compares
+    by what it holds, not its name."""
+    served = _document()
+    change(served)
+    assert missing_from(served, _document()) == found
 
 
 @pytest.mark.always

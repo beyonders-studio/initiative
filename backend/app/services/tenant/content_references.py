@@ -27,19 +27,22 @@ already reads provenance to decide that, so it is stated once, there.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Sequence
 from typing import Any
 
+import sqlalchemy as sa
 from sqlalchemy.orm import undefer
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.references import references_in_body, references_in_text
-from app.core.relationships import PERSON, EndpointKind, Provenance, RelationshipType
+from app.core.relationships import PERSON, Provenance, RelationshipType
 from app.core.search import SearchEntityType
+from app.core.tool_set import ToolSet
 from app.db import reference_targets
-from app.db.initiative_rls import COMMENT_PARENT_COLUMNS
-from app.models.tenant.comment import Comment
+from app.db.session import session_tools
+from app.db.tool_rows import locate, text_columns
+from app.models.tenant.comment import Comment, said_on
 from app.models.tenant.file import File
 from app.models.tenant.post import Post
 from app.models.tenant.relationship import EntityRelationship
@@ -65,14 +68,6 @@ BODY_COLUMNS: dict[SearchEntityType, tuple[type, str]] = {
     SearchEntityType.wiki_page: (WikiPage, "content"),
 }
 
-#: Kind -> the comment column naming a parent of that kind. Derived from the
-#: registry the comment policies are rendered from, so a new commentable tool is
-#: declared once and picked up here without an edit.
-_COMMENT_COLUMNS: dict[SearchEntityType, str] = {
-    SearchEntityType(column.removesuffix("_id")): column
-    for column in COMMENT_PARENT_COLUMNS
-}
-
 
 async def sync_for_entity(
     session: AsyncSession,
@@ -94,18 +89,19 @@ async def sync_for_entity(
     # body naming its own page is ordinary rather than an error.
     wanted.discard((entity.kind, entity.id))
 
-    live = await _live_targets(session, wanted)
+    tools = await session_tools(session)
+    live = await _by_kind(session, wanted, reference_targets.live_ids, tools)
     if relationships_service.records_edges(session):
         people = (
             markdown_mention_ids(body)
             if isinstance(body, str)
             else editor_mention_ids(body)
         )
-        live |= {(EndpointKind(PERSON.value), user_id) for user_id in people}
-        await _reconcile(session, entity, live, author_id=author_id)
+        live |= {(PERSON.value, user_id) for user_id in people}
+        await _reconcile(session, entity, live, tools, author_id=author_id)
 
 
-def references_in(body: Any) -> set[tuple[SearchEntityType, int]]:
+def references_in(body: Any) -> set[tuple[str, int]]:
     """Every thing a body points at, whichever of the two shapes it is in."""
     if isinstance(body, str):
         return references_in_text(body)
@@ -119,11 +115,11 @@ async def sync_for_comment(
 
     Called when a comment is written, edited, trashed or restored — all four
     change what the conversation says, and none of them is a change to the
-    comment's own edges, because a comment has none.
+    comment's own edges, because a comment has none. The thing it is about is
+    named in the community's tool set: the request's, or, where the system
+    routed this session itself, the one its installs make.
     """
-    parent = comment_parent(comment)
-    if parent is None:
-        return
+    parent = comment_parent(comment, await session_tools(session))
     await sync_for_entity(
         session,
         parent,
@@ -156,20 +152,32 @@ async def referencing_files(session: AsyncSession, file_id: int) -> list[File]:
     return list(rows.all())
 
 
-def comment_parent(comment: Comment) -> Endpoint | None:
-    """The thing a comment is about, as an edge would name it."""
-    for kind, column in _COMMENT_COLUMNS.items():
-        entity_id = getattr(comment, column, None)
-        if entity_id is not None:
-            return Endpoint(kind, entity_id)
-    return None
+def comment_parent(comment: Comment, tools: ToolSet) -> Endpoint:
+    """The thing a comment is about, as an edge would name it, in the
+    community with ``tools``."""
+    return Endpoint.of(tools, comment.subject_type, comment.subject_id)
+
+
+def texts_body(texts: Iterable[Any]) -> str | None:
+    """A tool plug-in's row's body: its declared text fields, as one text."""
+    return "\n\n".join(text for text in texts if text) or None
 
 
 async def own_body(session: AsyncSession, entity: Endpoint) -> Any:
-    """A thing's stored body, or None if its kind has none."""
+    """A thing's stored body, or None if its kind has none (:func:`texts_body`
+    for a tool plug-in's row)."""
     source = BODY_COLUMNS.get(entity.kind)
     if source is None:
-        return None
+        located = locate(await session_tools(session), entity.kind)
+        texts = text_columns(located.table) if located is not None else []
+        if not texts:
+            return None
+        row = (
+            await session.exec(
+                sa.select(*texts).where(located.table.c.id == entity.id)  # type: ignore[union-attr]
+            )
+        ).first()
+        return texts_body(row or ())
     model, column = source
     return (
         await session.exec(
@@ -180,51 +188,35 @@ async def own_body(session: AsyncSession, entity: Endpoint) -> Any:
 
 async def _comment_bodies(session: AsyncSession, entity: Endpoint) -> Sequence[str]:
     """Every live comment written about this thing."""
-    column = _COMMENT_COLUMNS.get(entity.kind)
-    if column is None:
-        return ()
     rows = await session.exec(
-        select(Comment.content).where(getattr(Comment, column) == entity.id)
+        select(Comment.content).where(said_on(entity.kind, entity.id))
     )
     return list(rows.all())
 
 
-async def _live_targets(
-    session: AsyncSession, wanted: set[tuple[SearchEntityType, int]]
-) -> set[tuple[SearchEntityType, int]]:
-    """The subset that still exists and this session may read.
-
-    Asked through the saving session, so a reference resolves to exactly what
-    the person writing the content can point at.
-    """
-    return await _by_kind(session, wanted, reference_targets.live_ids)
-
-
-async def _accepting_links(
-    session: AsyncSession, wanted: set[tuple[SearchEntityType, int]]
-) -> set[tuple[SearchEntityType, int]]:
-    """The subset that is still taking writes.
-
-    Asked only of the edges about to be MADE. An archived or trashed thing takes
-    no new links, so a mention of one records nothing until it comes back; an
-    edge already there stands on the mention that made it, which is still there.
-    """
-    return await _by_kind(session, wanted, reference_targets.unfrozen_ids)
-
-
 async def _by_kind(
     session: AsyncSession,
-    wanted: set[tuple[SearchEntityType, int]],
-    ask: Callable[[AsyncSession, SearchEntityType, list[int]], Awaitable[set[int]]],
-) -> set[tuple[SearchEntityType, int]]:
-    """Run one id question per kind, and put the pairs back together."""
-    by_kind: dict[SearchEntityType, list[int]] = {}
+    wanted: set[tuple[str, int]],
+    ask: Callable[..., Awaitable[set[int]]],
+    tools: ToolSet,
+) -> set[tuple[str, int]]:
+    """Run one id question per kind in the community with ``tools``, and put
+    the pairs back together.
+
+    Asked through the saving session, so a reference resolves to exactly what
+    the person writing the content can point at: what still exists and this
+    session may read (``live_ids``), or, of the edges about to be MADE, what is
+    still taking writes (``unfrozen_ids``). An archived or trashed thing takes
+    no new links, so a mention of one records nothing until it comes back; an
+    edge already there stands on the mention that made it, which is still
+    there."""
+    by_kind: dict[str, list[int]] = {}
     for kind, entity_id in wanted:
         by_kind.setdefault(kind, []).append(entity_id)
 
-    found: set[tuple[SearchEntityType, int]] = set()
+    found: set[tuple[str, int]] = set()
     for kind, ids in by_kind.items():
-        for entity_id in await ask(session, kind, ids):
+        for entity_id in await ask(session, kind, ids, tools=tools):
             found.add((kind, entity_id))
     return found
 
@@ -232,7 +224,8 @@ async def _by_kind(
 async def _reconcile(
     session: AsyncSession,
     entity: Endpoint,
-    wanted: set[tuple[EndpointKind, int]],
+    wanted: set[tuple[str, int]],
+    tools: ToolSet,
     *,
     author_id: int | None,
 ) -> None:
@@ -255,7 +248,7 @@ async def _reconcile(
         )
     ).all()
 
-    have = {(EndpointKind(row.target_type), row.target_id): row for row in existing}
+    have = {(row.target_type, row.target_id): row for row in existing}
 
     for key, row in have.items():
         if key not in wanted:
@@ -271,11 +264,13 @@ async def _reconcile(
         source=entity,
         relationship_type=RelationshipType.references,
         targets=[
-            Endpoint(kind, entity_id)
+            Endpoint.of(tools, kind, entity_id)
             for kind, entity_id in sorted(
-                await _accepting_links(session, adding - people)
+                await _by_kind(
+                    session, adding - people, reference_targets.unfrozen_ids, tools
+                )
                 | {pair for pair in people if pair[1] in members},
-                key=lambda pair: (pair[0].value, pair[1]),
+                key=lambda pair: (pair[0], pair[1]),
             )
         ],
         provenance=Provenance.content,

@@ -272,13 +272,7 @@ async def _place(
 
     row_id = int(row.id)  # type: ignore[attr-defined]
     if isinstance(row, Comment):
-        from app.services.tenant.comments import COMMENT_PARENT_COLUMNS
-
-        for column in COMMENT_PARENT_COLUMNS:
-            parent = getattr(row, column)
-            if parent is not None:
-                return (column.removesuffix("_id"), int(parent)), None
-        return None, None
+        return (row.subject_type, int(row.subject_id)), None
     if not going:
         return (target_type, row_id), None
     subject = await notifications.resolve_subject(system, (target_type, row_id))

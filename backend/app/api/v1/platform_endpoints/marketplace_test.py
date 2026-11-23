@@ -13,9 +13,11 @@ import json
 
 import pytest
 
+from app.core.audit_events import AuditEventType
 from app.core.config import settings
 from app.core.messages import MarketplaceMessages
 from app.models.platform.guild import CommunityRole
+from app.testing import emitted
 from app.testing.tuf_repository import service_plugin_definition
 
 RESCAN_URL = "/api/v1/marketplace/operator-catalog/rescan"
@@ -64,7 +66,7 @@ class TestOperatorRescan:
     """
 
     async def test_a_dropped_file_appears_without_a_restart(
-        self, client, acting_user, catalog_dir
+        self, client, acting_user, catalog_dir, capfd
     ):
         (catalog_dir / "standup.json").write_text(
             json.dumps(_manifest()), encoding="utf-8"
@@ -72,12 +74,24 @@ class TestOperatorRescan:
         # An operator who is also in a guild, so the listing can be read back
         # from the marketplace the way anyone would meet it.
         actor = await acting_user("owner", guild_role=CommunityRole.admin)
+        capfd.readouterr()
 
         response = await client.post(RESCAN_URL, headers=actor.headers)
 
         assert response.status_code == 200
         assert response.json()["published"] == 1
         assert response.json()["problems"] == []
+        # Recorded with its source and the counts it moved.
+        rows = emitted(capfd, AuditEventType.MARKETPLACE_CATALOG_REFRESHED)
+        assert [(r["actor_user_id"], r["guild_id"], r["target"]) for r in rows] == [
+            (actor.user.id, None, None)
+        ]
+        assert rows[0]["detail"] == {
+            "source": "operator_catalog",
+            "published": 1,
+            "withdrawn": 0,
+            "skipped": 0,
+        }
 
         page = await client.get(
             actor.g("/marketplace/listings/acme.standup"), headers=actor.headers
@@ -86,6 +100,7 @@ class TestOperatorRescan:
         # Provenance travels with the listing: the marketplace shows this as
         # the operator's own addition, never as something shipped from here.
         assert page.json()["source"] == "operator"
+        assert page.json()["publisher"] == "Acme"
 
     async def test_a_rescan_is_idempotent(self, client, acting_user, catalog_dir):
         (catalog_dir / "standup.json").write_text(
@@ -115,10 +130,11 @@ class TestOperatorRescan:
         assert body["problems"][0]["reason"]
 
     async def test_no_directory_configured_is_a_400(
-        self, client, acting_user, monkeypatch
+        self, client, acting_user, monkeypatch, capfd
     ):
         monkeypatch.setattr(settings, "MARKETPLACE_EXTRA_CATALOG_DIR", None)
         actor = await acting_user("owner")
+        capfd.readouterr()
 
         response = await client.post(RESCAN_URL, headers=actor.headers)
 
@@ -127,6 +143,8 @@ class TestOperatorRescan:
             response.json()["detail"]
             == MarketplaceMessages.OPERATOR_CATALOG_NOT_CONFIGURED
         )
+        # A refused scan moved nothing and records nothing.
+        assert emitted(capfd, AuditEventType.MARKETPLACE_CATALOG_REFRESHED) == []
 
     async def test_a_directory_that_did_not_mount_is_a_400(
         self, client, acting_user, tmp_path, monkeypatch
@@ -146,16 +164,21 @@ class TestOperatorRescan:
 
     @pytest.mark.parametrize("tier", ["member", "support", "moderator", "operator"])
     async def test_only_the_config_capability_may_rescan(
-        self, client, acting_user, catalog_dir, tier
+        self, client, acting_user, catalog_dir, tier, capfd
     ):
         """Publishing a listing decides what this deployment offers everyone
         on it, so it sits with app-wide configuration rather than with the
         tiers that read or moderate."""
+        (catalog_dir / "standup.json").write_text(
+            json.dumps(_manifest()), encoding="utf-8"
+        )
         actor = await acting_user(tier)
+        capfd.readouterr()
 
         response = await client.post(RESCAN_URL, headers=actor.headers)
 
         assert response.status_code == 403
+        assert emitted(capfd, AuditEventType.MARKETPLACE_CATALOG_REFRESHED) == []
 
     async def test_a_rescan_needs_a_session(self, client, catalog_dir):
         assert (await client.post(RESCAN_URL)).status_code == 401
@@ -164,26 +187,26 @@ class TestOperatorRescan:
 UPLOAD_URL = "/api/v1/marketplace/local/upload"
 
 
-def _counter_manifest(**overrides) -> dict:
+def _wiki_manifest(**overrides) -> dict:
     return {
         "uid": "VPR0AD00000001",
-        "public_id": "ours.party-tally",
-        "kind": "counter_group",
-        "name": "Party tally",
+        "public_id": "ours.party-handbook",
+        "kind": "wiki",
+        "name": "Party handbook",
         "publisher": "Our deployment",
-        "description": "Keep score.",
+        "description": "Keep the rules.",
         "version": "1.0.0",
         "definition": {
-            "type": "initiative-counter-group",
-            "name": "Tally",
-            "counters": [{"name": "Hit points", "count": 0}],
+            "type": "initiative-wiki",
+            "name": "Handbook",
+            "pages": [],
         },
         **overrides,
     }
 
 
 def _plugin_manifest(**overrides) -> dict:
-    return _counter_manifest(
+    return _wiki_manifest(
         uid="VPR0ADAPP00001",
         public_id="ours.tracker",
         kind="plugin",
@@ -200,14 +223,14 @@ class TestUploadingAListingFile:
         owner = await acting_user("owner", guild_role=CommunityRole.member)
 
         response = await client.post(
-            UPLOAD_URL, json={"manifest": _counter_manifest()}, headers=owner.headers
+            UPLOAD_URL, json={"manifest": _wiki_manifest()}, headers=owner.headers
         )
 
         assert response.status_code == 201, response.text
         assert response.json()["version"] == "1.0.0"
         shelf = await client.get(
             owner.g("/marketplace/listings"),
-            params={"kind": "counter_group"},
+            params={"kind": "wiki"},
             headers=owner.headers,
         )
         [card] = [
@@ -220,13 +243,13 @@ class TestUploadingAListingFile:
 
         response = await client.post(
             UPLOAD_URL,
-            json={"manifest": _counter_manifest(definition={"type": "nope"})},
+            json={"manifest": _wiki_manifest(definition={"type": "nope"})},
             headers=owner.headers,
         )
 
         assert response.status_code == 422
         assert response.json()["detail"] == MarketplaceMessages.LISTING_UPLOAD_INVALID
-        assert "initiative-counter-group" in response.json()["problem"]
+        assert "initiative-wiki" in response.json()["problem"]
 
     async def test_a_uid_another_catalogue_publishes_is_not_taken_over(
         self, client, acting_user, session
@@ -239,7 +262,7 @@ class TestUploadingAListingFile:
         owner = await acting_user("owner")
 
         response = await client.post(
-            UPLOAD_URL, json={"manifest": _counter_manifest()}, headers=owner.headers
+            UPLOAD_URL, json={"manifest": _wiki_manifest()}, headers=owner.headers
         )
 
         assert response.status_code == 422
@@ -261,9 +284,13 @@ class TestUploadingAListingFile:
 
         assert response.status_code == 201, response.text
         services = await client.get("/api/v1/plugin-services/", headers=owner.headers)
-        [registration] = services.json()
+        [registration] = services.json()["items"]
         assert registration["public_id"] == "ours.tracker"
         assert registration["listing_uid"] == manifest["uid"]
+        assert registration["version"] == manifest["version"]
+        assert registration["name"] == manifest["name"]
+        # Uploaded by this deployment, so not built by Initiative.
+        assert registration["first_party"] is False
         assert registration["scope_ceiling"] == ["projects:read"]
         assert registration["live"] is False
 
@@ -272,7 +299,7 @@ class TestUploadingAListingFile:
         actor = await acting_user(tier)
 
         response = await client.post(
-            UPLOAD_URL, json={"manifest": _counter_manifest()}, headers=actor.headers
+            UPLOAD_URL, json={"manifest": _wiki_manifest()}, headers=actor.headers
         )
 
         assert response.status_code == 403
@@ -282,7 +309,7 @@ class TestUploadingAListingFile:
     ):
         owner = await acting_user("owner")
         await client.post(
-            UPLOAD_URL, json={"manifest": _counter_manifest()}, headers=owner.headers
+            UPLOAD_URL, json={"manifest": _wiki_manifest()}, headers=owner.headers
         )
 
         scan = await client.post(RESCAN_URL, headers=owner.headers)

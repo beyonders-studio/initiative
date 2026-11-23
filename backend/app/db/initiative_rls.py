@@ -17,17 +17,20 @@ the classification, the generated policies, and its event stream all follow.
 ``tenancy_test.py``, ``guild_rls_test.py`` and ``event_readback_test.py``
 enforce that nothing drifts.
 
-This module is intentionally dependency-free (no models, no SQLAlchemy) so it can
-be imported by ``tenancy`` and by the build-time generator alike.
+A tool's item tables are named in its record (``ToolSpec.item_tables``), and
+their paths come from that name and the table's foreign key to its parent in
+the tool (:func:`item_paths`), read off the model metadata.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, replace
+from functools import lru_cache
 
-from app.core.plugin_scopes import tool_resource
+from sqlalchemy import ForeignKey, Table
+
 from app.core.reactions import ReactionTarget
 from app.core.relationships import (
     ENDPOINT_KINDS,
@@ -37,22 +40,20 @@ from app.core.relationships import (
     Provenance,
     RelationshipType,
 )
+from app.core.tool_set import BUILTIN_TOOLS, KEPT_TOOL_SETS, ToolRecord, ToolSet
 from app.core.tools import (
-    CONTENT_KINDS,
-    DEFAULT_ENABLED_TOOLS,
     INSTALL_METADATA_KIND,
     ITEM_KINDS,
-    KINDS,
     LAYOUT_INSTANCE_TABLES,
     PROPERTY_TARGETS,
     Tool,
 )
 from app.db import gucs
 from app.db.authorization import (
-    COMMUNITY_ROWS,
     IN_POLICY,
     POLICY_SETTINGS_ADMIN,
     STANDING,
+    community_surface,
     in_body,
     plugin_narrowed,
     plugin_scope,
@@ -109,7 +110,7 @@ def _parent(table: str, id_expr: str) -> str:
 #: Reads back what ``_parent`` writes. One formatter, one reader, so the drift
 #: test can ask a rendered chain which resources it names without a second
 #: declaration of the set.
-_PARENT_TYPE_RE = re.compile(r"'type', '([a-z_]+)'")
+_PARENT_TYPE_RE = re.compile(r"'type', '([a-z0-9_]+)'")
 
 
 def parent_types(chain_expr: str) -> frozenset[str]:
@@ -148,12 +149,6 @@ def _parent_chain(frm: str, tie: str, id_expr: str, *hops: tuple[str, str]) -> s
 # configuration. None renders no leg at all rather than a `true` one.
 DacBuilder = Callable[[str, str, WriteFlag], "str | None"]
 
-#: Every tool's own table, keyed by table name. The sharing gate is DERIVED from
-#: this rather than declared per table: a row is governed by the tool it belongs
-#: to, and a table that belongs to none is governed by none. So a seventh tool
-#: gates its own rows and its children's the day its table exists.
-_TOOL_BY_TABLE: dict[str, Tool] = {tool.plural: tool for tool in Tool}
-
 
 @dataclass(frozen=True)
 class DacPath:
@@ -186,17 +181,30 @@ class DacPath:
     """
 
     predicate: DacBuilder
-    tool: Tool | None = None
+    tool: ToolRecord | None = None
     via: tuple[tuple[str, str], ...] = ()
 
 
-def _switch_leg(tool: Tool, initiative: str) -> str:
-    """Whether ``tool`` is switched on for ``initiative``, for this reader."""
-    return (
+def tool_present(kind_sql: str, write: bool) -> str:
+    """Whether the tool plug-in's tool whose kind ``kind_sql`` (a SQL text
+    expression) names is there for this reader to read, or to write: what its
+    install's state says, for everyone the system engine is not."""
+    kinds = gucs.WRITABLE_TOOLS if write else gucs.OPEN_TOOLS
+    return f"({_P.system} OR ({_P.this_guild} AND {kind_sql} = ANY ({kinds.once})))"
+
+
+def _switch_leg(tool: ToolRecord, initiative: str, write: bool = False) -> str:
+    """Whether ``tool`` is switched on for ``initiative``, for this reader. A
+    tool plug-in's is first asked whether its install's state leaves it there
+    at all (:func:`tool_present`), which nobody's standing overrides."""
+    leg = (
         f"({_GUILD_ADMIN} OR {_PAM_ANY} OR {initiative} IS NULL"
-        f" OR ({_P.this_guild} AND ({initiative}::text || ':{tool.value}')"
+        f" OR ({_P.this_guild} AND ({initiative}::text || ':{tool.kind}')"
         f" = ANY ({_P.field('enabled_tools')})))"
     )
+    if not tool.installed:
+        return leg
+    return f"({tool_present(f"'{tool.kind}'", write)} AND {leg})"
 
 
 def _resource_call(tool: str, resource_id: str, initiative: str, write: bool) -> str:
@@ -215,7 +223,7 @@ def _resource_call(tool: str, resource_id: str, initiative: str, write: bool) ->
 
 
 def _tool_gate(
-    tool: Tool,
+    tool: ToolRecord,
     resource_id: str,
     initiative: str,
     command: str,
@@ -240,7 +248,7 @@ def _tool_gate(
     at all.
     """
     legs: list[str] = [
-        plugin_scope(tool_resource(tool), command != "SELECT", _P),
+        plugin_scope(tool.scope, command != "SELECT", _P),
         plugin_narrowed(initiative, _P),
     ]
 
@@ -252,59 +260,52 @@ def _tool_gate(
     # initiative the reader is in: an admin, a grantee and a system sweep are
     # already admitted above, so those are the only ones whose switch can decide
     # anything for them.
-    legs.append(_switch_leg(tool, initiative))
+    legs.append(_switch_leg(tool, initiative, write))
 
     key = tool.create_permission if creating else tool.view_permission
-    default = "false" if creating else str(tool in DEFAULT_ENABLED_TOOLS).lower()
+    default = "false" if creating else str(tool.spec.on_by_default).lower()
     legs.append(
         f"initiative_role_permits({initiative}, {gucs.USER_ID}, '{key}', {default}, {STANDING})"
     )
 
     if not creating:
         legs.append(
-            f"resource_access('{tool.value}', {resource_id}, {gucs.USER_ID}, "
+            f"resource_access('{tool.kind}', {resource_id}, {gucs.USER_ID}, "
             f"{initiative}, {_sql_bool(write)}, {STANDING})"
         )
 
     return "(" + " AND ".join(legs) + ")"
 
 
-def _dac_self(tool: Tool | None = None) -> DacPath:
-    """The row IS the shared resource. Which tool that is comes from the table
-    name at render time, so a table that is no tool's renders nothing; a caller
-    reaching the table under an alias (reactions, below) names the tool itself.
+def _dac_self(tool: ToolRecord | None, *, aliased: bool = False) -> DacPath:
+    """The row IS the shared resource, of ``tool``; a table that is no tool's
+    renders nothing. ``aliased`` is a caller reaching the table under an alias
+    (an entity's arm), where an INSERT is not the resource being made.
     """
 
     def build(t: str, command: str, w: bool) -> str | None:
-        governing = tool if tool is not None else _TOOL_BY_TABLE.get(t)
-        if governing is None:
+        if tool is None:
             return None
         return _tool_gate(
-            governing,
+            tool,
             f"{t}.id",
             f"{t}.initiative_id",
             command,
             w,
             # An INSERT is the resource being made only where the table IS the
-            # resource. A caller that names the tool reached it under an alias
-            # (a reaction on a notice), and there the INSERT is the reaction's:
-            # the notice already exists and answers for itself.
-            creating=command == "INSERT" and tool is None,
+            # resource. A caller reaching it under an alias asks for something
+            # that already exists and answers for itself.
+            creating=command == "INSERT" and not aliased,
         )
 
-    # ``tool`` here is only the explicitly-named one: without it the governing
-    # tool is read off the table name at render time, and the caller asking
-    # this registry knows its own table.
     return DacPath(predicate=build, tool=tool)
 
 
 def _dac_via(
-    parent: str, fk: str, *, parent_pk: str = "id", alias: str = "dac"
+    tool: ToolRecord, fk: str, *, parent_pk: str = "id", alias: str = "dac"
 ) -> DacPath:
     """The row is shared as part of its parent — a task by its project."""
-    tool = _TOOL_BY_TABLE.get(parent)
-    if tool is None:
-        return DacPath(predicate=lambda t, c, w: None)
+    parent = tool.table.name
 
     def build(t: str, c: str, w: bool) -> str | None:
         # For a read the membership walk above already reached this parent, and
@@ -312,7 +313,7 @@ def _dac_via(
         # question. Asking it again would consult ``resource_grants`` a second
         # time per row for the same answer. ``ANSWERED`` rather than nothing,
         # because a polymorphic path composes these arms per target type.
-        if c == "SELECT" and parent_answers_for_reads(parent):
+        if c == "SELECT" and parent_answers_for_reads(parent, tool):
             return ANSWERED
         return (
             f"EXISTS (SELECT 1 FROM {parent} {alias} "
@@ -331,13 +332,14 @@ def _dac_via(
     return DacPath(tool=tool, via=((fk, parent),), predicate=build)
 
 
-def _dac_two_hop(mid: str, mid_fk: str, parent: str, fk: str) -> DacPath:
-    """Two hops to the governing resource: ``table.<fk> -> mid -> parent`` — a
-    task's tag link by its task's project, an attendee by its event's calendar."""
-    tool = _TOOL_BY_TABLE[parent]
+def _dac_two_hop(tool: ToolRecord, mid: str, mid_fk: str, fk: str) -> DacPath:
+    """Two hops to the governing resource: ``table.<fk> -> mid ->`` ``tool``'s
+    table — a task's tag link by its task's project, an attendee by its
+    event's calendar."""
+    parent = tool.table.name
 
     def build(t: str, c: str, w: bool) -> str | None:
-        if c == "SELECT" and parent_answers_for_reads(mid):
+        if c == "SELECT" and parent_answers_for_reads(mid, tool):
             return ANSWERED
         return (
             f"EXISTS (SELECT 1 FROM {mid} dmid JOIN {parent} dpar "
@@ -444,19 +446,20 @@ def via_full_access(parent: str, fk: str) -> InitiativePath:
     )
 
 
-def direct() -> InitiativePath:
-    """The table has its own ``initiative_id`` column."""
+def direct(tool: ToolRecord | None = None) -> InitiativePath:
+    """The table has its own ``initiative_id`` column; its sharing is
+    ``tool``'s where it is that tool's own table."""
     return InitiativePath(
         predicate=lambda t, w: _access(f"{t}.initiative_id", w),
         initiative_expr=lambda r: f"{r}.initiative_id",
         # Nothing between the row and its initiative: it IS the addressable
         # thing, which is why the tool tables all take this path.
         parents=_no_parents,
-        dac=_dac_self(),
+        dac=_dac_self(tool),
     )
 
 
-def direct_or_guild(tool: Tool) -> InitiativePath:
+def direct_or_guild(tool: ToolRecord) -> InitiativePath:
     """Own ``initiative_id`` column, or none: a tool made for the whole guild.
 
     A row naming an initiative is gated like any :func:`direct` row. A row
@@ -465,19 +468,19 @@ def direct_or_guild(tool: Tool) -> InitiativePath:
     changing it is for the holders of its tool's surface (or a live write
     grant), or the installed plug-in's on a token not narrowed to one
     initiative, as itself or for a member holding that surface — and, where
-    the tool says so (``COMMUNITY_ROWS``), for whoever its sharing lets write
-    it. Sharing still applies on top, which is how the
+    the tool says so (``ToolSpec.community_rows``), for whoever its sharing
+    lets write it. Sharing still applies on top, which is how the
     admin decides who writes what the row holds. ``resource_actions`` asks the
     same writer for ``edit``.
     """
-    rows = COMMUNITY_ROWS[tool]
-    writer = _P.guild_row_writer(rows.surface)
+    rows = tool.spec.community_rows
+    writer = _P.guild_row_writer(community_surface(tool))
 
     def writes(t: str) -> str:
-        if not rows.granted_writes_row:
+        if rows is None or not rows.granted_writes_row:
             return writer
         return (
-            f"({writer} OR resource_access('{tool.value}', {t}.id, {gucs.USER_ID},"
+            f"({writer} OR resource_access('{tool.kind}', {t}.id, {gucs.USER_ID},"
             f" {t}.initiative_id, true, {STANDING}))"
         )
 
@@ -490,7 +493,7 @@ def direct_or_guild(tool: Tool) -> InitiativePath:
         ),
         initiative_expr=lambda r: f"{r}.initiative_id",
         parents=_no_parents,
-        dac=_dac_self(),
+        dac=_dac_self(tool),
         # Commenting on a guild-level row is a member's, as adding an event to
         # it is: the writer rule above is for the row itself.
         responding=lambda t, w: _access(f"{t}.initiative_id", w),
@@ -504,27 +507,32 @@ def direct_or_guild(tool: Tool) -> InitiativePath:
 ANSWERED = "true"
 
 
-def parent_answers_for_reads(parent: str) -> bool:
+def parent_answers_for_reads(parent: str, tool: ToolRecord | None = None) -> bool:
     """Whether walking to ``parent`` is, on its own, the read answer.
 
     A child's read leg is an ``EXISTS`` into its parent, and that inner scan
     runs the parent's own ``SELECT`` policy — which is the same question the
     child was about to ask a second time. So where the parent carries one, the
-    walk is the whole of it.
+    walk is the whole of it. A tool plug-in's tables, ``tool``'s when it is
+    one, carry the policies a built-in tool's do.
 
     A parent that carries none (the structural initiative tables, which are
     guild-scoped by the schema boundary) answers nothing, and a child of one
     keeps asking for itself.
     """
+    if tool is not None and parent in {t.name for t in (tool.table, *tool.items)}:
+        return True
     return parent in INITIATIVE_PATHS
 
 
-def via(parent: str, fk: str, *, parent_pk: str = "id") -> InitiativePath:
-    """One hop: ``table.<fk> -> parent.<parent_pk>``; parent has ``initiative_id``."""
+def via(tool: ToolRecord, fk: str, *, parent_pk: str = "id") -> InitiativePath:
+    """One hop: ``table.<fk>`` to ``tool``'s own table, which has
+    ``initiative_id``."""
+    parent = tool.table.name
 
     def predicate(t: str, w: bool) -> str:
         walk = f"EXISTS (SELECT 1 FROM {parent} WHERE {parent}.{parent_pk} = {t}.{fk}"
-        if not w and parent_answers_for_reads(parent):
+        if not w and parent_answers_for_reads(parent, tool):
             return walk + ")"
         return f"{walk} AND {_access(f'{parent}.initiative_id', w)})"
 
@@ -535,208 +543,189 @@ def via(parent: str, fk: str, *, parent_pk: str = "id") -> InitiativePath:
             f"WHERE {parent}.{parent_pk} = {r}.{fk})"
         ),
         parents=lambda r: _one_parent(parent, f"{r}.{fk}"),
-        dac=_dac_via(parent, fk, parent_pk=parent_pk),
+        dac=_dac_via(tool, fk, parent_pk=parent_pk),
     )
 
 
-def via_task_project(fk: str = "task_id") -> InitiativePath:
-    """Two hops: ``table.<fk> -> tasks -> projects.initiative_id``."""
+def via_item(tool: ToolRecord, mid: str, fk: str) -> InitiativePath:
+    """Two hops: ``table.<fk>`` to ``mid``, one of ``tool``'s items, and on
+    to the tool's table by ``mid``'s own key to it — a task's tag link by its
+    task's project, an attendee by its event's calendar."""
+    parent = tool.table.name
+    (key,) = _keys_to(next(t for t in tool.items if t.name == mid), (parent,))
+    mid_fk = key.parent.name
 
-    def predicate(t: str, w: bool) -> str:
-        if not w and parent_answers_for_reads("tasks"):
-            # One hop is enough for a read: the task's own policy is what walks
-            # on to its project.
-            return f"EXISTS (SELECT 1 FROM tasks tk WHERE tk.id = {t}.{fk})"
+    def walk(row: str) -> str:
         return (
-            f"EXISTS (SELECT 1 FROM tasks tk JOIN projects pr ON pr.id = tk.project_id "
-            f"WHERE tk.id = {t}.{fk} "
-            f"AND {_access('pr.initiative_id', w)})"
+            f"FROM {mid} dmid JOIN {parent} dpar ON dpar.id = dmid.{mid_fk} "
+            f"WHERE dmid.id = {row}.{fk}"
         )
 
+    def predicate(t: str, w: bool) -> str:
+        if not w and parent_answers_for_reads(mid, tool):
+            # The middle item's own policy is what walks on to the tool.
+            return f"EXISTS (SELECT 1 FROM {mid} dmid WHERE dmid.id = {t}.{fk})"
+        return f"EXISTS (SELECT 1 {walk(t)} AND {_access('dpar.initiative_id', w)})"
+
+    # The chain names what a reader fetches by its id: the middle item where it
+    # is a kind (a task), not where it is part of one (a post's poll).
+    named = ((mid, "dmid.id"),) if mid in {k.table for k in tool.children} else ()
     return InitiativePath(
         predicate=predicate,
-        initiative_expr=lambda r: (
-            f"(SELECT pr.initiative_id FROM tasks tk "
-            f"JOIN projects pr ON pr.id = tk.project_id WHERE tk.id = {r}.{fk})"
-        ),
+        initiative_expr=lambda r: f"(SELECT dpar.initiative_id {walk(r)})",
         parents=lambda r: _parent_chain(
-            "tasks tk",
-            "tk.id",
-            f"{r}.{fk}",
-            ("tasks", "tk.id"),
-            ("projects", "tk.project_id"),
+            f"{mid} dmid", "dmid.id", f"{r}.{fk}", *named, (parent, f"dmid.{mid_fk}")
         ),
-        dac=_dac_two_hop("tasks", "project_id", "projects", fk),
+        dac=_dac_two_hop(tool, mid, mid_fk, fk),
     )
 
 
-def via_post_poll(fk: str = "poll_id") -> InitiativePath:
-    """Two hops: ``table.<fk> -> post_polls -> posts.initiative_id``."""
-    return InitiativePath(
-        predicate=lambda t, w: (
-            f"EXISTS (SELECT 1 FROM post_polls pp JOIN posts po ON po.id = pp.post_id "
-            f"WHERE pp.id = {t}.{fk} "
-            f"AND {_access('po.initiative_id', w)})"
-        ),
-        initiative_expr=lambda r: (
-            f"(SELECT po.initiative_id FROM post_polls pp "
-            f"JOIN posts po ON po.id = pp.post_id WHERE pp.id = {r}.{fk})"
-        ),
-        # A poll has no route of its own — the notice that asks the question is
-        # the addressable thing, so the chain skips straight to it.
-        parents=lambda r: _parent_chain(
-            "post_polls pp", "pp.id", f"{r}.{fk}", ("posts", "pp.post_id")
-        ),
-        dac=_dac_two_hop("post_polls", "post_id", "posts", fk),
-    )
+def _keys_to(table: Table, parents: Iterable[str]) -> list[ForeignKey]:
+    """The keys of ``table`` to the id of one of ``parents``, a key to itself
+    left out (a page's parent page, an event's series)."""
+    names = set(parents) - {table.name}
+    keys = [fk for fk in table.foreign_keys if fk.column.table.name in names]
+    for fk in keys:
+        if fk.column.name != "id":
+            raise ValueError(
+                f"{table.name}.{fk.parent.name} keys {fk.column.table.name}."
+                f"{fk.column.name}, not its id"
+            )
+    return keys
 
 
-def via_event_calendar(fk: str = "calendar_event_id") -> InitiativePath:
-    """Two hops: ``table.<fk> -> calendar_events -> calendars.initiative_id``."""
-    return InitiativePath(
-        predicate=lambda t, w: (
-            f"EXISTS (SELECT 1 FROM calendar_events ce "
-            f"JOIN calendars cal ON cal.id = ce.calendar_id "
-            f"WHERE ce.id = {t}.{fk} "
-            f"AND {_access('cal.initiative_id', w)})"
-        ),
-        initiative_expr=lambda r: (
-            f"(SELECT cal.initiative_id FROM calendar_events ce "
-            f"JOIN calendars cal ON cal.id = ce.calendar_id WHERE ce.id = {r}.{fk})"
-        ),
-        parents=lambda r: _parent_chain(
-            "calendar_events ce",
-            "ce.id",
-            f"{r}.{fk}",
-            ("calendar_events", "ce.id"),
-            ("calendars", "ce.calendar_id"),
-        ),
-        dac=_dac_two_hop("calendar_events", "calendar_id", "calendars", fk),
-    )
+def item_path(tool: ToolRecord, item: Table) -> InitiativePath:
+    """The path of ``item``, one of ``tool``'s items (``ToolRecord.items``):
+    whatever its parent in the tool says.
+
+    Its foreign key to the tool's table is one hop. Without one, its key to
+    another of the tool's items that has one is two (:func:`via_item`). Which
+    tables are items is the record's to say; only the column and the path come
+    from the schema. No key, or more than one, raises rather than choosing.
+    """
+    parent = tool.table.name
+    table = item.name
+    own = _keys_to(item, (parent,))
+    if len(own) == 1:
+        return via(tool, own[0].parent.name)
+    if own:
+        raise ValueError(f"{table} has {len(own)} keys to {parent}")
+    one_hop = [t.name for t in tool.items if len(_keys_to(t, (parent,))) == 1]
+    through = _keys_to(item, one_hop)
+    if len(through) != 1:
+        raise ValueError(
+            f"{table} has {len(through)} keys to {parent}'s items, needs one"
+        )
+    return via_item(tool, through[0].column.table.name, through[0].parent.name)
+
+
+def item_paths(tools: ToolSet) -> dict[str, InitiativePath]:
+    """Every tool's item tables, each by :func:`item_path`."""
+    return {item.name: item_path(tool, item) for tool in tools for item in tool.items}
 
 
 @dataclass(frozen=True)
 class CommentParent:
-    """One thing a comment can hang off, declared once and rendered five ways.
+    """One kind a comment can be said on, declared once and rendered four ways.
 
-    ``frm``/``tie``/``initiative`` give the membership legs and the outbox
-    locator; ``chain`` names the addressable resources an event about the
-    comment carries, read off that same join. So a comment cannot be gated
-    through one parent and have its events attributed through another.
+    ``frm``/``tie``/``initiative`` give the outbox locator; ``chain`` names the
+    addressable resources an event about the comment carries, read off that
+    same join. The membership and sharing gate is not here: the comment's
+    policy asks :data:`ENTITY_ACCESS_FN` about its ``(subject_type,
+    subject_id)``, which is the kind's own entry.
 
     ``table``/``governed_by``/``tool_fk`` say which tool's SHARING answers for
-    the thread, which is not always the parent itself: a task is shared as part
+    the thread, which is not always the subject itself: a task is shared as part
     of its project and a wiki page as part of its wiki. Everything that has to
-    resolve a comment's tool — the DAC legs here, the search index's sharing
-    columns, the freeze check, the initiative lookup — reads them from here
-    rather than carrying its own special case per parent.
+    resolve a comment's tool — the search index's sharing columns, the
+    initiative lookup, the comment service — reads them from here rather than
+    carrying its own special case per kind.
     """
 
-    #: The ``comments`` column naming this parent.
-    column: str
-    #: FROM clause reaching the parent.
+    #: The kind, as ``comments.subject_type`` holds it.
+    kind: str
+    #: FROM clause reaching the subject.
     frm: str
-    #: What ties the parent row to ``column``.
+    #: What ties the subject row to ``comments.subject_id``.
     tie: str
-    #: The parent's initiative column.
+    #: The subject's initiative column.
     initiative: str
     #: (addressable table, column of ``frm`` holding its id), innermost first.
     chain: tuple[tuple[str, str], ...]
-    #: The parent's own table.
+    #: The subject's own table.
     table: str
-    #: The tool whose sharing governs this parent's rows, or ``None`` for a
-    #: parent no sharing governs (a collection), whose own row answers.
-    governed_by: Tool | None
+    #: The tool whose sharing governs this subject's rows, or ``None`` for a
+    #: subject no sharing governs (a collection), whose own row answers.
+    governed_by: ToolRecord | None
     #: The column of :attr:`table` holding that tool's id, or ``None`` when the
-    #: parent IS the tool row and ``column`` already names it.
+    #: subject IS the tool row.
     tool_fk: str | None = None
 
-    @property
-    def kind(self) -> str:
-        """The parent's kind as ``entity_access`` is asked about it — the
-        column name without its ``_id``, which is the vocabulary an edge end
-        and a search entry already use for the same thing."""
-        return self.column.removesuffix("_id")
 
-
-def _tool_comment_parent(tool: Tool) -> CommentParent:
-    """The comment parent for one tool — every tool's is the same shape.
-
-    A tool entity names its own initiative, so the join is the table itself and
-    the table stands as its own alias. Derived rather than listed so a comment
-    thread arrives with a new tool instead of waiting to be wired.
-    """
-    table = tool.plural
+def _own_comment_parent(
+    kind: str, table: str, governed_by: ToolRecord | None
+) -> CommentParent:
+    """A subject that names its own initiative, so the join is the table
+    itself and the table stands as its own alias: every tool, and a kind in
+    no one instance of its tool (a collection), which no sharing governs."""
     return CommentParent(
-        f"{tool.value}_id",
+        kind,
         table,
         f"{table}.id",
         f"{table}.initiative_id",
         ((table, f"{table}.id"),),
         table=table,
+        governed_by=governed_by,
+    )
+
+
+def _item_comment_parent(tool: ToolRecord, kind: str, item: Table) -> CommentParent:
+    """A kind inside ``tool``, reached through the hops its path walks up to
+    the tool, whose sharing governs it. Its chain names every row of the walk:
+    a comment on a task names the project too, the surface it shows up on."""
+    dac = item_path(tool, item).dac
+    assert dac is not None, item.name
+    aliases = ("ci", "cm", "ct")[: len(dac.via)] + ("ct",)
+    frm = f"{item.name} ci"
+    chain = [(item.name, "ci.id")]
+    for (fk, parent), here, there in zip(dac.via, aliases, aliases[1:], strict=False):
+        frm += f" JOIN {parent} {there} ON {there}.id = {here}.{fk}"
+        chain.append((parent, f"{there}.id"))
+    return CommentParent(
+        kind,
+        frm,
+        "ci.id",
+        "ct.initiative_id",
+        tuple(chain),
+        table=item.name,
         governed_by=tool,
+        tool_fk=dac.via[0][0] if len(dac.via) == 1 else None,
     )
 
 
-#: Every Tool appears here plus the content-level extras, matching the comment
-#: table's single-parent constraint. The extras are written out rather than
-#: derived because each names its own way up to a tool: a comment on a task
-#: names the project too — it is the surface a task comment shows up on, and
-#: the join is already made — and a comment on a wiki page names its wiki too.
-_COMMENT_PARENTS: tuple[CommentParent, ...] = (
-    CommentParent(
-        "task_id",
-        "tasks tk JOIN projects pr ON pr.id = tk.project_id",
-        "tk.id",
-        "pr.initiative_id",
-        (("tasks", "tk.id"), ("projects", "pr.id")),
-        table="tasks",
-        governed_by=Tool.project,
-        tool_fk="project_id",
-    ),
-    CommentParent(
-        "wiki_page_id",
-        "wiki_pages wp JOIN wikis wkp ON wkp.id = wp.wiki_id",
-        "wp.id",
-        "wkp.initiative_id",
-        (("wiki_pages", "wp.id"), ("wikis", "wkp.id")),
-        table="wiki_pages",
-        governed_by=Tool.wiki,
-        tool_fk="wiki_id",
-    ),
-    CommentParent(
-        "collection_id",
-        "collections",
-        "collections.id",
-        "collections.initiative_id",
-        (("collections", "collections.id"),),
-        table="collections",
-        governed_by=None,
-    ),
-    *(_tool_comment_parent(tool) for tool in Tool),
-)
+def comment_parents(tools: ToolSet) -> dict[str, CommentParent]:
+    """Every kind a comment is said on, keyed by the kind, in
+    ``COMMENT_TARGETS`` order: the kinds inside a tool that take comments,
+    then every tool. Derived rather than listed, so a thread arrives with a
+    new tool or kind instead of waiting to be wired."""
+    tool_of = {kind.value: tool for tool in tools for kind in tool.children}
+    inside = [
+        _own_comment_parent(kind.value, kind.table, None)
+        if kind.standalone
+        else _item_comment_parent(
+            tool_of[kind.value], kind.value, tools.tables[kind.table]
+        )
+        for kind in tools.child_kinds
+        if kind.commentable
+    ]
+    tools_own = [_own_comment_parent(t.kind, t.table.name, t) for t in tools]
+    return {p.kind: p for p in (*inside, *tools_own)}
 
 
-#: Every comment parent by its column — what the other derivations look it up
-#: by, so the parent set is stated once and they cannot disagree.
-COMMENT_PARENTS: dict[str, CommentParent] = {p.column: p for p in _COMMENT_PARENTS}
-
-#: The comment columns naming a parent, in declaration order. Search reads this
-#: to work out which tool's sharing governs a comment, so the parent set is
-#: stated once and the two derivations cannot disagree.
-COMMENT_PARENT_COLUMNS: tuple[str, ...] = tuple(COMMENT_PARENTS)
-
-
-def _comment_parent_kind(t: str) -> str:
-    """The kind of the one parent a comment row names, read off its columns."""
-    arms = " ".join(
-        f"WHEN {t}.{p.column} IS NOT NULL THEN '{p.kind}'" for p in _COMMENT_PARENTS
-    )
-    return f"(CASE {arms} END)"
-
-
-def _comment_parent_id(t: str) -> str:
-    return "COALESCE(" + ", ".join(f"{t}.{p.column}" for p in _COMMENT_PARENTS) + ")"
+#: Every kind a comment is said on among the built-in tools — what the other
+#: derivations look it up by, so the set is stated once and they cannot
+#: disagree.
+COMMENT_PARENTS: dict[str, CommentParent] = comment_parents(BUILTIN_TOOLS)
 
 
 def _entity_call(kind: str, entity_id: str, write: WriteFlag, share: WriteFlag) -> str:
@@ -746,37 +735,37 @@ def _entity_call(kind: str, entity_id: str, write: WriteFlag, share: WriteFlag) 
     )
 
 
-def comments_path() -> InitiativePath:
-    """Comments hang off exactly one parent — a task, a wiki page or any tool
-    entity — declared once in ``_COMMENT_PARENTS``.
+def comments_path(tools: ToolSet) -> InitiativePath:
+    """A comment is said on one subject — a task, a wiki page, a collection or
+    any tool entity — which the row names as ``(subject_type, subject_id)``.
 
-    The policy names that parent as the ``(kind, id)`` pair read off the row
-    and asks :data:`ENTITY_ACCESS_FN` about it, so a comment on a task is gated
-    by the same arm an edge to that task is. Membership and sharing ride in
-    the one call; a comment is a response, so the renderer passes read for the
-    sharing flag on every command (``DAC_WRITE_COMMANDS``).
+    The policy asks :data:`ENTITY_ACCESS_FN` about that pair, so a comment on a
+    task is gated by the same arm an edge to that task is. Membership and
+    sharing ride in the one call; a comment is a response, so the renderer
+    passes read for the sharing flag on every command (``DAC_WRITE_COMMANDS``).
     """
 
+    parents = comment_parents(tools).values()
+
     def folded(t: str, w: WriteFlag, sw: WriteFlag) -> str:
-        return _entity_call(_comment_parent_kind(t), _comment_parent_id(t), w, sw)
+        return _entity_call(f"{t}.subject_type", f"{t}.subject_id", w, sw)
 
     def locate(r: str) -> str:
-        lookups = ", ".join(
-            f"(SELECT {p.initiative} FROM {p.frm} WHERE {p.tie} = {r}.{p.column})"
-            for p in _COMMENT_PARENTS
+        arms = " ".join(
+            f"WHEN '{p.kind}' THEN "
+            f"(SELECT {p.initiative} FROM {p.frm} WHERE {p.tie} = {r}.subject_id)"
+            for p in parents
         )
-        return f"COALESCE({lookups})"
+        return f"(CASE {r}.subject_type {arms} END)"
 
     def chain(r: str) -> str:
-        # Same COALESCE as the locator, over the same joins: the first parent
-        # that resolves is the one parent a comment has.
-        lookups = ", ".join(
-            "(SELECT jsonb_build_array("
+        arms = " ".join(
+            f"WHEN '{p.kind}' THEN (SELECT jsonb_build_array("
             + ", ".join(_parent(table, column) for table, column in p.chain)
-            + f") FROM {p.frm} WHERE {p.tie} = {r}.{p.column})"
-            for p in _COMMENT_PARENTS
+            + f") FROM {p.frm} WHERE {p.tie} = {r}.subject_id)"
+            for p in parents
         )
-        return f"COALESCE({lookups}, {NO_PARENTS})"
+        return f"COALESCE((CASE {r}.subject_type {arms} END), {NO_PARENTS})"
 
     return InitiativePath(
         predicate=lambda t, w: folded(t, w, False),
@@ -832,25 +821,25 @@ def _target_path(
     )
 
 
-def _reaction_legs() -> dict[str, tuple[str, InitiativePath]]:
+def _reaction_legs(tools: ToolSet) -> dict[str, tuple[str, InitiativePath]]:
     paths: dict[ReactionTarget, InitiativePath] = {
-        ReactionTarget.comment: comments_path(),
+        ReactionTarget.comment: comments_path(tools),
         ReactionTarget.post: direct(),
     }
     return {target.value: (target.table, path) for target, path in paths.items()}
 
 
-def reactions_path() -> InitiativePath:
+def reactions_path(tools: ToolSet) -> InitiativePath:
     """A reaction is reached by whoever can reach the thing it is on: the
     comment arm walks to the comment's parent, the post arm asks the post. A
     new reactable kind adds a ``ReactionTarget`` member, which puts its table on
     the function's arms; nothing about the gate is written twice. Sharing rides
     in the call as read — reacting is responding.
     """
-    return _target_path(_reaction_legs())
+    return _target_path(_reaction_legs(tools))
 
 
-def batched_notices_path() -> InitiativePath:
+def batched_notices_path(tools: ToolSet) -> InitiativePath:
     """A queued line is reached like what it is about: the task assigned, or
     what was reacted to. An assignment's line is queued by whoever assigned,
     who writes to the task, so inserting one asks write of its sharing; taking
@@ -858,7 +847,10 @@ def batched_notices_path() -> InitiativePath:
     answers as the reaction did.
     """
     return _target_path(
-        {**_reaction_legs(), "task": ("tasks", via("projects", "project_id"))},
+        {
+            **_reaction_legs(tools),
+            "task": ("tasks", via(_PROJECTS, "project_id")),
+        },
         share_write=lambda t: f"{t}.kind = '{BatchedNoticeKind.task_assignment.value}'",
     )
 
@@ -891,7 +883,7 @@ def _relationship_end(
 ENTITY_ACCESS_FN = "entity_access"
 
 
-def entity_tables() -> dict[str, str]:
+def entity_tables(tools: ToolSet) -> dict[str, str]:
     """Every kind :data:`ENTITY_ACCESS_FN` answers for, and the table its ids
     point at — what an edge end, a reaction target, a recent view or a
     comment's parent may name. Derived from those four registries, so a kind
@@ -902,15 +894,15 @@ def entity_tables() -> dict[str, str]:
     for kind, table in (
         *((k.value, e.table) for k, e in ENDPOINT_KINDS.items()),
         *((t.value, t.table) for t in ReactionTarget),
-        *CONTENT_KIND_TABLES.items(),
-        *((p.kind, p.table) for p in _COMMENT_PARENTS),
+        *tools.kind_tables.items(),
+        *((p.kind, p.table) for p in comment_parents(tools).values()),
     ):
         if tables.setdefault(kind, table) != table:
             raise ValueError(f"kind {kind!r} names two tables: {tables[kind]}, {table}")
     return tables
 
 
-def _entity_dac(table: str) -> DacPath | None:
+def _entity_dac(table: str, paths: Mapping[str, InitiativePath]) -> DacPath | None:
     """The sharing leg for one kind, with its tool NAMED.
 
     Every kind is reached under an alias here. Where the row IS the governing
@@ -924,15 +916,14 @@ def _entity_dac(table: str) -> DacPath | None:
     does a kind no tool governs whose entry states its own leg (a collection's
     writer rule), which reads only the row it is handed.
     """
-    path = INITIATIVE_PATHS.get(table)
+    path = paths.get(table)
     dac = path.dac if path is not None else None
-    if dac is None or dac.via:
+    if dac is None or dac.via or dac.tool is None:
         return dac
-    tool = dac.tool or _TOOL_BY_TABLE.get(table)
-    return _dac_self(tool) if tool is not None else dac
+    return _dac_self(dac.tool, aliased=True)
 
 
-def _entity_arm(table: str) -> str:
+def _entity_arm(table: str, paths: Mapping[str, InitiativePath]) -> str:
     """What one kind asks of a reader beyond being able to see the row.
 
     The arm looks the row up in the kind's own table, so the kind's SELECT
@@ -942,11 +933,13 @@ def _entity_arm(table: str) -> str:
     would evaluate the same predicate twice on the same row, so the arm states
     only what a read does not answer: the write standing, when a flag asks
     for it, rendered with the flag decided so the planner sees a constant.
+    A tool plug-in's kind asks too, on a write, whether its tool may be
+    written (:func:`tool_present`).
 
     A kind whose own entry is folded asks it whole, for the same reason only
     when a flag is set: a comment's arm is one more call, to its parent.
     """
-    path = INITIATIVE_PATHS.get(table)
+    path = paths.get(table)
     if path is None:
         # Guild-level, and stated rather than defaulted. A tag is the guild's
         # own vocabulary: every member already sees every tag, so existence
@@ -961,7 +954,12 @@ def _entity_arm(table: str) -> str:
         )
     member = path.responding or path.predicate
     legs = [f"(NOT p_need_write OR ({member('re', True)}))"]
-    dac = _entity_dac(table)
+    tool = path.dac.tool if path.dac is not None else None
+    if tool is not None and tool.installed:
+        # The row's own SELECT policy asks whether a tool plug-in's tool is
+        # there to read; writing about the row asks whether it may be written.
+        legs.append(f"(NOT p_need_write OR {tool_present(f"'{tool.kind}'", True)})")
+    dac = _entity_dac(table, paths)
     if dac is not None:
         sharing = dac.predicate("re", "UPDATE", True)
         if sharing is not None:
@@ -969,7 +967,7 @@ def _entity_arm(table: str) -> str:
     return " AND ".join(legs)
 
 
-def render_entity_access_fn() -> str:
+def render_entity_access_fn(tools: ToolSet) -> str:
     """The per-kind gate, as one function every polymorphic policy calls.
 
     Rendered from ``INITIATIVE_PATHS`` like every policy here, so a kind's gate
@@ -989,11 +987,12 @@ def render_entity_access_fn() -> str:
     kind and has no table here. Like a tag, it asks nothing of the reader: the
     edge is read and written through the item on its other end.
     """
+    paths = paths_for(tools)
     arms = "\n".join(
         f"        WHEN '{kind}' THEN\n"
         f"            RETURN EXISTS (SELECT 1 FROM {table} re "
-        f"WHERE re.id = p_entity_id AND ({_entity_arm(table)}));"
-        for kind, table in sorted(entity_tables().items())
+        f"WHERE re.id = p_entity_id AND ({_entity_arm(table, paths)}));"
+        for kind, table in sorted(entity_tables(tools).items())
     )
     arms = in_body(arms)
     return f"""
@@ -1021,7 +1020,7 @@ $entity_access$;
 ENTITY_INITIATIVE_FN = "entity_initiative"
 
 
-def render_entity_initiative_fn() -> str:
+def render_entity_initiative_fn(tools: ToolSet) -> str:
     """The initiative of whatever a ``(kind, id)`` pair names, as one function.
 
     One arm per kind :data:`ENTITY_ACCESS_FN` answers for, each asking the
@@ -1030,12 +1029,13 @@ def render_entity_initiative_fn() -> str:
     to no initiative, and for a guild-level row. ``plpgsql`` and run as the
     caller, like :func:`render_entity_access_fn`.
     """
+    paths = paths_for(tools)
     arms = "\n".join(
         f"        WHEN '{kind}' THEN\n"
         f"            RETURN (SELECT {path.initiative_expr('re')} FROM {table} re "
         f"WHERE re.id = p_entity_id);"
-        for kind, table in sorted(entity_tables().items())
-        if (path := INITIATIVE_PATHS.get(table)) is not None
+        for kind, table in sorted(entity_tables(tools).items())
+        if (path := paths.get(table)) is not None
     )
     return f"""
 CREATE OR REPLACE FUNCTION {ENTITY_INITIATIVE_FN}(p_kind text, p_entity_id integer)
@@ -1057,7 +1057,7 @@ $entity_initiative$;
 CONTENT_ITEM_FN = "content_item_of"
 
 
-def render_content_item_fn() -> str:
+def render_content_item_fn(tools: ToolSet) -> str:
     """The item a change log row counts for, as ``(kind, id)``.
 
     The changed row itself when it is a tool or something inside one, else the
@@ -1066,7 +1066,7 @@ def render_content_item_fn() -> str:
     lateral call is planned as the join it stands for, and it reads no table.
     """
     kinds = ", ".join(
-        f"('{table}', '{kind}')" for kind, table in sorted(CONTENT_KIND_TABLES.items())
+        f"('{table}', '{kind}')" for kind, table in sorted(tools.kind_tables.items())
     )
     return f"""
 CREATE OR REPLACE FUNCTION {CONTENT_ITEM_FN}(p_type text, p_id integer, p_parents jsonb)
@@ -1087,25 +1087,26 @@ $content_item_of$;
 """
 
 
-def _entity_readable(t: str, kinds: Iterable[str]) -> str:
+def _entity_readable(t: str, tools: ToolSet) -> str:
     """A row on a ``(entity_type, entity_id)`` pair is read by whoever can see
     the thing it is on: one ``EXISTS`` into that thing's own table, whose
-    SELECT policies decide it. A kind outside ``kinds`` reads as nothing.
+    SELECT policies decide it. A kind that is no tool or nothing inside one
+    reads as nothing.
 
     The same lookup :data:`ENTITY_ACCESS_FN` makes for a read, written inline
     so the planner sees it. A filter reads thousands of values; inline, a scan
     builds the readable set once, where a call would run once per value.
     """
-    tables = entity_tables()
+    tables = entity_tables(tools)
     arms = " ".join(
         f"WHEN '{kind}' THEN EXISTS (SELECT 1 FROM {tables[kind]} re "
         f"WHERE re.id = {t}.entity_id)"
-        for kind in kinds
+        for kind in tools.content_kinds
     )
     return f"(CASE {t}.entity_type {arms} ELSE false END)"
 
 
-def metadata_values_path() -> InitiativePath:
+def metadata_values_path(tools: ToolSet) -> InitiativePath:
     """A metadata value is reached through the thing it is on and what its
     definition's owner adds, read off the definition in one ``EXISTS``.
 
@@ -1144,7 +1145,7 @@ def metadata_values_path() -> InitiativePath:
                 f"WHERE md.id = {t}.property_id AND (CASE WHEN {on_install}"
                 f" THEN md.install_id IS NOT NULL AND {t}.entity_id = md.install_id"
                 f" ELSE (md.install_id IS NULL OR {t}.entity_type IN ({items}))"
-                f" AND {_entity_readable(t, PROPERTY_TARGETS)} END)"
+                f" AND {_entity_readable(t, tools)} END)"
                 f" AND (md.install_id IS NULL OR {own} OR (NOT {on_install}"
                 f" AND ({_P.admin} OR {t}.entity_type = ANY (md.shown_on))))))"
             )
@@ -1220,25 +1221,56 @@ def administration_path() -> InitiativePath:
     )
 
 
-def tool_layouts_path() -> InitiativePath:
+def layout_holder(t: str, tools: ToolSet) -> str:
+    """The kind of the row a layout's ``tool_id`` names: the target itself, or
+    for a tool plug-in's item table, the table its rows sit under."""
+    if not tools.item_parents:
+        return f"{t}.tool"
+    arms = " ".join(
+        f"WHEN '{item}' THEN '{parent}'" for item, parent in tools.item_parents.items()
+    )
+    return f"(CASE {t}.tool {arms} ELSE {t}.tool END)"
+
+
+def tool_layouts_path(tools: ToolSet) -> InitiativePath:
     """A layout is read by the members of its initiative. A layout of one
     instance of a tool is written by whoever may write that instance, in the
     layout's own initiative: :data:`ENTITY_ACCESS_FN` asks the instance's own
-    entry, sharing included, as a property value's write does. A layout of a
-    shared tool (no instance) is written as the initiative's setup is
-    (:func:`managed_write`).
+    entry, sharing included, as a property value's write does; a tool
+    plug-in's item's, by whoever may write the row its items sit under. A
+    layout of a shared tool, or of a tool plug-in's own rows (no instance), is
+    written as the initiative's setup is (:func:`managed_write`). A tool
+    plug-in's layouts are there only while its install leaves its tool there
+    (:func:`tool_present`), as its rows are.
     """
+    owners = {
+        kind: tool.kind
+        for tool in tools.installed
+        for kind in (tool.kind, *(child.value for child in tool.children))
+    }
+
+    def present(t: str, w: bool, gate: str) -> str:
+        if not owners:
+            return gate
+        arms = " ".join(f"WHEN '{kind}' THEN '{tool}'" for kind, tool in owners.items())
+        return (
+            f"({gate} AND ({t}.tool NOT IN ({sql_values(owners)})"
+            f" OR {tool_present(f'(CASE {t}.tool {arms} END)', w)}))"
+        )
 
     def build(t: str, w: bool) -> str:
         if not w:
-            return _access(f"{t}.initiative_id", False)
+            return present(t, w, _access(f"{t}.initiative_id", False))
+        holder = layout_holder(t, tools)
         instance = (
-            f"({_entity_call(f'{t}.tool', f'{t}.tool_id', True, True)}"
-            f" AND {ENTITY_INITIATIVE_FN}({t}.tool, {t}.tool_id) = {t}.initiative_id)"
+            f"({_entity_call(holder, f'{t}.tool_id', True, True)}"
+            f" AND {ENTITY_INITIATIVE_FN}({holder}, {t}.tool_id) = {t}.initiative_id)"
         )
-        return (
+        return present(
+            t,
+            w,
             f"(CASE WHEN {t}.tool_id IS NULL THEN {managed_write(f'{t}.initiative_id')}"
-            f" ELSE ({_P.system} OR {instance}) END)"
+            f" ELSE ({_P.system} OR {instance}) END)",
         )
 
     return InitiativePath(
@@ -1246,7 +1278,7 @@ def tool_layouts_path() -> InitiativePath:
     )
 
 
-def relationships_path() -> InitiativePath:
+def relationships_path(tools: ToolSet) -> InitiativePath:
     """An edge is reached by whoever can reach BOTH of the things it connects.
 
     Polymorphic on both ends, so each end defers to :func:`render_entity_access_fn`
@@ -1272,6 +1304,10 @@ def relationships_path() -> InitiativePath:
       path read it out of a body, and the authority for it was the authority to
       put those words there, which that body's own gate already asked. READ on
       both, and the endpoint refuses to unlink one by hand at all.
+    * symmetric and asserted, with a tool plug-in's row on one end — the edge
+      is a response to that row, asked of it as a comment on it is: write on
+      the initiative, so a tool its install leaves read only takes none, and
+      read on its sharing.
     * a person on one end, whatever its type — the edge says something about
       the item on the other end, so making one is editing that item: WRITE on
       the item, whichever side it is on. The person's end asks nothing, and an
@@ -1283,6 +1319,12 @@ def relationships_path() -> InitiativePath:
     registry answers per command, and neither question is one a command can
     answer.
     """
+
+    installed = ", ".join(
+        f"'{kind}'"
+        for tool in tools.installed
+        for kind in (tool.kind, *(child.value for child in tool.children))
+    )
 
     def build(t: str, w: bool) -> str:
         # A write asks write of the end the edge describes, where somebody is
@@ -1298,11 +1340,26 @@ def relationships_path() -> InitiativePath:
         target_write: WriteFlag = (
             f"({t}.source_type = {person} AND {asserted})" if w else False
         )
+
+        def responds(end: str, write: WriteFlag) -> WriteFlag:
+            if not w or not installed:
+                return write
+            return (
+                f"({write} OR ({t}.relationship_type IN ({_SYMMETRIC_SQL})"
+                f" AND {t}.{end}_type IN ({installed}) AND {asserted}))"
+            )
+
         source = _entity_call(
-            f"{t}.source_type", f"{t}.source_id", source_write, source_write
+            f"{t}.source_type",
+            f"{t}.source_id",
+            responds("source", source_write),
+            source_write,
         )
         target = _entity_call(
-            f"{t}.target_type", f"{t}.target_id", target_write, target_write
+            f"{t}.target_type",
+            f"{t}.target_id",
+            responds("target", target_write),
+            target_write,
         )
         if w:
             between_people = (
@@ -1342,10 +1399,8 @@ def relationships_path() -> InitiativePath:
     return InitiativePath(predicate=build, initiative_expr=locate)
 
 
-# The tables that name a piece of content by (entity_type, entity_id), recent
-# views and engagement levels, take every tool and everything inside one, keyed
-# by its wire name, with the table its ids point at.
-CONTENT_KIND_TABLES: dict[str, str] = {k: KINDS[k].table for k in CONTENT_KINDS}
+#: ``ToolSet.kind_tables`` of the built-in tools.
+CONTENT_KIND_TABLES: dict[str, str] = BUILTIN_TOOLS.kind_tables
 
 
 def webhook_subscription_path() -> InitiativePath:
@@ -1377,7 +1432,7 @@ def webhook_subscription_path() -> InitiativePath:
     )
 
 
-def _named_tool_gate(t: str, write: bool) -> str:
+def _named_tool_gate(t: str, write: bool, tools: ToolSet) -> str:
     """Gates 3 and 4 for a row that names its governing tool: a search entry,
     a change in the change log.
 
@@ -1400,11 +1455,17 @@ def _named_tool_gate(t: str, write: bool) -> str:
         f" AND ({t}.initiative_id::text || ':' || {t}.dac_tool)"
         f" = ANY ({_P.field('enabled_tools')})))"
     )
+    if tools.installed:
+        installed = sql_values(tool.kind for tool in tools.installed)
+        switch = (
+            f"({switch} AND ({t}.dac_tool IS NULL OR {t}.dac_tool NOT IN ({installed})"
+            f" OR {tool_present(f'{t}.dac_tool', write)}))"
+        )
     key_arms = " ".join(
-        f"WHEN '{tool.value}' THEN '{tool.view_permission}'" for tool in Tool
+        f"WHEN '{tool.kind}' THEN '{tool.view_permission}'" for tool in tools
     )
     key = f"(CASE {t}.dac_tool {key_arms} END)"
-    defaults = sql_values(tool.value for tool in Tool if tool in DEFAULT_ENABLED_TOOLS)
+    defaults = sql_values(tool.kind for tool in tools if tool.spec.on_by_default)
     role = (
         f"({key} IS NULL OR initiative_role_permits({t}.initiative_id, "
         f"{gucs.USER_ID}, {key}, {t}.dac_tool IN ({defaults}), {STANDING}))"
@@ -1416,23 +1477,52 @@ def _named_tool_gate(t: str, write: bool) -> str:
     )
 
 
-def _unstamped_leg(t: str, kind_column: str, id_column: str) -> str:
-    """An entry that stamps no sharing, about a kind no sharing governs (a
-    collection) or a comment on one, is reached as the row it describes is:
-    that row's own policy decides."""
-    tables = {k.value: k.table for k in KINDS.values() if k.standalone}
-    tables["comment"] = "comments"
+def _reached_as_its_row(
+    t: str, kind_column: str, id_column: str, tables: dict[str, str]
+) -> str:
+    """A row naming a kind of ``tables`` (kind to table) by ``kind_column``
+    and ``id_column`` is reached as the row it names is: that row's own policy
+    decides."""
     arms = " ".join(
         f"WHEN '{kind}' THEN EXISTS (SELECT 1 FROM {table} sk"
         f" WHERE sk.id = {t}.{id_column})"
         for kind, table in tables.items()
     )
-    return (
-        f"({t}.dac_tool IS NOT NULL OR (CASE {t}.{kind_column} {arms} ELSE true END))"
-    )
+    return f"(CASE {t}.{kind_column} {arms} ELSE true END)"
 
 
-def named_tool_path(entity: tuple[str, str] | None = None) -> InitiativePath:
+def plugin_row_tables(tools: ToolSet) -> dict[str, str]:
+    """Each kind the community's tool plug-ins bring, with its table."""
+    return {
+        kind: table
+        for tool in tools.installed
+        for kind, table in (
+            (tool.kind, tool.table.name),
+            *((child.value, child.table) for child in tool.children),
+        )
+    }
+
+
+def plugin_entry_written(t: str, tools: ToolSet) -> str:
+    """The community admin writes a search entry about a tool plug-in's row
+    only while that row reads as there."""
+    return _reached_as_its_row(t, "entity_type", "entity_id", plugin_row_tables(tools))
+
+
+def _unstamped_leg(t: str, kind_column: str, id_column: str, tools: ToolSet) -> str:
+    """An entry that stamps no sharing, about a kind no sharing governs (a
+    collection), a comment on one or a tool plug-in's row, is reached as the
+    row it describes is."""
+    tables = {k.value: k.table for k in tools.child_kinds if k.standalone}
+    tables["comment"] = "comments"
+    tables |= plugin_row_tables(tools)
+    reached = _reached_as_its_row(t, kind_column, id_column, tables)
+    return f"({t}.dac_tool IS NOT NULL OR {reached})"
+
+
+def named_tool_path(
+    tools: ToolSet, entity: tuple[str, str] | None = None
+) -> InitiativePath:
     """A row about content, reached exactly like the content it describes: the
     search index, and the change log.
 
@@ -1460,7 +1550,7 @@ def named_tool_path(entity: tuple[str, str] | None = None) -> InitiativePath:
         )
         if entity is None:
             return gate
-        return f"({gate} AND {_unstamped_leg(t, *entity)})"
+        return f"({gate} AND {_unstamped_leg(t, *entity, tools)})"
 
     return InitiativePath(
         predicate=predicate,
@@ -1468,7 +1558,7 @@ def named_tool_path(entity: tuple[str, str] | None = None) -> InitiativePath:
         # The index stores the governing pair, so the legs need no join. Which
         # tool governs an entry differs per row, so the two that name a tool are
         # a CASE over it rather than a rendered constant.
-        dac=DacPath(predicate=lambda t, c, w: _named_tool_gate(t, w)),
+        dac=DacPath(predicate=lambda t, c, w: _named_tool_gate(t, w, tools)),
     )
 
 
@@ -1491,6 +1581,13 @@ def uploads_path() -> InitiativePath:
     )
 
 
+#: The built-in tools the paths written by hand name.
+_PROJECTS = BUILTIN_TOOLS.by_kind[Tool.project.value]
+_POSTS = BUILTIN_TOOLS.by_kind[Tool.post.value]
+#: Collections are part of Files.
+_FILES = BUILTIN_TOOLS.by_kind[Tool.file.value]
+
+
 def evidence_path() -> InitiativePath:
     """A stored object is reached exactly as the one parent it names is: a
     community report by those who settle it, an operations case by those in
@@ -1504,7 +1601,7 @@ def evidence_path() -> InitiativePath:
     report_walk = (
         "EXISTS (SELECT 1 FROM moderation_reports mr WHERE mr.id = {t}.report_id"
     )
-    case = via_task_project("case_task_id")
+    case = via_item(_PROJECTS, "tasks", "case_task_id")
 
     def predicate(t: str, w: bool) -> str:
         if not w:
@@ -1531,9 +1628,9 @@ def _collection_writer(initiative: str) -> str:
     """Changing a collection: the Files switch on in its initiative, and a role
     there that creates files. Its own sharing is none, so nothing else."""
     return (
-        f"({_switch_leg(Tool.file, initiative)}"
+        f"({_switch_leg(_FILES, initiative)}"
         f" AND initiative_role_permits({initiative}, {gucs.USER_ID}, "
-        f"'{Tool.file.create_permission}', false, {STANDING}))"
+        f"'{_FILES.create_permission}', false, {STANDING}))"
     )
 
 
@@ -1552,8 +1649,8 @@ def metadata_definitions_path() -> InitiativePath:
       initiative, and anybody in the community reads it, as they read which
       plug-ins are installed.
     """
-    project = via("projects", "project_id")
-    sharing = _dac_via("projects", "project_id")
+    project = via(_PROJECTS, "project_id")
+    sharing = _dac_via(_PROJECTS, "project_id")
 
     def project_sharing(t: str, c: str, w: bool) -> str | None:
         # Reading is the project's own SELECT policy, reached by the walk
@@ -1646,7 +1743,14 @@ def collection_files_path() -> InitiativePath:
     )
 
 
-def content_kind_path() -> InitiativePath:
+@lru_cache(KEPT_TOOL_SETS)
+def _paths(tools: ToolSet) -> dict[str, InitiativePath]:
+    """:func:`paths_for`, once per tool set, for a path that walks to
+    another table's."""
+    return paths_for(tools)
+
+
+def content_kind_path(tools: ToolSet) -> InitiativePath:
     """A row about one piece of content, reached exactly like the content
     itself: ``(entity_type, entity_id)`` is the pair the entity function takes,
     and every content kind is one of its arms. Writing the row asks nothing of
@@ -1658,8 +1762,9 @@ def content_kind_path() -> InitiativePath:
     def locate(r: str) -> str:
         arms = " ".join(
             f"WHEN '{etype}' THEN "
-            f"(SELECT {initiative_of(tbl, 're')} FROM {tbl} re WHERE re.id = {r}.entity_id)"
-            for etype, tbl in CONTENT_KIND_TABLES.items()
+            f"(SELECT {initiative_of(tbl, 're', paths=_paths(tools))} FROM {tbl} re"
+            f" WHERE re.id = {r}.entity_id)"
+            for etype, tbl in tools.kind_tables.items()
         )
         return f"(CASE {r}.entity_type {arms} END)"
 
@@ -1670,103 +1775,97 @@ def content_kind_path() -> InitiativePath:
     )
 
 
-# table -> how its rows resolve an initiative for initiative_access(...). THE
-# source of truth: INITIATIVE_SCOPED_TABLES and the rendered RLS DDL (app.db.guild_ddl) both derive from
-# this dict, so a new initiative-scoped table is declared here exactly once.
-INITIATIVE_PATHS: dict[str, InitiativePath] = {
-    # Every tool's table: its own initiative_id column. A calendar or a contact
-    # may name no initiative, being made for the whole guild.
-    **{
-        tool.plural: direct_or_guild(tool) if tool in COMMUNITY_ROWS else direct()
-        for tool in Tool
-    },
-    "metadata_definitions": metadata_definitions_path(),
-    # Sharing itself. It carries no sharing leg of its own: resource_access
-    # reads this table, so a policy here that called it would not resolve.
-    # ``direct()`` derives none, because the table is no tool's own.
-    "resource_grants": direct(),
-    # Who asked for a resource, and the answer: the initiative's gate, with
-    # who reads and writes which rows narrowed in ``app.db.guild_ddl``.
-    "share_requests": direct(),
-    # The change log itself, read like the content each change describes: a
-    # person reads a change only where they can open the tool instance that
-    # governs it (``dac_tool``/``dac_id``, stamped by the capture trigger), as
-    # with the search index. The poller and the levels pass read it as the
-    # system, so a subscription's reach is still the scope it names (see
-    # outbox_poller's module docstring). Writing is the capture trigger's alone
-    # (app.db.guild_ddl._WRITTEN_BY).
-    "event_outbox": named_tool_path(),
-    # The events installed plug-ins emit, scoped by the initiative an event names
-    # like the change log beside it. Written by the system engine alone
-    # (app.db.guild_ddl._WRITTEN_BY) and read by the poller.
-    "plugin_event_outbox": direct(),
-    # The search index. Derived from the content tables, and gated like them.
-    "search_entries": named_tool_path(entity=("entity_type", "entity_id")),
-    # Integration config, reached by whoever can reach what it watches.
-    "webhook_subscriptions": webhook_subscription_path(),
-    "guest_invite_grants": administration_path(),
-    # Stored files, reached through the initiative whose content shows them.
-    "uploads": uploads_path(),
-    # Reports a community settles. Reached by whoever already sees everything
-    # in the initiative, plus the guild admin — see direct_full_access.
-    "moderation_reports": direct_full_access(),
-    "moderation_report_reporters": via_full_access("moderation_reports", "report_id"),
-    "moderation_actions": direct_full_access(),
-    # Where a stream of operations work lands. Reached by whoever can reach the
-    # project it names, which is the initiative that does the work.
-    "intake_bindings": via("projects", "project_id"),
-    # One hop -> projects
-    "tasks": via("projects", "project_id"),
-    "task_statuses": via("projects", "project_id"),
-    "task_types": via("projects", "project_id"),
-    # One hop -> files
-    "file_versions": via("files", "file_id"),
-    # One hop -> counter_groups
-    "counters": via("counter_groups", "counter_group_id"),
-    # One hop -> wikis. The page tree is a column on this table, not a
-    # second path: every page of a wiki is reached exactly as hard as the
-    # wiki, however deep it sits.
-    "wiki_pages": via("wikis", "wiki_id"),
-    # One hop -> calendars
-    "calendar_events": via("calendars", "calendar_id"),
-    # One hop -> dashboards
-    # One hop -> posts
-    "post_reads": via("posts", "post_id"),
-    # Seen through their files, changed by the initiative's file makers.
-    "collections": collections_path(),
-    "collection_files": collection_files_path(),
-    "post_polls": via("posts", "post_id"),
-    # Two hops -> tasks -> projects
-    "task_assignees": via_task_project("task_id"),
-    # A case is read exactly as hard as the task it describes, so it hangs off
-    # the task rather than off the project column it is keyed by.
-    "intake_cases": via_task_project("task_id"),
-    # The votes for an idea are read as hard as the task that is the idea.
-    "idea_votes": via_task_project("task_id"),
-    # What a person attached: reached as its report or its case is.
-    "evidence": evidence_path(),
-    # Two hops -> post_polls -> posts
-    "post_poll_options": via_post_poll("poll_id"),
-    "post_poll_votes": via_post_poll("poll_id"),
-    # Two hops -> calendar_events -> calendars
-    "calendar_event_attendees": via_event_calendar("calendar_event_id"),
-    "calendar_event_answers": via_event_calendar("calendar_event_id"),
-    # Every metadata value, properties included, on any tool and sub-tool and
-    # on an install, by (entity_type, entity_id).
-    "metadata_values": metadata_values_path(),
-    # An initiative's views of one tool instance, or of a shared page.
-    "tool_layouts": tool_layouts_path(),
-    "comments": comments_path(),
-    # Polymorphic over what it is on; gated by that thing's own path.
-    "reactions": reactions_path(),
-    "relationships": relationships_path(),
-    # Per-user state, scoped via the entity it points at: a queued line is
-    # gated like the task or the reacted-to thing it describes.
-    "batched_notices": batched_notices_path(),
-    "event_reminder_dispatches": via_event_calendar("event_id"),
-    "personal_items": content_kind_path(),
-    "engagement_levels": content_kind_path(),
-}
+@lru_cache(KEPT_TOOL_SETS)
+def paths_for(tools: ToolSet) -> dict[str, InitiativePath]:
+    """table -> how its rows resolve an initiative for initiative_access(...),
+    for a community with ``tools``. THE source of truth: the rendered RLS DDL
+    (``app.db.guild_ddl``) derives from it, so a new initiative-scoped table is
+    declared here exactly once."""
+    return {
+        # Every tool's table: its own initiative_id column. A calendar or a contact
+        # may name no initiative, being made for the whole guild.
+        **{
+            tool.table.name: (
+                direct_or_guild(tool) if tool.spec.community_rows else direct(tool)
+            )
+            for tool in tools
+        },
+        "metadata_definitions": metadata_definitions_path(),
+        # Sharing itself. It carries no sharing leg of its own: resource_access
+        # reads this table, so a policy here that called it would not resolve.
+        # ``direct()`` derives none, because the table is no tool's own.
+        "resource_grants": direct(),
+        # Who asked for a resource, and the answer: the initiative's gate, with
+        # who reads and writes which rows narrowed in ``app.db.guild_ddl``.
+        "share_requests": direct(),
+        # The change log itself, read like the content each change describes: a
+        # person reads a change only where they can open the tool instance that
+        # governs it (``dac_tool``/``dac_id``, stamped by the capture trigger), as
+        # with the search index. The poller and the levels pass read it as the
+        # system, so a subscription's reach is still the scope it names (see
+        # outbox_poller's module docstring). Writing is the capture trigger's alone
+        # (app.db.guild_ddl._WRITTEN_BY).
+        "event_outbox": named_tool_path(tools),
+        # The events installed plug-ins emit, scoped by the initiative an event names
+        # like the change log beside it. Written by the system engine alone
+        # (app.db.guild_ddl._WRITTEN_BY) and read by the poller.
+        "plugin_event_outbox": direct(),
+        # The search index. Derived from the content tables, and gated like them.
+        "search_entries": named_tool_path(tools, entity=("entity_type", "entity_id")),
+        # Integration config, reached by whoever can reach what it watches.
+        "webhook_subscriptions": webhook_subscription_path(),
+        "guest_invite_grants": administration_path(),
+        # Stored files, reached through the initiative whose content shows them.
+        "uploads": uploads_path(),
+        # Reports a community settles. Reached by whoever already sees everything
+        # in the initiative, plus the guild admin — see direct_full_access.
+        "moderation_reports": direct_full_access(),
+        "moderation_report_reporters": via_full_access(
+            "moderation_reports", "report_id"
+        ),
+        "moderation_actions": direct_full_access(),
+        # Every tool's item tables, each read and written as its parent in the tool
+        # is: one hop to the tool's table, or two through the item that keys it.
+        # A wiki's page tree is a column on its pages, not a second path: every page
+        # is reached exactly as hard as the wiki, however deep it sits.
+        **item_paths(tools),
+        # Seen through their files, changed by the initiative's file makers.
+        "collections": collections_path(),
+        "collection_files": collection_files_path(),
+        # The operations community's own tables, kept out of the Projects record:
+        # they point at a project or a task for the work they route, not as part of
+        # it. Where a stream of operations work lands is reached by whoever can
+        # reach the project it names, which is the initiative that does the work.
+        "intake_bindings": via(_PROJECTS, "project_id"),
+        # A case is read exactly as hard as the task it describes, so it hangs off
+        # the task rather than off the project column it is keyed by.
+        "intake_cases": via_item(_PROJECTS, "tasks", "task_id"),
+        # The votes for an idea are read as hard as the task that is the idea.
+        "idea_votes": via_item(_PROJECTS, "tasks", "task_id"),
+        # What a person attached: reached as its report or its case is.
+        "evidence": evidence_path(),
+        # A vote's poll_id is keyed with its option to the option, not to the poll,
+        # so no key leads to the poll: the vote walks to its post by the id alone.
+        "post_poll_votes": via_item(_POSTS, "post_polls", "poll_id"),
+        # Every metadata value, properties included, on any tool and sub-tool and
+        # on an install, by (entity_type, entity_id).
+        "metadata_values": metadata_values_path(tools),
+        # An initiative's views of one tool instance, or of a shared page.
+        "tool_layouts": tool_layouts_path(tools),
+        "comments": comments_path(tools),
+        # Polymorphic over what it is on; gated by that thing's own path.
+        "reactions": reactions_path(tools),
+        "relationships": relationships_path(tools),
+        # Per-user state, scoped via the entity it points at: a queued line is
+        # gated like the task or the reacted-to thing it describes.
+        "batched_notices": batched_notices_path(tools),
+        "personal_items": content_kind_path(tools),
+        "engagement_levels": content_kind_path(tools),
+    }
+
+
+#: Every initiative-scoped table of the built-in tools, and its path.
+INITIATIVE_PATHS: dict[str, InitiativePath] = paths_for(BUILTIN_TOOLS)
 
 # Derived — the classification follows the registry, never duplicates it.
 INITIATIVE_SCOPED_TABLES: frozenset[str] = frozenset(INITIATIVE_PATHS)
@@ -1785,6 +1884,10 @@ class NamedPerson:
     #: The rows that keep the person, as a condition on ``t``, where ``%1$I``
     #: is the schema: what records something they did, rather than names them.
     kept: str | None = None
+    #: Archived or trashed rows keep the person on every departure, not only
+    #: on leaving the community: the row carries its own lifecycle stamp, and
+    #: is read-only while it is put away.
+    frozen_kept: bool = False
 
 
 NAMED_PEOPLE: tuple[NamedPerson, ...] = (
@@ -1804,13 +1907,35 @@ NAMED_PEOPLE: tuple[NamedPerson, ...] = (
 )
 
 
-def initiative_of(table: str, row: str, *, qualify: str = "") -> str:
+def named_people(tools: ToolSet) -> tuple[NamedPerson, ...]:
+    """Every column on a community's content that names a person: the
+    built-in tools' (:data:`NAMED_PEOPLE`), then each person field of its
+    installed tools' tables, emptied when the person leaves."""
+    return (
+        *NAMED_PEOPLE,
+        *(
+            NamedPerson(table.name, column.name, clear=True, frozen_kept=True)
+            for table in tools.installed_tables
+            for column in table.c
+            if column.info.get("field") == "user_reference"
+        ),
+    )
+
+
+def initiative_of(
+    table: str,
+    row: str,
+    *,
+    qualify: str = "",
+    paths: Mapping[str, InitiativePath] | None = None,
+) -> str:
     """The initiative a row of ``table`` belongs to, as a sub-select, walked
     through the hops its policies declare. ``qualify`` goes before each table
     name (a schema). A table that names its subject as a ``(kind, id)`` pair,
     or holds its own ``initiative_id``, has no hops to walk, and answers
-    through its own ``initiative_expr``."""
-    path = INITIATIVE_PATHS[table]
+    through its own ``initiative_expr``. ``paths`` are a community's
+    (:func:`paths_for`), the built-in tools' when not given."""
+    path = (paths or INITIATIVE_PATHS)[table]
     if path.dac is None or not path.dac.via:
         return path.initiative_expr(row)
     hops = path.dac.via
@@ -1892,18 +2017,18 @@ def governing_path(table: str) -> tuple[Tool, tuple[tuple[str, str], ...]] | Non
     the answer is a property of the row, or a configuration table that no
     tool's sharing governs.
     """
-    path = INITIATIVE_PATHS.get(table)
-    if path is None or path.dac is None:
+    walk = governing_walk(table, INITIATIVE_PATHS)
+    return None if walk is None else (Tool(walk[0].kind), walk[1])
+
+
+def governing_walk(
+    table: str, paths: Mapping[str, InitiativePath]
+) -> tuple[ToolRecord, tuple[tuple[str, str], ...]] | None:
+    """:func:`governing_path` among ``paths``, naming the tool's record."""
+    path = paths.get(table)
+    if path is None or path.dac is None or path.dac.tool is None:
         return None
-    tool = path.dac.tool
-    if tool is None:
-        # _dac_self reads it off the table name at render time rather than
-        # storing it; a table that is no tool's own has no answer here.
-        tool = _TOOL_BY_TABLE.get(table)
-        if tool is None:
-            return None
-        return tool, ()
-    return tool, path.dac.via
+    return path.dac.tool, path.dac.via
 
 
 def dac_asks_at_write(table: str, command: str) -> bool:
@@ -1986,11 +2111,12 @@ def reports_as(parent: str, fk: str, facet: str) -> ReportsAs:
     )
 
 
-def grants_report_on_their_resource() -> ReportsAs:
+def grants_report_on_their_resource(tools: ToolSet) -> ReportsAs:
     """A grant is sharing ON something — report it against that something.
 
-    ``resource_type`` holds the Tool value and ``resource_id`` its id, so the
-    event lands on the project (or file, counter group, …) whose access changed.
+    ``resource_type`` holds the tool's kind and ``resource_id`` its id, so the
+    event lands on the project (or file, tool plug-in's tool, …) whose access
+    changed.
     That is both what a subscriber wants to hear and already resolvable, where
     the grant row's own id resolves nowhere.
 
@@ -1998,9 +2124,9 @@ def grants_report_on_their_resource() -> ReportsAs:
     skipped, so the vocabulary below and what the trigger can emit stay the same
     set.
     """
-    arms = " ".join(f"WHEN '{t.value}' THEN '{t.plural}'" for t in Tool)
+    arms = " ".join(f"WHEN '{t.kind}' THEN '{t.table.name}'" for t in tools)
     return ReportsAs(
-        resource_types=frozenset(t.plural for t in Tool),
+        resource_types=frozenset(t.table.name for t in tools),
         id_expr=lambda r: f"{r}.resource_id",
         facet="sharing",
         type_expr=lambda r: f"(CASE {r}.resource_type {arms} END)",
@@ -2041,6 +2167,7 @@ def _reported_as(table: str) -> tuple[str, Callable[[str], str]]:
     if declared is None:
         return table, lambda alias: f"{alias}.id"
     report = declared[0] if isinstance(declared, tuple) else declared
+    assert isinstance(report, ReportsAs), table
     (parent,) = report.resource_types
     return parent, report.id_expr
 
@@ -2112,7 +2239,7 @@ def values_report_on_their_target(kinds: Iterable[str], facet: str) -> ReportsAs
     the current values. A pair naming none of ``kinds`` resolves to nothing,
     and the row is skipped.
     """
-    tables = {target: entity_tables()[target] for target in kinds}
+    tables = {target: entity_tables(BUILTIN_TOOLS)[target] for target in kinds}
     reports = {target: _reported_as(table) for target, table in tables.items()}
     type_arms = " ".join(
         f"WHEN '{target}' THEN '{resource}'"
@@ -2135,15 +2262,21 @@ def values_report_on_their_target(kinds: Iterable[str], facet: str) -> ReportsAs
     )
 
 
-def layouts_report_on_their_target() -> ReportsAs:
+def layouts_report_on_their_target(tools: ToolSet) -> ReportsAs:
     """A layout is a facet of the instance it is for, or of its initiative when
-    it is for a shared tool. Whoever shows the set re-reads it."""
+    it is for a shared tool or a tool plug-in's own rows; a tool plug-in's
+    item's, of the row its items sit under. Whoever shows the set re-reads
+    it."""
+    kinds = tools.kind_tables
+    tables = {
+        **LAYOUT_INSTANCE_TABLES,
+        **{item: kinds[parent] for item, parent in tools.item_parents.items()},
+    }
     arms = " ".join(
-        f"WHEN '{target}' THEN '{table}'"
-        for target, table in LAYOUT_INSTANCE_TABLES.items()
+        f"WHEN '{target}' THEN '{table}'" for target, table in tables.items()
     )
     return ReportsAs(
-        resource_types=frozenset(LAYOUT_INSTANCE_TABLES.values()) | {"initiatives"},
+        resource_types=frozenset(tables.values()) | {"initiatives"},
         id_expr=lambda r: f"COALESCE({r}.tool_id, {r}.initiative_id)",
         facet="layouts",
         type_expr=lambda r: (
@@ -2190,8 +2323,11 @@ class Emit:
     guild_wide: bool = False
     #: Report against a parent resource instead of naming this table. A tuple
     #: emits one event per entry — for a row that is a facet of more than one
-    #: thing, so every surface it shows on is told to re-read.
-    reports_as: ReportsAs | tuple[ReportsAs, ...] | None = None
+    #: thing, so every surface it shows on is told to re-read. A function is
+    #: the report in a community with the tools it is given.
+    reports_as: (
+        ReportsAs | tuple[ReportsAs, ...] | Callable[[ToolSet], ReportsAs] | None
+    ) = None
     #: Publish this table's own events under this resource type instead of the
     #: table's name, for a table whose API segment differs from it. Keeps the
     #: readback rule (``resource_type`` -> the detail route that serves the id)
@@ -2313,7 +2449,7 @@ EVENT_SOURCES: dict[str, Emit | Silent] = {
     ),
     # A layout is read in its instance's set, or its initiative's for a shared
     # tool, so a change reports as that.
-    "tool_layouts": Emit(reports_as=layouts_report_on_their_target()),
+    "tool_layouts": Emit(reports_as=layouts_report_on_their_target),
     # An answer is read with the event it answers, as its attendees are.
     "calendar_event_answers": Emit(
         reports_as=reports_as("calendar_events", "calendar_event_id", "answers")
@@ -2338,7 +2474,7 @@ EVENT_SOURCES: dict[str, Emit | Silent] = {
     # A draft page is read only by the wiki's writers, so like an unpublished
     # notice it is not news until it is finished.
     "wiki_pages": Emit(quiet_when=lambda r: f"{r}.is_draft"),
-    "resource_grants": Emit(reports_as=grants_report_on_their_resource()),
+    "resource_grants": Emit(reports_as=grants_report_on_their_resource),
     "post_polls": Emit(reports_as=reports_as("posts", "post_id", "poll")),
     "post_poll_options": Emit(reports_as=poll_options_report_on_their_post()),
     # A vote is the one gesture whose author is the private half of it — a poll
@@ -2397,20 +2533,23 @@ EVENT_SOURCES["metadata_values"] = Emit(
 )
 
 
-def initiative_locator(table: str) -> RowLocator:
+def initiative_locator(
+    table: str, paths: Mapping[str, InitiativePath] = INITIATIVE_PATHS
+) -> RowLocator:
     """Row expression yielding the initiative an event about ``table`` belongs to.
 
     One question, answered from the registry that already knows: an
     initiative-scoped table reuses the very path that renders its RLS, so a row
     can never be gated by one initiative and have its events attributed to
-    another. Guild-level emitters say so themselves.
+    another. Guild-level emitters say so themselves. ``paths`` are the
+    community's (:func:`paths_for`).
     """
     source = event_source(table)
     if source.guild_wide:
         return lambda _row: "NULL::integer"
     if source.initiative is not None:
         return source.initiative
-    path = INITIATIVE_PATHS.get(table)
+    path = paths.get(table)
     if path is None:
         raise RuntimeError(
             f"{table} emits events but nothing resolves the initiative they "

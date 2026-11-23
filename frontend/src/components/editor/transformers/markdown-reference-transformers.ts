@@ -29,6 +29,7 @@ import { isSmartChipKind, storedEntityType } from "@/lib/smartChips";
  *
  *   [[task:12|Roll call]]               a `#` link, Obsidian's wikilink —
  *                                       the embed is the same with a `!`
+ *   [[counter.tsjvtcm0s7gv2x:3|Laps]]   a `#` link to a tool plug-in's row
  *   [[task:12:status|In Progress]]      a smart chip: the link, plus the fact
  *   @[](4)                              a person, as a comment writes one
  *
@@ -40,7 +41,7 @@ import { isSmartChipKind, storedEntityType } from "@/lib/smartChips";
 const label = (text: string, delimiters: RegExp) => text.replace(delimiters, "");
 
 // Not after a `!`, which makes the same brackets an embed.
-const LINK = /(?<!!)\[\[([a-z_]+):(\d+)(?::([a-z_]+))?\|([^\]\n]*)\]\]/;
+const LINK = /(?<!!)\[\[([a-z_][a-z0-9_]*(?:\.[a-z0-9]+)?):(\d+)(?::([a-z_]+))?\|([^\]\n]*)\]\]/;
 
 /** A `#` link or a smart chip: the two differ only by the chip's aspect. */
 export const REFERENCE: TextMatchTransformer = {

@@ -16,7 +16,6 @@ from app.api.v1.platform_endpoints import (
     dm,
     dm_transport,
     email_otp,
-    field_catalog,
     guild_provider_connections,
     guilds,
     health,
@@ -78,13 +77,13 @@ from app.api.v1.tenant_endpoints import (
     collections,
     comments,
     contacts,
-    counters,
     custom_roles,
     dashboards,
     data_jobs,
     events,
     evidence,
     exports,
+    field_catalog,
     files,
     guild_plugins,
     holds,
@@ -95,6 +94,7 @@ from app.api.v1.tenant_endpoints import (
     moderation,
     personal_items,
     plugin_data,
+    plugin_tools,
     posts,
     projects,
     property_definitions,
@@ -104,6 +104,7 @@ from app.api.v1.tenant_endpoints import (
     relationships,
     resource_grants,
     resumable_uploads,
+    sends,
     share_requests,
     smart_chips,
     storage,
@@ -127,7 +128,6 @@ from app.api.v1.tenant_endpoints import (
 from app.api.v1.tenant_endpoints import (
     search as guild_search,
 )
-from app.api.v1.tenant_endpoints.tool_lists import TOOL_LISTS
 from app.core.tools import Tool
 
 api_router = APIRouter()
@@ -136,7 +136,6 @@ api_router = APIRouter()
 # Top-level routes: unauthenticated, user-scoped, operator, and cross-guild.
 # These do NOT take a guild path segment.
 # ---------------------------------------------------------------------------
-api_router.include_router(field_catalog.router, tags=["fields"])
 api_router.include_router(recurrence.router, prefix="/recurrence", tags=["recurrence"])
 api_router.include_router(version.router, tags=["version"])
 api_router.include_router(health.router, tags=["health"])
@@ -291,7 +290,7 @@ def _tool_mount(tool: Tool) -> dict[str, Any]:
     OpenAPI tag its list is published under."""
     return {
         "prefix": f"/{tool.route_segment}",
-        "tags": [TOOL_LISTS[tool].tag or tool.plural],
+        "tags": [tool.plural],
     }
 
 
@@ -306,6 +305,7 @@ guild_router.include_router(task_statuses.initiative_router, tags=["task-statuse
 guild_router.include_router(task_types.router, tags=["task-types"])
 guild_router.include_router(tool_layouts.router, tags=["layouts"])
 guild_router.include_router(query.router, tags=["query"])
+guild_router.include_router(field_catalog.router, tags=["fields"])
 guild_router.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
 # A community's own moderation: its reports, and settling them. No prefix —
 # the reports of an initiative lead with the initiative, and settling one leads
@@ -341,6 +341,8 @@ guild_router.include_router(
 guild_router.include_router(
     share_requests.router, prefix="/share-requests", tags=["sharing"]
 )
+# Pointing somebody at a thing, in their bell. Every kind, so mounted once.
+guild_router.include_router(sends.router, prefix="/sends", tags=["sharing"])
 guild_router.include_router(data_jobs.router, prefix="/data-jobs", tags=["data-jobs"])
 guild_router.include_router(exports.router, prefix="/exports", tags=["exports"])
 guild_router.include_router(demo.community_router, prefix="/demo", tags=["demo"])
@@ -348,16 +350,16 @@ guild_router.include_router(demo.sales_router, prefix="/demo", tags=["demo"])
 guild_router.include_router(imports.router, prefix="/imports", tags=["imports"])
 guild_router.include_router(resumable_uploads.router, prefix="/resumable-uploads")
 
-guild_router.include_router(counters.router, **_tool_mount(Tool.counter_group))
-# Flat read-back routes, at the guild root: an event envelope names a
-# resource by its own id, so every evented resource must resolve from one.
-guild_router.include_router(counters.counters_router, tags=["counters"])
 guild_router.include_router(calendars.router, **_tool_mount(Tool.calendar))
 guild_router.include_router(dashboards.router, **_tool_mount(Tool.dashboard))
 guild_router.include_router(posts.router, **_tool_mount(Tool.post))
 guild_router.include_router(wikis.router, **_tool_mount(Tool.wiki))
 guild_router.include_router(wikis.pages_router, tags=_tool_mount(Tool.wiki)["tags"])
 guild_router.include_router(contacts.router, **_tool_mount(Tool.contact))
+# Every tool plug-in's tool and items, by kind (tenant_endpoints/plugin_tools.py).
+guild_router.include_router(
+    plugin_tools.router, prefix="/plugin-tools", tags=["plugin-tools"]
+)
 # Plug-ins installed at guild scope. Every member reads them (the sidebar needs to
 # know what is there); installing and removing are guild-admin actions.
 #

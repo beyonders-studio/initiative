@@ -10,9 +10,6 @@ into the trash with it is ``soft_delete_test``'s; restoring it is ``trash_test``
 each tool carries inside it is that tool's own test. So is the duplicate of a
 row inside a tool (``resource_access.SUB_TOOLS``), which each sub-tool routes
 itself.
-
-The counter-group signal tests this replaces asserted the same thing under the
-tool's own event names.
 """
 
 import pytest
@@ -27,7 +24,6 @@ from app.models.platform.guild import CommunityRole
 from app.models.tenant.calendar_event import CalendarEvent
 from app.models.tenant.collection import Collection
 from app.models.tenant.comment import Comment
-from app.models.tenant.counter import Counter
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.models.tenant.task import Task
 from app.models.tenant.wiki import WikiPage
@@ -36,7 +32,6 @@ from app.services.tenant.tags import TAG_LINKS
 from app.testing import (
     assign_tag,
     create_calendar_event,
-    create_counter,
     create_initiative,
     create_resource_grant,
     create_tag,
@@ -210,17 +205,16 @@ def test_every_table_inside_a_tool_is_copied_or_left_on_purpose(tool: Tool):
     """A table filed under a tool is either copied with it or, like its
     comments, stays with the original. A new one fails here until its copier
     says which."""
-    inside = {child for child, _ in CASCADE_CHILDREN.get(TOOL_LISTS[tool].model, ())}
+    from app.db.base import MODELS_BY_TABLE
+
+    children = CASCADE_CHILDREN.get(TOOL_LISTS[tool].model.__table__, ())
+    inside = {MODELS_BY_TABLE[edge.table.name] for edge in children}
     assert inside - {Comment} == TOOL_COPIERS[tool].copies
 
 
 #: Where each row inside a tool is addressed, and how one called ``name`` is made.
 CHILDREN = {
     Task: ("tasks", lambda s, tool, user, name: create_task(s, tool, title=name)),
-    Counter: (
-        "counters",
-        lambda s, tool, user, name: create_counter(s, tool, name=name),
-    ),
     CalendarEvent: (
         "calendar-events",
         lambda s, tool, user, name: create_calendar_event(s, tool, user, title=name),

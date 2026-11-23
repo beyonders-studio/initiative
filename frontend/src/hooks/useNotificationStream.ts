@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 
 import { getAuthToken } from "@/api/client";
@@ -9,6 +10,7 @@ import { refreshFiledTickets } from "@/hooks/useTickets";
 import { type AlertFrame, receiveAlert } from "@/lib/desktopAlerts";
 import { openLiveSocket } from "@/lib/liveSocket";
 import { buildApiWsUrl } from "@/lib/wsUrl";
+import Desktop from "@/plugins/desktop";
 
 // "Somebody just did something here" (the backend's MSG_ACTIVE). One byte, no
 // payload: the socket already knows whose it is.
@@ -20,7 +22,8 @@ const MSG_ACTIVE = 6;
 const ACTIVITY_INTERVAL_MS = 60_000;
 
 // What counts as a sign of someone. Pointer, key and scroll cover being at the
-// machine; a tab coming back to the front covers returning to it.
+// machine; a tab coming back to the front covers returning to it. The desktop
+// app also hears of input to the rest of the computer, which a tab cannot.
 const ACTIVITY_EVENTS = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
 
 // A frame is the only prompt to re-read the account, so a re-read that fails
@@ -245,12 +248,17 @@ export const useNotificationStream = () => {
       window.addEventListener(name, reportActivity, { passive: true });
     }
     document.addEventListener("visibilitychange", onVisibilityChange);
+    const computer =
+      Capacitor.getPlatform() === "electron"
+        ? Desktop.addListener("computerActive", reportActivity)
+        : null;
 
     return () => {
       for (const name of ACTIVITY_EVENTS) {
         window.removeEventListener(name, reportActivity);
       }
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      void computer?.then((handle) => handle.remove());
       setConnected(false);
       connection.close();
     };

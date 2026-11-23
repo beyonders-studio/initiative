@@ -3,11 +3,10 @@
  *
  * The create wizard asks "what is this initiative made of?" of people on their
  * first minute in the app, and a name plus a sentence is not enough to answer
- * it — "counter" means nothing until you have seen one. So each card carries
- * a small picture of the screen it is standing in for, drawn from what that
- * screen actually renders: the counter's [−] value [+] in its number, bar and
- * ring forms, the calendar's weekday header over a month of cells with event
- * chips that run across days.
+ * it — "dashboard" means nothing until you have seen one. So each card
+ * carries a small picture of the screen it is standing in for, drawn from what
+ * that screen actually renders: the calendar's weekday header over a month of
+ * cells with event chips that run across days.
  *
  * Shapes, not screenshots: it has to read at thumbnail size and in either
  * theme, and it must never look like a real screen somebody could try to
@@ -18,7 +17,7 @@
  * sketch, the same way it catches one without an icon.
  */
 
-import { Minus, Plus } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
@@ -196,49 +195,6 @@ const CalendarSketch = ({ active }: SketchProps) => (
   </Frame>
 );
 
-/** Counters: a minus on the left, a plus on the right, the number in the
- *  middle — the row exactly as the tool draws it — over the bar it fills. */
-const CounterGroupSketch = ({ active }: SketchProps) => (
-  <Frame>
-    <div className="flex h-full flex-col justify-between">
-      <div className={cn("h-1.5 w-1/3 rounded-sm", ink(active))} />
-      <div className="flex items-center justify-between gap-2 px-1">
-        <div
-          className={cn(
-            "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border",
-            line(active),
-            faint(active),
-            active ? "text-primary" : "text-muted-foreground"
-          )}
-        >
-          <Minus className="h-3.5 w-3.5" strokeWidth={3} />
-        </div>
-        <div
-          className={cn(
-            "font-bold font-mono text-2xl tabular-nums leading-none",
-            active ? "text-primary" : "text-muted-foreground/70"
-          )}
-        >
-          24
-        </div>
-        <div
-          className={cn(
-            "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border",
-            line(active),
-            faint(active),
-            active ? "text-primary" : "text-muted-foreground"
-          )}
-        >
-          <Plus className="h-3.5 w-3.5" strokeWidth={3} />
-        </div>
-      </div>
-      <div className={cn("h-2 w-full overflow-hidden rounded-full", faint(active))}>
-        <div className={cn("h-full w-3/5 rounded-full", accent(active))} />
-      </div>
-    </div>
-  </Frame>
-);
-
 /** The dashboard: a bar chart, a sparkline, a big number and a donut. */
 const DashboardSketch = ({ active }: SketchProps) => (
   <Frame>
@@ -377,7 +333,6 @@ export const TOOL_SKETCHES: Record<Tool, (props: SketchProps) => ReactNode> = {
   [Tool.project]: ProjectSketch,
   [Tool.file]: FileSketch,
   [Tool.calendar]: CalendarSketch,
-  [Tool.counter_group]: CounterGroupSketch,
   [Tool.dashboard]: DashboardSketch,
   [Tool.post]: PostSketch,
   [Tool.wiki]: WikiSketch,
@@ -394,22 +349,25 @@ export const ToolSketch = ({ tool, active }: ToolSketchProps) => {
   return <Sketch active={active} />;
 };
 
+/** An icon in a tile, lit when its tool is picked: a tool plug-in's, which
+ *  has no sketch. */
+export const IconTile = ({ icon: Icon, active }: SketchProps & { icon: LucideIcon }) => (
+  <span
+    aria-hidden="true"
+    className={cn(
+      "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors",
+      active
+        ? "bg-primary/15 text-primary shadow-[inset_0_0_0_1px] shadow-primary/40"
+        : "bg-muted text-muted-foreground"
+    )}
+  >
+    <Icon className="h-5 w-5" />
+  </span>
+);
+
 /** The tool's icon in a tile, lit when the tool is picked. Kept beside the
  *  sketch rather than replaced by it: the icon is what the sidebar will show,
  *  so seeing them together is what teaches the association. */
-export const ToolIconTile = ({ tool, active }: ToolSketchProps) => {
-  const Icon = TOOL_ICONS[tool];
-  return (
-    <span
-      aria-hidden="true"
-      className={cn(
-        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors",
-        active
-          ? "bg-primary/15 text-primary shadow-[inset_0_0_0_1px] shadow-primary/40"
-          : "bg-muted text-muted-foreground"
-      )}
-    >
-      <Icon className="h-5 w-5" />
-    </span>
-  );
-};
+export const ToolIconTile = ({ tool, active }: ToolSketchProps) => (
+  <IconTile icon={TOOL_ICONS[tool]} active={active} />
+);

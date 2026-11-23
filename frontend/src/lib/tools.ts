@@ -5,12 +5,12 @@
  * generated types). Every derived name follows one rule set, so a tool's
  * entry here is just its icon:
  *
- *   value            "counter_group"          (the enum / resource_type)
- *   plural           "counter_groups"         → permission keys, member flags
- *   kebab plural     "counter-groups"         → route segment, API path
- *   camel plural     "counterGroups"          → i18n namespace, palette group
- *   camel singular   "counterGroup"           → route param name
- *   pascal singular  "CounterGroup"           → nav create-label key
+ *   value            "calendar_event"         (the enum / resource_type)
+ *   plural           "calendar_events"        → permission keys, member flags
+ *   kebab plural     "calendar-events"        → route segment, API path
+ *   camel plural     "calendarEvents"         → i18n namespace, palette group
+ *   camel singular   "calendarEvent"          → route param name
+ *   pascal singular  "CalendarEvent"          → nav create-label key
  *
  * ## Adding a tool
  * 1. Backend: add the `Tool` enum member + wire the registries there
@@ -27,6 +27,11 @@
  * below with its reason — the same way `app/core/tools.py` states these facts
  * — so a new tool gets every surface by default and an omission has to be
  * written down to happen.
+ *
+ * What the backend knows about a tool (its default switch, what it exports
+ * to, the kinds inside it) is its record there, which `pnpm generate:api`
+ * writes beside the API types; the facts here are the ones only the frontend
+ * has.
  */
 
 import type { ParseKeys } from "i18next";
@@ -35,15 +40,15 @@ import {
   BookUser,
   CalendarDays,
   Files,
-  Gauge,
   LayoutDashboard,
   ListTodo,
   type LucideIcon,
   Megaphone,
 } from "lucide-react";
 
-import type { InitiativeRead, PermissionKey } from "@/api/generated/initiativeAPI.schemas";
+import type { FileType, InitiativeRead } from "@/api/generated/initiativeAPI.schemas";
 import { ListingKind, Tool } from "@/api/generated/initiativeAPI.schemas";
+import records from "@/api/generated/tools.json";
 
 /**
  * The icon each tool renders with everywhere (sidebar, recents, palette,
@@ -52,7 +57,6 @@ import { ListingKind, Tool } from "@/api/generated/initiativeAPI.schemas";
 export const TOOL_ICONS: Record<Tool, LucideIcon> = {
   [Tool.project]: ListTodo,
   [Tool.file]: Files,
-  [Tool.counter_group]: Gauge,
   [Tool.calendar]: CalendarDays,
   [Tool.dashboard]: LayoutDashboard,
   [Tool.post]: Megaphone,
@@ -63,30 +67,68 @@ export const TOOL_ICONS: Record<Tool, LucideIcon> = {
 /** Every tool, in canonical enum order. */
 export const TOOLS = Object.values(Tool) as Tool[];
 
-/**
- * On unless an initiative says otherwise. Mirrors backend
- * `DEFAULT_ENABLED_TOOLS`.
- *
- * Projects and files used to be exempt from the master switch entirely —
- * always on, with no `{plural}_enabled` column. Relationships ended that: a
- * tool no longer needs either of them to be linkable, so an initiative that is
- * only a calendar is a coherent thing to want. What they keep is the default,
- * which is the part that was ever load-bearing.
- */
-export const DEFAULT_ENABLED_TOOLS: ReadonlySet<Tool> = new Set([Tool.project, Tool.file]);
+/** Whether a kind is a built-in tool's, rather than a tool plug-in's. */
+export const isBuiltInTool = (kind: string): kind is Tool => (TOOLS as string[]).includes(kind);
+
+/** A tool's record, as the backend's `ToolSpec` declares it. */
+interface ToolRecord {
+  /** Switched on in an initiative that says nothing about its tools. */
+  on_by_default: boolean;
+  /** What a selection of it exports to, in the order offered: null where it
+   *  depends on each row (a file's, on its type), empty for none. */
+  export_formats: string[] | null;
+  /** What an initiative or community report may write it in, in the order
+   *  offered; empty where it rides as its envelope. */
+  report_formats: string[];
+  /** How it lays out what it holds, if it does. */
+  layouts: { per_instance: boolean; lists: string[]; detail: string | null } | null;
+}
+
+const TOOL_RECORDS = records.tools as Record<Tool, ToolRecord>;
+
+/** On unless an initiative says otherwise. */
+export const DEFAULT_ENABLED_TOOLS: ReadonlySet<Tool> = new Set(
+  TOOLS.filter((tool) => TOOL_RECORDS[tool].on_by_default)
+);
 
 /**
- * Tools WITHOUT an export-engine source, and why. Stated as an exclusion so
- * the default is "a new tool is portable" — mirrors backend
- * `NON_EXPORTABLE_TOOLS`. Export and import are ONE capability (a tool's JSON
- * envelope round-trips through both), so this set governs each.
+ * Tools WITHOUT an export-engine source. Export and import are ONE capability
+ * (a tool's JSON envelope round-trips through both), so this set governs each.
  */
-export const NON_EXPORTABLE_TOOLS: ReadonlySet<Tool> = new Set<Tool>([
-  // Empty, and that is the point: every tool has an export source. What used
-  // to sit here (Tool.dashboard) is now handled where it belongs — an entity
-  // built on a plug-in this build does not ship is filtered by provenance on the
-  // server, which is a property of the ROW, not of the tool.
-]);
+export const NON_EXPORTABLE_TOOLS: ReadonlySet<Tool> = new Set(
+  TOOLS.filter((tool) => TOOL_RECORDS[tool].export_formats?.length === 0)
+);
+
+/** What a selection of a tool's rows exports to, in the order offered; null
+ *  for a tool whose formats depend on each row (files). */
+export const toolExportFormats = (tool: Tool): readonly string[] | null =>
+  TOOL_RECORDS[tool].export_formats;
+
+/** What a report may write a tool's rows in, in the order offered. */
+export const toolReportFormats = (tool: Tool): readonly string[] =>
+  TOOL_RECORDS[tool].report_formats;
+
+/** What a file of this type exports as, in the order offered: the editor's
+ *  formats for its own types, the stored file itself (`file`) for the rest. */
+export const fileTypeExportFormats = (type: FileType): readonly string[] =>
+  records.file_types[type].export_formats;
+
+/** What a report may write each type of file in, in the order offered. */
+export const FILE_TYPE_REPORT_FORMATS = records.tools.file.type_report_formats;
+
+/** The tools whose every instance lays out its own items (a project's). */
+export const INSTANCE_LAYOUT_TOOLS: ReadonlySet<Tool> = new Set(
+  TOOLS.filter((tool) => {
+    const layouts = TOOL_RECORDS[tool].layouts;
+    return layouts?.per_instance && (layouts.lists.length > 0 || layouts.detail !== null);
+  })
+);
+
+/** The tools the whole initiative shares one page of (its calendar, its
+ *  posts), whose layouts are the initiative's. */
+export const SHARED_LAYOUT_TOOLS: ReadonlySet<Tool> = new Set(
+  TOOLS.filter((tool) => TOOL_RECORDS[tool].layouts?.per_instance === false)
+);
 
 /** Tools with an export-engine source (single + bulk selection export), and
  *  equally the tools whose envelope can be imported. */
@@ -152,15 +194,19 @@ const TOOL_VIEW_SPECS: Partial<Record<Tool, ToolViewSpec>> = {
   [Tool.file]: TEMPLATE_VIEWS,
 };
 
+/** A tool's views by its kind: a tool plug-in's are the two every tool has. */
+const viewSpec = (tool: string): ToolViewSpec =>
+  (isBuiltInTool(tool) ? TOOL_VIEW_SPECS[tool] : undefined) ?? DEFAULT_VIEWS;
+
 /** The views a tool's list offers. */
-export const toolViews = (tool: Tool): ToolView[] =>
-  TOOL_VIEWS.filter((view) => view in (TOOL_VIEW_SPECS[tool] ?? DEFAULT_VIEWS));
+export const toolViews = (tool: string): ToolView[] =>
+  TOOL_VIEWS.filter((view) => view in viewSpec(tool));
 
 /** What a tool's list endpoint is asked for to show `view`. Most tools' live
  *  view asks for nothing, which keeps its query key — and so its cache entry —
  *  the one every other caller of the list already uses. */
-export const toolViewParams = (tool: Tool, view: ToolView): ToolViewParams =>
-  (TOOL_VIEW_SPECS[tool] ?? DEFAULT_VIEWS)[view] ?? {};
+export const toolViewParams = (tool: string, view: ToolView): ToolViewParams =>
+  viewSpec(tool)[view] ?? {};
 
 /**
  * Sidebar display order within an initiative. Projects render last because the
@@ -172,7 +218,6 @@ export const SIDEBAR_TOOLS: Tool[] = [
   Tool.dashboard,
   Tool.file,
   Tool.post,
-  Tool.counter_group,
   Tool.wiki,
   Tool.project,
 ];
@@ -182,7 +227,7 @@ export const SIDEBAR_TOOLS: Tool[] = [
 // ---------------------------------------------------------------------------
 
 /**
- * "counter_group" → "counter_groups", "collection" → "collections".
+ * "calendar_event" → "calendar_events", "collection" → "collections".
  *
  * One rule, mirrored from the backend's `Tool.plural`: a trailing `y` after a
  * consonant becomes `ies`, and everything else takes an `s`.
@@ -192,15 +237,15 @@ export const toolPlural = (tool: Tool | ChildKind): string =>
 
 /**
  * Inverse of {@link toolPlural} for any table-ish plural the bus names —
- * "collections" → "collection", "counter_groups" → "counter_group". The one
+ * "collections" → "collection", "calendar_events" → "calendar_event". The one
  * spelling rule, read backwards, so a resource type is never singularized by
  * chopping an `s` off.
  */
 export const singularOf = (plural: string): string =>
   plural.endsWith("ies") ? `${plural.slice(0, -3)}y` : plural.replace(/s$/, "");
 
-/** "counter_group" → "counter-groups" — route segment AND API path segment.
- *  A child kind's API path follows the same rule ("calendar_event" →
+/** "calendar" → "calendars" — route segment AND API path segment. A child
+ *  kind's API path follows the same rule ("calendar_event" →
  *  "calendar-events"). */
 export const toolRouteSegment = (tool: Tool | ChildKind): string =>
   toolPlural(tool).replaceAll("_", "-");
@@ -228,24 +273,25 @@ export const toolInPath = (pathname: string): { tool: Tool; id: number } | null 
   return null;
 };
 
-/** "counter_group" → "counterGroups" — i18n namespace, palette group key. */
+/** "calendar" → "calendars" — i18n namespace, palette group key. An
+ *  underscore starts a capital, as "calendar_event" → "calendarEvents". */
 export const toolCamelPlural = (tool: Tool): string =>
   toolPlural(tool).replace(/_(\w)/g, (_, c: string) => c.toUpperCase());
 
-/** "counter_group" → "counterGroup" — the stem of the route param name. */
+/** "calendar" → "calendar" — the stem of the route param name. */
 export const toolCamelSingular = (tool: Tool): string =>
   tool.replace(/_(\w)/g, (_, c: string) => c.toUpperCase());
 
-/** "counter_group" → "CounterGroup" */
+/** "calendar" → "Calendar" */
 export const toolPascalSingular = (tool: Tool): string =>
   tool.replace(/(?:^|_)(\w)/g, (_, c: string) => c.toUpperCase());
 
-/** "counter_group" → "CounterGroups", "post" → "Posts" — the stem of
+/** "calendar" → "Calendars", "post" → "Posts" — the stem of
  *  the per-tool permission label keys. */
 export const toolPascalPlural = (tool: Tool): string =>
   toolPlural(tool).replace(/(?:^|_)(\w)/g, (_, c: string) => c.toUpperCase());
 
-/** Resource-relative API path (WITHOUT the `/c/{communityId}` segment), e.g. "/api/v1/counter-groups".
+/** Resource-relative API path (WITHOUT the `/c/{communityId}` segment), e.g. "/api/v1/calendars".
  *  Callers must prepend `/api/v1/c/${communityId}` when building community-scoped requests. */
 export const toolApiPath = (tool: Tool): string => `/api/v1/${toolRouteSegment(tool)}`;
 
@@ -266,7 +312,7 @@ export const initiativeRoute = (initiativeId: number): string =>
 
 /**
  * Community-relative list route for a tool inside one initiative — which is also
- * the initiative page with that tool's tab selected, e.g. "/i/12/counter-groups".
+ * the initiative page with that tool's tab selected, e.g. "/i/12/calendars".
  *
  * `initiativeId === null` names a COMMUNITY-LEVEL entity. Calendars and contacts
  * are the tools that have any (one a community plug-in holds has no
@@ -278,11 +324,11 @@ export const toolListRoute = (tool: Tool, initiativeId: number | null): string =
     ? `/${toolRouteSegment(tool)}`
     : `${initiativeRoute(initiativeId)}/${toolRouteSegment(tool)}`;
 
-/** Community-relative detail route for one entity, e.g. "/i/12/counter-groups/3". */
+/** Community-relative detail route for one entity, e.g. "/i/12/calendars/3". */
 export const toolDetailRoute = (tool: Tool, initiativeId: number | null, id: number): string =>
   `${toolListRoute(tool, initiativeId)}/${id}`;
 
-/** Community-relative settings route, e.g. "/i/12/counter-groups/3/settings". */
+/** Community-relative settings route, e.g. "/i/12/calendars/3/settings". */
 export const toolSettingsRoute = (tool: Tool, initiativeId: number | null, id: number): string =>
   `${toolDetailRoute(tool, initiativeId, id)}/settings`;
 
@@ -304,7 +350,7 @@ export type ToolSettingsSection = (typeof TOOL_SETTINGS_SECTIONS)[number];
 const TOOL_SETTINGS_DEFAULT_SECTION: ToolSettingsSection = "details";
 
 /** Community-relative route for one section of a tool's settings, e.g.
- *  "/i/12/counter-groups/3/settings/access". */
+ *  "/i/12/calendars/3/settings/access". */
 export const toolSettingsSectionRoute = (
   tool: Tool,
   initiativeId: number | null,
@@ -317,7 +363,7 @@ export const toolSettingsSectionRoute = (
 
 // --- The tools with a child entity -----------------------------------------
 // Stated here once rather than left to each page: a task belongs to a project,
-// an event to a calendar, a counter to its group, a page to its wiki, and each
+// an event to a calendar, a page to its wiki, and each
 // child nests under its parent so the URL reads end to end.
 
 /** e.g. "/i/1/projects/2/tasks/5". */
@@ -330,13 +376,6 @@ export const eventRoute = (
   calendarId: number,
   eventId: number
 ): string => `${toolDetailRoute(Tool.calendar, initiativeId, calendarId)}/events/${eventId}`;
-
-/** e.g. "/i/1/counter-groups/3/counter/7". */
-export const counterRoute = (
-  initiativeId: number | null,
-  groupId: number,
-  counterId: number
-): string => `${toolDetailRoute(Tool.counter_group, initiativeId, groupId)}/counter/${counterId}`;
 
 /**
  * e.g. "/i/1/files/collections/5": a collection, which is in the initiative's
@@ -377,13 +416,14 @@ export const wikiFileRoute = (
  */
 export const entityRefRoute = (refType: string, id: number): string => `/go/${refType}/${id}`;
 
-/** "counter_group" → "counter-group". The KEBAB SINGULAR: envelope
+/** "calendar" → "calendar". The KEBAB SINGULAR: envelope
  * discriminator and entity-ref segment. */
 export const toolKebabSingular = (tool: Tool): string => tool.replaceAll("_", "-");
 
-/** Export endpoint (relative to /c/{communityId}), e.g. "/exports/counter_group".
+/** Export endpoint (relative to /c/{communityId}), e.g. "/exports/calendar",
+ * a built-in tool's or a tool plug-in's by its kind.
  * It takes the selection as `ids`. */
-export const toolExportEndpoint = (tool: Tool): string => `/exports/${tool}`;
+export const toolExportEndpoint = (tool: string): string => `/exports/${tool}`;
 
 /** The envelope ``type`` discriminator a tool's single-entity export emits —
  * the same value its importer registers under: the kebab-singular. */
@@ -394,13 +434,13 @@ export const toolEnvelopeType = (tool: Tool): string => `initiative-${toolKebabS
 export const toolForEnvelopeType = (type: string): Tool | null =>
   BULK_EXPORT_TOOLS.find((tool) => toolEnvelopeType(tool) === type) ?? null;
 
-/** nav.json label key, e.g. "counterGroups". Typed against the nav namespace
+/** nav.json label key, e.g. "calendars". Typed against the nav namespace
  * so `t(toolNavLabelKey(tool))` satisfies typed i18next — the drift test
  * asserts the key actually exists for every tool. */
 export const toolNavLabelKey = (tool: Tool): ParseKeys<"nav"> =>
   toolCamelPlural(tool) as ParseKeys<"nav">;
 
-/** nav.json create-label key, e.g. "createCounterGroup". */
+/** nav.json create-label key, e.g. "createCalendar". */
 export const toolCreateLabelKey = (tool: Tool): ParseKeys<"nav"> =>
   `create${toolPascalSingular(tool)}` as ParseKeys<"nav">;
 
@@ -420,13 +460,15 @@ export const kindNames = (
   kinds: t(`common:kinds.${kind}.plural`),
 });
 
-/** Role permission key gating viewing, e.g. "counter_groups_enabled". */
-export const toolViewPermission = (tool: Tool): PermissionKey =>
-  `${toolPlural(tool)}_enabled` as PermissionKey;
+/** Role permission key gating viewing a tool, by kind: a built-in tool's,
+ *  e.g. "calendars_enabled", or a tool plug-in's, "<kind>:enabled". */
+export const toolViewPermission = (kind: string): string =>
+  isBuiltInTool(kind) ? `${toolPlural(kind)}_enabled` : `${kind}:enabled`;
 
-/** Role permission key gating creation, e.g. "create_counter_groups". */
-export const toolCreatePermission = (tool: Tool): PermissionKey =>
-  `create_${toolPlural(tool)}` as PermissionKey;
+/** Role permission key gating creating in a tool, by kind: a built-in tool's,
+ *  e.g. "create_calendars", or a tool plug-in's, "<kind>:create". */
+export const toolCreatePermission = (kind: string): string =>
+  isBuiltInTool(kind) ? `create_${toolPlural(kind)}` : `${kind}:create`;
 
 /**
  * The shape every tool's read schema shares where comments are concerned: the
@@ -452,25 +494,18 @@ export interface ToolRelationEntity {
   initiative_id?: number | null;
 }
 
+/** An entity kind a tool holds: a task, an event, a page. */
+export type ChildKind = keyof typeof records.child_kinds;
+
 /**
  * The tool an entity that is not one of its own is addressed inside.
  *
  * A link is cached against a TOOL, so writing one from a child has to refresh
- * the container's copy: a task's is its project, an event's its calendar, a
- * counter's its group. Exactly the non-tool entity kinds the search vocabulary
- * names, minus the two nothing links from — a comment, which no edge may name,
- * and a tag, which is picked with the tag picker.
+ * the container's copy: a task's is its project, an event's its calendar.
  */
-export const PARENT_TOOL = {
-  task: Tool.project,
-  calendar_event: Tool.calendar,
-  counter: Tool.counter_group,
-  collection: Tool.file,
-  wiki_page: Tool.wiki,
-} as const satisfies Record<string, Tool>;
-
-/** An entity kind a tool holds: a task, an event, a page. */
-export type ChildKind = keyof typeof PARENT_TOOL;
+export const PARENT_TOOL = Object.fromEntries(
+  Object.entries(records.child_kinds).map(([kind, { parent }]) => [kind, parent])
+) as Record<ChildKind, Tool>;
 
 /**
  * Tools whose detail page does NOT carry a relations panel, and why. Stated as
@@ -498,12 +533,10 @@ export const NO_ACTIVITY_DRAWER: ReadonlySet<Tool> = new Set<Tool>([
 /** Whether this tool's pages carry the activity drawer. */
 export const showsActivity = (tool: Tool): boolean => !NO_ACTIVITY_DRAWER.has(tool);
 
-/**
- * The initiative master-switch field for a tool (same spelling as the view
- * permission). Every tool has one.
- */
-export const isToolEnabled = (tool: Tool, initiative: InitiativeRead): boolean =>
-  Boolean(initiative[`${toolPlural(tool)}_enabled` as keyof InitiativeRead]);
+/** Whether the initiative has this tool switched on, by kind. Every tool has
+ *  a switch, a tool plug-in's too. */
+export const isToolEnabled = (kind: string, initiative: InitiativeRead): boolean =>
+  Boolean(initiative.tools[kind]);
 
 /** Community-relative create target for a tool inside an initiative: the tool's
  *  own tab, with its create dialog open (`?create=true`). Callers prepend the

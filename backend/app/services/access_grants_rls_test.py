@@ -17,16 +17,15 @@ from app.db.request_context import ContentGrantee, Platform
 from app.db.schema_provisioning import guild_schema_name
 from app.db.session import set_rls_context
 from app.models.platform.user import UserRole
-from app.models.tenant._mixins import ActorKind
-from app.models.tenant.counter import CounterGroup
-from app.models.tenant.file import File
 from app.services.platform import app_settings as app_settings_service
 from app.testing import (
     create_access_grant,
+    create_file,
     create_guild,
     create_initiative,
     create_project,
     create_user,
+    create_wiki,
 )
 from app.testing.schema_harness import route_session_to_guild
 
@@ -42,6 +41,10 @@ async def _reset_role(session: AsyncSession) -> None:
 async def test_pam_read_grant_sees_only_granted_guild(
     session: AsyncSession, reading_as
 ):
+    """A live read grant reads the granted guild's row and content, files and
+    wikis included, and nothing of another guild; it writes nothing. Wikis
+    carry a policy that reads ``current_guild_id``, which a grantee leaves
+    unset, so the read also proves that read is NULLIF-guarded."""
     owner = await create_user(session, email="owner@example.com", role=UserRole.owner)
     support = await create_user(
         session, email="support@example.com", role=UserRole.support
@@ -50,82 +53,40 @@ async def test_pam_read_grant_sees_only_granted_guild(
     guild_a = await create_guild(session, creator=owner)
     init_a = await create_initiative(session, guild_a, owner)
     proj_a = await create_project(session, init_a, owner, name="Alpha")
-    doc_a = File(
-        initiative_id=init_a.id,
-        name="Alpha Doc",
-        content={},
-        created_by=owner.id,
-        created_by_kind=ActorKind.member,
-    )
-    session.add(doc_a)
-    await session.commit()
-    await session.refresh(doc_a)
+    doc_a = await create_file(session, init_a, owner, name="Alpha Doc")
+    wiki_a = await create_wiki(session, init_a, owner)
 
     guild_b = await create_guild(session, creator=owner)
     init_b = await create_initiative(session, guild_b, owner)
     await create_project(session, init_b, owner, name="Bravo")
 
-    # Live READ grant scoped to guild A, entered through the seam.
     await create_access_grant(session, user=support, guild=guild_a)
     reader = await reading_as(support.id, guild_a.id)
 
-    # The rest of this test reads as the grantee.
-    session = reader
-    if True:
-        # The guild row itself must be readable — get_guild_membership fetches
-        # it to build the request context, so without this every guild-scoped
-        # endpoint 500s for a grantee.
-        visible_guild = (
-            await session.exec(
-                text("SELECT id FROM guilds WHERE id = :g"), params={"g": guild_a.id}
-            )
-        ).all()
-        assert len(visible_guild) == 1, (
-            "grantee must be able to read the granted guild row"
+    async def visible(statement: str, **params) -> int:
+        return len((await reader.exec(text(statement), params=params)).all())
+
+    # The guild row itself: the seam fetches it to build the request context.
+    assert await visible("SELECT id FROM guilds WHERE id = :g", g=guild_a.id) == 1
+    for table, row in (
+        ("initiatives", init_a),
+        ("projects", proj_a),
+        ("files", doc_a),
+        ("wikis", wiki_a),
+    ):
+        assert await visible(f"SELECT id FROM {table} WHERE id = :i", i=row.id) == 1, (
+            f"read grant should see the granted guild's {table}"
         )
+    # Guild B's project lives in another schema. (Queried by name — its
+    # per-schema id collides with A's.)
+    assert await visible("SELECT id FROM projects WHERE name = 'Bravo'") == 0
 
-        # Initiatives of the granted guild are visible (the sidebar list) — this
-        # is the exact RLS path the empty-guild bug would break.
-        visible_inits = (
-            await session.exec(
-                text("SELECT id FROM initiatives WHERE id = :i"),
-                params={"i": init_a.id},
-            )
-        ).all()
-        assert len(visible_inits) == 1, (
-            "read grant should see the granted guild's initiatives"
+    # The read-only role has no write on the schema.
+    with pytest.raises(DBAPIError):
+        await reader.exec(
+            text("UPDATE projects SET name = 'edited' WHERE name = 'Alpha'")
         )
-
-        visible_a = (
-            await session.exec(
-                text("SELECT id FROM projects WHERE id = :p"), params={"p": proj_a.id}
-            )
-        ).all()
-        assert len(visible_a) == 1, "read grant should see the granted guild's project"
-
-        # Files must be visible too — the collaboration WebSocket loads the
-        # file under this exact pam_read context before authorizing.
-        visible_doc = (
-            await session.exec(
-                text("SELECT id FROM files WHERE id = :d"), params={"d": doc_a.id}
-            )
-        ).all()
-        assert len(visible_doc) == 1, "read grant should see the granted guild's files"
-
-        # Cross-guild isolation: guild B's project lives in another schema, so it
-        # is invisible here. (Query by name — its per-schema id collides with A's.)
-        visible_b = (
-            await session.exec(text("SELECT id FROM projects WHERE name = 'Bravo'"))
-        ).all()
-        assert len(visible_b) == 0, "read grant must NOT see other guilds"
-
-        # Read grant is read-only: the read-only role has no write on the schema,
-        # so a write is denied at the role level (raises permission denied).
-        with pytest.raises(DBAPIError):
-            await session.exec(
-                text("UPDATE projects SET name = 'hacked' WHERE name = 'Alpha'")
-            )
-        await session.rollback()
+    await reader.rollback()
 
 
 async def test_grantee_guild_settings_lazy_create_does_not_fault(
@@ -166,46 +127,6 @@ async def test_grantee_guild_settings_lazy_create_does_not_fault(
         )
     ).scalar_one()
     assert persisted == 0, "grantee read must not create a guild_settings row"
-
-
-async def test_pam_read_grant_does_not_fault_legacy_isolation_tables(
-    session: AsyncSession, reading_as
-):
-    """Tables with the legacy guild_isolation policy must not 500 for a grantee.
-
-    A grantee leaves ``current_guild_id`` unset, so a policy that casts it to
-    int without a NULLIF guard raises ``invalid input syntax for type integer``
-    and faults the whole query (counters, …). This guards migration
-    ``20260530_0095``.
-    """
-    owner = await create_user(session, email="owner4@example.com", role=UserRole.owner)
-    support = await create_user(
-        session, email="support4@example.com", role=UserRole.support
-    )
-    guild = await create_guild(session, creator=owner)
-    init = await create_initiative(session, guild, owner)
-    cg = CounterGroup(
-        initiative_id=init.id,
-        name="Stats",
-        created_by=owner.id,
-        created_by_kind=ActorKind.member,
-    )
-    session.add(cg)
-    await session.commit()
-    await session.refresh(cg)
-
-    await create_access_grant(session, user=support, guild=guild)
-    reader = await reading_as(support.id, guild.id)
-
-    # This would raise InvalidTextRepresentationError pre-0095.
-    visible_cg = (
-        await reader.exec(
-            text("SELECT id FROM counter_groups WHERE id = :c"), params={"c": cg.id}
-        )
-    ).all()
-    assert len(visible_cg) == 1, (
-        "read grant should see the granted guild's counter groups"
-    )
 
 
 async def test_no_pam_flag_sees_nothing(session: AsyncSession):

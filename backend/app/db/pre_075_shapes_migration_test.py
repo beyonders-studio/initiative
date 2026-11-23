@@ -5,10 +5,7 @@ rows those releases would have written."""
 
 from __future__ import annotations
 
-import importlib.util
 import json
-from pathlib import Path
-from types import ModuleType
 
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
@@ -27,19 +24,9 @@ from app.testing import (
     create_upload,
     create_user,
 )
-
-_VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
+from app.testing.later_revisions import load_revision, step_newest
 
 THUMBS = "\N{THUMBS UP SIGN}"
-
-
-def _load(name: str) -> ModuleType:
-    path = _VERSIONS / name
-    spec = importlib.util.spec_from_file_location(path.stem, path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 async def _sql(session, sql, params=None):
@@ -122,8 +109,15 @@ async def test_notification_lines_take_todays_shape(session) -> None:
         ).scalar_one()
     await session.commit()
 
-    migration = _load("20261109_0594_notification_lines_take_todays_shape.py")
+    migration = load_revision("20261109_0594_notification_lines_take_todays_shape.py")
+    schema = f"guild_{guild.id}"
+    # The revisions after it come off around it.
+    after = migration.revision
+    await session.run_sync(
+        _run(lambda: step_newest(forward=False, after=after), schema)
+    )
     await session.run_sync(_run(migration.upgrade))
+    await session.run_sync(_run(lambda: step_newest(forward=True, after=after), schema))
     await session.commit()
 
     stored = {
@@ -188,7 +182,7 @@ async def test_plugin_pages_and_endpoints_say_admin_only(session) -> None:
     await session.commit()
     install_table = f'"guild_{guild.id}".guild_plugins'
     versions = "public.marketplace_listing_versions"
-    migration = _load("20261109_0595_plugin_pages_say_admin_only.py")
+    migration = load_revision("20261109_0595_plugin_pages_say_admin_only.py")
 
     def seed(sync_session) -> None:
         bind = sync_session.connection()
@@ -258,7 +252,7 @@ async def test_every_upload_names_its_type(session) -> None:
         await create_upload(session, guild, user, filename=name, commit=False)
     await session.commit()
 
-    migration = _load("20261109_0596_every_upload_names_its_type.py")
+    migration = load_revision("20261109_0596_every_upload_names_its_type.py")
     await session.run_sync(_run(migration._downgrade, schema))
     await _sql(session, text(f'UPDATE "{schema}".uploads SET content_type = NULL'))
     await session.commit()

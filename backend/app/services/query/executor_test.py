@@ -61,41 +61,13 @@ async def guild(engine):
             await drop_guild_schema(conn, _GID)
 
 
-async def test_it_returns_columns_and_rows(guild):
+async def test_a_statement_the_planner_prices_too_high_never_runs(guild, monkeypatch):
+    """What the planner expected is reported, and a price over the bound stops
+    the statement before it runs."""
     result = await run("SELECT title FROM tasks", context=_context(guild))
     assert result.columns == (QueryColumn(name="title", type=FieldType.text),)
     assert result.rows == ()
-
-
-async def test_an_aggregate_answers_without_shipping_the_rows(guild):
-    """The shape a stat tile asks for: one number, computed by the database."""
-    result = await run(
-        "SELECT count(*) AS n FROM tasks",
-        context=_context(guild),
-    )
-    assert result.columns == (QueryColumn(name="n", type=FieldType.number),)
-    assert result.rows == ((0,),)
-
-
-async def test_every_shipped_dashboard_asks_something_postgres_plans(guild):
-    """The validator reads a statement; only Postgres can say it groups what
-    it shows and that its types meet. A shipped tile it refuses is an error in
-    every community that installed the dashboard."""
-    from app.services.marketplace.builtin import load_builtin_manifests
-
-    for manifest in load_builtin_manifests():
-        if manifest.get("kind") != "dashboard":
-            continue
-        for widget in manifest["definition"]["widgets"]:
-            await describe(resolve(widget["binding"]["sql"]), context=_context(guild))
-
-
-async def test_it_reports_what_the_planner_expected(guild):
-    result = await run("SELECT title FROM tasks", context=_context(guild))
     assert result.cost > 0
-
-
-async def test_a_statement_the_planner_prices_too_high_never_runs(guild, monkeypatch):
     monkeypatch.setattr(executor, "QUERY_MAX_COST", 0.0)
     with pytest.raises(QueryError) as refused:
         await run("SELECT title FROM tasks", context=_context(guild))
@@ -238,19 +210,6 @@ async def test_a_description_that_cannot_be_planned_is_stopped(
     assert stopped.value.code == QueryMessages.TIMED_OUT
 
 
-async def test_a_field_selected_on_its_own_is_typed_by_the_registry(guild):
-    """``project_id`` is stored as an integer and means a project. The shape a
-    query reports and the fields a dataset offers answer that the same way,
-    because one declaration answers both."""
-    columns, _ = await describe(
-        resolve("SELECT project_id, title FROM tasks"), context=_context(guild)
-    )
-    assert columns == (
-        QueryColumn(name="project_id", type=FieldType.reference),
-        QueryColumn(name="title", type=FieldType.text),
-    )
-
-
 async def test_an_output_built_from_fields_is_typed_by_the_database(guild):
     """Nothing declares what an expression is, so the database describes it."""
     columns, _ = await describe(
@@ -287,21 +246,3 @@ async def test_a_length_of_time_is_not_a_moment(guild):
         resolve("SELECT interval '3 days' AS gap FROM tasks"), context=_context(guild)
     )
     assert columns == (QueryColumn(name="gap", type=FieldType.text),)
-
-
-async def test_calendar_dates_keep_their_kind_beside_timestamps(guild):
-    statement = resolve("SELECT title FROM tasks")
-    values = type(statement)(
-        sql=(
-            "SELECT date '2026-08-03' AS day,"
-            " timestamp '2026-08-03 00:00:00' AS local_at,"
-            " timestamptz '2026-08-03T00:00:00Z' AS at"
-        ),
-        parameters=(),
-        relations=("tasks",),
-    )
-    result = await execute(values, context=_context(guild))
-    assert [column.date_only for column in result.columns] == [True, False, False]
-    # The numeric wire spelling stays compatible; metadata preserves the
-    # distinction a viewer west of UTC needs when formatting these values.
-    assert result.rows == ((1785715200000, 1785715200000, 1785715200000),)

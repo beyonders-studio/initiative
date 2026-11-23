@@ -30,7 +30,9 @@
     "plugins": "Plug-ins",
     "pluginFallback": "Plug-in {{id}}",
     "pluginGrantHint": "The community's settings decide what a plug-in can reach, so it can't be changed here.",
-    "settingsDescription": "Choose who can view and edit this."
+    "settingsDescription": "Choose who can view and edit this.",
+    "noteLabel": "Note to people you add",
+    "notePlaceholder": "Sent with the next person you add (optional)"
   },
   "bulkAccess": {
     "title": "Edit access",
@@ -98,8 +100,6 @@
     "resource_project_other": "projects",
     "resource_file_one": "file",
     "resource_file_other": "files",
-    "resource_counter_group_one": "counter group",
-    "resource_counter_group_other": "counter groups",
     "resource_calendar_one": "calendar",
     "resource_calendar_other": "calendars",
     "resource_dashboard_one": "dashboard",
@@ -109,7 +109,9 @@
     "resource_wiki_one": "wiki",
     "resource_wiki_other": "wikis",
     "resource_contact_one": "contact",
-    "resource_contact_other": "contacts"
+    "resource_contact_other": "contacts",
+    "resource_item_one": "item",
+    "resource_item_other": "items"
   },
   "request": {
     "needAccess": "You need access",
@@ -157,5 +159,21 @@
     "answered": "Already answered",
     "answeredDescription": "There's nothing left to answer here.",
     "error": "Couldn't send your answer. Please try again."
+  },
+  "send": {
+    "button": "Send to…",
+    "copyLink": "Copy link",
+    "title": "Send to…",
+    "description": "They get it in their notifications and open it on whatever they're using.",
+    "people": "People",
+    "addPeople": "Add people",
+    "remove": "Remove {{name}}",
+    "letIn": "If someone can't open it yet",
+    "letAsk": "Let them ask",
+    "submit": "Send",
+    "sent": "Sent",
+    "sentSomeMayAsk_one": "Sent. {{count}} person can't open it yet and can ask for access.",
+    "sentSomeMayAsk_other": "Sent. {{count}} people can't open it yet and can ask for access.",
+    "error": "Couldn't send it. Please try again."
   }
 }

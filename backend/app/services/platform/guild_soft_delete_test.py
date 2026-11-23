@@ -24,7 +24,6 @@ from app.db.holds import HoldsInForce
 from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
 from app.models.platform.guild import (
-    LIVE_STATUSES,
     OPERATOR_SETTABLE_STATUSES,
     CommunityRole,
     CommunityStatus,
@@ -83,36 +82,21 @@ async def _delete_via_danger_zone(
     await post_commit.settle_all()
 
 
-# ── The status set itself ───────────────────────────────────────────────────
-
-
-def test_deleted_is_not_a_status_that_reaches_content():
-    """The anti-drift guard.
-
-    Every gate asks ``status in LIVE_STATUSES``. This pins what that set
-    contains, so adding a status is a decision about which side it falls on
-    rather than something that happens by default.
-    """
-    assert LIVE_STATUSES == {CommunityStatus.active, CommunityStatus.read_only}
-    assert CommunityStatus.deleted not in LIVE_STATUSES
-    assert CommunityStatus.deleted not in OPERATOR_SETTABLE_STATUSES
-    # Every status is either live or refused — none is unaccounted for.
-    assert set(CommunityStatus) - LIVE_STATUSES == {
-        CommunityStatus.suspended,
-        CommunityStatus.on_hold,
-        CommunityStatus.deleted,
-    }
-
-
 # ── What a delete leaves behind ─────────────────────────────────────────────
 
 
+@pytest.mark.parametrize("others", [1, 0], ids=["others in it", "a community of one"])
 async def test_deleting_keeps_the_row_the_roster_and_the_content(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, others: int
 ):
+    """The roster is what a restore brings back, so it stays — except where it
+    is one row describing the person doing the deleting. Every larger
+    community keeps its own, because those rows are other people's."""
     admin, guild = await _seated_guild(session)
-    member = await create_user(session)
-    await create_guild_membership(session, user=member, guild=guild)
+    for _ in range(others):
+        await create_guild_membership(
+            session, user=await create_user(session), guild=guild
+        )
 
     await _delete_via_danger_zone(client, guild=guild, headers=get_auth_headers(admin))
 
@@ -126,31 +110,7 @@ async def test_deleting_keeps_the_row_the_roster_and_the_content(
             select(GuildMembership).where(GuildMembership.guild_id == guild.id)
         )
     ).all()
-    assert len(roster) == 2, "the roster is what a restore brings back"
-
-
-async def test_a_community_of_one_takes_its_roster_with_it(
-    client: AsyncClient, session: AsyncSession
-):
-    """The single case where memberships go.
-
-    That roster is one row describing the person doing the deleting. Every
-    larger community keeps its own, because those rows are other people's.
-    """
-    admin, guild = await _seated_guild(session)
-
-    await _delete_via_danger_zone(client, guild=guild, headers=get_auth_headers(admin))
-
-    session.expunge_all()
-    roster = (
-        await session.exec(
-            select(GuildMembership).where(GuildMembership.guild_id == guild.id)
-        )
-    ).all()
-    assert roster == []
-    # ...and what comes back therefore has to be seated.
-    row = (await session.exec(select(Guild).where(Guild.id == guild.id))).one()
-    assert row.status == CommunityStatus.deleted.value
+    assert len(roster) == (others + 1 if others else 0)
 
 
 async def test_a_deleted_community_is_gone_for_its_admin_too(

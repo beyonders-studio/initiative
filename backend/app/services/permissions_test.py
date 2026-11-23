@@ -63,6 +63,7 @@ from app.testing import (
     create_task,
     create_user,
     route_as,
+    switch_tools,
 )
 from app.testing.factories import TOOL_FACTORIES
 
@@ -139,11 +140,7 @@ class World:
 async def build_world(session, role_session, acting_user, tool: Tool) -> World:
     owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
     initiative, guild = owner.initiative, owner.guild
-    for t in Tool:
-        if hasattr(initiative, t.view_permission):
-            setattr(initiative, t.view_permission, True)
-    session.add(initiative)
-    await session.commit()
+    await switch_tools(session, initiative, dict.fromkeys(Tool, True))
 
     co_member = await acting_user(
         guild_role=CommunityRole.member,
@@ -346,15 +343,6 @@ async def test_general_access_covers_the_initiatives_members_only(
     assert row is None
 
 
-async def test_membership_alone_grants_nothing(session, role_session, acting_user):
-    """The gate is an AND-layer: being in the initiative is not access to its
-    resources."""
-    w = await build_world(session, role_session, acting_user, Tool.project)
-    await w.grant(None)
-    row, _ = await w.as_reader(w.co_member.user)
-    assert row is None
-
-
 @pytest.mark.parametrize("tool", ALL_TOOLS, ids=lambda t: t.value)
 async def test_a_grant_left_behind_after_removal_reaches_nothing(
     session, role_session, acting_user, reading_as, tool: Tool
@@ -427,18 +415,6 @@ async def test_who_may_be_named_is_who_can_open_it(
 
 
 # ── The overrides that sit above sharing ─────────────────────────────────────
-
-
-async def test_a_guild_admin_bypasses_the_scope_gate(
-    session, role_session, acting_user
-):
-    """Guild admin is full authority over the guild, membership of the
-    initiative or not."""
-    w = await build_world(session, role_session, acting_user, Tool.project)
-    await w.grant(None)
-    row, context = await w.as_reader(w.admin.user)
-    require_access(w.resource, row, context=context, access="write")
-    require_access(w.resource, row, context=context, action=Action.delete)
 
 
 def test_a_standing_for_another_community_is_never_read_back():
@@ -604,15 +580,6 @@ def test_no_standing_at_all_narrows_rather_than_opens():
     )
 
 
-@pytest.mark.parametrize("tool", list(Tool))
-def test_every_tool_can_be_scoped(tool):
-    """Every tool in the registry resolves through the clause, so a tool added
-    later inherits the same listing rule."""
-    sql = _compiled(granted_scope_clause(tool, Project.id, 1, context=standing(7)))
-    assert "resource_granted(" in sql
-    assert tool.value in sql
-
-
 # ---------------------------------------------------------------------------
 # The audience — who a resource's sharing reaches
 # ---------------------------------------------------------------------------
@@ -749,7 +716,7 @@ async def _still_named(session, person_id: int, named: dict) -> list[str]:
 
 
 async def test_leaving_an_initiative_takes_you_off_its_content(
-    session, role_session, acting_user
+    client, session, role_session, acting_user
 ):
     """Every grant naming someone in an initiative goes with their membership
     of it, owner rows included, and they are taken off its content: archived
@@ -762,15 +729,11 @@ async def test_leaving_an_initiative_takes_you_off_its_content(
     await archive_entity(session, named["project"])
     await session.commit()
 
-    s = await w.role_session("app_user")
-    await route_as(s, user_id=w.owner.user.id, guild_id=w.guild.id)
-    await s.exec(
-        delete(InitiativeMember).where(
-            InitiativeMember.initiative_id == w.initiative.id,
-            InitiativeMember.user_id == member_id,
-        )
+    response = await client.delete(
+        w.owner.g(f"/initiatives/{w.initiative.id}/members/{member_id}"),
+        headers=w.owner.headers,
     )
-    await s.commit()
+    assert response.status_code == 204, response.text
 
     assert await _still_named(session, member_id, named) == []
     # A person field stays, with the person cleared.

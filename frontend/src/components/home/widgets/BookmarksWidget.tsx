@@ -97,7 +97,7 @@ export const BookmarksWidget = ({ options }: HomeWidgetProps) => {
                 title={t("common:bookmark.remove")}
                 onClick={() =>
                   unbookmark.mutate({
-                    tool: item.entity_type,
+                    tool: item.entity_type as Tool,
                     entityId: item.entity_id,
                     communityId: item.community_id,
                     next: false,

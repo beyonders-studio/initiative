@@ -12,9 +12,11 @@ from app.core.search import SearchEntityType
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.relationship import EntityRelationship
 from app.testing import (
+    add_counter,
     create_initiative,
     create_tag,
     create_task,
+    install_tool_plugin,
 )
 
 
@@ -98,38 +100,39 @@ async def test_task_tags_replace_and_dedup(client: AsyncClient, acting_user, ses
     assert await _task_tag_ids(session, a.guild.id, task.id) == {other.id}
 
 
-async def test_set_tags_rejects_trashed_tag(client: AsyncClient, acting_user, session):
-    """A trashed tag id is invalid everywhere — the incident regression: a
-    stale client merging a since-trashed tag id must get a clean 400."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    tag = await create_tag(session, a.guild)
-    task = await create_task(session, a.project)
-
-    delete = await client.delete(a.g(f"/tags/{tag.id}"), headers=a.headers)
-    assert delete.status_code == 204
-
-    response = await client.patch(
-        a.g(f"/tasks/{task.id}"), headers=a.headers, json={"tag_ids": [tag.id]}
-    )
-    assert response.status_code == 400
-    assert response.json()["detail"] == "INVALID_TAG_IDS"
-
-
-async def test_set_tags_rejects_other_guilds_tag(
+async def test_set_tags_rejects_a_trashed_or_foreign_tag(
     client: AsyncClient, acting_user, session
 ):
+    """A trashed tag id is invalid everywhere — the incident regression: a
+    stale client merging a since-trashed tag id must get a clean 400, and a bulk
+    edit naming one changes nothing. Another guild's tag is refused the same."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
+    trashed = await create_tag(session, a.guild)
     b = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     foreign_tag = await create_tag(session, b.guild)
     task = await create_task(session, a.project)
 
-    response = await client.patch(
-        a.g(f"/tasks/{task.id}"),
+    delete = await client.delete(a.g(f"/tags/{trashed.id}"), headers=a.headers)
+    assert delete.status_code == 204
+
+    for tag in (trashed, foreign_tag):
+        response = await client.patch(
+            a.g(f"/tasks/{task.id}"), headers=a.headers, json={"tag_ids": [tag.id]}
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"] == "INVALID_TAG_IDS"
+    response = await client.post(
+        a.g("/tags/bulk"),
         headers=a.headers,
-        json={"tag_ids": [foreign_tag.id]},
+        json={
+            "target_type": "task",
+            "target_ids": [task.id],
+            "add_tag_ids": [trashed.id],
+        },
     )
     assert response.status_code == 400
     assert response.json()["detail"] == "INVALID_TAG_IDS"
+    assert await _task_tag_ids(session, a.guild.id, task.id) == set()
 
 
 async def test_generic_tool_tags_route_covers_every_tool(
@@ -177,6 +180,74 @@ async def test_generic_tool_tags_route_covers_every_tool(
         assert [t["id"] for t in row["tags"]] == [tag.id], tool
 
 
+async def test_a_tool_plugins_rows_are_tagged_as_a_tools_are(
+    client: AsyncClient, acting_user, session
+):
+    """A tool plug-in's tool row is tagged and has its thread switched through
+    the generic routes, its item is tagged by the bulk edit, and both are
+    counted and listed on the tag's page, each addressed by its tool."""
+    import sqlalchemy as sa
+
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    await install_tool_plugin(client, session, seat)
+    tools, group, counter = await add_counter(
+        session, seat.guild.id, seat.initiative.id
+    )
+    (tool,) = tools.installed
+    (item_kind,) = (child.value for child in tool.children)
+    tag = await create_tag(session, seat.guild)
+
+    response = await client.put(
+        seat.g(f"/tools/{tool.kind}/{group}/tags"),
+        headers=seat.headers,
+        json={"tag_ids": [tag.id]},
+    )
+    assert response.status_code == 200, response.text
+    assert [t["id"] for t in response.json()] == [tag.id]
+    response = await client.put(
+        seat.g(f"/tools/{tool.kind}/{group}/comments"),
+        headers=seat.headers,
+        json={"comments_enabled": False},
+    )
+    assert response.json() == {"comments_enabled": False}, response.text
+    assert (
+        await session.exec(
+            sa.select(tool.table.c.comments_enabled).where(tool.table.c.id == group)
+        )
+    ).scalar_one() is False
+    # An item is not a tool.
+    response = await client.put(
+        seat.g(f"/tools/{item_kind}/{counter}/tags"),
+        headers=seat.headers,
+        json={"tag_ids": [tag.id]},
+    )
+    assert response.status_code == 404, response.text
+
+    response = await client.post(
+        seat.g("/tags/bulk"),
+        headers=seat.headers,
+        json={
+            "target_type": item_kind,
+            "target_ids": [counter],
+            "add_tag_ids": [tag.id],
+        },
+    )
+    assert response.json() == {"updated_count": 1}, response.text
+
+    counts = await client.get(seat.g(f"/tags/{tag.id}/counts"), headers=seat.headers)
+    assert counts.json()["counts"] == {tool.kind: 1, item_kind: 1}, counts.text
+    for kind, row_id in ((tool.kind, group), (item_kind, counter)):
+        listed = await client.get(
+            seat.g(f"/tags/{tag.id}/entities"),
+            headers=seat.headers,
+            params={"kind": kind},
+        )
+        assert [
+            (i["entity_type"], i["entity_id"], i["tool"], i["tool_id"], i["tool_title"])
+            for i in listed.json()["items"]
+        ] == [(kind, row_id, tool.kind, group, "Scores")], listed.text
+
+
 async def test_generic_tool_tags_route_rejects_unknown_tool(
     client: AsyncClient, acting_user
 ):
@@ -184,7 +255,7 @@ async def test_generic_tool_tags_route_rejects_unknown_tool(
     response = await client.put(
         a.g("/tools/task/1/tags"), headers=a.headers, json={"tag_ids": []}
     )
-    assert response.status_code == 422
+    assert response.status_code == 404
 
 
 # ---------------------------------------------------------------------------
@@ -382,7 +453,7 @@ async def test_a_tags_entities_need_a_taggable_kind(
     untaggable = await client.get(
         a.g(f"/tags/{tag.id}/entities"), headers=a.headers, params={"kind": "comment"}
     )
-    assert untaggable.status_code == 422
+    assert untaggable.status_code == 404
 
 
 async def test_bulk_edit_requires_an_operation(client: AsyncClient, acting_user):
@@ -393,29 +464,6 @@ async def test_bulk_edit_requires_an_operation(client: AsyncClient, acting_user)
         json={"target_type": "task", "target_ids": [1]},
     )
     assert response.status_code == 422
-
-
-async def test_bulk_edit_rejects_trashed_tag_atomically(
-    client: AsyncClient, acting_user, session
-):
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    trashed = await create_tag(session, a.guild)
-    task = await create_task(session, a.project)
-    delete = await client.delete(a.g(f"/tags/{trashed.id}"), headers=a.headers)
-    assert delete.status_code == 204
-
-    response = await client.post(
-        a.g("/tags/bulk"),
-        headers=a.headers,
-        json={
-            "target_type": "task",
-            "target_ids": [task.id],
-            "add_tag_ids": [trashed.id],
-        },
-    )
-    assert response.status_code == 400
-    assert response.json()["detail"] == "INVALID_TAG_IDS"
-    assert await _task_tag_ids(session, a.guild.id, task.id) == set()
 
 
 async def test_bulk_edit_denied_without_project_write(

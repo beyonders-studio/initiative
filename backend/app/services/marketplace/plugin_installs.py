@@ -11,10 +11,10 @@ removed, or reported removed by the vendor — and read by two things:
   time;
 * :func:`routed`, the installs a vendor delivery belongs to.
 
-A route is held by one community unless the listing's registration shares
-routes (``shared_routes``): each row's ``exclusive`` is the negation of it, and
-a unique index holds an exclusive route to one row. A connect claims its route
-(:func:`claim`) before it stores the value.
+Every community that connected the same vendor account holds its route, and
+a delivery goes to each. A route the platform connected for every community
+(:mod:`app.services.marketplace.platform_connections`) is not indexed: it
+reaches every install of its listing.
 
 Beside it, ``public.plugin_install_claims`` holds the values each install holds
 for its plug-in's unique settings, current and earlier, so no two communities
@@ -47,7 +47,6 @@ from fastapi import HTTPException
 from fastapi import status as http_status
 from sqlalchemy import delete, text, tuple_, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -61,18 +60,15 @@ from app.core.encryption import (
 from app.core.messages import PluginServiceMessages
 from app.db import cohorts
 from app.db import session as db_session
-from app.db.errors import dbapi_constraint
 from app.db.request_context import SystemGuild
 from app.models.platform.guild import LIVE_STATUS_VALUES, Guild
 from app.models.platform.plugin_install import (
-    EXCLUSIVE_ROUTE_INDEX,
     HOOK_ROUTE_MAX_LENGTH,
     PluginInstall,
     PluginInstallClaim,
     PluginInstallStatus,
     PluginState,
 )
-from app.models.platform.plugin_service_registration import PluginServiceRegistration
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.services import audit as audit_service
 from app.services.marketplace import community_hooks
@@ -81,7 +77,11 @@ from app.services.marketplace.manifest_values import (
     MIN_UNIQUE_SETTING_VALUE_LENGTH,
     UNIQUE_SETTING_VALUE_CHARS,
 )
-from app.services.marketplace.registration_lookup import load_registrations
+from app.services.marketplace.registration_lookup import (
+    invalidate_registrations,
+    load_registrations,
+)
+from app.services.platform.retention import PLUGIN_INSTALL_DELETION_DAYS
 from app.services.tenant.plugin_config import REMOVED_AT, connection_by_id
 
 logger = logging.getLogger(__name__)
@@ -92,18 +92,20 @@ __all__ = [
     "CommunityInstall",
     "IndexedInstall",
     "assigned_value",
-    "claim",
     "claim_value",
     "community_installs",
     "forget",
     "hook_route",
+    "listing_installs",
     "page",
     "record",
     "reindex_community",
+    "reinstall_tool",
     "routed",
     "set_status",
     "set_suspended",
     "suspension_moved",
+    "uninstall_tool",
 ]
 
 #: The most installs one page lists.
@@ -166,58 +168,25 @@ def hook_route(
     return text if text and len(text) <= HOOK_ROUTE_MAX_LENGTH else None
 
 
-async def claim(guild_id: int, plugin: GuildPlugin, route: str | None) -> bool:
-    """Write one install's row as ``plugin`` stands, routed by ``route``.
-
-    False, writing nothing, when the route is held for another community's
-    install. Whether this install's route is its own alone follows its
-    registration's ``shared_routes``, read under a share lock, so a change to
-    the setting waits for this write and this write for the change."""
-    if not plugin.listing_uid or plugin.id is None:
-        return True
-    async with db_session.SystemSessionLocal() as session:
-        shared = (
-            await session.exec(
-                select(PluginServiceRegistration.shared_routes)
-                .where(PluginServiceRegistration.listing_uid == plugin.listing_uid)
-                .with_for_update(read=True)
-            )
-        ).all()
-        values = {
-            "listing_uid": plugin.listing_uid,
-            "enabled": bool(plugin.enabled),
-            "hook_route": route,
-            "exclusive": not (shared and all(shared)),
-        }
-        try:
-            await session.exec(
-                pg_insert(PluginInstall)
-                .values(guild_id=guild_id, install_id=plugin.id, **values)
-                .on_conflict_do_update(
-                    index_elements=[PluginInstall.guild_id, PluginInstall.install_id],
-                    set_=values,
-                )
-            )
-            await session.commit()
-        except IntegrityError as exc:
-            if dbapi_constraint(exc) != EXCLUSIVE_ROUTE_INDEX:
-                raise
-            await session.rollback()
-            return False
-    return True
-
-
 async def record(guild_id: int, plugin: GuildPlugin) -> None:
-    """Write one install's row as ``plugin`` now stands. A route held for
-    another community is left out: the row is written with none."""
-    if not await claim(guild_id, plugin, hook_route(plugin.definition, plugin.config)):
-        logger.info(
-            "plug-in installs: install %s in guild %s routes by a value another "
-            "community holds, and is indexed without it",
-            plugin.id,
-            guild_id,
+    """Write one install's row as ``plugin`` now stands."""
+    if not plugin.listing_uid or plugin.id is None:
+        return
+    values = {
+        "listing_uid": plugin.listing_uid,
+        "enabled": bool(plugin.enabled),
+        "hook_route": hook_route(plugin.definition, plugin.config),
+    }
+    async with db_session.SystemSessionLocal() as session:
+        await session.exec(
+            pg_insert(PluginInstall)
+            .values(guild_id=guild_id, install_id=plugin.id, **values)
+            .on_conflict_do_update(
+                index_elements=[PluginInstall.guild_id, PluginInstall.install_id],
+                set_=values,
+            )
         )
-        await claim(guild_id, plugin, None)
+        await session.commit()
 
 
 async def reindex_community(session: AsyncSession, guild_id: int) -> None:
@@ -228,7 +197,7 @@ async def reindex_community(session: AsyncSession, guild_id: int) -> None:
     them.
 
     Each install is held while its row is written, as a connect holds it
-    while it claims a route, so the row is written from the install as the
+    while it records its route, so the row is written from the install as the
     connect left it: the install is locked first and its row after, the
     order every path holding both takes them in. The rows to drop are those the index held before the
     installs were read and whose install is gone by then: an install made
@@ -371,6 +340,30 @@ async def routed(listing_uid: str, route_value: str) -> list[IndexedInstall]:
             Guild.status.in_(sorted(LIVE_STATUS_VALUES)),
         )
         .order_by(PluginInstall.guild_id)
+    )
+    async with db_session.SystemSessionLocal() as session:
+        rows = (await session.exec(statement)).all()
+    return [
+        IndexedInstall(
+            guild_id=row[0], install_id=row[1], active=True, route=route_value
+        )
+        for row in rows
+    ]
+
+
+async def listing_installs(listing_uid: str, route_value: str) -> list[IndexedInstall]:
+    """Every install of a listing, in a community still live, found by the
+    route value of the connection the platform holds for every community.
+    Whether each is switched on is the install row's answer, as for
+    :func:`routed`."""
+    statement = (
+        select(PluginInstall.guild_id, PluginInstall.install_id)
+        .join(Guild, Guild.id == PluginInstall.guild_id)
+        .where(
+            PluginInstall.listing_uid == listing_uid,
+            Guild.status.in_(sorted(LIVE_STATUS_VALUES)),
+        )
+        .order_by(PluginInstall.guild_id, PluginInstall.install_id)
     )
     async with db_session.SystemSessionLocal() as session:
         rows = (await session.exec(statement)).all()
@@ -579,6 +572,91 @@ async def set_status(
             detail={"from": before, "to": status.value},
         )
     return row
+
+
+def _uninstalled(row: PluginInstall) -> bool:
+    """Whether ``row`` is deleted by its community's uninstall, rather than by
+    staff or billing: its status has not moved since."""
+    return (
+        row.status == PluginInstallStatus.deleted.value
+        and row.uninstalled_at is not None
+        and row.uninstalled_at == row.status_changed_at
+    )
+
+
+async def uninstall_tool(
+    guild_id: int, plugin: GuildPlugin, *, actor_user_id: int
+) -> None:
+    """The community's admin uninstalls ``plugin``, a tool plug-in, consenting
+    to its content being deleted once the deletion window ends
+    (``retention.PLUGIN_INSTALL_DELETION``): its install moves to
+    ``deleted``, stamped as the community's uninstall, and its tool is gone
+    from the community until it is installed again. Its tables, rows and rules
+    stay until the window ends. Committed on the system engine; the caller
+    holds the install."""
+    await record(guild_id, plugin)
+    async with db_session.SystemSessionLocal() as session:
+        row = await _locked(session, guild_id, plugin.id or 0)
+        before, now = row.status, utcnow()
+        row.status = PluginInstallStatus.deleted.value
+        row.status_changed_at = row.uninstalled_at = now
+        session.add(row)
+        await audit_service.record(
+            session,
+            event_type=AuditEventType.PLUGIN_UNINSTALLED,
+            actor_user_id=actor_user_id,
+            guild_id=guild_id,
+            target_type="plugin",
+            target_id=row.install_id,
+            detail={
+                "listing_uid": row.listing_uid,
+                "from": before,
+                "content_deleted_after_days": PLUGIN_INSTALL_DELETION_DAYS,
+            },
+        )
+        community_hooks.status_changed(session, guild_id)
+        await session.commit()
+    invalidate_registrations()
+
+
+async def reinstall_tool(
+    guild_id: int, plugin: GuildPlugin, *, actor_user_id: int
+) -> bool:
+    """Install ``plugin``, a tool plug-in its community uninstalled, again
+    within its window: the deletion is called off and the tool is back, with
+    everything it held. False, changing nothing, where its install is not
+    waiting on the community's uninstall. Committed on the system engine; the
+    caller holds the install."""
+    async with db_session.SystemSessionLocal() as session:
+        row = (
+            await session.exec(
+                select(PluginInstall)
+                .where(
+                    PluginInstall.guild_id == guild_id,
+                    PluginInstall.install_id == plugin.id,
+                )
+                .with_for_update()
+            )
+        ).one_or_none()
+        if row is None or not _uninstalled(row):
+            return False
+        row.status = PluginInstallStatus.active.value
+        row.status_changed_at = utcnow()
+        row.uninstalled_at = None
+        session.add(row)
+        await audit_service.record(
+            session,
+            event_type=AuditEventType.PLUGIN_INSTALLED,
+            actor_user_id=actor_user_id,
+            guild_id=guild_id,
+            target_type="plugin",
+            target_id=row.install_id,
+            detail={"listing_uid": row.listing_uid, "reinstalled": True},
+        )
+        community_hooks.status_changed(session, guild_id)
+        await session.commit()
+    invalidate_registrations()
+    return True
 
 
 # --- claims on unique settings -------------------------------------------------

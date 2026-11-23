@@ -1,10 +1,10 @@
 """Comments across every commentable surface.
 
 ``TOOL_COMMENT_TARGETS`` is the registry: **every** ``Tool`` entity is
-commentable — one nullable FK per tool on ``comments``, drift-tested against
-the enum — plus the content-level extras in ``EXTRA_COMMENT_TARGETS``, which
-are not tools and anchor to the tool that owns them for access (a task to its
-project, a wiki page to its wiki). Reading a thread takes read access on that
+commentable — a comment names its subject as ``(subject_type, subject_id)``,
+drift-tested against the enum — plus the content-level extras in
+``EXTRA_COMMENT_TARGETS``, which are not tools and anchor to the tool that owns
+them for access (a task to its project, a wiki page to its wiki). Reading a thread takes read access on that
 anchor, posting takes write access, exactly as it always has for tasks and
 files.
 
@@ -19,7 +19,7 @@ so a project with comments off still has task threads.
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
@@ -35,22 +35,23 @@ from app.core.messages import (
     KindMessages,
 )
 from app.core.tools import KINDS, Tool
-from app.db.initiative_rls import (
-    COMMENT_PARENT_COLUMNS as RLS_COMMENT_PARENT_COLUMNS,
-)
-from app.db.initiative_rls import (
-    COMMENT_PARENTS,
-)
+from app.db.base import MODELS_BY_TABLE
+from app.db.initiative_rls import COMMENT_PARENTS, comment_parents
 from app.db.query import ids_in
-from app.db.session import guild_context, install_context, routed_guild_id
+from app.db.session import (
+    guild_context,
+    install_context,
+    routed_guild_id,
+    routed_tools,
+)
 from app.db.soft_delete_filter import select_including_deleted
+from app.db.tool_rows import Located, ToolRow, load_row, locate, table_of
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import User
 from app.models.tenant._mixins import ActorKind, tool_models
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.collection import Collection
-from app.models.tenant.comment import Comment, CommentAudience, in_thread
-from app.models.tenant.counter import CounterGroup
+from app.models.tenant.comment import Comment, CommentAudience, in_thread, said_on
 from app.models.tenant.dashboard import Dashboard
 from app.models.tenant.file import File
 from app.models.tenant.initiative import Initiative
@@ -95,15 +96,10 @@ class CommentValidationError(CommentError):
 
 @dataclass(frozen=True)
 class CommentTarget:
-    """How one tool binds to comments: its model and the FK column on
-    ``comments`` (``{tool}_id``)."""
+    """How one tool binds to comments: its model, under the tool's own kind."""
 
     tool: Tool
     model: type[SQLModel]
-
-    @property
-    def column(self) -> str:
-        return f"{self.tool.value}_id"
 
 
 #: Every tool's model, imported so it is *registered*: a class has to have been
@@ -111,7 +107,6 @@ class CommentTarget:
 #: what makes the lookup below independent of import order.
 _REGISTERED = (
     Calendar,
-    CounterGroup,
     Dashboard,
     File,
     Post,
@@ -121,15 +116,10 @@ _REGISTERED = (
 
 # Every Tool is commentable, derived from the enum rather than listed — a new
 # tool carries a comment thread the day its model exists. comments_test asserts
-# this spans the enum, and that the columns here match the model and the RLS
-# parent registry (app.db.initiative_rls._COMMENT_PARENTS).
+# this spans the enum, and that the kinds here match the RLS subject registry
+# (app.db.initiative_rls.COMMENT_PARENTS).
 TOOL_COMMENT_TARGETS: dict[Tool, CommentTarget] = {
     tool: CommentTarget(tool, tool_models()[tool.plural]) for tool in Tool
-}
-
-
-_TARGETS_BY_COLUMN: dict[str, CommentTarget] = {
-    target.column: target for target in TOOL_COMMENT_TARGETS.values()
 }
 
 
@@ -144,7 +134,7 @@ class ExtraCommentTarget:
     that titles the thread.
     """
 
-    #: The kind's name — the ``{kind}_id`` column, and what an event or a
+    #: The kind's name — ``comments.subject_type``, and what an event or a
     #: notification about this thread calls it.
     kind: str
     model: type[SQLModel]
@@ -158,14 +148,11 @@ class ExtraCommentTarget:
     #: reader.
     anchor_switch: bool = True
 
-    @property
-    def column(self) -> str:
-        return f"{self.kind}_id"
 
-
-#: The content-level extras, in the order the parent registry declares them.
+#: The content-level extras, by kind, in the order the subject registry
+#: declares them.
 EXTRA_COMMENT_TARGETS: dict[str, ExtraCommentTarget] = {
-    target.column: target
+    target.kind: target
     for target in (
         ExtraCommentTarget(
             "task",
@@ -180,40 +167,33 @@ EXTRA_COMMENT_TARGETS: dict[str, ExtraCommentTarget] = {
     )
 }
 
-#: Every comment-parent column, extras first — the single-parent rule and the
-#: create/list surfaces all read this tuple. Ordered by the parent registry so
-#: this and the policies cannot disagree about the set.
-COMMENT_PARENT_COLUMNS: tuple[str, ...] = RLS_COMMENT_PARENT_COLUMNS
-
 
 async def annotate_comment_counts(
     session: AsyncSession,
     rows: Sequence[Any],
     *,
-    column: str,
+    kind: str,
 ) -> None:
     """Set ``comment_count`` on each row from one grouped query.
 
-    ``column`` is the comment-parent column these rows are the parent of —
-    ``post_id`` for posts, ``project_id`` for projects, and so on; every member of
-    :data:`COMMENT_PARENT_COLUMNS` works. One statement for the whole page,
-    rather than a count per row, because a board asks this about twenty posts
-    at once.
+    ``kind`` is what these rows are — ``post`` for posts, ``project`` for
+    projects, and so on; every key of ``COMMENT_PARENTS`` works. One statement
+    for the whole page, rather than a count per row, because a board asks this
+    about twenty posts at once.
 
     Trashed comments are excluded by the soft-delete filter, so a thread that
     was cleared out reads as empty rather than as history.
     """
-    if column not in COMMENT_PARENT_COLUMNS:
-        raise KeyError(f"{column} is not a comment parent")
+    if kind not in COMMENT_PARENTS:
+        raise KeyError(f"{kind} takes no comments")
     ids = [row.id for row in rows if getattr(row, "id", None) is not None]
     if not ids:
         return
-    parent = getattr(Comment, column)
     result = await session.exec(
-        select(parent, func.count(Comment.id))
-        .where(parent.in_(tuple(ids)))
+        select(Comment.subject_id, func.count(Comment.id))
+        .where(said_on(kind, ids))
         .where(in_thread())
-        .group_by(parent)
+        .group_by(Comment.subject_id)
     )
     counts = dict(result.all())
     for row in rows:
@@ -230,11 +210,12 @@ class _ParentContext:
     extra carries its own row as well (``extra``/``extra_row``), plus the tool
     it anchors to — a task also fills ``task``/``project``, which is the pair
     the task notifications and the task serializer read. Either way the fields
-    every caller needs — the comments column, the parent id, the initiative
-    (``None`` for a guild-level calendar), a display title — are filled.
+    every caller needs — the kind, the parent id, the initiative (``None`` for
+    a guild-level calendar), a display title — are filled. A tool plug-in's
+    row, the tool's or an item's, is ``installed``, and is the thread's row.
     """
 
-    column: str
+    kind: str
     entity_id: int
     initiative_id: int | None
     title: str
@@ -244,6 +225,7 @@ class _ParentContext:
     resource: SQLModel | None = None
     extra: ExtraCommentTarget | None = None
     extra_row: SQLModel | None = None
+    installed: ToolRow | None = None
 
     @property
     def ref_type(self) -> str | None:
@@ -252,22 +234,21 @@ class _ParentContext:
         own id, so this is also where a link to the thread goes."""
         if self.extra is not None:
             return self.extra.kind
+        if self.installed is not None:
+            return self.kind
         return self.tool.value if self.tool is not None else None
 
+    @property
+    def row(self) -> Any:
+        """The row the thread is on."""
+        if self.installed is not None:
+            return self.installed
+        return self.extra_row if self.extra is not None else self.resource
 
-def _single_target(ids: Mapping[str, int | None]) -> tuple[str, int]:
-    provided = [(column, value) for column, value in ids.items() if value is not None]
-    if len(provided) != 1:
-        raise CommentValidationError(CommentMessages.PROVIDE_ONE_ENTITY)
-    return provided[0]
 
-
-def _comment_target(comment: Comment) -> tuple[str, int]:
-    for column in COMMENT_PARENT_COLUMNS:
-        value = getattr(comment, column)
-        if value is not None:
-            return column, value
-    raise CommentValidationError(CommentMessages.NOT_LINKED)
+def subject_of(comment: Comment) -> tuple[str, int]:
+    """What ``comment`` is said on, as ``(kind, id)``."""
+    return comment.subject_type, comment.subject_id
 
 
 async def _get_task_context(
@@ -290,13 +271,13 @@ async def _get_task_context(
         return None
     task, project, initiative = row
     return _ParentContext(
-        column="task_id",
+        kind="task",
         entity_id=cast(int, task.id),
         initiative_id=initiative.id,
         title=task.title,
         task=task,
         project=project,
-        extra=EXTRA_COMMENT_TARGETS["task_id"],
+        extra=EXTRA_COMMENT_TARGETS["task"],
         extra_row=task,
     )
 
@@ -315,7 +296,7 @@ async def _get_extra_context(
     by — the master switch, the comment switch, and the sharing — and only the
     identity of the thread differs.
     """
-    parent = COMMENT_PARENTS[target.column]
+    parent = COMMENT_PARENTS[target.kind]
     statement = select(target.model).where(target.model.id == entity_id)  # type: ignore[attr-defined]
     if parent.governed_by is None:
         statement = statement.options(selectinload(target.model.initiative))  # type: ignore[attr-defined]
@@ -324,7 +305,7 @@ async def _get_extra_context(
         return None
     if parent.governed_by is None:
         return _ParentContext(
-            column=target.column,
+            kind=target.kind,
             entity_id=cast(int, row.id),
             initiative_id=row.initiative_id,
             title=getattr(row, target.title_field),
@@ -334,13 +315,13 @@ async def _get_extra_context(
         )
     anchor = await _get_tool_context(
         session,
-        TOOL_COMMENT_TARGETS[parent.governed_by],
+        TOOL_COMMENT_TARGETS[Tool(parent.governed_by.kind)],
         entity_id=getattr(row, cast(str, parent.tool_fk)),
         guild_id=guild_id,
     )
     if anchor is None:
         return None
-    anchor.column = target.column
+    anchor.kind = target.kind
     anchor.entity_id = cast(int, row.id)
     anchor.title = getattr(row, target.title_field)
     anchor.extra = target
@@ -367,7 +348,7 @@ async def _get_tool_context(
     if row is None:
         return None
     return _ParentContext(
-        column=target.column,
+        kind=target.tool.value,
         entity_id=cast(int, row.id),
         initiative_id=row.initiative_id,
         title=row.name,
@@ -376,22 +357,49 @@ async def _get_tool_context(
     )
 
 
+async def _get_installed_context(
+    session: AsyncSession, located: Located, *, entity_id: int
+) -> _ParentContext | None:
+    """One row of a tool plug-in's, the tool's or an item's, with the tool's
+    row: read through the routed session, so the row is the reader's to
+    reach, as its tool's is."""
+    row = await load_row(session, located, routed_tools(session), entity_id)
+    if row is None:
+        return None
+    return _ParentContext(
+        kind=located.kind,
+        entity_id=int(row.id),
+        initiative_id=row.tool["initiative_id"],
+        title=row.name,
+        installed=row,
+    )
+
+
 async def _load_parent(
     session: AsyncSession,
     *,
-    column: str,
+    kind: str,
     entity_id: int,
     guild_id: int,
 ) -> _ParentContext | None:
-    if column == "task_id":
+    tools = routed_tools(session)
+    if kind not in tools.comment_targets:
+        raise _parent_missing(kind)
+    located = locate(tools, kind)
+    if located is not None:
+        return await _get_installed_context(session, located, entity_id=entity_id)
+    if kind == "task":
         return await _get_task_context(session, task_id=entity_id, guild_id=guild_id)
-    extra = EXTRA_COMMENT_TARGETS.get(column)
+    extra = EXTRA_COMMENT_TARGETS.get(kind)
     if extra is not None:
         return await _get_extra_context(
             session, extra, entity_id=entity_id, guild_id=guild_id
         )
     return await _get_tool_context(
-        session, _TARGETS_BY_COLUMN[column], entity_id=entity_id, guild_id=guild_id
+        session,
+        TOOL_COMMENT_TARGETS[Tool(kind)],
+        entity_id=entity_id,
+        guild_id=guild_id,
     )
 
 
@@ -440,6 +448,22 @@ async def _ensure_parent_access(
     and gets the project's sharing without the project's switch: its thread
     belongs to the task, not to the project's tool surface.
     """
+    if ctx.installed is not None:
+        # Read through the routed session with its tool's row, so the reader
+        # reaches it; the tool's switch and its comment switch answer for the
+        # thread, as a wiki's do for its pages.
+        located = locate(routed_tools(session), ctx.kind)
+        assert located is not None
+        tool = located.tool
+        if guild_context(session) is not None and not await tool_on_in(
+            session, await session.get(Initiative, ctx.initiative_id), tool
+        ):
+            raise CommentPermissionError(
+                KindMessages.TOOL_NOT_ENABLED, params={"kind": tool.kind}
+            )
+        if not ctx.installed.tool.get("comments_enabled", True):
+            raise CommentPermissionError(CommentMessages.COMMENTS_DISABLED)
+        return
     if ctx.extra is not None and not ctx.extra.anchor_switch:
         # An extra whose thread is its own: admitted by the anchor's sharing,
         # asked none of its switches. The task is the one, and its context
@@ -480,9 +504,7 @@ async def _ensure_parent_access(
 
 
 def serialize_comment(comment: Comment, *, viewer_id: int | None = None):
-    """The read shape of one comment. A task comment reports its task's
-    project — resolved by whichever service call loaded the parent — through
-    the same ``project_id`` field a project comment fills from its own column.
+    """The read shape of one comment.
 
     Reactions come from rows stamped on the comment by
     :func:`attach_reactions`; a comment that was never stamped serializes with
@@ -492,9 +514,6 @@ def serialize_comment(comment: Comment, *, viewer_id: int | None = None):
     from app.services.tenant import reactions as reactions_service
 
     read = CommentRead.model_validate(comment)
-    task_project_id = getattr(comment, "_task_project_id", None)
-    if task_project_id is not None:
-        read.project_id = task_project_id
     removal = removal_of(comment)
     if removal is not None:
         # A tombstone names neither its words nor who wrote them; a deleted
@@ -534,7 +553,7 @@ def removal_of(comment: Comment) -> tuple[str, str | None] | None:
 async def attach_reactions(session: AsyncSession, *comments: Comment) -> None:
     """Load every comment's reactions in ONE query and stamp them on the rows.
 
-    A plain attribute, like ``_task_project_id`` above — the comments table has
+    A plain attribute — the comments table has
     no relationship to the polymorphic reactions table, and a thread of fifty
     must not become fifty queries.
     """
@@ -564,17 +583,15 @@ async def _get_comment(
     return result.one_or_none()
 
 
-def _parent_missing(column: str) -> CommentNotFoundError:
-    """The parent a ``{kind}_id`` column names is not there to comment on."""
-    return CommentNotFoundError(
-        KindMessages.NOT_FOUND, params={"kind": column.removesuffix("_id")}
-    )
+def _parent_missing(kind: str) -> CommentNotFoundError:
+    """The subject named is not there to comment on."""
+    return CommentNotFoundError(KindMessages.NOT_FOUND, params={"kind": kind})
 
 
 async def _resolved_parent(
     session: AsyncSession,
     *,
-    column: str,
+    kind: str,
     entity_id: int,
     guild_id: int,
     user: User | None,
@@ -585,18 +602,16 @@ async def _resolved_parent(
     ``user`` is ``None`` for an installed plug-in, which is in no initiative as a
     member: a parent its policies hid is simply not found.
     """
-    ctx = await _load_parent(
-        session, column=column, entity_id=entity_id, guild_id=guild_id
-    )
+    ctx = await _load_parent(session, kind=kind, entity_id=entity_id, guild_id=guild_id)
     if ctx is None:
         # The policies took the parent out before this ran. In the initiative
         # it is the reader's to know about, so sharing is what refused it.
-        table = COMMENT_PARENTS[column].table
+        table = comment_parents(routed_tools(session))[kind].table
         if user is not None and await reachability.reader_is_in_the_initiative(
             table, entity_id, cast(int, user.id), guild_id
         ):
             raise CommentPermissionError(CommentMessages.PERMISSION_DENIED)
-        raise _parent_missing(column)
+        raise _parent_missing(kind)
     await _ensure_parent_access(session, ctx, user=user, access=access)
     return ctx
 
@@ -623,19 +638,21 @@ async def _locked_now(session: AsyncSession, ctx: _ParentContext) -> bool:
     this write has committed."""
     from app.db.advisory_locks import LockNamespace, advisory_lock
 
-    row = ctx.extra_row if ctx.extra is not None else ctx.resource
+    row = ctx.row
+    table = table_of(row)
     await advisory_lock(
         session,
         LockNamespace.COMMENT_THREAD,
-        thread_key(routed_guild_id(session), str(row.__tablename__), int(row.id)),
+        thread_key(routed_guild_id(session), table.name, int(row.id)),
     )
-    model = type(row)
-    if not hasattr(model, "comments_locked_at"):
+    if "comments_locked_at" not in table.c:
         return False
     # Read again now that it is this write's turn.
     return (
         await session.exec(
-            select_including_deleted(model.comments_locked_at).where(model.id == row.id)
+            select_including_deleted(table.c.comments_locked_at).where(
+                table.c.id == row.id
+            )
         )
     ).first() is not None
 
@@ -649,19 +666,7 @@ def thread_key(guild_id: int | None, table: str, row_id: int) -> str:
 def thread_locked(ctx: _ParentContext) -> bool:
     """Whether a moderator closed this thread: nothing is added to it or
     edited in it, by anyone, until it is reopened."""
-    row = ctx.extra_row if ctx.extra is not None else ctx.resource
-    return getattr(row, "comments_locked_at", None) is not None
-
-
-def _stamp_parent(
-    session: AsyncSession, ctx: _ParentContext, *comments: Comment
-) -> None:
-    """Record what the parent says about loaded rows, for serialization: the
-    task's project — a plain attribute, never the ``project_id`` column (that
-    names a comment ON a project)."""
-    for comment in comments:
-        if ctx.project is not None:
-            object.__setattr__(comment, "_task_project_id", ctx.project.id)
+    return getattr(ctx.row, "comments_locked_at", None) is not None
 
 
 async def get_comment_with_parent(
@@ -694,16 +699,15 @@ async def get_comment_with_parent(
             raise CommentPermissionError(CommentMessages.PERMISSION_DENIED)
         raise CommentNotFoundError(CommentMessages.NOT_FOUND)
 
-    column, entity_id = _comment_target(comment)
+    kind, entity_id = subject_of(comment)
     ctx = await _resolved_parent(
         session,
-        column=column,
+        kind=kind,
         entity_id=entity_id,
         guild_id=guild_id,
         user=user,
         access=access,
     )
-    _stamp_parent(session, ctx, comment)
     await attach_reactions(session, comment)
     return comment, ctx
 
@@ -731,7 +735,7 @@ async def _ensure_said_to_a_filer(
     session: AsyncSession,
     *,
     person: User | None,
-    column: str,
+    kind: str,
     entity_id: int,
 ) -> None:
     """Refuse a comment said to a filer anywhere but a case that has one.
@@ -743,7 +747,7 @@ async def _ensure_said_to_a_filer(
     from app.models.tenant.intake import IntakeCase
     from app.services.tenant.cases import holds_cases
 
-    if person is None or column != "task_id" or not await holds_cases(session):
+    if person is None or kind != "task" or not await holds_cases(session):
         raise CommentValidationError(CommentMessages.NOT_SAID_TO_A_FILER)
     case = (
         await session.exec(
@@ -766,13 +770,13 @@ async def create_comment(
     author: User | notifications.PluginAuthor,
     guild_id: int,
     content: str,
-    targets: Mapping[str, int | None],
+    subject: tuple[str, int],
     parent_comment_id: int | None = None,
     audience: CommentAudience = CommentAudience.members,
 ) -> Comment:
-    """Post one comment on one parent, and tell whoever it concerns.
+    """Post one comment on one subject, and tell whoever it concerns.
 
-    ``targets`` maps comment-parent columns to ids; exactly one is set.
+    ``subject`` is what it is said on, as ``(kind, id)``.
 
     ``author`` is the person posting, or the installed plug-in posting as itself:
     its comment names no author, and the notices name the plug-in.
@@ -788,10 +792,10 @@ async def create_comment(
         if not parent_comment:
             raise CommentNotFoundError(CommentMessages.PARENT_NOT_FOUND)
 
-    column, entity_id = _single_target(targets)
+    kind, entity_id = subject
     ctx = await _resolved_parent(
         session,
-        column=column,
+        kind=kind,
         entity_id=entity_id,
         guild_id=guild_id,
         user=person,
@@ -803,13 +807,13 @@ async def create_comment(
     # reopening it is how anyone adds to it.
     if await _locked_now(session, ctx):
         raise CommentPermissionError(CommentMessages.LOCKED)
-    if parent_comment and getattr(parent_comment, column) != ctx.entity_id:
+    if parent_comment and subject_of(parent_comment) != (kind, ctx.entity_id):
         raise CommentValidationError(CommentMessages.PARENT_MISMATCH)
     if parent_comment and parent_comment.audience != audience:
         raise CommentValidationError(CommentMessages.AUDIENCE_MISMATCH)
     if audience is CommentAudience.filer:
         await _ensure_said_to_a_filer(
-            session, person=person, column=column, entity_id=ctx.entity_id
+            session, person=person, kind=kind, entity_id=ctx.entity_id
         )
         from app.services.platform import ticket_stream
 
@@ -819,7 +823,8 @@ async def create_comment(
         content=content,
         parent_comment_id=parent_comment_id,
         audience=audience,
-        **{column: ctx.entity_id},
+        subject_type=kind,
+        subject_id=ctx.entity_id,
     )
     session.add(comment)
     await session.flush()
@@ -827,7 +832,6 @@ async def create_comment(
     await session.refresh(
         comment, attribute_names=["created_by", "created_by_kind", "author"]
     )
-    _stamp_parent(session, ctx, comment)
     await content_references.sync_for_comment(session, comment, author_id=author.id)
     await attachments_service.claim_uploads(session, comment)
 
@@ -927,9 +931,10 @@ async def _process_comment_notifications(
         told.update(fresh)
         return fresh
 
-    # The thread's own fields: a task by its column, any other parent as an
+    # The thread's own fields: a task by its own field, any other parent as an
     # entity.
-    where = {"comment_id": comment.id, "task_id": comment.task_id}
+    thread_task_id = ctx.task.id if ctx.task is not None else None
+    where = {"comment_id": comment.id, "task_id": thread_task_id}
     if ctx.task is None:
         where |= {"entity_type": ctx.ref_type, "entity_id": ctx.entity_id}
 
@@ -978,7 +983,7 @@ async def _process_comment_notifications(
             data={
                 "comment_id": comment.id,
                 "mentioned_task_id": task_id,
-                "context_task_id": comment.task_id,
+                "context_task_id": thread_task_id,
                 "context_entity_type": where.get("entity_type"),
                 "context_entity_id": where.get("entity_id"),
                 "mentioned_by_name": name,
@@ -1031,7 +1036,7 @@ async def list_comments(
     *,
     user: User | None,
     guild_id: int,
-    targets: Mapping[str, int | None],
+    subject: tuple[str, int],
     limit: int,
     cursor: str | None = None,
 ) -> ThreadPage:
@@ -1041,10 +1046,10 @@ async def list_comments(
     with every reply under them, so a conversation is never split across
     pages. The rows come back in the order they were written.
     """
-    column, entity_id = _single_target(targets)
+    kind, entity_id = subject
     ctx = await _resolved_parent(
         session,
-        column=column,
+        kind=kind,
         entity_id=entity_id,
         guild_id=guild_id,
         user=user,
@@ -1057,7 +1062,7 @@ async def list_comments(
     parent = aliased(Comment)
     child = aliased(Comment)
     roots = select(Comment.id, Comment.created_at).where(
-        getattr(Comment, column) == ctx.entity_id,
+        said_on(kind, ctx.entity_id),
         or_(
             Comment.parent_comment_id.is_(None),
             # Trashed counts as absent here for every reader: the trash's own
@@ -1113,9 +1118,8 @@ async def list_comments(
     )
     comments = list((await session.exec(stmt)).all())
     comments = await _with_deleted_parents(
-        session, comments, guild_id=guild_id, column=column, entity_id=ctx.entity_id
+        session, comments, guild_id=guild_id, kind=kind, entity_id=ctx.entity_id
     )
-    _stamp_parent(session, ctx, *comments)
     await attach_reactions(session, *comments)
     return ThreadPage(comments, next_cursor, locked, can_moderate)
 
@@ -1137,7 +1141,7 @@ async def _with_deleted_parents(
     comments: list[Comment],
     *,
     guild_id: int,
-    column: str,
+    kind: str,
     entity_id: int,
 ) -> list[Comment]:
     """``comments`` and, in order, the comments their replies answer that are
@@ -1168,7 +1172,7 @@ async def _with_deleted_parents(
                 await system.exec(
                     select_including_deleted(Comment)
                     .where(ids_in(Comment.id, missing))
-                    .where(getattr(Comment, column) == entity_id)
+                    .where(said_on(kind, entity_id))
                     .where(Comment.deleted_at.is_not(None))  # type: ignore[union-attr]
                     .where(Comment.held_at.is_(None))  # type: ignore[union-attr]
                     .where(in_thread())
@@ -1192,10 +1196,10 @@ async def _with_deleted_parents(
 async def _tell_the_filer(session: AsyncSession, comment: Comment) -> None:
     """A change to what is said with whoever filed a case reaches their open
     ticket pages."""
-    if comment.audience is CommentAudience.filer and comment.task_id is not None:
+    if comment.audience is CommentAudience.filer and comment.subject_type == "task":
         from app.services.platform import ticket_stream
 
-        await ticket_stream.queue_for_case(session, comment.task_id)
+        await ticket_stream.queue_for_case(session, comment.subject_id)
 
 
 async def delete_comment(
@@ -1209,14 +1213,11 @@ async def delete_comment(
     if not comment:
         raise CommentNotFoundError(CommentMessages.NOT_FOUND)
 
-    column, entity_id = _comment_target(comment)
-    ctx = await _load_parent(
-        session, column=column, entity_id=entity_id, guild_id=guild_id
-    )
+    kind, entity_id = subject_of(comment)
+    ctx = await _load_parent(session, kind=kind, entity_id=entity_id, guild_id=guild_id)
     if ctx is None:
         raise CommentNotFoundError(CommentMessages.NOT_FOUND)
     await _ensure_parent_access(session, ctx, user=user, access="read")
-    _stamp_parent(session, ctx, comment)
 
     # Deleting is the author's alone; a moderator takes a comment down
     # instead (``moderation_acts``), which leaves a tombstone and a record.
@@ -1269,10 +1270,8 @@ async def update_comment(
         raise CommentValidationError(CommentMessages.REMOVED)
 
     # Verify access to the linked entity (same checks as delete_comment)
-    column, entity_id = _comment_target(comment)
-    ctx = await _load_parent(
-        session, column=column, entity_id=entity_id, guild_id=guild_id
-    )
+    kind, entity_id = subject_of(comment)
+    ctx = await _load_parent(session, kind=kind, entity_id=entity_id, guild_id=guild_id)
     if ctx is None:
         raise CommentNotFoundError(CommentMessages.NOT_FOUND)
     await _ensure_parent_access(session, ctx, user=user, access="read")
@@ -1280,7 +1279,6 @@ async def update_comment(
     # included. Taking one's own comment back is still a delete.
     if await _locked_now(session, ctx):
         raise CommentPermissionError(CommentMessages.LOCKED)
-    _stamp_parent(session, ctx, comment)
 
     previous_content = comment.content
     comment.content = content
@@ -1321,36 +1319,31 @@ async def recent_activity(
         Comment.removed_at.is_(None),
         in_thread(),
     ]
-    # A comment is reached through its parent — the task's project, or the
+    # A comment is reached through its subject — the task's project, or the
     # tool entity itself — so the sharing gate is applied per kind, each leg a
-    # subquery over the parent table (which also drops trashed parents via the
-    # session's soft-delete filter). Each clause is a no-op for a request that
-    # reaches the whole guild, leaving only "attached to some parent".
-    legs = []
-    reachable_by_tool = {}
+    # subquery over the subject's table (which also drops trashed subjects via
+    # the session's soft-delete filter). Each clause is a no-op for a request
+    # that reaches the whole guild, leaving only "said on some subject".
+    reachable: dict[str, Any] = {}
     for tool, target in TOOL_COMMENT_TARGETS.items():
         model = target.model
-        fk = getattr(Comment, target.column)
         # The entity's own comment switch gates its thread, so it gates the
         # feed too.
         parent_ids = select(model.id).where(model.comments_enabled.is_(True))
         # The tool's master switch gates the thread, so it gates the feed
         # too. A parent that names no initiative (a guild calendar) has no
         # switch to answer to.
-        parent_ids = parent_ids.where(
+        reachable[tool.value] = parent_ids.where(
             or_(
                 model.initiative_id.is_(None),
                 model.initiative_id.in_(select(Initiative.id).where(tool_on_sql(tool))),
             )
         )
-        reachable_by_tool[tool] = parent_ids
-        legs.append(and_(fk.isnot(None), fk.in_(parent_ids)))
     # The extras — a thread on something that is not a tool. Each is reached
     # through the tool that owns it, and takes that tool's switches only where
     # its registry entry says they answer for it.
-    for column, extra in EXTRA_COMMENT_TARGETS.items():
-        parent = COMMENT_PARENTS[column]
-        fk = getattr(Comment, column)
+    for kind, extra in EXTRA_COMMENT_TARGETS.items():
+        parent = COMMENT_PARENTS[kind]
         rows = select(extra.model.id)
         if parent.governed_by is None:
             tool = KINDS[extra.kind].tool
@@ -1363,11 +1356,18 @@ async def recent_activity(
         elif extra.anchor_switch:
             rows = rows.where(
                 getattr(extra.model, parent.tool_fk).in_(
-                    reachable_by_tool[parent.governed_by]
+                    reachable[parent.governed_by.kind]
                 )
             )
-        legs.append(and_(fk.isnot(None), fk.in_(rows)))
-    conditions.append(or_(*legs))
+        reachable[kind] = rows
+    conditions.append(
+        or_(
+            *(
+                and_(Comment.subject_type == kind, Comment.subject_id.in_(ids))
+                for kind, ids in reachable.items()
+            )
+        )
+    )
 
     stmt = (
         select(Comment)
@@ -1379,71 +1379,41 @@ async def recent_activity(
     result = await session.exec(stmt)
     comments = result.all()
 
-    # Batch-load the parents the rows point at
-    task_ids = {c.task_id for c in comments if c.task_id}
-    tasks_by_id: dict[int, Task] = {}
-    projects_by_id: dict[int, Project] = {}
-    if task_ids:
-        task_result = await session.exec(select(Task).where(Task.id.in_(task_ids)))
-        for task in task_result.all():
-            tasks_by_id[task.id] = task  # ty: ignore[invalid-assignment] — persisted row, id is set
-
-        project_ids = {t.project_id for t in tasks_by_id.values()}
-        if project_ids:
-            proj_result = await session.exec(
-                select(Project).where(Project.id.in_(project_ids))
-            )
-            for proj in proj_result.all():
-                projects_by_id[proj.id] = proj  # ty: ignore[invalid-assignment] — persisted row, id is set
-
-    # The extras' rows, and the tool row each belongs to — the feed shows the
-    # thread's own name and links at its real address, and the initiative is
-    # the tool's. The task is loaded above instead: its entry carries the
-    # project as well, which no other extra has.
-    extra_rows: dict[str, dict[int, object]] = {}
-    extra_anchors: dict[str, dict[int, object]] = {}
-    for column, extra in EXTRA_COMMENT_TARGETS.items():
-        if column == "task_id":
-            continue
-        parent = COMMENT_PARENTS[column]
-        ids = {value for c in comments if (value := getattr(c, column)) is not None}
-        rows: dict[int, object] = {}
-        anchors: dict[int, object] = {}
-        if ids:
-            loaded = (
-                await session.exec(select(extra.model).where(extra.model.id.in_(ids)))
+    # The subjects the page's comments are on, a query per kind present.
+    on: dict[str, set[int]] = {}
+    for comment in comments:
+        on.setdefault(comment.subject_type, set()).add(comment.subject_id)
+    subjects: dict[str, dict[int, Any]] = {}
+    for kind, ids in on.items():
+        model = MODELS_BY_TABLE[COMMENT_PARENTS[kind].table]
+        subjects[kind] = {
+            row.id: row
+            for row in (
+                await session.exec(select(model).where(model.id.in_(ids)))
             ).all()
-            rows = {row.id: row for row in loaded}
-            if parent.governed_by is None:
-                # It is its own anchor.
-                extra_rows[column] = extra_anchors[column] = rows
-                continue
-            anchor_model = TOOL_COMMENT_TARGETS[parent.governed_by].model
-            anchor_ids = {getattr(row, parent.tool_fk) for row in loaded}
-            if anchor_ids:
-                anchors = {
-                    anchor.id: anchor
-                    for anchor in (
-                        await session.exec(
-                            select(anchor_model).where(anchor_model.id.in_(anchor_ids))
-                        )
-                    ).all()
-                }
-        extra_rows[column] = rows
-        extra_anchors[column] = anchors
-
-    rows_by_tool: dict[Tool, dict] = {}
-    for tool, target in TOOL_COMMENT_TARGETS.items():
-        ids = {
-            value for c in comments if (value := getattr(c, target.column)) is not None
         }
-        if not ids:
-            rows_by_tool[tool] = {}
+    # The tool row each extra's subject belongs to: the feed shows the
+    # thread's own name and links at its real address, and the initiative is
+    # the tool's. A task's anchor is its project, which the entry carries too.
+    anchors: dict[str, dict[int, Any]] = {}
+    for kind, rows_by_id in subjects.items():
+        parent = COMMENT_PARENTS[kind]
+        if parent.tool_fk is None or parent.governed_by is None:
             continue
-        loaded = await session.exec(
-            select(target.model).where(target.model.id.in_(ids))
+        anchor_model = TOOL_COMMENT_TARGETS[Tool(parent.governed_by.kind)].model
+        anchor_ids = {getattr(row, parent.tool_fk) for row in rows_by_id.values()}
+        anchors[kind] = (
+            {
+                anchor.id: anchor
+                for anchor in (
+                    await session.exec(
+                        select(anchor_model).where(anchor_model.id.in_(anchor_ids))
+                    )
+                ).all()
+            }
+            if anchor_ids
+            else {}
         )
-        rows_by_tool[tool] = {row.id: row for row in loaded.all()}
 
     # The feed's chips, in one query for the whole page rather than one per row.
     reactions_by_comment = await reactions_service.load_reactions(
@@ -1465,52 +1435,28 @@ async def recent_activity(
                 reactions_by_comment.get(comment.id, []), viewer_id=viewer_id
             ),
         }
-        if comment.task_id:
-            task = tasks_by_id.get(comment.task_id)
-            project = projects_by_id.get(task.project_id) if task else None
-            fields.update(
-                project_id=project.id if project else None,
-                project_name=project.name if project else None,
-                entity_type="task",
-                entity_id=comment.task_id,
-                entity_name=task.title if task else None,
-                initiative_id=project.initiative_id if project else None,
-            )
-        elif hit := next(
-            (
-                (column, value)
-                for column in extra_rows
-                if (value := getattr(comment, column)) is not None
-            ),
-            None,
-        ):
-            column, value = hit
-            extra = EXTRA_COMMENT_TARGETS[column]
-            row = extra_rows[column].get(value)
-            tool_fk = COMMENT_PARENTS[column].tool_fk
-            anchor = (
-                extra_anchors[column].get(getattr(row, tool_fk) if tool_fk else value)
-                if row is not None
-                else None
-            )
-            fields.update(
-                entity_type=extra.kind,
-                entity_id=value,
-                entity_name=getattr(row, extra.title_field) if row else None,
-                initiative_id=anchor.initiative_id if anchor else None,
-            )
+        kind, entity_id = subject_of(comment)
+        parent = COMMENT_PARENTS[kind]
+        row = subjects.get(kind, {}).get(entity_id)
+        if row is None:
+            anchor = None
+        elif parent.tool_fk is not None:
+            anchor = anchors.get(kind, {}).get(getattr(row, parent.tool_fk))
         else:
-            for tool, target in TOOL_COMMENT_TARGETS.items():
-                value = getattr(comment, target.column)
-                if value is None:
-                    continue
-                row = rows_by_tool[tool].get(value)
-                fields.update(
-                    entity_type=tool.value,
-                    entity_id=value,
-                    entity_name=row.name if row else None,
-                    initiative_id=row.initiative_id if row else None,
-                )
-                break
+            anchor = row
+        extra = EXTRA_COMMENT_TARGETS.get(kind)
+        fields.update(
+            entity_type=kind,
+            entity_id=entity_id,
+            entity_name=(
+                getattr(row, extra.title_field if extra else "name") if row else None
+            ),
+            initiative_id=anchor.initiative_id if anchor else None,
+        )
+        if kind == "task":
+            fields.update(
+                project_id=anchor.id if anchor else None,
+                project_name=anchor.name if anchor else None,
+            )
         entries.append(RecentActivityEntry(**fields))
     return entries

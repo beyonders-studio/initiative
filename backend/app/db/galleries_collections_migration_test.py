@@ -5,11 +5,8 @@ way ``files_formats_migration_test`` runs its revisions."""
 
 from __future__ import annotations
 
-import importlib.util
 import json
 from datetime import UTC, datetime
-from pathlib import Path
-from types import ModuleType
 from typing import Any
 
 from alembic.migration import MigrationContext
@@ -26,18 +23,7 @@ from app.testing import (
     create_tag,
     create_user,
 )
-from app.testing.later_revisions import step_later_revisions
-
-_VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
-
-
-def _load(name: str) -> ModuleType:
-    path = _VERSIONS / name
-    spec = importlib.util.spec_from_file_location(path.stem, path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+from app.testing.later_revisions import load_revision, step_later_revisions
 
 
 async def _rows(session, sql: str, **params: Any) -> list[tuple]:
@@ -53,8 +39,8 @@ def _runner(schema: str):
     """Revision 0546 one way or the other, on one guild's schema only, with
     the later revisions (``app.testing.later_revisions``) and the metadata
     store (20261027_0550) off first and back on last."""
-    migration = _load("20261027_0546_galleries_are_collections.py")
-    metadata = _load("20261027_0550_metadata_is_one_store.py")
+    migration = load_revision("20261027_0546_galleries_are_collections.py")
+    metadata = load_revision("20261027_0550_metadata_is_one_store.py")
 
     def run(forward: bool):
         def apply(sync_session) -> None:
@@ -385,10 +371,11 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
     )
     assert await _rows(
         session,
-        f"SELECT collection_id, content FROM {s}.comments WHERE id = :c",
+        f"SELECT subject_type, subject_id, content FROM {s}.comments WHERE id = :c",
         c=comment,
     ) == [
         (
+            "collection",
             gallery,
             f"Lovely, as #file[Spec]({spec.id}) says of #file[it]({sunset_file})",
         )
@@ -493,7 +480,9 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
     ) == [(None, 17)]
     assert await _rows(
         session,
-        f"SELECT files_enabled FROM {s}.initiatives WHERE id = :i",
+        f"SELECT enabled FROM {s}.initiative_rules WHERE initiative_id = :i "
+        "AND initiative_role_id IS NULL AND install_id IS NULL "
+        "AND key = 'files_enabled'",
         i=initiative.id,
     ) == [(True,)]
     assert {("create_files", True), ("files_enabled", True)} <= set(

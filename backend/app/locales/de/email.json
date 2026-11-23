@@ -607,6 +607,16 @@
         "title": "Du kannst es jetzt bearbeiten",
         "body_one": "<strong>{{answerer}}</strong> hat dir <strong>{{title}}</strong> zum Bearbeiten freigegeben",
         "body_other": "<strong>{{answerer}}</strong> hat dir {{count}} Dateien zum Bearbeiten freigegeben"
+      },
+      "read_note": {
+        "subject": "Du kannst es jetzt ansehen",
+        "title": "Du kannst es jetzt ansehen",
+        "body": "<strong>{{answerer}}</strong> lässt dich <strong>{{title}}</strong> ansehen: „{{note}}“"
+      },
+      "write_note": {
+        "subject": "Du kannst es jetzt bearbeiten",
+        "title": "Du kannst es jetzt bearbeiten",
+        "body": "<strong>{{answerer}}</strong> lässt dich <strong>{{title}}</strong> bearbeiten: „{{note}}“"
       }
     },
     "declined": {
@@ -621,6 +631,28 @@
       "subject": "Erinnerung: {{task}}",
       "title": "Erinnerung",
       "body": "Du wolltest an <strong>{{task}}</strong> erinnert werden."
+    }
+  },
+  "item": {
+    "sent": {
+      "subject": "{{sender}} hat dir {{title}} geschickt",
+      "title": "Für dich",
+      "body": "<strong>{{sender}}</strong> hat dir <strong>{{title}}</strong> geschickt"
+    },
+    "sent_note": {
+      "subject": "{{sender}} hat dir {{title}} geschickt",
+      "title": "Für dich",
+      "body": "<strong>{{sender}}</strong> hat dir <strong>{{title}}</strong> geschickt: „{{note}}“"
+    },
+    "sent_unnamed": {
+      "subject": "{{sender}} hat dir etwas geschickt",
+      "title": "Für dich",
+      "body": "<strong>{{sender}}</strong> hat dir etwas geschickt, um dessen Zugriff du bitten kannst"
+    },
+    "sent_unnamed_note": {
+      "subject": "{{sender}} hat dir etwas geschickt",
+      "title": "Für dich",
+      "body": "<strong>{{sender}}</strong> hat dir etwas geschickt, um dessen Zugriff du bitten kannst: „{{note}}“"
     }
   }
 }

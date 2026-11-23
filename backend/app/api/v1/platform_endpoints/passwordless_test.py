@@ -179,9 +179,16 @@ def _events(
 # ---------------------------------------------------------------------------
 
 
-async def test_the_only_way_in_stays(client: AsyncClient, session: AsyncSession):
-    """An account with nothing else to sign in with keeps its password."""
+@pytest.mark.parametrize("withdrawn_passkey", [False, True])
+async def test_the_only_way_in_stays(
+    client: AsyncClient, session: AsyncSession, withdrawn_passkey: bool
+):
+    """An account with nothing else to sign in with keeps its password — and a
+    passkey this deployment stopped accepting is not something else."""
     user = await _account(session, "pl-only@example.com")
+    if withdrawn_passkey:
+        await _seed_passkey(session, user)
+        await _withdraw_passkeys(session)
 
     response = await client.post(
         REMOVE, json={"current_password": PASSWORD}, headers=get_auth_headers(user)
@@ -283,25 +290,17 @@ async def test_an_account_holding_none_has_nothing_to_remove(
     assert response.json()["detail"] == "PASSWORD_NOT_HELD"
 
 
-async def test_a_credential_the_deployment_withdrew_is_not_a_way_in(
-    client: AsyncClient, session: AsyncSession
-):
-    """The account holds a passkey, but this deployment stopped accepting
-    them — so the password is again all it has."""
-    user = await _account(session, "pl-withdrawn@example.com")
-    await _seed_passkey(session, user)
-    await _withdraw_passkeys(session)
-
-    response = await client.post(
-        REMOVE, json={"current_password": PASSWORD}, headers=get_auth_headers(user)
-    )
-    assert response.status_code == 409
-    assert response.json()["detail"] == "PASSWORD_IS_LAST_METHOD"
-
-
 async def test_removing_keeps_this_device_signed_in(
-    client: AsyncClient, session: AsyncSession, capfd
+    client: AsyncClient, session: AsyncSession, capfd, monkeypatch
 ):
+    """The device it was done from stays signed in on a replacement session,
+    the others are signed out, and the account is told by letter."""
+    sent: list[int] = []
+
+    async def record(user, pieces, **_) -> None:
+        sent.append(user.id)
+
+    monkeypatch.setattr(email_outbox, "enqueue_account_letter", record)
     user = await _account(session, "pl-remove@example.com")
     user_id = user.id
     version_before = user.token_version
@@ -344,6 +343,7 @@ async def test_removing_keeps_this_device_signed_in(
     assert (
         len(_events(written, user_id, AuditEventType.AUTH_RECOVERY_CODES_ISSUED)) == 1
     )
+    assert sent == [user_id]
 
 
 async def test_an_account_that_already_holds_codes_keeps_them(
@@ -367,26 +367,6 @@ async def test_an_account_that_already_holds_codes_keeps_them(
         await totp_service.remaining_recovery_codes(session, user_id=user_id)
         == totp_service.RECOVERY_CODE_COUNT
     )
-
-
-async def test_the_letter_says_the_password_is_gone(
-    client: AsyncClient, session: AsyncSession, monkeypatch
-):
-    sent: list[int] = []
-
-    async def record(user, pieces, **_) -> None:
-        sent.append(user.id)
-
-    monkeypatch.setattr(email_outbox, "enqueue_account_letter", record)
-
-    user = await _account(session, "pl-letter@example.com")
-    await _seed_passkey(session, user)
-
-    response = await client.post(
-        REMOVE, json={"current_password": PASSWORD}, headers=get_auth_headers(user)
-    )
-    assert response.status_code == 200, response.text
-    assert sent == [user.id]
 
 
 async def test_the_app_is_sent_to_a_browser_for_this(
@@ -504,8 +484,16 @@ async def test_an_account_holding_a_password_recovers_by_mail_instead(
     assert response.json()["detail"] == "SIGN_IN_LOCKED"
 
 
-async def test_an_address_nobody_holds_gets_the_same_answer(client: AsyncClient):
-    response = await client.post(
+async def test_a_code_that_does_not_match_is_written_down(
+    client: AsyncClient, session: AsyncSession, capfd
+):
+    """A code that does not match is refused as an address nobody holds is,
+    and written down against the account it named."""
+    user = await _account(session, "pl-badcode@example.com", password=None)
+    user_id = user.id
+    await _issue_codes(session, user)
+
+    nobody = await client.post(
         RECOVER,
         json={
             "email": "nobody@example.com",
@@ -513,16 +501,8 @@ async def test_an_address_nobody_holds_gets_the_same_answer(client: AsyncClient)
             "password": NEW_PASSWORD,
         },
     )
-    assert response.status_code == 400
-    assert response.json()["detail"] == "RECOVERY_CODE_INVALID"
-
-
-async def test_a_code_that_does_not_match_is_written_down(
-    client: AsyncClient, session: AsyncSession, capfd
-):
-    user = await _account(session, "pl-badcode@example.com", password=None)
-    user_id = user.id
-    await _issue_codes(session, user)
+    assert nobody.status_code == 400
+    assert nobody.json()["detail"] == "RECOVERY_CODE_INVALID"
     capfd.readouterr()
 
     response = await client.post(
@@ -855,27 +835,23 @@ _GATED = [
 ]
 
 
-@pytest.mark.parametrize("slug,route,_ok", _GATED, ids=[row[0] for row in _GATED])
-async def test_a_sign_in_of_a_while_ago_no_longer_speaks_for_the_account(
-    client: AsyncClient, session: AsyncSession, slug: str, route, _ok: int
-):
-    user = await _account(session, f"pl-stale-{slug}@example.com", password=None)
-    headers = await _proof_headers(session, user, minutes_ago=11)
-
-    response = await route(client, session, user, headers)
-    assert response.status_code == 403, response.text
-    assert response.json()["detail"] == "RECENT_PROOF_REQUIRED"
-
-
 @pytest.mark.parametrize("slug,route,ok", _GATED, ids=[row[0] for row in _GATED])
-async def test_a_sign_in_just_made_speaks_for_the_account(
+async def test_only_a_sign_in_just_made_speaks_for_the_account(
     client: AsyncClient, session: AsyncSession, slug: str, route, ok: int
 ):
-    user = await _account(session, f"pl-fresh-{slug}@example.com", password=None)
-    headers = await _proof_headers(session, user)
+    """For an account holding no password, a sign-in just made answers in its
+    place, and one of a while ago does not."""
+    fresh = await _account(session, f"pl-fresh-{slug}@example.com", password=None)
+    stale = await _account(session, f"pl-stale-{slug}@example.com", password=None)
 
-    response = await route(client, session, user, headers)
-    assert response.status_code == ok, response.text
+    answered = await route(client, session, fresh, await _proof_headers(session, fresh))
+    refused = await route(
+        client, session, stale, await _proof_headers(session, stale, minutes_ago=11)
+    )
+
+    assert answered.status_code == ok, answered.text
+    assert refused.status_code == 403, refused.text
+    assert refused.json()["detail"] == "RECENT_PROOF_REQUIRED"
 
 
 async def test_a_renewed_session_is_read_back_to_the_sign_in_it_began_at(

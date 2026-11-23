@@ -4,6 +4,9 @@
   "help": "Aide",
   "helpDraft": "Brouillon de la demande d'aide",
   "reloadPage": "Recharger la page",
+  "copyPageLink": "Copier le lien de cette page",
+  "pageLinkCopied": "Lien copié",
+  "pageLinkCopyFailed": "Impossible de copier le lien",
   "user": "Utilisateur",
   "userWithId": "Utilisateur n° {{id}}",
   "formerMember": "Ancien membre",
@@ -75,6 +78,7 @@
     "viewMode": "Mode d'affichage",
     "noEntries": "Aucun événement",
     "allDay": "Toute la journée",
+    "until": "Jusqu’à {{time}}",
     "more": "+{{count}} de plus",
     "start": "Début",
     "due": "Échéance"
@@ -330,11 +334,6 @@
       "this": "ce fichier",
       "plural": "fichiers"
     },
-    "counter_group": {
-      "name": "Groupe de compteurs",
-      "this": "ce groupe de compteurs",
-      "plural": "groupes de compteurs"
-    },
     "calendar": {
       "name": "Calendrier",
       "this": "ce calendrier",
@@ -369,11 +368,6 @@
       "name": "Événement",
       "this": "cet événement",
       "plural": "événements"
-    },
-    "counter": {
-      "name": "Compteur",
-      "this": "ce compteur",
-      "plural": "compteurs"
     },
     "wiki_page": {
       "name": "Page",

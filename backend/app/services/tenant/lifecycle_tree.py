@@ -4,7 +4,9 @@ Trashing, restoring, purging and archiving all act on a row *and everything
 filed under it*. The tree they walk is not written down anywhere: it is read off
 the foreign keys between the soft-deletable tables, so a table that joins the
 trash can with a key to its parent joins the cascade in the same change, and the
-four lifecycles cannot disagree about it.
+four lifecycles cannot disagree about it. A comment names what it is said on as
+a pair rather than a key, so it is filed under every kind that takes comments
+(``COMMENT_TARGETS``).
 
 A key that lets go on delete (``SET NULL``) is a pointer rather than ownership —
 a collection's cover file, a wiki's home page — so it is not an edge: the thing
@@ -20,75 +22,156 @@ trashed or archived row freezes everything under it at the database (see
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any
 
-from sqlalchemy import delete, update
+from sqlalchemy import Table, and_, delete, select, update
+from sqlalchemy.sql import FromClause
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tool_set import BUILTIN_TOOLS, KEPT_TOOL_SETS, ToolSet
+from app.core.tools import TRASHABLE_EXTRAS, plural_of
 from app.db.base import MODELS_BY_TABLE
 from app.db.query import ids_in
-from app.db.soft_delete_filter import SOFT_DELETE_MODELS, select_including_deleted
+from app.db.session import routed_tools
+from app.db.soft_delete_filter import SOFT_DELETE_TABLES
+from app.db.tool_rows import table_of
 
-#: parent model -> [(child model, fk column on the child)]
-Tree = Mapping[type, Sequence[tuple[type, str]]]
 
-#: model -> ids, for one level of a walk.
-Level = dict[type, list[int]]
+@dataclass(frozen=True)
+class Edge:
+    """One way a row is filed under another: a foreign key on ``table``, or,
+    for a comment, the ``(subject_type, subject_id)`` pair it names its subject
+    by, where ``kind`` is the parent's kind and ``column`` the id."""
+
+    #: The table at the other end: the child, read downwards; the parent,
+    #: read upwards.
+    table: Table
+    column: str
+    kind: str | None = None
+
+    def under(self, child: FromClause, parent_ids: Sequence[int]) -> Any:
+        """``child`` rows filed under any of these parents."""
+        tie = ids_in(child.c[self.column], parent_ids)
+        return (
+            tie if self.kind is None else and_(child.c.subject_type == self.kind, tie)
+        )
+
+    def ties(self, child: FromClause, parent: FromClause) -> Any:
+        """``child`` filed under ``parent``, as a join condition."""
+        tie = parent.c.id == child.c[self.column]
+        return (
+            tie if self.kind is None else and_(child.c.subject_type == self.kind, tie)
+        )
+
+
+#: parent table -> [edge to a child]
+Tree = Mapping[Table, Sequence[Edge]]
+
+#: table -> ids, for one level of a walk.
+Level = dict[Table, list[int]]
 
 #: A subtree deeper than this is a cycle in the data, not a tree.
 _MAX_DEPTH = 256
 
 
-def _derive_children() -> dict[type, list[tuple[type, str]]]:
-    tree: dict[type, list[tuple[type, str]]] = {}
-    for child in SOFT_DELETE_MODELS:
-        for column in child.__table__.columns:
+def binned_tables(tools: ToolSet) -> tuple[Table, ...]:
+    """Every table with the trash in a community with ``tools``: the models'
+    and the installed tools' that carry its column."""
+    return (
+        *(SQLModel.metadata.tables[name] for name in SOFT_DELETE_TABLES),
+        *(table for table in tools.installed_tables if "deleted_at" in table.c),
+    )
+
+
+def trash_kinds(tools: ToolSet) -> dict[str, Table]:
+    """What the trash calls the rows of each table with the trash, in a
+    community with ``tools``: the kind it keeps, or what else the trash holds
+    (a comment, an initiative)."""
+
+    named = tools.kind_tables | {e: plural_of(e) for e in TRASHABLE_EXTRAS}
+    return {
+        kind: tools.tables[name]
+        for kind, name in named.items()
+        if "deleted_at" in tools.tables[name].c
+    }
+
+
+@lru_cache(KEPT_TOOL_SETS)
+def cascade_children(tools: ToolSet) -> dict[Table, list[Edge]]:
+    """parent table -> [edge to a child]: what a trashed row takes with it,
+    in a community with ``tools``."""
+    from app.db.initiative_rls import comment_parents
+
+    binned = binned_tables(tools)
+    tree: dict[Table, list[Edge]] = {}
+    for child in binned:
+        for column in child.columns:
             for fk in column.foreign_keys:
-                parent = MODELS_BY_TABLE.get(fk.column.table.name)
-                if (
-                    parent not in SOFT_DELETE_MODELS
-                    or (fk.ondelete or "").upper() == "SET NULL"
-                ):
+                parent = fk.column.table
+                if parent not in binned or (fk.ondelete or "").upper() == "SET NULL":
                     continue
-                tree.setdefault(parent, []).append((child, column.name))
+                tree.setdefault(parent, []).append(Edge(child, column.name))
+    # A comment names what it is said on by kind, not by a key, so it is filed
+    # under every kind that takes comments.
+    comments = tools.tables["comments"]
+    parents = comment_parents(tools)
+    for kind in tools.comment_targets:
+        parent = tools.tables[parents[kind].table]
+        tree.setdefault(parent, []).append(Edge(comments, "subject_id", kind))
     return tree
 
 
-#: parent model -> [(child model, fk column)]: what a trashed row takes with it.
-CASCADE_CHILDREN: dict[type, list[tuple[type, str]]] = _derive_children()
+@lru_cache(KEPT_TOOL_SETS)
+def cascade_parents(tools: ToolSet) -> dict[Table, list[Edge]]:
+    """child table -> [edge to a parent]: the same edges read upwards."""
+    parents: dict[Table, list[Edge]] = {}
+    for parent, children in cascade_children(tools).items():
+        for edge in children:
+            parents.setdefault(edge.table, []).append(
+                Edge(parent, edge.column, edge.kind)
+            )
+    return parents
 
-#: child model -> [(parent model, fk column)]: the same edges read upwards.
-CASCADE_PARENTS: dict[type, list[tuple[type, str]]] = {}
-for _parent, _children in CASCADE_CHILDREN.items():
-    for _child, _fk in _children:
-        CASCADE_PARENTS.setdefault(_child, []).append((_parent, _fk))
+
+#: The built-in tools' tree, downwards and upwards.
+CASCADE_CHILDREN: dict[Table, list[Edge]] = cascade_children(BUILTIN_TOOLS)
+CASCADE_PARENTS: dict[Table, list[Edge]] = cascade_parents(BUILTIN_TOOLS)
 
 
-def parents_first(models: Iterable[type]) -> tuple[type, ...]:
-    """``models`` ordered so every parent comes before its children.
+def parents_first(
+    tables: Iterable[Table], tools: ToolSet = BUILTIN_TOOLS
+) -> tuple[Table, ...]:
+    """``tables`` ordered so every parent comes before its children.
 
     A table's edge to itself (a reply under a comment, a page under a page) is
     no constraint on the order. Ties keep the order they were given in.
     """
-    pending = list(models)
-    placed: list[type] = []
+    upwards = cascade_parents(tools)
+    pending = list(tables)
+    placed: list[Table] = []
     while pending:
-        for model in pending:
-            parents = {p for p, _ in CASCADE_PARENTS.get(model, ()) if p is not model}
+        for table in pending:
+            parents = {
+                edge.table for edge in upwards.get(table, ()) if edge.table is not table
+            }
             if not parents & set(pending):
-                placed.append(model)
-                pending.remove(model)
+                placed.append(table)
+                pending.remove(table)
                 break
         else:  # pragma: no cover — the tables' keys would have to form a loop
             raise RuntimeError(f"cascade tree has a cycle among {pending}")
     return tuple(placed)
 
 
-def group_by_model(rows: Iterable[SQLModel]) -> Level:
+def group_by_table(rows: Iterable[Any]) -> Level:
+    """Rows' ids by the table each is kept in: a model's instance's, or a
+    tool plug-in's row's (``app.db.tool_rows``)."""
     level: Level = {}
     for row in rows:
-        level.setdefault(type(row), []).append(row.id)  # type: ignore[attr-defined]
+        level.setdefault(table_of(row), []).append(row.id)
     return level
 
 
@@ -99,15 +182,15 @@ def _keep_deepest(levels: list[Level]) -> list[Level]:
     on, so it is reached twice. Its deepest level is the one that is below all
     of its parents, which is the one every direction of write needs.
     """
-    seen: set[tuple[type, int]] = set()
+    seen: set[tuple[Table, int]] = set()
     kept: list[Level] = []
     for level in reversed(levels):
         narrowed: Level = {}
-        for model, ids in level.items():
-            fresh = [i for i in ids if (model, i) not in seen]
-            seen.update((model, i) for i in fresh)
+        for table, ids in level.items():
+            fresh = [i for i in ids if (table, i) not in seen]
+            seen.update((table, i) for i in fresh)
             if fresh:
-                narrowed[model] = fresh
+                narrowed[table] = fresh
         kept.append(narrowed)
     kept.reverse()
     return [level for level in kept if level]
@@ -115,56 +198,66 @@ def _keep_deepest(levels: list[Level]) -> list[Level]:
 
 async def subtree_levels(
     session: AsyncSession,
-    roots: Iterable[SQLModel],
+    roots: Iterable[Any],
     *,
-    tree: Tree = CASCADE_CHILDREN,
-    where: Callable[[type], Any] | None = None,
+    tree: Tree | None = None,
+    where: Callable[[Table], Any] | None = None,
 ) -> list[Level]:
     """The roots and everything under them, grouped by depth — roots first.
 
-    ``where(model)`` narrows which children are followed (the ones still live,
-    the ones stamped by one particular trashing, …); without it every child is,
-    in the bin or not. Each row appears once, at the deepest level it sits.
+    ``tree`` is the community's (:func:`cascade_children`), the one the
+    session is routed into when not given. ``where(table)`` narrows which
+    children are followed (the ones still live, the ones stamped by one
+    particular trashing, …); without it every child is, in the bin or not.
+    Each row appears once, at the deepest level it sits.
     """
+    if tree is None:
+        tree = cascade_children(routed_tools(session))
     levels: list[Level] = []
-    frontier = group_by_model(roots)
+    frontier = group_by_table(roots)
     while frontier:
         if len(levels) >= _MAX_DEPTH:
             raise RuntimeError("cascade tree is deeper than any real one could be")
         levels.append(frontier)
-        found: dict[type, dict[int, None]] = {}
-        for parent_model, parent_ids in frontier.items():
-            for child_model, fk_col in tree.get(parent_model, ()):
-                stmt = select_including_deleted(child_model.id).where(  # type: ignore[attr-defined]
-                    ids_in(getattr(child_model, fk_col), parent_ids)
+        found: dict[Table, dict[int, None]] = {}
+        for parent, parent_ids in frontier.items():
+            for edge in tree.get(parent, ()):
+                child = edge.table
+                stmt = (
+                    select(child.c.id)
+                    .where(edge.under(child, parent_ids))
+                    .execution_options(include_deleted=True)
                 )
                 if where is not None:
-                    stmt = stmt.where(where(child_model))
-                for child_id in (await session.exec(stmt)).all():
-                    found.setdefault(child_model, {})[child_id] = None
-        frontier = {model: list(ids) for model, ids in found.items()}
+                    stmt = stmt.where(where(child))
+                for child_id in (await session.exec(stmt)).scalars().all():
+                    found.setdefault(child, {})[child_id] = None
+        frontier = {table: list(ids) for table, ids in found.items()}
     return _keep_deepest(levels)
 
 
+def _synced(statement: Any, table: Table) -> Any:
+    """``statement`` on ``table``, naming its model where it has one, so the
+    session keeps the rows of it that it holds in step. A table no model maps
+    has no rows in the session."""
+    model = MODELS_BY_TABLE.get(table.name)
+    if model is None:
+        return statement(table)
+    return statement(model).execution_options(synchronize_session="fetch")
+
+
 async def set_columns(
-    session: AsyncSession, model: type, ids: Sequence[int], values: dict[str, Any]
+    session: AsyncSession, table: Table, ids: Sequence[int], values: dict[str, Any]
 ) -> None:
-    """One UPDATE for every row of ``model`` named, kept in step with any of
+    """One UPDATE for every row of ``table`` named, kept in step with any of
     them the session already holds."""
     await session.exec(
-        update(model)  # type: ignore[call-overload]
-        .where(ids_in(model.id, ids))  # type: ignore[attr-defined]
-        .values(**values)
-        .execution_options(synchronize_session="fetch")
+        _synced(update, table).where(ids_in(table.c.id, ids)).values(**values)
     )
 
 
-async def delete_rows(session: AsyncSession, model: type, ids: Sequence[int]) -> None:
-    """Delete these rows of ``model``. What hangs off them outside the trash
+async def delete_rows(session: AsyncSession, table: Table, ids: Sequence[int]) -> None:
+    """Delete these rows of ``table``. What hangs off them outside the trash
     goes with them at the database (``ON DELETE CASCADE``), in the same
     statement."""
-    await session.exec(
-        delete(model)  # type: ignore[call-overload]
-        .where(ids_in(model.id, ids))  # type: ignore[attr-defined]
-        .execution_options(synchronize_session="fetch")
-    )
+    await session.exec(_synced(delete, table).where(ids_in(table.c.id, ids)))

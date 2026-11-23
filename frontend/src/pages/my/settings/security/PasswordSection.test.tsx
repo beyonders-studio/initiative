@@ -22,15 +22,7 @@ const mocks = vi.hoisted(() => ({
   passkeys: vi.fn(),
   removePassword: vi.fn(),
   removeAnswer: vi.fn(),
-  update: vi.fn(),
   refreshUser: vi.fn(),
-}));
-
-vi.mock("@/hooks/useUsers", () => ({
-  useUpdateCurrentUser: (options: unknown) => {
-    mocks.update(options);
-    return { mutate: vi.fn(), isPending: false };
-  },
 }));
 
 vi.mock("@/api/generated/auth/auth", () => ({
@@ -94,22 +86,18 @@ describe("PasswordSection", () => {
     mocks.refreshUser.mockResolvedValue(undefined);
   });
 
-  it("offers to give the password up only where a passkey can take over", async () => {
-    mocks.passkeys.mockReturnValue(holding(0));
-    const { unmount } = await render();
-
-    expect(screen.queryByRole("button", { name: /remove your password/i })).not.toBeInTheDocument();
-    unmount();
-
-    mocks.passkeys.mockReturnValue(holding(1));
+  it("offers to give the password up where a passkey can take over", async () => {
     await render();
 
     expect(screen.getByRole("button", { name: /remove your password/i })).toBeInTheDocument();
     expect(mocks.passkeys).toHaveBeenCalledWith({ query: { enabled: true } });
   });
 
-  it("does not offer it where the deployment has withdrawn passkeys", async () => {
-    mocks.passkeys.mockReturnValue(holding(1, { offered: false }));
+  it.each([
+    ["no passkey to take over", holding(0)],
+    ["the deployment has withdrawn passkeys", holding(1, { offered: false })],
+  ])("does not offer to give it up where %s", async (_, answer) => {
+    mocks.passkeys.mockReturnValue(answer);
     await render();
 
     expect(screen.queryByRole("button", { name: /remove your password/i })).not.toBeInTheDocument();

@@ -8,6 +8,7 @@ its sharing admits the reader.
 
 import asyncio
 import json
+from types import SimpleNamespace
 
 import pytest
 from fastapi import status
@@ -16,11 +17,23 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.api import content_socket
 from app.api.content_socket import MSG_AUTH, read_auth_frame, serve_tool_stream
 from app.core.security import SESSION_COOKIE_NAME
-from app.core.tools import Tool
+from app.db.plugin_tools import provisioned_tools
 from app.models.platform.guild import CommunityRole
-from app.services.content_sockets import resource_room, sockets
-from app.testing import create_counter_group, get_auth_token
-from app.testing.sockets import settle
+from app.services.content_sockets import (
+    ContentSockets,
+    Credential,
+    Subscriber,
+    Wire,
+    resource_room,
+    sockets,
+)
+from app.testing import (
+    COUNTERS_UID,
+    get_auth_token,
+    install_tool_plugin,
+    switch_tools,
+)
+from app.testing.sockets import FakeWebSocket, settle
 
 
 class InboundWebSocket:
@@ -148,11 +161,14 @@ async def test_hanging_up_before_the_first_frame_closes_nothing() -> None:
 # ── a tool row's stream ─────────────────────────────────────────────────────
 
 
+GROUP = f"counter_group.{COUNTERS_UID.lower()}"
+
+
 async def _watch(guild_id: int, group_id: int, token: str) -> InboundWebSocket:
     """Open a counter group's stream and hold it until the handshake is done."""
     websocket = InboundWebSocket([_binary({"token": token})])
     serving = asyncio.create_task(
-        serve_tool_stream(websocket, guild_id, Tool.counter_group, group_id)  # type: ignore[arg-type]
+        serve_tool_stream(websocket, guild_id, GROUP, group_id)  # type: ignore[arg-type]
     )
     _done, _ = await asyncio.wait(
         {serving, asyncio.create_task(websocket.seated.wait())},
@@ -162,69 +178,84 @@ async def _watch(guild_id: int, group_id: int, token: str) -> InboundWebSocket:
     return websocket
 
 
+async def _group(client, session: AsyncSession, acting_user, owner) -> int:
+    """Counters installed in ``owner``'s community, and a counter group
+    ``owner`` makes in its initiative, shared with nobody else."""
+    seat = await acting_user(guild=owner.guild, guild_role=CommunityRole.superadmin)
+    await install_tool_plugin(client, session, seat)
+    made = await client.post(
+        owner.g(f"/plugin-tools/{GROUP}/"),
+        headers=owner.headers,
+        json={"initiative_id": owner.initiative.id, "name": "Scores", "grants": []},
+    )
+    assert made.status_code == 201, made.text
+    return made.json()["id"]
+
+
 async def test_a_reader_of_the_counter_group_is_seated_and_told_of_changes(
-    session: AsyncSession, acting_user
+    client, session: AsyncSession, acting_user
 ) -> None:
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    group = await create_counter_group(session, a.initiative, a.user)
+    group_id = await _group(client, session, acting_user, a)
 
-    websocket = await _watch(a.guild.id, group.id, get_auth_token(a.user))
+    websocket = await _watch(a.guild.id, group_id, get_auth_token(a.user))
     assert websocket.closed is None
-    room = resource_room(a.guild.id, "counter_group", group.id)
+    room = resource_room(a.guild.id, GROUP, group_id)
     assert sockets.room_size(room) == 1
 
-    sockets.signal(a.guild.id, Tool.counter_group, group.id, "counter_updated")
+    tools = await provisioned_tools(a.guild.id)
+    sockets.signal(a.guild.id, tools.by_kind[GROUP], group_id, "updated")
     await settle()
     await websocket.serving  # type: ignore[attr-defined]
 
-    assert [frame["type"] for frame in websocket.sent] == ["counter_updated"]
+    assert [frame["type"] for frame in websocket.sent] == ["updated"]
     assert sockets.room_size(room) == 0
 
 
-async def test_a_revoked_sign_in_is_refused(session: AsyncSession, acting_user) -> None:
+async def test_a_revoked_sign_in_is_refused(
+    client, session: AsyncSession, acting_user
+) -> None:
     """A sign-in ended by bumping ``token_version`` opens no socket."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    group = await create_counter_group(session, a.initiative, a.user)
+    group_id = await _group(client, session, acting_user, a)
     token = get_auth_token(a.user)
     a.user.token_version += 1
     session.add(a.user)
     await session.commit()
 
-    websocket = await _watch(a.guild.id, group.id, token)
+    websocket = await _watch(a.guild.id, group_id, token)
     await websocket.serving  # type: ignore[attr-defined]
 
     assert websocket.closed == status.WS_1008_POLICY_VIOLATION
 
 
 async def test_a_counter_group_whose_tool_is_switched_off_is_not_streamed(
-    session: AsyncSession, acting_user
+    client, session: AsyncSession, acting_user
 ) -> None:
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    group = await create_counter_group(session, a.initiative, a.user)
-    a.initiative.counter_groups_enabled = False
-    session.add(a.initiative)
-    await session.commit()
+    group_id = await _group(client, session, acting_user, a)
+    tools = await provisioned_tools(a.guild.id)
+    await switch_tools(session, a.initiative, {tools.by_kind[GROUP]: False})  # type: ignore[dict-item]
 
-    websocket = await _watch(a.guild.id, group.id, get_auth_token(a.user))
+    websocket = await _watch(a.guild.id, group_id, get_auth_token(a.user))
     await websocket.serving  # type: ignore[attr-defined]
 
     assert websocket.closed == status.WS_1008_POLICY_VIOLATION
 
 
 async def test_a_member_the_counter_group_is_not_shared_with_is_refused(
-    session: AsyncSession, acting_user
+    client, session: AsyncSession, acting_user
 ) -> None:
     owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    group = await create_counter_group(session, owner.initiative, owner.user)
     outsider = await acting_user(
         guild_role=CommunityRole.member,
         guild=owner.guild,
         initiative=owner.initiative,
         initiative_role="member",
     )
-    await session.commit()
+    group_id = await _group(client, session, acting_user, owner)
 
-    websocket = await _watch(owner.guild.id, group.id, get_auth_token(outsider.user))
+    websocket = await _watch(owner.guild.id, group_id, get_auth_token(outsider.user))
     await websocket.serving  # type: ignore[attr-defined]
 
     assert websocket.closed == status.WS_1008_POLICY_VIOLATION
@@ -233,25 +264,41 @@ async def test_a_member_the_counter_group_is_not_shared_with_is_refused(
 # ── a held socket ───────────────────────────────────────────────────────────
 
 
+async def _hold(websocket, monkeypatch, heartbeat: float, on_bytes) -> ContentSockets:
+    """Seat ``websocket`` in a fresh register's room for file 3 and hold it
+    open until the client hangs up."""
+    register = ContentSockets()
+    monkeypatch.setattr(content_socket, "sockets", register)
+    monkeypatch.setattr(content_socket, "HEARTBEAT_SECONDS", heartbeat)
+    room = resource_room(1, "file", 3)
+
+    async def keep(_session, _user):
+        return frozenset({room})
+
+    sub = Subscriber(
+        websocket=websocket,
+        user=SimpleNamespace(id=1),  # type: ignore[arg-type]
+        guild_id=1,
+        wire=Wire.bytes,
+        authorize=keep,
+        credential=Credential(),
+        rooms=frozenset({room}),
+    )
+    register.join(sub)
+    try:
+        await content_socket.hold_open(sub, on_bytes=on_bytes)
+        await settle()
+    finally:
+        if register._loop_task is not None:
+            register._loop_task.cancel()
+    return register
+
+
 async def test_a_held_socket_hands_on_binary_frames_and_beats_when_quiet(
     monkeypatch,
 ) -> None:
     """Every socket beats the same way, the collaboration socket included, so
     one client-side check notices a connection that has stopped carrying."""
-    from types import SimpleNamespace
-
-    from app.services.content_sockets import (
-        ContentSockets,
-        Credential,
-        Subscriber,
-        Wire,
-    )
-    from app.testing.sockets import FakeWebSocket
-
-    register = ContentSockets()
-    monkeypatch.setattr(content_socket, "sockets", register)
-    monkeypatch.setattr(content_socket, "HEARTBEAT_SECONDS", 0.01)
-
     inbound = [
         {"type": "websocket.receive", "bytes": b"\x02edit"},
         None,  # the client says nothing for a while
@@ -270,27 +317,8 @@ async def test_a_held_socket_hands_on_binary_frames_and_beats_when_quiet(
             return frame
 
     websocket = Client()
-
-    async def keep(_session, _user):
-        return frozenset({resource_room(1, "file", 3)})
-
-    sub = Subscriber(
-        websocket=websocket,  # type: ignore[arg-type]
-        user=SimpleNamespace(id=1),  # type: ignore[arg-type]
-        guild_id=1,
-        wire=Wire.bytes,
-        authorize=keep,
-        credential=Credential(),
-        rooms=frozenset({resource_room(1, "file", 3)}),
-    )
-    register.join(sub)
     received: list[bytes] = []
-    try:
-        await content_socket.hold_open(sub, on_bytes=received.append)
-        await settle()
-    finally:
-        if register._loop_task is not None:
-            register._loop_task.cancel()
+    register = await _hold(websocket, monkeypatch, 0.01, received.append)
 
     assert received == [b"\x02edit"]
     assert content_socket.HEARTBEAT_FRAME in websocket.sent
@@ -301,20 +329,6 @@ async def test_a_socket_that_keeps_talking_is_still_beaten_to(monkeypatch) -> No
     """Someone typing alone in a file sends constantly and is sent nothing
     back — edits are relayed to everyone else. The beat is measured from what
     the server last said, so their client still hears one and keeps the socket."""
-    from types import SimpleNamespace
-
-    from app.services.content_sockets import (
-        ContentSockets,
-        Credential,
-        Subscriber,
-        Wire,
-    )
-    from app.testing.sockets import FakeWebSocket
-
-    register = ContentSockets()
-    monkeypatch.setattr(content_socket, "sockets", register)
-    monkeypatch.setattr(content_socket, "HEARTBEAT_SECONDS", 0.05)
-
     # An edit every 10ms for 300ms: never quiet for a whole beat.
     edits = 30
 
@@ -329,25 +343,6 @@ async def test_a_socket_that_keeps_talking_is_still_beaten_to(monkeypatch) -> No
             return {"type": "websocket.receive", "bytes": b"\x02edit"}
 
     websocket = Typist()
-
-    async def keep(_session, _user):
-        return frozenset({resource_room(1, "file", 3)})
-
-    sub = Subscriber(
-        websocket=websocket,  # type: ignore[arg-type]
-        user=SimpleNamespace(id=1),  # type: ignore[arg-type]
-        guild_id=1,
-        wire=Wire.bytes,
-        authorize=keep,
-        credential=Credential(),
-        rooms=frozenset({resource_room(1, "file", 3)}),
-    )
-    register.join(sub)
-    try:
-        await content_socket.hold_open(sub, on_bytes=lambda _data: None)
-        await settle()
-    finally:
-        if register._loop_task is not None:
-            register._loop_task.cancel()
+    await _hold(websocket, monkeypatch, 0.05, lambda _data: None)
 
     assert websocket.sent.count(content_socket.HEARTBEAT_FRAME) >= 2

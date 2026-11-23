@@ -26,13 +26,12 @@
     "tag": "Tag",
     "calendar": "Kalender",
     "calendar_event": "Kalendertermin",
-    "counter_group": "Zählergruppe",
-    "counter": "Zähler",
     "dashboard": "Dashboard",
     "post": "Beitrag",
     "wiki": "Wiki",
     "wiki_page": "Seite",
     "contact": "Kontakt",
-    "collection": "Sammlung"
+    "collection": "Sammlung",
+    "pluginItem": "Plug-in-Element"
   }
 }

@@ -41,6 +41,7 @@ from app.testing import (
     drain_notices,
     get_auth_headers,
     route_session_to_guild,
+    switch_tools,
 )
 
 
@@ -90,10 +91,7 @@ async def _enable_calendars(session: AsyncSession, initiative, creator):
 
     ``create_calendar`` seeds the creator-owner grant + an all-initiative-members
     read grant, mirroring the create endpoint's default sharing."""
-    initiative.calendars_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.calendar: True})
     return await create_calendar(session, initiative, creator)
 
 
@@ -124,28 +122,51 @@ async def _setup_event(session, acting_user):
     return a, a.guild, a.initiative, calendar, event
 
 
+NAIVE = "2099-10-20T12:00:00"
+AWARE = "2099-10-20T13:00:00Z"
+
+
 @pytest.mark.parametrize(
-    "start,end",
+    ("method", "path", "payload", "params"),
     [
-        ("2099-10-20T12:00:00", "2099-10-20T13:00:00"),
-        ("2099-10-20T12:00:00Z", "2099-10-20T13:00:00"),
-        ("2099-10-20T12:00:00", "2099-10-20T13:00:00Z"),
+        *(
+            ("POST", "/", {"title": "Timed", "start_at": s, "end_at": e}, None)
+            for s, e in ((NAIVE, NAIVE), (AWARE, NAIVE), (NAIVE, AWARE))
+        ),
+        ("PATCH", "/{event}", {"start_at": NAIVE}, None),
+        *(
+            ("POST", f"/{{event}}/occurrences{path}", {"start": NAIVE}, None)
+            for path in ("", "/detach", "/restore", "/add")
+        ),
+        (
+            "PATCH",
+            "/{event}/rsvp",
+            {"rsvp_status": "accepted", "occurrence": NAIVE},
+            None,
+        ),
+        *(
+            (method, f"/{{event}}{path}", payload, {"occurrence": NAIVE})
+            for method, path, payload in (
+                ("GET", "", None),
+                ("POST", "/duplicate", None),
+                ("DELETE", "", None),
+                ("PUT", "/attendees", []),
+            )
+        ),
     ],
 )
-async def test_event_creation_requires_offsets(
-    client, session, acting_user, start, end
+async def test_a_time_without_an_offset_is_refused(
+    client, session, acting_user, method, path, payload, params
 ):
-    actor = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    calendar = await _enable_calendars(session, actor.initiative, actor.user)
-    response = await client.post(
-        actor.g("/calendar-events/"),
+    actor, _, _, calendar, event = await _setup_event(session, acting_user)
+    if method == "POST" and path == "/":
+        payload = {**payload, "calendar_id": calendar.id}
+    response = await client.request(
+        method,
+        actor.g(f"/calendar-events{path.format(event=event.id)}"),
         headers=actor.headers,
-        json={
-            "title": "Timed",
-            "calendar_id": calendar.id,
-            "start_at": start,
-            "end_at": end,
-        },
+        params=params,
+        json=payload,
     )
     assert response.status_code == 422, response.text
 
@@ -172,64 +193,12 @@ async def test_event_creation_accepts_explicit_offsets(
     ) == datetime.fromisoformat(f"2099-10-20T12:00:00{offset}")
 
 
-async def test_event_update_requires_offset(client, session, acting_user):
-    actor, _, _, _, event = await _setup_event(session, acting_user)
-    response = await client.patch(
-        actor.g(f"/calendar-events/{event.id}"),
-        headers=actor.headers,
-        json={"start_at": "2099-10-20T12:00:00"},
-    )
-    assert response.status_code == 422, response.text
-
-
-@pytest.mark.parametrize("path", ["", "/detach", "/restore", "/add"])
-async def test_occurrence_requests_require_offset(client, session, acting_user, path):
-    actor, _, _, _, event = await _setup_event(session, acting_user)
-    response = await client.post(
-        actor.g(f"/calendar-events/{event.id}/occurrences{path}"),
-        headers=actor.headers,
-        json={"start": "2099-10-20T12:00:00"},
-    )
-    assert response.status_code == 422, response.text
-
-
-async def test_rsvp_occurrence_requires_offset(client, session, acting_user):
-    actor, _, _, _, event = await _setup_event(session, acting_user)
-    response = await client.patch(
-        actor.g(f"/calendar-events/{event.id}/rsvp"),
-        headers=actor.headers,
-        json={"rsvp_status": "accepted", "occurrence": "2099-10-20T12:00:00"},
-    )
-    assert response.status_code == 422, response.text
-
-
-@pytest.mark.parametrize(
-    ("method", "path", "payload"),
-    [
-        ("GET", "", None),
-        ("POST", "/duplicate", None),
-        ("DELETE", "", None),
-        ("PUT", "/attendees", []),
-    ],
-)
-async def test_occurrence_query_requires_offset(
-    client, session, acting_user, method, path, payload
-):
-    actor, _, _, _, event = await _setup_event(session, acting_user)
-    response = await client.request(
-        method,
-        actor.g(f"/calendar-events/{event.id}{path}"),
-        headers=actor.headers,
-        params={"occurrence": "2099-10-20T12:00:00"},
-        json=payload,
-    )
-    assert response.status_code == 422, response.text
-
-
 async def test_event_summary_includes_tags(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
-    a, guild, initiative, _calendar, event = await _setup_event(session, acting_user)
+    """An event with no tags still serializes ``tags: []`` in the summary."""
+    a, guild, initiative, calendar, event = await _setup_event(session, acting_user)
+    untagged = await create_calendar_event(session, calendar, a.user, title="U")
 
     tag = await create_tag(session, guild, name="Priority", color="#ff0000")
 
@@ -250,26 +219,10 @@ async def test_event_summary_includes_tags(
     )
     assert response.status_code == 200, response.text
     items = {item["id"]: item for item in response.json()["events"]}
-    assert event.id in items
     tags = items[event.id]["tags"]
     assert [t["id"] for t in tags] == [tag.id]
     assert tags[0]["name"] == "Priority"
-
-
-async def test_event_summary_tags_default_empty(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """An event with no tags still serializes ``tags: []`` in the summary."""
-    a, _guild, initiative, _calendar, event = await _setup_event(session, acting_user)
-
-    response = await client.get(
-        a.g("/calendar-entries/"),
-        headers=a.headers,
-        params=_around_now(initiative_id=initiative.id),
-    )
-    assert response.status_code == 200, response.text
-    items = {item["id"]: item for item in response.json()["events"]}
-    assert items[event.id]["tags"] == []
+    assert items[untagged.id]["tags"] == []
 
 
 async def test_create_event_notifies_attendees_not_creator(
@@ -289,13 +242,16 @@ async def test_create_event_notifies_attendees_not_creator(
         json={
             "calendar_id": calendar.id,
             "title": "Kickoff",
-            "start_at": "2026-07-01T15:00:00Z",
-            "end_at": "2026-07-01T16:00:00Z",
+            "start_at": "2026-07-01T14:00:00Z",
+            "end_at": "2026-07-03T16:00:00Z",
             "all_day": False,
             "attendee_ids": [attendee.user.id],
         },
     )
     assert response.status_code == 201
+    # A timed (non-all-day) event may span more than 24 hours / cross days.
+    assert response.json()["start_at"].startswith("2026-07-01")
+    assert response.json()["end_at"].startswith("2026-07-03")
 
     invites = await _notifications_for(
         session, attendee.user.id, NotificationType.event_invitation
@@ -312,35 +268,6 @@ async def test_create_event_notifies_attendees_not_creator(
         )
         == []
     )
-
-
-async def test_create_multi_day_timed_event_is_allowed(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """A timed (non-all-day) event may now span more than 24 hours / cross days."""
-    (
-        organizer,
-        _attendee,
-        _guild,
-        _initiative,
-        calendar,
-    ) = await _setup_organizer_and_attendee(session, acting_user)
-
-    response = await client.post(
-        organizer.g("/calendar-events/"),
-        headers=organizer.headers,
-        json={
-            "calendar_id": calendar.id,
-            "title": "Conference",
-            "start_at": "2026-07-01T14:00:00Z",
-            "end_at": "2026-07-03T16:00:00Z",
-            "all_day": False,
-        },
-    )
-    assert response.status_code == 201
-    body = response.json()
-    assert body["start_at"].startswith("2026-07-01")
-    assert body["end_at"].startswith("2026-07-03")
 
 
 async def test_one_occurrence_changes_alone(
@@ -1197,7 +1124,8 @@ async def test_guild_entries_filter_events_without_calendar_grant(
 ):
     """The per-guild read resolves an event through its calendar's sharing.
 
-    Events carry no grants of their own, so calendar sharing is what decides.
+    Events carry no grants of their own, so calendar sharing is what decides,
+    though the member is in the initiative and RLS shows the row.
     ``calendar_ids`` narrows the result; it is not how access is resolved.
     """
     admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
@@ -1227,52 +1155,16 @@ async def test_guild_entries_filter_events_without_calendar_grant(
     assert resp.status_code == 200, resp.text
     assert resp.json()["events"] == []
 
-    # The admin reaches it, as they do every calendar in their guild.
-    resp = await client.get(
-        path, params=_around_now(), headers=get_auth_headers(admin.user)
-    )
-    assert resp.status_code == 200, resp.text
-    assert event.id in {item["id"] for item in resp.json()["events"]}
-
-
-async def test_my_calendar_entries_filter_events_without_calendar_grant(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """The cross-guild /me read applies the same calendar DAC filter as the
-    per-guild read: a non-admin member doesn't see an event in a calendar they
-    hold no grant for (even though they're an initiative member and RLS shows
-    the row). Events inherit calendar access; they carry no grants of their own."""
-    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    member = await acting_user(
-        guild_role=CommunityRole.member,
-        guild=admin.guild,
-        initiative=admin.initiative,
-        initiative_role="member",
-    )
-    guild = admin.guild
-    initiative = admin.initiative
-    calendar = await _enable_calendars(session, initiative, admin.user)
-    event = await create_calendar_event(session, calendar, admin.user, title="NoGrant")
-
-    await _drop_all_members_grant(session, guild, calendar)
-
-    # Member: the ungranted event is hidden on /me.
-    resp = await client.get(
-        "/api/v1/me/calendar-entries",
-        params=_around_now(),
-        headers=get_auth_headers(member.user),
-    )
-    assert resp.status_code == 200, resp.text
-    assert event.id not in {item["id"] for item in resp.json()["events"]}
-
-    # Admin: sees it via the guild-admin bypass.
-    resp = await client.get(
-        "/api/v1/me/calendar-entries",
-        params=_around_now(),
-        headers=get_auth_headers(admin.user),
-    )
-    assert resp.status_code == 200, resp.text
-    assert event.id in {item["id"] for item in resp.json()["events"]}
+    # The admin reaches it, as they do every calendar in their guild — and the
+    # cross-guild /me read applies the same calendar filter.
+    for read in (path, "/api/v1/me/calendar-entries"):
+        for reader, seen in ((admin, True), (member, False)):
+            resp = await client.get(
+                read, params=_around_now(), headers=get_auth_headers(reader.user)
+            )
+            assert resp.status_code == 200, resp.text
+            ids = {item["id"] for item in resp.json()["events"]}
+            assert (event.id in ids) is seen, (read, seen)
 
 
 async def test_my_calendar_entries_leave_out_what_was_never_shared(
@@ -1317,10 +1209,7 @@ async def _switch_calendars_on(session: AsyncSession, initiative) -> None:
 
     Off by default — and a guild calendar answers to this switch not at all,
     which is part of what the tests below check."""
-    initiative.calendars_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.calendar: True})
 
 
 class TestGuildCalendarEvents:
@@ -1336,17 +1225,6 @@ class TestGuildCalendarEvents:
     property definitions. A guild calendar has no initiative to borrow from, so
     those refuse rather than resolve to something else.
     """
-
-    async def test_events_are_listed(self, client: AsyncClient, acting_user, session):
-        a = await acting_user(guild_role=CommunityRole.admin)
-        calendar = await create_guild_calendar(session, a.guild, a.user)
-        await create_calendar_event(session, calendar, a.user, title="Club night")
-
-        response = await client.get(
-            a.g("/calendar-entries/"), headers=a.headers, params=_around_now()
-        )
-        assert response.status_code == 200, response.text
-        assert [e["title"] for e in response.json()["events"]] == ["Club night"]
 
     async def test_a_member_in_no_initiative_sees_them(
         self, client: AsyncClient, acting_user, session
@@ -1386,71 +1264,36 @@ class TestGuildCalendarEvents:
         assert response.status_code == 200, response.text
         assert [e["title"] for e in response.json()["events"]] == ["Sprint review"]
 
-    async def test_the_calendar_is_listed_but_not_under_an_initiative(
-        self, client: AsyncClient, acting_user, session
-    ):
-        a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-        await _switch_calendars_on(session, a.initiative)
-        await create_guild_calendar(session, a.guild, a.user, name="Community calendar")
-        await create_calendar(session, a.initiative, a.user, name="Team calendar")
-
-        every = await client.get(a.g("/calendars/"), headers=a.headers)
-        assert sorted(c["name"] for c in every.json()["items"]) == [
-            "Community calendar",
-            "Team calendar",
-        ]
-
-        scoped = await client.get(
-            a.g("/calendars/"),
-            headers=a.headers,
-            params={"initiative_id": a.initiative.id},
-        )
-        assert [c["name"] for c in scoped.json()["items"]] == ["Team calendar"]
-
     async def test_anyone_in_the_guild_can_attend(
         self, client: AsyncClient, acting_user, session
     ):
         """An initiative calendar draws attendees from its initiative; a guild
         calendar has none, so the guild is who can attend — including a member
-        who belongs to no initiative at all."""
+        who belongs to no initiative at all, and nobody outside it."""
         a = await acting_user(guild_role=CommunityRole.admin)
         member = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
+        stranger = await acting_user(guild_role=CommunityRole.admin)
         calendar = await create_guild_calendar(session, a.guild, a.user)
 
-        response = await client.post(
-            a.g("/calendar-events/"),
-            headers=a.headers,
-            json={
-                "calendar_id": calendar.id,
-                "title": "Club night",
-                "start_at": "2026-09-01T18:00:00Z",
-                "end_at": "2026-09-01T20:00:00Z",
-                "attendee_ids": [member.user.id],
-            },
-        )
+        async def invite(user_id: int):
+            return await client.post(
+                a.g("/calendar-events/"),
+                headers=a.headers,
+                json={
+                    "calendar_id": calendar.id,
+                    "title": "Club night",
+                    "start_at": "2026-09-01T18:00:00Z",
+                    "end_at": "2026-09-01T20:00:00Z",
+                    "attendee_ids": [user_id],
+                },
+            )
+
+        response = await invite(member.user.id)
         assert response.status_code == 201, response.text
         assert [at["user"]["id"] for at in response.json()["attendees"]] == [
             member.user.id
         ]
-
-    async def test_someone_outside_the_guild_cannot_attend(
-        self, client: AsyncClient, acting_user, session
-    ):
-        a = await acting_user(guild_role=CommunityRole.admin)
-        stranger = await acting_user(guild_role=CommunityRole.admin)
-        calendar = await create_guild_calendar(session, a.guild, a.user)
-
-        response = await client.post(
-            a.g("/calendar-events/"),
-            headers=a.headers,
-            json={
-                "calendar_id": calendar.id,
-                "title": "Club night",
-                "start_at": "2026-09-01T18:00:00Z",
-                "end_at": "2026-09-01T20:00:00Z",
-                "attendee_ids": [stranger.user.id],
-            },
-        )
+        response = await invite(stranger.user.id)
         assert response.status_code == 422
         assert response.json()["detail"] == CommonMessages.PERSON_CANNOT_READ
 

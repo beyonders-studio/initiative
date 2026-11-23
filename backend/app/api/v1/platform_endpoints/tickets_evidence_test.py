@@ -22,7 +22,7 @@ from app.core.messages import EvidenceMessages
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole
-from app.models.tenant.comment import Comment, CommentAudience
+from app.models.tenant.comment import Comment, CommentAudience, said_on
 from app.models.tenant.evidence import Evidence
 from app.models.tenant.intake import IntakeCase
 from app.models.tenant.task import Task
@@ -306,7 +306,7 @@ async def test_an_answer_with_a_refused_file_is_not_taken(
     assert response.status_code == 400
     await set_rls_context(session, SystemGuild(desk["guild_id"]))
     said = (
-        await session.exec(select(Comment.content).where(Comment.task_id == task_id))
+        await session.exec(select(Comment.content).where(said_on("task", task_id)))
     ).all()
     assert "Look." not in said
 

@@ -16,6 +16,11 @@ carries the same vocabulary the renderer keys by. A property's field is named
 ``property:<definition id>``, so renaming it keeps every layout that shows it;
 a plug-in's is ``plugin:<install id>:<metadata key>``.
 
+A tool plug-in declares its tables' layouts in this same grammar, which the
+plug-in contract mirrors (``toolLayouts``), and names its own fields by key.
+Validated with ``{TOOL_FIELDS: <the table's field ids>}`` as context, a layout
+names those fields in place of a built-in tool's.
+
 A preset holds its tool's filter shape: ``TaskFilterSpec`` on a project's
 lists, ``CalendarFilterSpec`` on the initiative's calendar. Each mirrors what
 that list's filter controls show rather than the ``conditions`` DSL its
@@ -25,14 +30,27 @@ remap its status ids.
 
 from __future__ import annotations
 
+import json
+from collections.abc import Iterable
 from datetime import datetime
 from enum import Enum
 from typing import Annotated, Any, Literal, get_args
 
-from pydantic import AfterValidator, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AfterValidator,
+    ConfigDict,
+    Discriminator,
+    Field,
+    Tag,
+    ValidationInfo,
+    ValidatorFunctionWrapHandler,
+    WrapValidator,
+    field_validator,
+    model_validator,
+)
 
 from app.core.collection_shapes import FieldDisplay
-from app.core.tools import LAYOUT_KIND_TARGETS, Tool
+from app.core.tools import Tool
 from app.models.tenant.task import TaskPriority, TaskStatusCategory
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.query import DateBucket, FilterOp, SortDir
@@ -47,9 +65,10 @@ from app.services.marketplace.manifest_values import (
 
 #: What one layout may hold. Every part of a tree counts as a
 #: node, as does every column.
-MAX_NODES = 300
-MAX_DEPTH = 6
-MAX_DEFINITION_BYTES = 64 * 1024
+MAX_NODES = contract.cap("layoutNodes")
+MAX_DEPTH = contract.cap("layoutDepth")
+MAX_DEFINITION_BYTES = contract.cap("layoutBytes")
+MAX_SECTION_TITLE_LENGTH = contract.cap("layoutTitleLength")
 #: One plug-in's parts on one task: on a card, or across its detail.
 MAX_PLUGIN_PARTS = contract.cap("partsPlacedPerItem")
 #: Presets on one list.
@@ -78,6 +97,9 @@ MAX_COMMUNITY_IDS = 50
 
 SLUG_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
 MAX_SLUG_LENGTH = 64
+#: What an ``items`` part previews of a row's items.
+MAX_PREVIEW_ITEMS = contract.cap("previewItems")
+MAX_PREVIEW_FIELDS = contract.cap("previewFields")
 
 
 class _Strict(SanitizedBaseModel):
@@ -216,19 +238,6 @@ class EventDetailFieldId(str, Enum):
     tags = "tags"
 
 
-class CounterDetailFieldId(str, Enum):
-    """What a counter's detail edits as a field. Its count, what is linked to
-    it and what can be done with it are parts of their own."""
-
-    name = "name"
-    color = "color"
-    min = "min"
-    max = "max"
-    step = "step"
-    start = "start"
-    view = "view"
-
-
 class PostDetailFieldId(str, Enum):
     """What a notice's detail draws as a field. Its title, tags and properties
     are its tool's, in its header; what it says, asks and answers, and when it
@@ -282,9 +291,30 @@ def _property_field(value: str) -> str:
     raise ValueError("a property's field is 'property:<id>'")
 
 
+#: The validation context key that names the fields a tool plug-in's table
+#: has: given, a layout names those and nothing else.
+TOOL_FIELDS = "tool_fields"
+
+
+def _tool_field(
+    value: Any, handler: ValidatorFunctionWrapHandler, info: ValidationInfo
+) -> Any:
+    """A field a tool plug-in's table has, where the context names them;
+    otherwise the id the type itself takes."""
+    fields = (info.context or {}).get(TOOL_FIELDS)
+    if fields is None:
+        return handler(value)
+    if isinstance(value, str) and value in fields:
+        return value
+    raise ValueError(f"{value!r} is not a field of this table")
+
+
+#: A field id that is a tool plug-in's field where the context names them.
+_ToolField = WrapValidator(_tool_field)
+
 NamedFieldId = Annotated[str, AfterValidator(_named_field)]
 PropertyFieldId = Annotated[str, AfterValidator(_property_field)]
-CardFieldId = TaskFieldId | FileFieldId | NamedFieldId
+CardFieldId = Annotated[TaskFieldId | FileFieldId | NamedFieldId, _ToolField]
 
 
 #: The characters a built-in field's name is written in.
@@ -344,15 +374,19 @@ TaskDetailFieldId = Enum(
     {f.name: f.value for f in TaskFieldId if f.value in _PAGE},
     type=str,
 )
-ColumnFieldId = TaskColumnFieldId | FileFieldId | NamedFieldId
-DetailFieldId = (
+ColumnFieldId = Annotated[TaskColumnFieldId | FileFieldId | NamedFieldId, _ToolField]
+DetailFieldId = Annotated[
     TaskDetailFieldId
     | EventDetailFieldId
-    | CounterDetailFieldId
     | PostDetailFieldId
     | FileFieldId
-    | NamedFieldId
-)
+    | NamedFieldId,
+    _ToolField,
+]
+#: The field a list's look is for.
+DisplayFieldId = Annotated[PropertyFieldId, _ToolField]
+#: The colour field a card is drawn in.
+TintFieldId = Annotated[NamedFieldId, _ToolField]
 
 
 def _part_id(value: str) -> str:
@@ -365,6 +399,10 @@ def _part_id(value: str) -> str:
 
 
 # -- Parts --------------------------------------------------------------------
+
+
+def _unset(value: Any) -> bool:
+    return value is None
 
 
 class StackProps(_Strict):
@@ -380,8 +418,15 @@ class FieldProps(_Strict):
     field: CardFieldId
 
 
+class CardProps(_Strict):
+    #: A colour field of the row, which the card is drawn in. A row with no
+    #: colour draws plain.
+    tint: TintFieldId | None = None
+
+
 class CardPart(_Strict):
     type: Literal["card"]
+    props: CardProps | None = Field(default=None, exclude_if=_unset)
     children: list[CardChild] = Field(default_factory=list)
 
 
@@ -416,17 +461,37 @@ class PluginPart(_Strict):
     props: PluginPartProps
 
 
+#: What an item part names in the item table it previews: that table's
+#: fields, which the card's own table does not hold.
+_ItemKey = Annotated[str, Field(min_length=1, max_length=MAX_FIELD_ID_LENGTH)]
+
+
+class ItemsProps(_Strict):
+    #: The item table directly under the row's, by its key.
+    item: _ItemKey
+    #: Its fields each preview shows, in order.
+    fields: list[_ItemKey] = Field(min_length=1, max_length=MAX_PREVIEW_FIELDS)
+    #: How many of the row's items it shows at most.
+    limit: int = Field(ge=1, le=MAX_PREVIEW_ITEMS)
+    #: A colour field of the item table, which each preview is drawn in.
+    tint: _ItemKey | None = None
+
+
+class ItemsPart(_Strict):
+    """The row's first items of one item table, in their own order, each drawn
+    small with the fields ``fields`` names."""
+
+    type: Literal["items"]
+    props: ItemsProps
+
+
 CardChild = Annotated[
-    CardPart | StackPart | FieldPart | PropertiesPart | PluginPart,
+    CardPart | StackPart | FieldPart | PropertiesPart | PluginPart | ItemsPart,
     Field(discriminator="type"),
 ]
 
 CardPart.model_rebuild()
 StackPart.model_rebuild()
-
-
-def _unset(value: Any) -> bool:
-    return value is None
 
 
 class DetailFieldProps(_Strict):
@@ -445,7 +510,7 @@ class DetailFieldPart(_Strict):
 
 class SectionProps(_Strict):
     #: The initiative's own words, drawn as written.
-    title: str | None = Field(default=None, max_length=100)
+    title: str | None = Field(default=None, max_length=MAX_SECTION_TITLE_LENGTH)
     #: Drawn folded until the reader opens it.
     collapsed: bool | None = None
 
@@ -467,7 +532,7 @@ class DetailStackPart(_Strict):
 #: The parts a detail draws as its own, which edit or show more than one
 #: field: a task's status, who made it, its read-only notice, its case and its
 #: comments; an event's answer; a picture itself, where it came from and its
-#: versions; a counter's count; a notice's body, schedule, reactions and poll;
+#: versions; a notice's body, schedule, reactions and poll;
 #: and any item's dates, menu and relations. Which of them a kind of
 #: detail draws is ``app.services.tenant.tool_layouts.DETAIL_PARTS``.
 OwnPartType = Literal[
@@ -480,7 +545,6 @@ OwnPartType = Literal[
     "case",
     "comments",
     "rsvp",
-    "count",
     "body",
     "schedule",
     "reactions",
@@ -515,6 +579,25 @@ SectionPart.model_rebuild()
 DetailStackPart.model_rebuild()
 
 
+def parts_of(part: Any, depth: int = 1) -> Iterable[tuple[Any, int]]:
+    """Every part in a tree, with its depth."""
+    yield part, depth
+    if isinstance(part, (CardPart, StackPart, DetailStackPart, SectionPart)):
+        for child in part.children:
+            yield from parts_of(child, depth + 1)
+
+
+def too_large(stored: dict[str, Any], roots: list[Any], loose: int) -> bool:
+    """Whether a layout holds more nodes, nests deeper or takes more bytes
+    than one may. ``loose`` is the nodes outside any tree (columns)."""
+    found = [each for root in roots for each in parts_of(root)]
+    return (
+        len(found) + loose > MAX_NODES
+        or max((depth for _, depth in found), default=0) > MAX_DEPTH
+        or len(json.dumps(stored).encode()) > MAX_DEFINITION_BYTES
+    )
+
+
 # -- Definitions --------------------------------------------------------------
 
 #: Every way a layout can list a tool's items; which of them a tool draws is
@@ -524,7 +607,7 @@ ListLayoutKind = Literal[
 ]
 #: Every kind of thing a detail layout shows one of; which a tool holds is
 #: ``app.core.tools.DETAIL_LAYOUTS``.
-DetailLayoutKind = Literal["task", "calendar_event", "counter", "post", "file"]
+DetailLayoutKind = Literal["task", "calendar_event", "post", "file"]
 
 
 #: What a table can be sorted by, as the task list takes it.
@@ -540,8 +623,17 @@ TaskSortField = Literal[
 
 
 class PresetSort(_Strict):
-    field: TaskSortField
+    #: A task list's sort field, or, where the context names a tool plug-in's
+    #: fields, one of those.
+    field: Annotated[TaskSortField, _ToolField]
     dir: SortDir = SortDir.asc
+
+
+#: A preset's name in each language a tool plug-in ships it in.
+_PresetNames = dict[
+    Annotated[str, Field(min_length=1, max_length=35)],
+    Annotated[str, Field(min_length=1, max_length=100)],
+]
 
 
 class LayoutPreset(_Strict):
@@ -549,8 +641,11 @@ class LayoutPreset(_Strict):
     Picking one makes them that person's own."""
 
     #: Left out for a shipped preset no one renamed, which each reader sees
-    #: named in their own language.
-    name: str | None = Field(default=None, min_length=1, max_length=100)
+    #: named in their own language; a tool plug-in's names its in each
+    #: language it ships.
+    name: Annotated[str, Field(min_length=1, max_length=100)] | _PresetNames | None = (
+        None
+    )
     #: What a link to the preset carries; kept when it is renamed.
     slug: str = Field(min_length=1, max_length=MAX_SLUG_LENGTH, pattern=SLUG_PATTERN)
     #: Its tool's shape, which the service holds it to.
@@ -572,6 +667,17 @@ class LayoutGrouping(_Strict):
     hidden: list[Annotated[str, Field(max_length=MAX_SLUG_LENGTH)]] = Field(
         default_factory=list, max_length=MAX_HIDDEN_GROUPS
     )
+
+
+class DisplayFrom(_Strict):
+    """A look read from the row: a select field of it, each of whose options
+    is a look the drawn field has, so each row keeps its own."""
+
+    model_config = ConfigDict(
+        extra="forbid", validate_by_name=True, serialize_by_alias=True
+    )
+
+    from_: Annotated[NamedFieldId, _ToolField] = Field(alias="from")
 
 
 class ColumnLimit(_Strict):
@@ -604,8 +710,9 @@ class ListLayoutDefinition(_Strict):
     #: Left out of the list's menu; none keeps what its tool ships.
     hidden: bool | None = None
     #: How each scale or counter it shows is drawn, by the field's
-    #: ``property:<id>``. One with none is drawn as a number.
-    displays: dict[PropertyFieldId, FieldDisplay] | None = Field(
+    #: ``property:<id>``, or the select field of the row that names its look.
+    #: One with none is drawn as a number.
+    displays: dict[DisplayFieldId, FieldDisplay | DisplayFrom] | None = Field(
         default=None, max_length=MAX_NODES
     )
 
@@ -670,6 +777,33 @@ ToolLayoutWrite = Annotated[
 ]
 
 
+def _plugin_kind(value: str) -> str:
+    """A tool plug-in's kind: its key, ``.`` and its uid in lower case."""
+    from app.db.plugin_tools import is_plugin_kind
+
+    if not is_plugin_kind(value):
+        raise ValueError("not a tool plug-in's kind")
+    return value
+
+
+#: The kind of a tool plug-in's table: what its rows' page is laid out as.
+ToolPluginKind = Annotated[str, AfterValidator(_plugin_kind)]
+
+
+class ToolPluginLayoutWrite(_Strict):
+    """One of a tool plug-in's table's layouts as it is changed: a list by its
+    kind, or its rows' page by the table's. It names the table's own fields,
+    so the table's declaration checks it, where the target is known."""
+
+    kind: ListLayoutKind | ToolPluginKind
+    definition: dict[str, Any]
+
+
+#: A layout as a request changes it: an Initiative tool's, or a tool
+#: plug-in's.
+LayoutWrite = ToolLayoutWrite | ToolPluginLayoutWrite
+
+
 class ToolLayoutDefaultWrite(_Strict):
     """The list a target opens on."""
 
@@ -709,21 +843,39 @@ class DetailLayoutRead(SanitizedBaseModel):
     updated_at: datetime | None = None
 
 
+class ToolPluginDetailLayoutRead(SanitizedBaseModel):
+    """How a tool plug-in's table shows one of its rows, named by the table's
+    kind: as its plug-in ships it until it is changed."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    kind: ToolPluginKind
+    definition: DetailLayoutDefinition
+    #: When it was last changed; None as shipped.
+    updated_at: datetime | None = None
+
+
+_LIST_KINDS = frozenset(get_args(ListLayoutKind))
+
+
+def _layout_shape(value: Any) -> str:
+    """Which of a target's layouts ``value`` is: a list, an Initiative
+    tool's item's page, or a tool plug-in's table's rows' page."""
+    kind = (
+        value.get("kind") if isinstance(value, dict) else getattr(value, "kind", None)
+    )
+    if kind in _LIST_KINDS:
+        return "list"
+    return "plugin" if isinstance(kind, str) and "." in kind else "detail"
+
+
 #: One of a target's layouts.
 ToolLayoutRead = Annotated[
-    ListLayoutRead | DetailLayoutRead, Field(discriminator="kind")
+    Annotated[ListLayoutRead, Tag("list")]
+    | Annotated[DetailLayoutRead, Tag("detail")]
+    | Annotated[ToolPluginDetailLayoutRead, Tag("plugin")],
+    Discriminator(_layout_shape),
 ]
-
-
-#: What a request names a set of layouts by: any tool, or a kind inside one
-#: that lays out what it holds. Which of them have layouts is
-#: ``app.core.tools.LAYOUT_TARGETS``; the others are refused by name.
-LayoutTarget = Enum(
-    "LayoutTarget",
-    {value: value for value in (*(t.value for t in Tool), *LAYOUT_KIND_TARGETS)},
-    type=str,
-)
-LayoutTarget.__doc__ = "What a set of layouts is for."
 
 
 class ToolLayoutSetRead(SanitizedBaseModel):

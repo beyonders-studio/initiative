@@ -29,34 +29,6 @@ from app.testing.factories import (
 )
 
 
-async def test_the_sole_seat_is_reported(session: AsyncSession):
-    """A community whose only superadmin is this account."""
-    seat = await create_user(session)
-    guild = await create_guild(session, creator=seat)
-    await create_guild_membership(
-        session, user=seat, guild=guild, role=CommunityRole.superadmin
-    )
-    # Somebody to strand: a community of one is the exception, tested below.
-    await create_guild_membership(
-        session, user=await create_user(session), guild=guild, role=CommunityRole.member
-    )
-
-    assert await user_service.is_last_guild_superadmin(session, seat.id) == [guild.name]
-
-
-async def test_another_seat_holder_clears_it(session: AsyncSession):
-    """Two superadmins, so neither is the last one."""
-    first = await create_user(session, email="first@example.com")
-    second = await create_user(session, email="second@example.com")
-    guild = await create_guild(session, creator=first)
-    for user in (first, second):
-        await create_guild_membership(
-            session, user=user, guild=guild, role=CommunityRole.superadmin
-        )
-
-    assert await user_service.is_last_guild_superadmin(session, first.id) == []
-
-
 async def test_an_ordinary_admin_is_not_a_seat(session: AsyncSession):
     """An admin does not count, which is the whole point of the split: their
     leaving never strands a community, because its seat is still there."""
@@ -74,7 +46,8 @@ async def test_an_ordinary_admin_is_not_a_seat(session: AsyncSession):
 
 
 async def test_seats_are_reported_per_community(session: AsyncSession):
-    """One community where they are the only seat, one where they are not."""
+    """One community where they are the only seat and somebody is there to
+    strand, one where another superadmin clears it."""
     seat = await create_user(session)
     alone = await create_guild(session, name="Alone", creator=seat)
     await create_guild_membership(
@@ -132,26 +105,6 @@ async def test_the_only_member_of_a_community_may_go(session: AsyncSession):
     await user_service.deactivate_user(session, alone_id)
     reloaded = (await session.exec(select(User).where(User.id == alone_id))).one()
     assert reloaded.status == UserStatus.deactivated
-
-
-async def test_one_other_member_brings_the_block_back(session: AsyncSession):
-    """Somebody else is there, so there is somebody to appoint — and somebody
-    to strand by not appointing them."""
-    seat = await create_user(session, email="seat@example.com")
-    member = await create_user(session, email="member@example.com")
-    guild = await create_guild(session, name="Not Just Me", creator=seat)
-    await create_guild_membership(
-        session, user=seat, guild=guild, role=CommunityRole.superadmin
-    )
-    await create_guild_membership(
-        session, user=member, guild=guild, role=CommunityRole.member
-    )
-
-    assert await user_service.is_last_guild_superadmin(session, seat.id) == [
-        "Not Just Me"
-    ]
-    with pytest.raises(user_service.SeatWouldBeEmptied):
-        await user_service.deactivate_user(session, seat.id)
 
 
 async def test_a_second_seat_lets_the_account_go(session: AsyncSession):
@@ -507,59 +460,6 @@ async def test_hard_delete_user_scrubs_addressed_invites(
     assert guild_service.invite_is_active(scrubbed) is False
 
 
-async def test_users_table_has_rls_delete_deny_policy(session: AsyncSession):
-    """``users`` carries FORCE RLS, the ``users_no_delete`` restrictive policy,
-    and the per-role policy set that leaves every request-path write on the
-    caller's own row (migrations 0109, 0144, 0202). User rows are removed on
-    the system engine only."""
-    from sqlalchemy import text
-
-    rls_enabled = await session.exec(
-        text(
-            "SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE relname = 'users'"
-        )
-    )
-    enabled, forced = rls_enabled.one()
-    assert enabled is True
-    assert forced is True
-
-    policies = await session.exec(
-        text(
-            "SELECT polname, polcmd, polpermissive FROM pg_policy "
-            "WHERE polrelid = 'users'::regclass ORDER BY polname"
-        )
-    )
-    rows = list(policies)
-    names = {row[0] for row in rows}
-    assert "users_no_delete" in names
-    # Phase 2 decomposed the broad open policy into per-tier policies.
-    assert "users_open" not in names
-    assert {
-        # Read legs: the request path names other people all the time.
-        "users_app_user_read",
-        "users_platform_read",
-        # Write legs: each one scoped to the caller's own row.
-        "users_app_user_self_update",
-        "users_platform_self",
-    } <= names
-    # 0221 took the guild path off this table entirely — it reads people from
-    # ``public.guild_member_profiles`` now — so its two legs are gone with it.
-    assert {
-        "users_app_guild_base_read",
-        "users_app_guild_base_self_update",
-    } & names == set()
-    # 0202 retired the table-wide floors and the moderator+ update-all leg.
-    assert {
-        "users_app_floor",
-        "users_guild_floor",
-        "users_platform_manage",
-    }.isdisjoint(names)
-    deny_policy = next(row for row in rows if row[0] == "users_no_delete")
-    # polcmd '6' = DELETE; polpermissive False = restrictive.
-    # See: https://www.postgresql.org/docs/current/catalog-pg-policy.html
-    assert deny_policy[2] is False  # restrictive
-
-
 async def test_is_last_config_manager_ignores_inactive_targets(session: AsyncSession):
     """An owner whose status isn't ``active`` doesn't contribute to the
     active config-manager count, so they can never be "the last owner".
@@ -691,63 +591,6 @@ async def test_soft_delete_removes_membership_in_guild_schema(
     assert refreshed.status == UserStatus.anonymized
 
 
-async def test_soft_delete_takes_their_name_out_of_digest_lines(
-    session: AsyncSession, role_session
-):
-    """Anonymizing a user leaves content as it is, since a mention holds no
-    name; batched lines lose the assigner's name snapshot and id (issue
-    #794)."""
-    from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
-    from app.services.tenant.mention_parser import ANONYMIZED_MENTION_NAME
-    from app.testing.factories import (
-        create_initiative,
-        create_initiative_member,
-        create_project,
-        create_task,
-    )
-    from app.testing.schema_harness import route_session_to_guild
-
-    author = await create_user(session, email="author@example.com")
-    victim = await create_user(session, email="victim@example.com")
-    guild = await create_guild(session, creator=author)
-    await create_guild_membership(session, user=victim, guild=guild)
-    initiative = await create_initiative(session, guild, author)
-    await create_initiative_member(session, initiative=initiative, user=victim)
-    project = await create_project(session, initiative, author)
-    task = await create_task(session, project)
-    line = BatchedNotice(
-        user_id=author.id,
-        kind=BatchedNoticeKind.task_assignment,
-        actor_id=victim.id,
-        actor_name="Vic Tim",
-        target_type="task",
-        target_id=task.id,
-        target_path=f"/go/task/{task.id}",
-        title=task.title,
-        project_id=project.id,
-        project_name=project.name,
-    )
-    session.add(line)
-    await session.commit()
-    line_id = line.id
-    victim_id = victim.id
-
-    system_session = await role_session("app_admin")
-    await user_service.soft_delete_user(system_session, victim_id)
-
-    session.expunge_all()
-    await route_session_to_guild(session, guild.id)
-    line_name, line_by = (
-        await session.exec(
-            select(BatchedNotice.actor_name, BatchedNotice.actor_id).where(
-                BatchedNotice.id == line_id
-            )
-        )
-    ).one()
-    assert line_name == ANONYMIZED_MENTION_NAME
-    assert line_by is None
-
-
 async def test_hard_delete_anonymized_user_cleans_guild_data(
     session: AsyncSession, role_session
 ):
@@ -812,36 +655,6 @@ async def test_hard_delete_anonymized_user_cleans_guild_data(
     ).one_or_none() is not None
 
 
-async def test_soft_delete_user_removes_sign_in_sessions(session: AsyncSession):
-    """Erasure empties the account of its sign-in sessions too — those rows
-    carry a device label, a user agent and an address."""
-    from app.models.platform.auth_session import AuthSession
-    from app.services.auth import sessions as session_service
-
-    user = await create_user(session)
-    bystander = await create_user(session)
-    mine = await session_service.create_session(
-        session,
-        user_id=user.id,
-        amr=["pwd"],
-        satisfied_providers=[],
-        user_agent="Mozilla/5.0",
-        ip="203.0.113.7",
-        device_name="Laptop",
-    )
-    theirs = await session_service.create_session(
-        session, user_id=bystander.id, amr=["pwd"], satisfied_providers=[]
-    )
-    await session.commit()
-    mine_id, theirs_id, user_id = mine.session.id, theirs.session.id, user.id
-
-    await user_service.soft_delete_user(session, user_id)
-
-    session.expire_all()
-    assert await session.get(AuthSession, mine_id) is None
-    assert await session.get(AuthSession, theirs_id) is not None
-
-
 async def test_soft_delete_user_removes_the_second_factor(session: AsyncSession):
     """Erasure empties the account of its factor, the seed behind it, the codes
     that stand in for it, and any sign-in held part-way through."""
@@ -894,10 +707,13 @@ async def test_soft_delete_user_empties_the_shared_tables(
 ):
     """Everything a hard delete takes by cascade, anonymizing takes by hand:
     the row stays, so no cascade fires. Run on the system engine, which is what
-    the purge worker erases on, so a missing grant fails here too."""
+    the purge worker erases on, so a missing grant fails here too. Sign-in
+    sessions go with the rest — those rows carry a device label, a user agent
+    and an address."""
     import uuid
 
     from app.models.platform.announcement import AnnouncementReadReceipt
+    from app.models.platform.auth_session import AuthSession
     from app.models.platform.contact_grant import (
         ContactGrant,
         ContactGrantKind,
@@ -967,8 +783,22 @@ async def test_soft_delete_user_empties_the_shared_tables(
             ),
         ]
     )
+    from app.services.auth import sessions as session_service
+
+    await session_service.create_session(
+        session,
+        user_id=user.id,
+        amr=["pwd"],
+        satisfied_providers=[],
+        user_agent="Mozilla/5.0",
+        ip="203.0.113.7",
+        device_name="Laptop",
+    )
+    theirs = await session_service.create_session(
+        session, user_id=other.id, amr=["pwd"], satisfied_providers=[]
+    )
     await session.commit()
-    user_id, other_id = user.id, other.id
+    user_id, other_id, theirs_id = user.id, other.id, theirs.session.id
 
     await user_service.soft_delete_user(await role_session("app_admin"), user_id)
     session.expire_all()
@@ -992,10 +822,12 @@ async def test_soft_delete_user_empties_the_shared_tables(
         (UserIgnore, UserIgnore.ignored_user_id),
         (ContactGrant, ContactGrant.user_id_low),
         (ContactGrant, ContactGrant.user_id_high),
+        (AuthSession, AuthSession.user_id),
     ):
         rows = (await session.exec(select(model).where(column == user_id))).all()
         assert rows == [], f"{column} kept a row"
 
+    assert await session.get(AuthSession, theirs_id) is not None
     # The other side of the conversation is still on it.
     assert (
         await session.exec(

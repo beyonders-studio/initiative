@@ -44,7 +44,11 @@ async def _mentions(user_id: int) -> list[Notification]:
 async def _mention(client, actor, task_id: int, user) -> int:
     posted = await client.post(
         actor.g("/comments/"),
-        json={"task_id": task_id, "content": f"hi @[{user.username}]({user.id})"},
+        json={
+            "subject_type": "task",
+            "subject_id": task_id,
+            "content": f"hi @[{user.username}]({user.id})",
+        },
         headers=actor.headers,
     )
     assert posted.status_code in (200, 201), posted.text
@@ -80,7 +84,11 @@ async def test_a_mention_reaches_only_people_the_project_is_shared_with(
     assert len(await _mentions(member.user.id)) == 1
     plain = await client.post(
         owner.g("/comments/"),
-        json={"task_id": task.id, "content": "and another thing"},
+        json={
+            "subject_type": "task",
+            "subject_id": task.id,
+            "content": "and another thing",
+        },
         headers=owner.headers,
     )
     assert plain.status_code in (200, 201), plain.text

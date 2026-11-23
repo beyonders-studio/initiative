@@ -30,14 +30,20 @@ import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { useCommunities } from "@/hooks/useCommunities";
 import type { MutationOpts } from "@/types/mutation";
-import type { QueryOpts } from "@/types/query";
 
-export const useCommunityPlugins = (options?: QueryOpts<CommunityPluginListResponse>) => {
+/** The community's installs, or what `select` reads off them. A reader the
+ *  installs are not read for (a guest) asks for none. */
+export const useCommunityPlugins = <T = CommunityPluginListResponse>({
+  enabled = true,
+  select,
+}: {
+  enabled?: boolean;
+  select?: (data: CommunityPluginListResponse) => T;
+} = {}) => {
   const communityId = useActiveCommunityId();
   const communityWide = Boolean(useCommunities().activeCommunity?.can.community_wide);
-  const { enabled = true, ...rest } = options ?? {};
-  return useListCommunityPlugins(communityId, {
-    query: { enabled: enabled && communityWide, ...rest },
+  return useListCommunityPlugins<T>(communityId, {
+    query: { enabled: enabled && communityWide, select },
   });
 };
 
@@ -86,13 +92,22 @@ export interface UninstallPlugin {
   pluginId: number;
   /** Also ask the plug-in to delete what it holds about the community. */
   erase?: boolean;
+  /** A tool plug-in: consent to its tool's content being deleted once the
+   * deletion window ends. */
+  deleteContent?: boolean;
 }
 
 export const useUninstallCommunityPlugin = (options?: MutationOpts<void, UninstallPlugin>) => {
   return useCommunityMutation<void, UninstallPlugin>(
     {
-      mutationFn: (communityId, { pluginId, erase }) =>
-        uninstallCommunityPlugin(communityId, pluginId, erase ? { erase: true } : undefined),
+      mutationFn: (communityId, { pluginId, erase, deleteContent }) =>
+        uninstallCommunityPlugin(
+          communityId,
+          pluginId,
+          erase || deleteContent
+            ? { ...(erase && { erase: true }), ...(deleteContent && { delete_content: true }) }
+            : undefined
+        ),
       invalidate: () => invalidate(q.plugins()),
       errorKey: "plugins:error",
     },
@@ -120,7 +135,6 @@ export const useSetPluginScopes = (
 const ITEM_READS: Record<ItemKind, (id: number) => Spec[]> = {
   task: (id) => [q.allTasks(), q.task(id)],
   calendar_event: (id) => [q.allCalendarEvents(), q.calendarEvent(id)],
-  counter: (id) => [q.allCounterGroups(), q.counter(id)],
   post: (id) => [q.allPosts(), q.post(id)],
 };
 

@@ -34,6 +34,7 @@ import re
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
+import sqlalchemy as sa
 from sqlalchemy.orm import undefer
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -42,6 +43,7 @@ from app.core.references import (
     REFERENCE_NODES,
     SOURCE_REF,
     TEXT_REFERENCE,
+    TRIGGER_WORD,
     format_ref,
     kind_for_trigger,
     parse_ref,
@@ -50,12 +52,16 @@ from app.core.references import (
 )
 from app.core.search import SearchEntityType
 from app.core.tools import Tool, tool_envelope_type
+from app.db.session import routed_tools
+from app.db.tool_rows import Located, locate, text_columns
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from app.services.import_engine.context import ImportContext
 
 #: An exported reference in markdown: the id's place holds the ref instead.
-_EXPORTED_TEXT_REFERENCE = re.compile(r"#([\w-]+)\[([^\]]*)\]\(([a-z_]+:\d+)\)")
+_EXPORTED_TEXT_REFERENCE = re.compile(
+    rf"#({TRIGGER_WORD})\[([^\]]*)\]\(([a-z_][a-z0-9_]*(?:\.[a-z0-9]+)?:\d+)\)"
+)
 
 
 def _is_id(value: Any) -> bool:
@@ -296,6 +302,30 @@ def _body_column(kind: SearchEntityType) -> tuple[type, str] | None:
     return BODY_COLUMNS.get(kind)
 
 
+async def _settle_tool_row(
+    session: AsyncSession,
+    located: Located,
+    entity_id: int,
+    resolve: Callable[[str], int | None],
+) -> int:
+    """Place the exported references in a tool plug-in's row's text fields,
+    and answer 1 where that changed it."""
+    table = located.table
+    texts = text_columns(table)
+    row = (await session.exec(sa.select(*texts).where(table.c.id == entity_id))).first()
+    if row is None:
+        return 0
+    placed = {
+        column.name: _settle(value, resolve)
+        for column, value in zip(texts, row, strict=True)
+        if has_source_references(value)
+    }
+    if not placed:
+        return 0
+    await session.exec(sa.update(table).where(table.c.id == entity_id).values(placed))
+    return 1
+
+
 async def resolve_references(
     session: AsyncSession, context: ImportContext, *, author_id: int | None
 ) -> int:
@@ -330,7 +360,14 @@ async def resolve_references(
     # What each rewritten body is about: a comment's edges belong to the thing
     # it is on, which is why a sync reads a body and its comments together.
     owners: dict[int, Endpoint] = {}
+    tools = routed_tools(session)
     for kind, entity_id in noted:
+        located = locate(tools, kind)
+        if located is not None:
+            changed += await _settle_tool_row(session, located, entity_id, resolve)
+            owner = Endpoint.of(tools, kind, entity_id)
+            owners[owner.node] = owner
+            continue
         column = _body_column(kind)
         if column is None:
             continue
@@ -360,12 +397,11 @@ async def resolve_references(
             )
             session.add(row)
         owner = (
-            content_references.comment_parent(row)
+            content_references.comment_parent(row, tools)
             if kind == SearchEntityType.comment
             else Endpoint(kind, entity_id)
         )
-        if owner is not None:
-            owners[owner.node] = owner
+        owners[owner.node] = owner
     await session.flush()
 
     # An import writes a body without the edges a save derives from it, and

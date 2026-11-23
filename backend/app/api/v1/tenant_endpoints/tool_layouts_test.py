@@ -23,9 +23,10 @@ from app.schemas.tenant.tool_layout import MAX_DEPTH, MAX_NODES, MAX_PLUGIN_PART
 from app.services.tenant import task_types as task_types_service
 from app.services.tenant import tool_layouts as tool_layouts_service
 from app.testing import (
-    create_counter_group,
+    add_counter,
     create_project,
     create_resource_grant,
+    install_tool_plugin,
     route_session_to_guild,
 )
 
@@ -140,6 +141,20 @@ async def test_a_project_draws_its_layouts_as_shipped_until_one_changes(
         ("calendar", False, False, None, None),
         *(("task", None, None, task_type.id, None) for task_type in types),
     ]
+
+    # The list it opens on is its own change, which dates no layout.
+    response = await client.put(
+        a.g("/layouts/default"),
+        params=_project(a),
+        json={"kind": "board"},
+        headers=a.headers,
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert [
+        layout["kind"] for layout in body["layouts"] if layout.get("is_default")
+    ] == ["board"]
+    assert set(_dates(body).values()) == {None}
 
 
 async def test_a_project_shows_the_lists_it_chooses_and_always_one(
@@ -273,28 +288,6 @@ async def test_a_task_page_names_one_of_its_projects_types(
     assert stolen.status_code == 404
     assert stolen.json()["detail"] == "TASK_TYPE_NOT_FOUND"
     assert typed_list.status_code == 422
-
-
-async def test_the_list_a_project_opens_on_is_its_own_change(
-    client: AsyncClient, acting_user
-):
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-
-    response = await client.put(
-        a.g("/layouts/default"),
-        params=_project(a),
-        json={"kind": "board"},
-        headers=a.headers,
-    )
-
-    assert response.status_code == 200, response.text
-    body = response.json()
-    assert [
-        layout["kind"] for layout in body["layouts"] if layout.get("is_default")
-    ] == ["board"]
-    assert set(_dates(body).values()) == {None}
 
 
 async def test_changes_to_a_target_take_turns(
@@ -449,54 +442,9 @@ async def test_an_initiatives_layouts_list_each_project_the_reader_can_open(
         (manager.project.id, False)
     ]
 
-
-async def test_tools_lay_out_their_items(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Each its own item detail, listed among the initiative's layouts."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    group = await create_counter_group(session, a.initiative, a.user, name="Tally")
-    detail = _detail(
-        "counter",
-        {"type": "count"},
-        {"type": "section", "children": [_field("step"), _field("property:12")]},
-        {"type": "relations"},
-        _plugin_part(3),
-    )
-
-    saved = await client.put(
-        a.g("/layouts/"),
-        params={"tool": "counter_group", "tool_id": group.id},
-        json=detail,
-        headers=a.headers,
-    )
-    listed = await client.get(
-        a.g("/layouts/initiative"),
-        params={"initiative_id": a.initiative.id},
-        headers=a.headers,
-    )
-
-    assert saved.status_code == 200, saved.text
-    assert [layout["kind"] for layout in saved.json()["layouts"]] == ["counter"]
-    assert sorted((each["tool"], each["name"]) for each in listed.json()) == [
-        ("counter_group", "Tally"),
-    ]
-
-
-async def test_an_initiatives_layouts_are_not_listed_outside_it(
-    client: AsyncClient, acting_user
-):
-    owner = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    outsider = await acting_user(guild_role=CommunityRole.member, guild=owner.guild)
-
-    response = await client.get(
-        outsider.g("/layouts/initiative"),
-        params={"initiative_id": owner.initiative.id},
-        headers=outsider.headers,
-    )
-
+    # Outside the initiative there is nothing to list.
+    outsider = await acting_user(guild_role=CommunityRole.member, guild=manager.guild)
+    response = await client.get(url, params=params, headers=outsider.headers)
     assert response.status_code == 404
 
 
@@ -979,9 +927,10 @@ async def test_a_detail_draws_only_what_its_kind_has(
     assert response.json()["detail"] == "TOOL_LAYOUTS_KIND_NOT_ALLOWED"
 
 
-async def test_the_calendar_lays_out_its_event_detail(client: AsyncClient, acting_user):
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    params = {"tool": "calendar", "initiative_id": a.initiative.id}
+async def test_a_shared_tool_lays_out_its_detail(client: AsyncClient, acting_user):
+    """The calendar's events share one detail, and so does every notice in
+    the initiative's posts."""
+    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     event = _detail(
         "calendar_event",
         {"type": "rsvp"},
@@ -993,26 +942,6 @@ async def test_the_calendar_lays_out_its_event_detail(client: AsyncClient, actin
         _plugin_part(3),
         _field("plugin:3:ci.state"),
     )
-
-    saved = await client.put(
-        a.g("/layouts/"), params=params, json=event, headers=a.headers
-    )
-
-    assert saved.status_code == 200, saved.text
-    layout = {each["kind"]: each for each in saved.json()["layouts"]}["calendar_event"]
-    assert [part["type"] for part in layout["definition"]["side"]] == [
-        "rsvp",
-        "section",
-        "plugin",
-        "field",
-    ]
-    assert layout["updated_at"] is not None
-
-
-async def test_the_posts_lay_out_their_notice_detail(client: AsyncClient, acting_user):
-    """One detail every notice in the initiative shares, as the calendar's
-    events do."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     notice = _detail(
         "post",
         {"type": "body"},
@@ -1022,22 +951,21 @@ async def test_the_posts_lay_out_their_notice_detail(client: AsyncClient, acting
         _plugin_part(3),
     )
 
-    saved = await client.put(
-        a.g("/layouts/"),
-        params={"tool": "post", "initiative_id": a.initiative.id},
-        json=notice,
-        headers=a.headers,
-    )
-
-    assert saved.status_code == 200, saved.text
-    layout = {each["kind"]: each for each in saved.json()["layouts"]}["post"]
-    assert [part["type"] for part in layout["definition"]["side"]] == [
-        "body",
-        "poll",
-        "field",
-        "field",
-        "plugin",
-    ]
+    for tool, payload in (("calendar", event), ("post", notice)):
+        saved = await client.put(
+            a.g("/layouts/"),
+            params={"tool": tool, "initiative_id": a.initiative.id},
+            json=payload,
+            headers=a.headers,
+        )
+        assert saved.status_code == 200, saved.text
+        layout = {each["kind"]: each for each in saved.json()["layouts"]}[
+            payload["kind"]
+        ]
+        assert [part["type"] for part in layout["definition"]["side"]] == [
+            part["type"] for part in payload["definition"]["side"]
+        ]
+        assert layout["updated_at"] is not None
 
 
 @pytest.mark.parametrize(
@@ -1058,3 +986,190 @@ async def test_a_target_must_name_what_its_tool_takes(
 
     assert response.status_code == 400
     assert response.json()["detail"] == "TOOL_LAYOUTS_TARGET_INVALID"
+
+
+# -- A tool plug-in's tables -----------------------------------------------
+
+
+async def _counters_installed(
+    client: AsyncClient, session: AsyncSession, acting_user
+) -> tuple[Any, Any, dict[str, Any], dict[str, Any]]:
+    """A community with Counters installed and a group holding a counter: its
+    admin, a member of its initiative, and the targets of the counters in the
+    group and of the groups in the initiative."""
+    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    member = await acting_user(
+        guild=admin.guild, initiative=admin.initiative, initiative_role="member"
+    )
+    seat = await acting_user(guild=admin.guild, guild_role=CommunityRole.superadmin)
+    await install_tool_plugin(client, session, seat)
+    tools, group, _ = await add_counter(session, admin.guild.id, admin.initiative.id)
+    (tool,) = tools.installed
+    (counter,) = tool.children
+    return (
+        admin,
+        member,
+        {"tool": counter.value, "tool_id": group},
+        {"tool": tool.kind, "initiative_id": admin.initiative.id},
+    )
+
+
+def _layouts(response: Any) -> dict[str, dict[str, Any]]:
+    return {each["kind"]: each for each in response.json()["layouts"]}
+
+
+async def test_a_tool_plugins_table_is_laid_out_as_its_plugin_declares(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """Its lists and its rows' page are the declared ones, drawn as shipped
+    until they are changed; a change names the table's own fields and is held
+    to the declaration, is read back as stored, and a reset draws it as
+    shipped again. A row purged takes the layouts of its items with it."""
+    from app.db.plugin_tools import provisioned_tools
+    from app.db.tool_rows import ToolRow
+    from app.services.tenant.soft_delete import hard_purge_entities
+
+    admin, _member, counters, _groups = await _counters_installed(
+        client, session, acting_user
+    )
+    item = counters["tool"]
+    page = {
+        "kind": item,
+        "definition": {
+            "main": [{"type": "field", "props": {"field": "count"}}],
+            "side": [{"type": "field", "props": {"field": "step", "required": False}}],
+        },
+    }
+
+    path = admin.g("/layouts/")
+    shipped = await client.get(path, params=counters, headers=admin.headers)
+    saved = await client.put(path, params=counters, json=page, headers=admin.headers)
+    # Sent back as read, with what it leaves out as null.
+    hidden = await client.put(
+        path,
+        params=counters,
+        json={
+            "kind": "grid",
+            "definition": {**_layouts(shipped)["grid"]["definition"], "hidden": True},
+        },
+        headers=admin.headers,
+    )
+    reset = await client.delete(
+        admin.g(f"/layouts/{item}"), params=counters, headers=admin.headers
+    )
+
+    assert shipped.status_code == 200, shipped.text
+    assert shipped.json()["can_configure"] is True
+    assert list(_layouts(shipped)) == ["grid", "table", item]
+    assert all(each["updated_at"] is None for each in shipped.json()["layouts"])
+    assert saved.status_code == 200, saved.text
+    assert _layouts(saved)[item]["definition"]["main"] == page["definition"]["main"]
+    assert _layouts(saved)[item]["updated_at"] is not None
+    # The grid hidden, the table is the one it opens on.
+    assert hidden.status_code == 200, hidden.text
+    assert _layouts(hidden)["grid"]["hidden"] is True
+    assert _layouts(hidden)["table"]["is_default"] is True
+    assert reset.status_code == 200, reset.text
+    assert _layouts(reset)[item]["updated_at"] is None
+    stored = (
+        await session.exec(select(ToolLayout).where(ToolLayout.tool == item))
+    ).all()
+    assert sorted(row.kind for row in stored) == ["grid"]
+
+    for change in (
+        # A field it does not declare.
+        {"kind": item, "definition": {"main": [_field("title")]}},
+        # A plug-in's part.
+        {
+            "kind": item,
+            "definition": {
+                "main": [{"type": "plugin", "props": {"plugin": 3, "part": "x"}}]
+            },
+        },
+        # A counter required.
+        {
+            "kind": item,
+            "definition": {
+                "main": [
+                    {"type": "field", "props": {"field": "count", "required": True}}
+                ]
+            },
+        },
+        # A column it does not declare.
+        {"kind": "table", "definition": {"columns": ["name", "nope"]}},
+        # A card on a table.
+        {"kind": "table", "definition": {"card": {"type": "card"}}},
+        # A list it does not declare.
+        {"kind": "board", "definition": {"card": {"type": "card"}}},
+        # A look a number has not.
+        {"kind": "grid", "definition": {"displays": {"min": "bar"}}},
+    ):
+        response = await client.put(
+            admin.g("/layouts/"), params=counters, json=change, headers=admin.headers
+        )
+        assert response.status_code == 400, (change, response.text)
+        assert response.json()["detail"] == "TOOL_LAYOUTS_KIND_NOT_ALLOWED"
+
+    saved = await client.put(
+        admin.g("/layouts/"),
+        params=counters,
+        json={"kind": "table", "definition": {"columns": ["name"]}},
+        headers=admin.headers,
+    )
+    assert saved.status_code == 200, saved.text
+
+    tools = await provisioned_tools(admin.guild.id)
+    (tool,) = tools.installed
+    await route_session_to_guild(session, admin.guild.id)
+    await hard_purge_entities(
+        session, [ToolRow(tool.table, {"id": counters["tool_id"]})], tools=tools
+    )
+    await session.commit()
+
+    left = await session.exec(
+        select(ToolLayout).where(ToolLayout.tool == counters["tool"])
+    )
+    assert left.all() == []
+
+
+async def test_a_tool_plugins_own_rows_are_laid_out_by_the_initiatives_managers(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """The tool's own rows are listed in the initiative, so their layouts are
+    the initiative's: its members read them, and its managers change them."""
+    admin, member, counters, groups = await _counters_installed(
+        client, session, acting_user
+    )
+    change = {"kind": "table", "definition": {"columns": ["name", "description"]}}
+
+    read = await client.get(
+        member.g("/layouts/"), params=groups, headers=member.headers
+    )
+    refused = await client.put(
+        member.g("/layouts/"), params=groups, json=change, headers=member.headers
+    )
+    saved = await client.put(
+        admin.g("/layouts/"), params=groups, json=change, headers=admin.headers
+    )
+
+    assert read.status_code == 200, read.text
+    assert read.json()["can_configure"] is False
+    assert list(_layouts(read)) == ["grid", "table", groups["tool"]]
+    assert refused.status_code == 403
+    assert saved.status_code == 200, saved.text
+    assert _layouts(saved)["table"]["definition"]["columns"] == ["name", "description"]
+
+    # Neither the tool's rows' layouts nor its items' are reached outside it.
+    outsider = await acting_user(guild=admin.guild, initiative=True)
+    for target in (counters, groups):
+        read = await client.get(
+            outsider.g("/layouts/"), params=target, headers=outsider.headers
+        )
+        written = await client.put(
+            outsider.g("/layouts/"),
+            params=target,
+            json=change,
+            headers=outsider.headers,
+        )
+        assert read.status_code in (403, 404), read.text
+        assert written.status_code in (403, 404), written.text

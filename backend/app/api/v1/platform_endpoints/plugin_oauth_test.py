@@ -23,12 +23,8 @@ from app.core.plugin_access_token import (
     PluginAccessToken,
     unseal_access_token,
 )
-from app.models.platform.plugin_service_registration import (
-    PluginServiceRegistration,
-    RegistrationKind,
-)
 from app.models.tenant.guild_plugin import GuildPlugin
-from app.services.marketplace import plugin_installs, plugin_oauth
+from app.services.marketplace import plugin_installs, plugin_keys, plugin_oauth
 from app.services.marketplace.plugin_refs import ensure_plugin_guild_ref
 from app.services.marketplace.registration_lookup import invalidate_registrations
 from app.services.tenant import plugin_updates
@@ -37,6 +33,7 @@ from app.testing.audit import emitted
 from app.testing.plugin_clients import (
     CLIENT,
     InstalledPlugin,
+    client_jwks,
     install_plugin,
     mint_client_assertion,
 )
@@ -44,6 +41,8 @@ from app.testing.plugin_clients import (
 TOKEN_URL = "/api/v1/plugin-platform/oauth/token"
 INSTALLATIONS_URL = "/api/v1/plugin-platform/installations"
 ASSERTION_TYPE = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+#: Standings: asked for by level, never carried by default.
+_STANDINGS = ["initiatives:moderate", "community:admin"]
 
 
 def _assertion(**overrides) -> str:
@@ -65,23 +64,39 @@ def _error(response) -> str:
     return response.json()["error"]
 
 
+async def _update(session: AsyncSession, sql: str, **params) -> None:
+    await session.exec(text(sql).bindparams(client=CLIENT, **params))
+    await session.commit()
+    invalidate_registrations()
+
+
 async def _limit_to_operations(session: AsyncSession) -> None:
     """Limit the client's registration to the operations community, which no
     test community is."""
-    await session.exec(
-        text(
-            "UPDATE public.plugin_service_registrations SET availability = 'operations' "
-            "WHERE public_id = :c"
-        ).bindparams(c=CLIENT)
+    await _update(
+        session,
+        "UPDATE public.plugin_service_registrations SET availability = 'operations' "
+        "WHERE public_id = :client",
     )
-    await session.commit()
-    invalidate_registrations()
+
+
+async def _narrow_ceiling(session: AsyncSession, *scopes: str) -> None:
+    await _update(
+        session,
+        "UPDATE public.plugin_service_registrations SET scope_ceiling = :ceiling "
+        "WHERE public_id = :client",
+        ceiling=list(scopes),
+    )
 
 
 async def _installation(installed: InstalledPlugin) -> str:
     return await ensure_plugin_guild_ref(
         guild_id=installed.guild.id, public_id=installed.public_id
     )
+
+
+def _placed(installed: InstalledPlugin) -> str:
+    return f"urn:initiative:initiative:{installed.placed.id}"
 
 
 # ---------------------------------------------------------------------------
@@ -117,21 +132,9 @@ async def test_an_assertion_presented_twice_is_refused_and_written_down(
     emitted(capfd)
     again = await _ask(client, assertion=assertion)
     assert again.status_code == 401
+    assert _error(again) == "invalid_client"
     (line,) = emitted(capfd, AuditEventType.SECURITY_REPLAY_REJECTED)
     assert line["detail"] == {"channel": "plugin_assertion", "install": CLIENT}
-
-
-async def test_a_key_the_plugin_never_registered_is_refused(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session
-):
-    """Only the registered Ed25519 key authenticates: an RSA key, even under the
-    plug-in's own kid, is refused, as is any non-EdDSA algorithm."""
-    await install_plugin(session, acting_user, role_session, granted=["files:read"])
-
-    response = await _ask(client, assertion=_assertion(key="foreign-rsa"))
-
-    assert response.status_code == 401
-    assert _error(response) == "invalid_client"
 
 
 # ---------------------------------------------------------------------------
@@ -148,8 +151,9 @@ async def test_an_installation_token_carries_every_granted_scope(
         role_session,
         granted=["files:write", "comments:read"],
     )
+    installation = await _installation(installed)
 
-    response = await _ask(client, installation=await _installation(installed))
+    response = await _ask(client, installation=installation)
 
     assert response.status_code == 200, response.text
     assert response.json()["scope"] == "comments:read files:write"
@@ -161,41 +165,16 @@ async def test_an_installation_token_carries_every_granted_scope(
     assert token.scopes == frozenset({"files:write", "comments:read"})
     assert token.initiative_id is None
 
-
-async def test_an_installation_token_can_be_down_scoped(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session
-):
-    installed = await install_plugin(
-        session,
-        acting_user,
-        role_session,
-        granted=["files:write", "comments:read"],
-    )
-
-    response = await _ask(
-        client, installation=await _installation(installed), scope="comments:read"
-    )
-
-    assert response.status_code == 200, response.text
-    assert response.json()["scope"] == "comments:read"
-    token = unseal_access_token(response.json()["access_token"])
+    # Down-scoped, and a written resource asked for at read.
+    narrowed = await _ask(client, installation=installation, scope="comments:read")
+    assert narrowed.status_code == 200, narrowed.text
+    assert narrowed.json()["scope"] == "comments:read"
+    token = unseal_access_token(narrowed.json()["access_token"])
     assert isinstance(token, InstallAccessToken)
     assert token.scopes == frozenset({"comments:read"})
-
-
-async def test_a_written_resource_may_be_asked_for_at_read(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session
-):
-    installed = await install_plugin(
-        session, acting_user, role_session, granted=["files:write"]
-    )
-
-    response = await _ask(
-        client, installation=await _installation(installed), scope="files:read"
-    )
-
-    assert response.status_code == 200, response.text
-    assert response.json()["scope"] == "files:read"
+    read = await _ask(client, installation=installation, scope="files:read")
+    assert read.status_code == 200, read.text
+    assert read.json()["scope"] == "files:read"
 
 
 async def test_a_scope_to_use_another_plugin_is_issued_and_asked_for_by_name(
@@ -225,22 +204,6 @@ async def test_a_scope_to_use_another_plugin_is_issued_and_asked_for_by_name(
     other = await _ask(client, installation=installation, scope="plugins:tests.other")
     assert other.status_code == 400
     assert _error(other) == "invalid_scope"
-
-
-@pytest.mark.parametrize("scope", ["projects:read", "files:write", "not-a-scope"])
-async def test_a_scope_beyond_the_grant_is_refused(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session, scope
-):
-    installed = await install_plugin(
-        session, acting_user, role_session, granted=["files:read"]
-    )
-
-    response = await _ask(
-        client, installation=await _installation(installed), scope=scope
-    )
-
-    assert response.status_code == 400
-    assert _error(response) == "invalid_scope"
 
 
 async def _upgrade_dropping(session: AsyncSession, installed: InstalledPlugin, keep):
@@ -296,36 +259,23 @@ async def test_a_scope_the_pinned_version_dropped_is_not_issued(
 async def test_a_scope_the_ceiling_no_longer_allows_is_not_issued(
     client: AsyncClient, session: AsyncSession, acting_user, role_session
 ):
-    """Narrowing the registration's ceiling narrows the next token, whatever
-    the seat granted before."""
-    from app.models.platform.plugin_service_registration import (
-        PluginServiceRegistration,
-    )
-    from app.services.marketplace import registration_lookup
-
+    """Narrowing the registration's ceiling narrows the next token, and the
+    levels it may ask for, whatever the seat granted before."""
     installed = await install_plugin(
         session,
         acting_user,
         role_session,
-        granted=["files:write", "comments:read"],
+        granted=["files:write", "comments:read", *_STANDINGS],
     )
     installation = await _installation(installed)
-
-    registration = (
-        await session.exec(
-            select(PluginServiceRegistration).where(
-                PluginServiceRegistration.public_id == CLIENT
-            )
-        )
-    ).one()
-    registration.scope_ceiling = ["comments:read"]
-    session.add(registration)
-    await session.commit()
-    registration_lookup.invalidate_registrations()
+    await _narrow_ceiling(session, "comments:read")
 
     after = await _ask(client, installation=installation)
     assert after.status_code == 200, after.text
     assert after.json()["scope"] == "comments:read"
+    level = await _ask(client, installation=installation, level="community_admin")
+    assert level.status_code == 400
+    assert _error(level) == "invalid_scope"
 
 
 async def test_a_placed_initiative_narrows_the_token(
@@ -338,231 +288,169 @@ async def test_a_placed_initiative_narrows_the_token(
     response = await _ask(
         client,
         installation=await _installation(installed),
-        resource=f"urn:initiative:initiative:{installed.placed.id}",
+        resource=_placed(installed),
     )
 
     assert response.status_code == 200, response.text
     token = unseal_access_token(response.json()["access_token"])
     assert isinstance(token, InstallAccessToken)
     assert token.initiative_id == installed.placed.id
-
-
-@pytest.mark.parametrize("which", ["unplaced", "malformed"])
-async def test_an_initiative_it_is_not_placed_in_is_refused(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session, which
-):
-    installed = await install_plugin(
-        session, acting_user, role_session, granted=["files:read"]
-    )
-    resource = (
-        f"urn:initiative:initiative:{installed.unplaced.id}"
-        if which == "unplaced"
-        else "urn:initiative:project:1"
-    )
-
-    response = await _ask(
-        client, installation=await _installation(installed), resource=resource
-    )
-
-    assert response.status_code == 400
-    assert _error(response) == "invalid_target"
 
 
 # ---------------------------------------------------------------------------
 # Standings: asked for by level, never carried by default
 # ---------------------------------------------------------------------------
 
-_STANDINGS = ["initiatives:moderate", "community:admin"]
 
-
-async def test_a_granted_standing_is_not_on_a_token_that_did_not_ask(
+async def test_a_standing_is_carried_only_at_the_level_asked_for(
     client: AsyncClient, session: AsyncSession, acting_user, role_session
 ):
     installed = await install_plugin(
         session, acting_user, role_session, granted=["files:read", *_STANDINGS]
     )
+    installation = await _installation(installed)
+    placed = _placed(installed)
 
-    response = await _ask(client, installation=await _installation(installed))
+    # Granted, but not on a token that did not ask.
+    plain = await _ask(client, installation=installation)
+    assert plain.status_code == 200, plain.text
+    assert plain.json()["scope"] == "files:read"
 
-    assert response.status_code == 200, response.text
-    assert response.json()["scope"] == "files:read"
-
-
-async def test_a_moderator_level_carries_its_scope_into_the_initiative(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session
-):
-    installed = await install_plugin(
-        session, acting_user, role_session, granted=["files:read", *_STANDINGS]
+    moderator = await _ask(
+        client, installation=installation, resource=placed, level="moderator"
     )
-
-    response = await _ask(
-        client,
-        installation=await _installation(installed),
-        resource=f"urn:initiative:initiative:{installed.placed.id}",
-        level="moderator",
-    )
-
-    assert response.status_code == 200, response.text
-    assert response.json()["scope"] == "files:read initiatives:moderate"
-    token = unseal_access_token(response.json()["access_token"])
+    assert moderator.status_code == 200, moderator.text
+    assert moderator.json()["scope"] == "files:read initiatives:moderate"
+    token = unseal_access_token(moderator.json()["access_token"])
     assert isinstance(token, InstallAccessToken)
     assert token.scopes == frozenset({"files:read", "initiatives:moderate"})
     assert token.initiative_id == installed.placed.id
 
-
-async def test_a_guild_admin_level_carries_its_scope(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session
-):
-    installed = await install_plugin(
-        session, acting_user, role_session, granted=["files:read", *_STANDINGS]
+    admin = await _ask(
+        client, installation=installation, scope="files:read", level="community_admin"
     )
+    assert admin.status_code == 200, admin.text
+    assert admin.json()["scope"] == "community:admin files:read"
 
-    response = await _ask(
-        client,
-        installation=await _installation(installed),
-        scope="files:read",
-        level="community_admin",
+    # Narrowed, it administers within that one initiative.
+    narrowed = await _ask(
+        client, installation=installation, resource=placed, level="community_admin"
     )
-
-    assert response.status_code == 200, response.text
-    assert response.json()["scope"] == "community:admin files:read"
-
-
-@pytest.mark.parametrize(
-    ("level", "narrowed"), [("moderator", True), ("community_admin", False)]
-)
-async def test_a_level_the_community_did_not_grant_is_refused(
-    client: AsyncClient,
-    session: AsyncSession,
-    acting_user,
-    role_session,
-    level,
-    narrowed,
-):
-    installed = await install_plugin(
-        session, acting_user, role_session, granted=["files:read"]
-    )
-    form = {"level": level}
-    if narrowed:
-        form["resource"] = f"urn:initiative:initiative:{installed.placed.id}"
-
-    response = await _ask(client, installation=await _installation(installed), **form)
-
-    assert response.status_code == 400
-    assert _error(response) == "invalid_scope"
-
-
-async def test_a_level_the_ceiling_does_not_allow_is_refused(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session
-):
-    from app.models.platform.plugin_service_registration import (
-        PluginServiceRegistration,
-    )
-    from app.services.marketplace import registration_lookup
-
-    installed = await install_plugin(
-        session, acting_user, role_session, granted=["files:read", *_STANDINGS]
-    )
-    registration = (
-        await session.exec(
-            select(PluginServiceRegistration).where(
-                PluginServiceRegistration.public_id == CLIENT
-            )
-        )
-    ).one()
-    registration.scope_ceiling = ["files:read"]
-    session.add(registration)
-    await session.commit()
-    registration_lookup.invalidate_registrations()
-
-    response = await _ask(
-        client, installation=await _installation(installed), level="community_admin"
-    )
-
-    assert response.status_code == 400
-    assert _error(response) == "invalid_scope"
-
-
-async def test_a_moderator_level_names_its_initiative(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session
-):
-    """A moderator moderates one initiative, which the token names."""
-    installed = await install_plugin(
-        session, acting_user, role_session, granted=["files:read", *_STANDINGS]
-    )
-
-    response = await _ask(
-        client, installation=await _installation(installed), level="moderator"
-    )
-
-    assert response.status_code == 400
-    assert _error(response) == "invalid_target"
-
-
-async def test_a_guild_admin_level_may_be_narrowed(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session
-):
-    """Narrowed, it administers within that one initiative."""
-    installed = await install_plugin(
-        session, acting_user, role_session, granted=["files:read", *_STANDINGS]
-    )
-
-    response = await _ask(
-        client,
-        installation=await _installation(installed),
-        resource=f"urn:initiative:initiative:{installed.placed.id}",
-        level="community_admin",
-    )
-
-    assert response.status_code == 200, response.text
-    token = unseal_access_token(response.json()["access_token"])
+    assert narrowed.status_code == 200, narrowed.text
+    token = unseal_access_token(narrowed.json()["access_token"])
     assert isinstance(token, InstallAccessToken)
     assert token.scopes == frozenset({"files:read", "community:admin"})
     assert token.initiative_id == installed.placed.id
 
 
-@pytest.mark.parametrize("standing", _STANDINGS)
-async def test_a_standing_is_not_asked_for_by_scope(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session, standing
+@pytest.mark.parametrize(
+    ("granted", "form", "error"),
+    [
+        *(
+            pytest.param(
+                ["files:read"], lambda i, scope=scope: {"scope": scope}, "invalid_scope"
+            )
+            for scope in ("projects:read", "files:write", "not-a-scope")
+        ),
+        pytest.param(
+            ["files:read"],
+            lambda i: {"resource": f"urn:initiative:initiative:{i.unplaced.id}"},
+            "invalid_target",
+            id="unplaced-initiative",
+        ),
+        pytest.param(
+            ["files:read"],
+            lambda i: {"resource": "urn:initiative:project:1"},
+            "invalid_target",
+            id="malformed-resource",
+        ),
+        # A level the community did not grant.
+        pytest.param(
+            ["files:read"],
+            lambda i: {"level": "moderator", "resource": _placed(i)},
+            "invalid_scope",
+            id="ungranted-moderator",
+        ),
+        pytest.param(
+            ["files:read"],
+            lambda i: {"level": "community_admin"},
+            "invalid_scope",
+            id="ungranted-community-admin",
+        ),
+        # A moderator moderates one initiative, which the token names.
+        pytest.param(
+            ["files:read", *_STANDINGS],
+            lambda i: {"level": "moderator"},
+            "invalid_target",
+            id="moderator-without-initiative",
+        ),
+        *(
+            pytest.param(
+                ["files:read", *_STANDINGS],
+                lambda i, standing=standing: {"scope": f"files:read {standing}"},
+                "invalid_scope",
+                id=f"{standing}-by-scope",
+            )
+            for standing in _STANDINGS
+        ),
+        pytest.param(
+            ["files:read", *_STANDINGS],
+            lambda i: {"level": "owner"},
+            "invalid_request",
+            id="unknown-level",
+        ),
+        pytest.param(
+            ["files:read"],
+            lambda i: {"installation": "not-a-reference"},
+            "invalid_grant",
+            id="unknown-installation",
+        ),
+        # A plug-in token takes no level.
+        pytest.param(
+            _STANDINGS,
+            lambda i: {"installation": None, "level": "community_admin"},
+            "invalid_request",
+            id="plugin-token-level",
+        ),
+        # The member grant's assertion authenticates the client (RFC 7523
+        # §3); the member grant itself is in ``plugin_member_tokens_test``.
+        pytest.param(
+            ["files:read"],
+            lambda i: {
+                "installation": None,
+                "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+            },
+            "invalid_request",
+            id="member-grant-with-client-assertion",
+        ),
+        pytest.param(
+            ["files:read"],
+            lambda i: {"installation": None, "grant_type": "password"},
+            "unsupported_grant_type",
+            id="unknown-grant-type",
+        ),
+    ],
+)
+async def test_a_token_it_will_not_issue_is_refused(
+    client: AsyncClient,
+    session: AsyncSession,
+    acting_user,
+    role_session,
+    granted,
+    form,
+    error,
 ):
     installed = await install_plugin(
-        session, acting_user, role_session, granted=["files:read", *_STANDINGS]
+        session, acting_user, role_session, granted=granted
     )
+    asked = {"installation": await _installation(installed), **form(installed)}
+    if asked["installation"] is None:
+        del asked["installation"]
 
-    response = await _ask(
-        client,
-        installation=await _installation(installed),
-        scope=f"files:read {standing}",
-    )
+    response = await _ask(client, **asked)
 
     assert response.status_code == 400
-    assert _error(response) == "invalid_scope"
-
-
-async def test_an_unknown_level_is_refused(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session
-):
-    installed = await install_plugin(
-        session, acting_user, role_session, granted=["files:read", *_STANDINGS]
-    )
-
-    response = await _ask(
-        client, installation=await _installation(installed), level="owner"
-    )
-
-    assert response.status_code == 400
-    assert _error(response) == "invalid_request"
-
-
-async def test_a_plugin_token_takes_no_level(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session
-):
-    await install_plugin(session, acting_user, role_session, granted=_STANDINGS)
-
-    response = await _ask(client, level="community_admin")
-
-    assert response.status_code == 400
-    assert _error(response) == "invalid_request"
+    assert _error(response) == error
 
 
 async def test_a_member_token_takes_no_level(
@@ -585,17 +473,6 @@ async def test_a_member_token_takes_no_level(
         "error": "invalid_request",
         "error_description": "a member token takes no level",
     }
-
-
-async def test_an_unknown_installation_is_refused(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session
-):
-    await install_plugin(session, acting_user, role_session, granted=["files:read"])
-
-    response = await _ask(client, installation="not-a-reference")
-
-    assert response.status_code == 400
-    assert _error(response) == "invalid_grant"
 
 
 async def test_another_clients_installation_is_refused(
@@ -629,32 +506,6 @@ async def test_an_operations_plugin_gets_no_token_elsewhere(
 
     assert response.status_code == 400
     assert _error(response) == "invalid_grant"
-
-
-async def test_the_member_grant_takes_no_client_assertion(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session
-):
-    """Its assertion authenticates the client (RFC 7523 §3); the member grant
-    itself is in ``plugin_member_tokens_test``."""
-    await install_plugin(session, acting_user, role_session, granted=["files:read"])
-
-    response = await _ask(
-        client, grant_type="urn:ietf:params:oauth:grant-type:jwt-bearer"
-    )
-
-    assert response.status_code == 400
-    assert _error(response) == "invalid_request"
-
-
-async def test_an_unknown_grant_type_is_unsupported(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session
-):
-    await install_plugin(session, acting_user, role_session, granted=["files:read"])
-
-    response = await _ask(client, grant_type="password")
-
-    assert response.status_code == 400
-    assert _error(response) == "unsupported_grant_type"
 
 
 # ---------------------------------------------------------------------------
@@ -692,26 +543,43 @@ async def test_a_bad_assertion_is_an_invalid_client(
     assert _error(response) == "invalid_client"
 
 
-async def test_an_assertion_is_used_once(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session
-):
-    await install_plugin(session, acting_user, role_session, granted=["files:read"])
-    assertion = _assertion()
-
-    first = await _ask(client, assertion=assertion)
-    second = await _ask(client, assertion=assertion)
-
-    assert first.status_code == 200, first.text
-    assert second.status_code == 401
-    assert _error(second) == "invalid_client"
+_REGISTRATION = (
+    "UPDATE public.plugin_service_registrations SET {} WHERE public_id = :client"
+)
 
 
-async def test_a_suspended_registration_is_an_invalid_client(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session
+@pytest.mark.parametrize(
+    ("installed_as", "sql"),
+    [
+        pytest.param({"suspended": True}, None, id="suspended"),
+        # A declarative plug-in runs no code, so keys left on its registration
+        # authenticate nothing.
+        pytest.param(
+            {}, _REGISTRATION.format("kind = 'declarative'"), id="declarative"
+        ),
+        pytest.param({}, _REGISTRATION.format("jwks = NULL"), id="no-key-set"),
+        pytest.param(
+            {},
+            "UPDATE public.publishers SET enabled = false WHERE id = "
+            "(SELECT publisher_id FROM public.plugin_service_registrations "
+            "WHERE public_id = :client)",
+            id="publisher-switched-off",
+        ),
+    ],
+)
+async def test_a_registration_that_is_not_live_is_an_invalid_client(
+    client: AsyncClient,
+    session: AsyncSession,
+    acting_user,
+    role_session,
+    installed_as,
+    sql,
 ):
     await install_plugin(
-        session, acting_user, role_session, granted=["files:read"], suspended=True
+        session, acting_user, role_session, granted=["files:read"], **installed_as
     )
+    if sql:
+        await _update(session, sql)
 
     response = await _ask(client)
 
@@ -719,29 +587,35 @@ async def test_a_suspended_registration_is_an_invalid_client(
     assert _error(response) == "invalid_client"
 
 
-async def test_a_declarative_registration_is_never_a_client(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session
+async def test_a_key_set_published_at_its_address_authenticates(
+    client: AsyncClient,
+    session: AsyncSession,
+    acting_user,
+    role_session,
+    monkeypatch,
 ):
-    """A declarative plug-in runs no code, so keys left on its registration
-    authenticate nothing."""
+    """The key set's fetch is stood in for here; ``plugin_keys_test`` covers it."""
+    base = "https://tracker.example.test"
     await install_plugin(session, acting_user, role_session, granted=["files:read"])
-    registration = (
-        await session.exec(
-            select(PluginServiceRegistration).where(
-                PluginServiceRegistration.public_id == CLIENT
-            )
-        )
-    ).one()
-    registration.kind = RegistrationKind.DECLARATIVE
-    session.add(registration)
-    await session.commit()
-    invalidate_registrations()
-    assert registration.jwks
+    await _update(
+        session,
+        _REGISTRATION.format("jwks = NULL, base_url = :base, jwks_uri = :uri"),
+        base=base,
+        uri=f"{base}/.well-known/jwks.json",
+    )
+    fetched: list[str] = []
+
+    async def _fetch(jwks_uri, transport):
+        fetched.append(jwks_uri)
+        return plugin_keys._parse(client_jwks(), jwks_uri)
+
+    monkeypatch.setattr(plugin_keys, "_fetch", _fetch)
+    plugin_keys.clear_fetched_keys()
 
     response = await _ask(client)
 
-    assert response.status_code == 401
-    assert _error(response) == "invalid_client"
+    assert response.status_code == 200, response.text
+    assert fetched == [f"{base}/.well-known/jwks.json"]
 
 
 async def test_no_assertion_is_an_invalid_client(

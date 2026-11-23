@@ -24,57 +24,28 @@ const pageFor = (entityInitiativeId: number | null | undefined) => () => {
 };
 
 describe("useCanonicalInitiativeId", () => {
-  it("rewrites the address to the initiative the entity is actually in", async () => {
-    const { router } = renderPage(pageFor(7), {
-      initialRoute: ROUTE,
-      routeParams: PARAMS,
-    });
-
-    await waitFor(() => {
-      expect(router.state.location.pathname).toBe("/c/3/i/7/projects/1");
-    });
-  });
-
-  it("keeps the query string when it corrects the address", async () => {
+  it("rewrites the address to the entity's initiative, keeping its query and fragment", async () => {
     const { router } = renderPage(pageFor(7), {
       initialRoute: ROUTE,
       routeParams: PARAMS,
       routerSearch: { tab: "board" },
-    });
-
-    await waitFor(() => {
-      expect(router.state.location.pathname).toBe("/c/3/i/7/projects/1");
-    });
-    expect(router.state.location.search).toMatchObject({ tab: "board" });
-  });
-
-  it("keeps the fragment when it corrects the address", async () => {
-    const { router } = renderPage(pageFor(7), {
-      initialRoute: ROUTE,
-      routeParams: PARAMS,
       routerHash: "tasks",
     });
 
     await waitFor(() => {
       expect(router.state.location.pathname).toBe("/c/3/i/7/projects/1");
     });
+    expect(router.state.location.search).toMatchObject({ tab: "board" });
     // Carried across as its own value — `hash` arrives without the "#", so a
     // correction that pasted it onto the path would lose it or bury it there.
     expect(router.state.location.hash).toBe("tasks");
   });
 
-  it("leaves an address the entity agrees with alone", async () => {
-    const { router, getByTestId } = renderPage(pageFor(5), {
-      initialRoute: ROUTE,
-      routeParams: PARAMS,
-    });
-
-    await waitFor(() => expect(getByTestId("resolved")).toHaveTextContent("5"));
-    expect(router.state.location.pathname).toBe("/c/3/i/5/projects/1");
-  });
-
-  it("trusts the path while the entity is still loading", async () => {
-    const { router, getByTestId } = renderPage(pageFor(undefined), {
+  it.each([
+    ["agrees with", 5],
+    ["is still loading for", undefined],
+  ])("leaves the address alone while the entity %s it", async (_state, entityInitiativeId) => {
+    const { router, getByTestId } = renderPage(pageFor(entityInitiativeId), {
       initialRoute: ROUTE,
       routeParams: PARAMS,
     });

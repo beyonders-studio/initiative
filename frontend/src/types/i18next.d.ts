@@ -11,7 +11,6 @@ import type communities from "../../public/locales/en/communities.json";
 import type communityHome from "../../public/locales/en/communityHome.json";
 import type connections from "../../public/locales/en/connections.json";
 import type contacts from "../../public/locales/en/contacts.json";
-import type counterGroups from "../../public/locales/en/counterGroups.json";
 import type dashboards from "../../public/locales/en/dashboards.json";
 import type dates from "../../public/locales/en/dates.json";
 import type editor from "../../public/locales/en/editor.json";
@@ -59,7 +58,6 @@ declare module "i18next" {
       command: typeof command;
       common: typeof common;
       plugins: typeof plugins;
-      counterGroups: typeof counterGroups;
       marketplace: typeof marketplace;
       dashboards: typeof dashboards;
       dates: typeof dates;

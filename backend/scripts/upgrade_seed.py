@@ -34,7 +34,6 @@ from app.testing import (
     checklist_items,
     create_calendar_event,
     create_comment,
-    create_counter,
     create_guild,
     create_guild_membership,
     create_initiative,
@@ -95,7 +94,15 @@ async def seed(session: AsyncSession) -> None:
     if "queue" in by_name:
         # A release with queues gives the upgrade an item to make a task of.
         await testing.create_queue_item(session, by_name["queue"])
-    await create_counter(session, by_name["counter_group"])
+    if "counter_group" in by_name:
+        # A release with built-in counters gives the upgrade a counter to
+        # carry into the Counters plug-in.
+        await testing.create_counter(session, by_name["counter_group"])
+    else:
+        # Where Counters is a plug-in, the community installs it, so every
+        # community holds the tool an upgraded one's counters became.
+        await testing.install_counters(session, guild.id, owner.id, {initiative.id})
+        await testing.add_counter(session, guild.id, initiative.id)
     await create_calendar_event(session, by_name["calendar"], owner)
     await create_wiki_page(session, by_name["wiki"], owner)
 

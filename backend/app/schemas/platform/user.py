@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from enum import Enum
 from typing import Any, Literal
 
@@ -274,8 +274,9 @@ class UserSummary(UserIdentity, PersonShape):
     (an N+1 enrichment on the full roster), no timestamps. The payload is
     bounded by pagination on the endpoints that serve it.
 
-    ``profile_decorations`` is quoted and the model rebuilt below, because the
-    catalog shape it names is declared further down this file.
+    ``profile_decorations`` and ``custom_status`` are quoted and the model
+    rebuilt below, because the shapes they name are declared further down this
+    file.
     """
 
     display_name: str | None = None
@@ -283,6 +284,8 @@ class UserSummary(UserIdentity, PersonShape):
     profile_decorations: ProfileDecorations = Field(
         default_factory=lambda: ProfileDecorations()
     )
+    #: What they say they are up to, so a list of people shows it beside them.
+    custom_status: CustomStatus = Field(default_factory=lambda: CustomStatus())
     #: The rung this member holds in the guild this was read under. Absent
     #: where the caller asked outside a guild, which is why it is optional
     #: rather than defaulted to the quietest of them.
@@ -322,6 +325,10 @@ class CustomStatus(SanitizedBaseModel):
 
     emoji: str | None = None
     text: str | None = Field(default=None, max_length=STATUS_TEXT_MAX_LENGTH)
+    #: When it comes off on its own; ``None`` keeps it until it is changed.
+    #: Read rather than swept: a status past this reads as no status, wherever
+    #: it is read, so nothing has to run at the moment it ends.
+    clear_at: AwareDatetime | None = None
 
     @field_validator("emoji")
     @classmethod
@@ -339,6 +346,15 @@ class CustomStatus(SanitizedBaseModel):
     @classmethod
     def _blank_is_none(cls, value: str | None) -> str | None:
         return None if value is None else (value.strip() or None)
+
+    @model_validator(mode="after")
+    def _ended_is_empty(self) -> CustomStatus:
+        """Nothing said has nothing to end, and what has ended says nothing."""
+        if self.clear_at is not None and self.clear_at <= datetime.now(UTC):
+            self.emoji = self.text = None
+        if self.emoji is None and self.text is None:
+            self.clear_at = None
+        return self
 
 
 #: How many trophies one profile may wear. A rendering bound — a row of them
@@ -552,8 +568,7 @@ class CommunityRosterMember(UserSummary):
     """One person on a community's people roster.
 
     ``UserSummary`` plus what a roster row draws beside the name: how they
-    appear right now and the line they wrote. Both are public, as they are on
-    the profile.
+    appear right now. It is public, as it is on the profile.
     """
 
     model_config = ConfigDict(
@@ -561,7 +576,6 @@ class CommunityRosterMember(UserSummary):
     )
 
     presence: Presence = Presence.offline
-    custom_status: CustomStatus = Field(default_factory=CustomStatus)
 
 
 class CommunityRosterResponse(PageMeta):

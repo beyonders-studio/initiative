@@ -50,16 +50,13 @@ async def test_the_key_set_is_served_without_any_credential(
 
     keys = response.json()["keys"]
     assert len(keys) == 1
+    assert set(keys[0]) <= {"kty", "crv", "use", "alg", "kid", "x"}
     assert keys[0]["kty"] == "OKP"
     assert keys[0]["crv"] == "Ed25519"
     assert keys[0]["alg"] == "EdDSA"
+    assert keys[0]["use"] == "sig"
     assert keys[0]["kid"] == "plugin-platform-1"
     assert keys[0]["x"]
-
-
-async def test_it_never_serves_private_material(client: AsyncClient, configured):
-    entry = (await client.get(JWKS_URL)).json()["keys"][0]
-    assert set(entry) <= {"kty", "crv", "use", "alg", "kid", "x"}
 
 
 async def test_an_unconfigured_deployment_says_so_rather_than_publishing_nothing(

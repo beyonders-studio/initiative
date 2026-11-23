@@ -46,16 +46,6 @@ async def test_an_answer_travels_to_the_next_browser(client, acting_user):
     assert carried.json()["cookie_consent"]["granted"] == ["analytics"]
 
 
-async def test_allowing_nothing_is_an_answer(client, acting_user):
-    actor = await acting_user()
-
-    await client.put(CONSENT, json={"granted": [], "version": 1}, headers=actor.headers)
-
-    consent = (await client.get(ME, headers=actor.headers)).json()["cookie_consent"]
-    assert consent is not None
-    assert consent["granted"] == []
-
-
 async def test_changing_your_mind_replaces_the_answer(client, acting_user):
     """A settings row, not a history: what applies now is the only question."""
     actor = await acting_user()
@@ -71,6 +61,10 @@ async def test_changing_your_mind_replaces_the_answer(client, acting_user):
 
     assert withdrawn.status_code == 200, withdrawn.text
     assert withdrawn.json()["granted"] == []
+    # Allowing nothing is an answer, not the absence of one.
+    consent = (await client.get(ME, headers=actor.headers)).json()["cookie_consent"]
+    assert consent is not None
+    assert consent["granted"] == []
 
 
 async def test_the_stamp_is_the_servers(client, acting_user):

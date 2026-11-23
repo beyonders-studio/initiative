@@ -91,28 +91,11 @@ def _held(register: ContentSockets, user_id: int) -> int:
     return register.room_size(account_room(user_id))
 
 
-async def test_a_valid_token_joins_and_then_leaves_the_registry(
-    session, register
-) -> None:
-    user = await create_user(session)
-    await session.commit()
-    token = get_auth_token(user)
-    websocket = FakeWebSocket([_auth_frame(f'{{"token": "{token}"}}'.encode())])
-
-    await websocket_notifications(websocket)
-
-    assert websocket.accepted
-    assert websocket.closed_with is None
-    # The keepalive loop ended with the client's disconnect, and the socket
-    # left with it.
-    assert _held(register, user.id) == 0
-
-
 async def test_the_socket_is_registered_while_the_loop_runs(
     session, register, monkeypatch
 ) -> None:
-    """The registry entry has to exist *during* the socket's life, which the
-    disconnect above tears down before we can look at it."""
+    """The registry entry exists *during* the socket's life, and leaves with
+    the client's disconnect."""
     user = await create_user(session)
     await session.commit()
     token = get_auth_token(user)
@@ -131,7 +114,10 @@ async def test_the_socket_is_registered_while_the_loop_runs(
     monkeypatch.setattr(websocket, "receive", receive)
     await websocket_notifications(websocket)
 
+    assert websocket.accepted
+    assert websocket.closed_with is None
     assert counted == [1]
+    assert _held(register, user.id) == 0
 
 
 async def test_a_session_cookie_stands_in_for_a_null_token(
@@ -184,14 +170,6 @@ async def test_an_active_frame_marks_its_person_present(
     assert websocket.closed_with is None
 
 
-async def test_an_invalid_token_is_refused(session, register) -> None:
-    websocket = FakeWebSocket([_auth_frame(b'{"token": "not-a-token"}')])
-
-    await websocket_notifications(websocket)
-
-    assert websocket.closed_with == WS_POLICY_VIOLATION
-
-
 async def test_a_revoked_token_is_refused(session, register) -> None:
     """Logout / password change revoke by bumping ``token_version``; the socket
     must honour that the same way the REST path does."""
@@ -209,24 +187,20 @@ async def test_a_revoked_token_is_refused(session, register) -> None:
     assert _held(register, user.id) == 0
 
 
-async def test_a_first_frame_that_is_not_msg_auth_is_refused(register) -> None:
-    websocket = FakeWebSocket([bytes([0]) + b"{}"])
-
-    await websocket_notifications(websocket)
-
-    assert websocket.closed_with == WS_POLICY_VIOLATION
-
-
-async def test_a_malformed_auth_payload_is_refused(register) -> None:
-    websocket = FakeWebSocket([_auth_frame(b"not json")])
-
-    await websocket_notifications(websocket)
-
-    assert websocket.closed_with == WS_POLICY_VIOLATION
-
-
-async def test_no_token_and_no_cookie_is_refused(register) -> None:
-    websocket = FakeWebSocket([_auth_frame(b'{"token": null}')])
+@pytest.mark.parametrize(
+    "first_frame",
+    [
+        _auth_frame(b'{"token": "not-a-token"}'),
+        bytes([0]) + b"{}",
+        _auth_frame(b"not json"),
+        _auth_frame(b'{"token": null}'),
+    ],
+    ids=["invalid-token", "not-msg-auth", "malformed", "no-token-no-cookie"],
+)
+async def test_a_first_frame_that_proves_nobody_is_refused(
+    register, first_frame: bytes
+) -> None:
+    websocket = FakeWebSocket([first_frame])
 
     await websocket_notifications(websocket)
 

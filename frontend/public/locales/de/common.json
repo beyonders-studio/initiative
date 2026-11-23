@@ -4,6 +4,9 @@
   "help": "Hilfe",
   "helpDraft": "Entwurf der Hilfeanfrage",
   "reloadPage": "Seite neu laden",
+  "copyPageLink": "Link zu dieser Seite kopieren",
+  "pageLinkCopied": "Link kopiert",
+  "pageLinkCopyFailed": "Link konnte nicht kopiert werden",
   "deletedUserName": "Gelöschter Benutzer #{{id}}",
   "user": "Benutzer",
   "userWithId": "Benutzer #{{id}}",
@@ -76,6 +79,7 @@
     "viewMode": "Ansichtsmodus",
     "noEntries": "Keine Termine",
     "allDay": "Ganztägig",
+    "until": "Bis {{time}}",
     "more": "+{{count}} weitere",
     "start": "Start",
     "due": "Fällig"
@@ -330,11 +334,6 @@
       "this": "diese Datei",
       "plural": "Dateien"
     },
-    "counter_group": {
-      "name": "Zählergruppe",
-      "this": "diese Zählergruppe",
-      "plural": "Zählergruppen"
-    },
     "calendar": {
       "name": "Kalender",
       "this": "diesen Kalender",
@@ -369,11 +368,6 @@
       "name": "Termin",
       "this": "diesen Termin",
       "plural": "Termine"
-    },
-    "counter": {
-      "name": "Zähler",
-      "this": "diesen Zähler",
-      "plural": "Zähler"
     },
     "wiki_page": {
       "name": "Seite",

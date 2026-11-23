@@ -26,6 +26,8 @@ from app.testing import (
     create_task,
     drain_notices,
     guild_of,
+    switch_tools,
+    thread_path,
 )
 from app.testing.schema_harness import route_session_to_guild
 
@@ -35,10 +37,7 @@ PARTY = "\N{PARTY POPPER}"
 
 async def _posts_enabled(session, initiative) -> None:
     """Posts are off on a fresh initiative, so a notice test turns them on."""
-    initiative.posts_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.post: True})
 
 
 async def _strip_grants(session, tool: Tool, entity):
@@ -59,7 +58,7 @@ async def _comment_on_task(client, actor, task_id: int, content: str = "Hello") 
     created = await client.post(
         actor.g("/comments/"),
         headers=actor.headers,
-        json={"content": content, "task_id": task_id},
+        json={"subject_type": "task", "subject_id": task_id, "content": content},
     )
     assert created.status_code == 201, created.text
     return created.json()["id"]
@@ -124,9 +123,7 @@ class TestReactionToggle:
             )
             assert resp.status_code == 200, resp.text
 
-        listed = await client.get(
-            a.g("/comments/"), headers=a.headers, params={"task_id": task.id}
-        )
+        listed = await client.get(a.g(thread_path("task", task.id)), headers=a.headers)
         assert listed.status_code == 200
         [comment] = listed.json()["comments"]
         group = comment["reactions"][0]
@@ -149,28 +146,6 @@ class TestReactionToggle:
                 json={"emoji": emoji},
             )
         assert [g["emoji"] for g in seen.json()["groups"]] == [PARTY, THUMBS]
-
-    async def test_comment_read_carries_its_reactions(
-        self, client, session, acting_user
-    ):
-        a = await acting_user(
-            guild_role=CommunityRole.member, initiative=True, project=True
-        )
-        task = await create_task(session, a.project)
-        comment_id = await _comment_on_task(client, a, task.id)
-        await client.put(
-            a.g(f"/reactions/comment/{comment_id}"),
-            headers=a.headers,
-            json={"emoji": THUMBS},
-        )
-
-        listed = await client.get(
-            a.g("/comments/"), headers=a.headers, params={"task_id": task.id}
-        )
-        assert listed.status_code == 200
-        [comment] = listed.json()["comments"]
-        assert [g["emoji"] for g in comment["reactions"]] == [THUMBS]
-        assert comment["reactions"][0]["reacted"] is True
 
     async def test_editing_a_comment_keeps_its_reactions(
         self, client, session, acting_user
@@ -270,7 +245,8 @@ class TestReactionToggle:
     ):
         """The cap is counted after the insert rather than before, so a row
         that landed concurrently is still counted — and going over rolls the
-        whole request back rather than leaving the extra behind."""
+        whole request back rather than leaving the extra behind. Reaching the
+        cap itself is allowed."""
         from sqlmodel import select
 
         from app.core.reactions import ReactionTarget
@@ -286,7 +262,7 @@ class TestReactionToggle:
         # Fill the allowance behind the request's back. Keycap digits and the
         # regional indicators are the two cheap runs of distinct valid emoji.
         filler = [f"{n}\ufe0f\u20e3" for n in range(10)] + [
-            chr(0x1F1E6 + n) for n in range(MAX_REACTIONS_PER_USER - 10)
+            chr(0x1F1E6 + n) for n in range(MAX_REACTIONS_PER_USER - 11)
         ]
         for emoji in filler:
             session.add(
@@ -300,6 +276,12 @@ class TestReactionToggle:
             )
         await session.commit()
 
+        last = await client.put(
+            a.g(f"/reactions/comment/{comment_id}"),
+            headers=a.headers,
+            json={"emoji": THUMBS},
+        )
+        assert last.status_code == 200, last.text
         refused = await client.put(
             a.g(f"/reactions/comment/{comment_id}"),
             headers=a.headers,
@@ -329,39 +311,6 @@ class TestReactionToggle:
             json={"emoji": "<b>gotcha</b>"},
         )
         assert refused.status_code == 422
-
-    async def test_caps_one_person_per_target(self, client, session, acting_user):
-        a = await acting_user(
-            guild_role=CommunityRole.member, initiative=True, project=True
-        )
-        task = await create_task(session, a.project)
-        comment_id = await _comment_on_task(client, a, task.id)
-
-        # Distinct emoji: the keycap digits are cheap to generate and valid.
-        emojis = [f"{n}️⃣" for n in range(10)] + [
-            "\N{THUMBS UP SIGN}",
-            "\N{THUMBS DOWN SIGN}",
-            "\N{PARTY POPPER}",
-            "\N{EYES}",
-            "\N{ROCKET}",
-            "\N{CONFUSED FACE}",
-            "\N{FIRE}",
-            "\N{SPARKLES}",
-            "\N{CLAPPING HANDS SIGN}",
-            "\N{RAISED HAND}",
-            "\N{SNOWFLAKE}",
-        ]
-        assert len(emojis) > MAX_REACTIONS_PER_USER
-        statuses = []
-        for emoji in emojis:
-            resp = await client.put(
-                a.g(f"/reactions/comment/{comment_id}"),
-                headers=a.headers,
-                json={"emoji": emoji},
-            )
-            statuses.append(resp.status_code)
-        assert statuses[MAX_REACTIONS_PER_USER - 1] == 200
-        assert statuses[MAX_REACTIONS_PER_USER] == 400
 
     async def test_suggested_set_is_served(self, client, acting_user):
         a = await acting_user(guild_role=CommunityRole.member)
@@ -398,9 +347,7 @@ class TestReactionAccess:
             json={"emoji": THUMBS},
         )
 
-        listed = await client.get(
-            a.g("/comments/"), headers=b.headers, params={"task_id": task.id}
-        )
+        listed = await client.get(a.g(thread_path("task", task.id)), headers=b.headers)
         assert listed.status_code == 200
         [comment] = listed.json()["comments"]
         assert comment["reactions"][0]["count"] == 1
@@ -485,7 +432,11 @@ class TestReactionAccess:
         created = await client.post(
             a.g("/comments/"),
             headers=a.headers,
-            json={"content": "before", "project_id": project.id},
+            json={
+                "subject_type": "project",
+                "subject_id": project.id,
+                "content": "before",
+            },
         )
         assert created.status_code == 201
         comment_id = created.json()["id"]

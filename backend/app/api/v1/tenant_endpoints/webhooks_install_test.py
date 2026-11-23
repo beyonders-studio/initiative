@@ -22,7 +22,13 @@ from app.core.messages import PluginMessages, WebhookSubscriptionMessages
 from app.models.tenant._mixins import ActorKind
 from app.models.tenant.webhook_subscription import WebhookSubscription
 from app.services.marketplace import plugin_refs
-from app.testing import create_guild_plugin, emitted, route_session_to_guild
+from app.testing import (
+    COUNTERS_UID,
+    create_guild_plugin,
+    emitted,
+    install_tool_plugin,
+    route_session_to_guild,
+)
 from app.testing.plugin_clients import (
     CLIENT,
     assert_names_nobody,
@@ -240,6 +246,54 @@ async def test_an_unknown_event_type_is_still_a_400(
     )
     assert response.status_code == 400, response.text
     assert response.json()["detail"] == WebhookSubscriptionMessages.UNKNOWN_EVENT_TYPE
+
+
+async def test_an_install_subscribes_to_a_tool_plugins_rows_by_their_kinds(
+    client, session, acting_user, role_session
+):
+    """A tool plug-in's tool and its items are subscribed to by their kinds,
+    once the community has the tool, with the tool's read scope, and filtered
+    by the fields their rows have."""
+    group, counter = (
+        f"{key}.{COUNTERS_UID.lower()}" for key in ("counter_group", "counter")
+    )
+    read = f"{group}:read"
+    installed = await install_plugin(
+        session,
+        acting_user,
+        role_session,
+        granted=[read, "files:read"],
+        requested=[read, "files:read"],
+    )
+    events = [f"{group}.created", f"{counter}.updated", f"{counter}.deleted"]
+
+    async def subscribe(scopes: list[str], **body: Any) -> Any:
+        return await _subscribe(
+            client,
+            installed,
+            install_headers(installed, scopes),
+            initiative_id=installed.placed.id,
+            event_types=events,
+            **body,
+        )
+
+    # Its kinds name nothing in a community without the tool.
+    response = await subscribe([read])
+    assert response.status_code == 400, response.text
+    assert response.json()["detail"] == WebhookSubscriptionMessages.UNKNOWN_EVENT_TYPE
+
+    await install_tool_plugin(client, session, installed.seat)
+    response = await subscribe([read], fields=["count", "archived_at"])
+    assert response.status_code == 201, response.text
+    assert response.json()["event_types"] == events
+
+    response = await subscribe([read], fields=["nothing"])
+    assert response.status_code == 400, response.text
+    assert response.json()["detail"] == WebhookSubscriptionMessages.UNKNOWN_FIELD
+
+    response = await subscribe(["files:read"])
+    assert response.status_code == 403, response.text
+    assert response.json()["detail"] == PluginMessages.SCOPE_REQUIRED
 
 
 async def test_listing_and_rewriting_stay_with_people(

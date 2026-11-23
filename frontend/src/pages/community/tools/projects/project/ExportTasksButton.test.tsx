@@ -30,19 +30,6 @@ describe("ExportTasksButton", () => {
     localStorage.clear();
   });
 
-  it("downloads the PDF directly on an inline (200) export", async () => {
-    server.use(communityHttp.get("/exports/tasks", () => pdfResponse()));
-    renderWithProviders(<ExportTasksButton params={{ conditions: [] }} />);
-
-    await userEvent.click(screen.getByRole("button", { name: /export/i }));
-    await userEvent.click(await screen.findByRole("menuitem", { name: /pdf document/i }));
-
-    await waitFor(() => expect(downloadBlob).toHaveBeenCalledTimes(1));
-    expect(vi.mocked(downloadBlob).mock.calls[0][1]).toBe("tasks.pdf");
-    expect(toast.success).toHaveBeenCalled();
-    expect(toast.error).not.toHaveBeenCalled();
-  });
-
   it("polls a queued (202) job and downloads when it finishes", async () => {
     server.use(
       communityHttp.get("/exports/tasks", () =>
@@ -80,77 +67,41 @@ describe("ExportTasksButton", () => {
     expect(downloadBlob).not.toHaveBeenCalled();
   });
 
-  it("sends the given selector and chosen format on the wire, honoring a label override", async () => {
-    let sentConditions: unknown = null;
-    let sentFormat: string | null = null;
-    server.use(
-      communityHttp.get("/exports/tasks", ({ request }) => {
-        const url = new URL(request.url);
-        const raw = url.searchParams.get("conditions");
-        sentConditions = raw ? JSON.parse(raw) : null;
-        sentFormat = url.searchParams.get("format");
-        return pdfResponse();
-      })
-    );
-    renderWithProviders(
-      <ExportTasksButton
-        params={{ conditions: [{ field: "id", op: "in_", value: [3, 5] }] }}
-        label="Export Selected"
-      />
-    );
+  it.each([
+    [/pdf document/i, "pdf", null, "tasks.pdf"],
+    [/pdf \(detailed\)/i, "pdf", "detailed", "tasks.pdf"],
+    [/csv/i, "csv", null, "tasks.csv"],
+    [/task list/i, "md", "checklist", "tasks.md"],
+  ])(
+    "downloads an inline (200) export from %s, sending the given selector",
+    async (item, format, layout, filename) => {
+      let sent = new URLSearchParams();
+      server.use(
+        communityHttp.get("/exports/tasks", ({ request }) => {
+          sent = new URL(request.url).searchParams;
+          return pdfResponse();
+        })
+      );
+      renderWithProviders(
+        <ExportTasksButton
+          params={{ conditions: [{ field: "id", op: "in_", value: [3, 5] }] }}
+          label="Export Selected"
+        />
+      );
 
-    await userEvent.click(screen.getByRole("button", { name: "Export Selected" }));
-    await userEvent.click(await screen.findByRole("menuitem", { name: /csv/i }));
+      await userEvent.click(screen.getByRole("button", { name: "Export Selected" }));
+      await userEvent.click(await screen.findByRole("menuitem", { name: item }));
 
-    await waitFor(() => expect(downloadBlob).toHaveBeenCalledTimes(1));
-    expect(sentConditions).toEqual([{ field: "id", op: "in_", value: [3, 5] }]);
-    expect(sentFormat).toBe("csv");
-    expect(vi.mocked(downloadBlob).mock.calls[0][1]).toBe("tasks.csv");
-  });
-
-  it("sends layout=checklist for the Markdown task list entry", async () => {
-    let sent: { format: string | null; layout: string | null } | null = null;
-    server.use(
-      communityHttp.get("/exports/tasks", ({ request }) => {
-        const url = new URL(request.url);
-        sent = {
-          format: url.searchParams.get("format"),
-          layout: url.searchParams.get("layout"),
-        };
-        return pdfResponse();
-      })
-    );
-    renderWithProviders(<ExportTasksButton params={{ conditions: [] }} />);
-
-    await userEvent.click(screen.getByRole("button", { name: /export/i }));
-    await userEvent.click(await screen.findByRole("menuitem", { name: /task list/i }));
-
-    await waitFor(() => expect(downloadBlob).toHaveBeenCalledTimes(1));
-    expect(sent).toEqual({ format: "md", layout: "checklist" });
-    expect(vi.mocked(downloadBlob).mock.calls[0][1]).toBe("tasks.md");
-  });
-
-  it("sends format=pdf&layout=detailed for the detailed PDF entry", async () => {
-    let sent: { format: string | null; layout: string | null } | null = null;
-    server.use(
-      communityHttp.get("/exports/tasks", ({ request }) => {
-        const url = new URL(request.url);
-        sent = {
-          format: url.searchParams.get("format"),
-          layout: url.searchParams.get("layout"),
-        };
-        return pdfResponse();
-      })
-    );
-    renderWithProviders(<ExportTasksButton params={{ conditions: [] }} />);
-
-    await userEvent.click(screen.getByRole("button", { name: /export/i }));
-    await userEvent.click(await screen.findByRole("menuitem", { name: /pdf \(detailed\)/i }));
-
-    await waitFor(() => expect(downloadBlob).toHaveBeenCalledTimes(1));
-    expect(sent).toEqual({ format: "pdf", layout: "detailed" });
-    expect(vi.mocked(downloadBlob).mock.calls[0][1]).toBe("tasks.pdf");
-  });
+      await waitFor(() => expect(downloadBlob).toHaveBeenCalledTimes(1));
+      expect(JSON.parse(sent.get("conditions") ?? "null")).toEqual([
+        { field: "id", op: "in_", value: [3, 5] },
+      ]);
+      expect([sent.get("format"), sent.get("layout")]).toEqual([format, layout]);
+      expect(vi.mocked(downloadBlob).mock.calls[0][1]).toBe(filename);
+      expect(toast.success).toHaveBeenCalled();
+      expect(toast.error).not.toHaveBeenCalled();
+    }
+  );
 
   it("resumes a pending job from storage on mount and downloads it", async () => {
     setItem("exports:pending:1", "9");

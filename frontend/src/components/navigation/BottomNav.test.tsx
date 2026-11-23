@@ -38,14 +38,14 @@ vi.mock("@/hooks/useInitiativeAccess", async (importOriginal) => ({
 
 import { BottomNav } from "./BottomNav";
 
-const setup = () =>
+const setup = (initialRoute = "/") =>
   renderPage(
     () => (
       <SidebarProvider>
         <BottomNav />
       </SidebarProvider>
     ),
-    { initialRoute: "/" }
+    { initialRoute }
   );
 
 beforeEach(() => {
@@ -57,10 +57,12 @@ beforeEach(() => {
 });
 
 describe("the bottom bar", () => {
-  it("goes to My Messages", async () => {
+  it("goes to My Messages, carrying no mark when nothing is waiting", async () => {
     const { router } = setup();
 
-    await userEvent.click(await screen.findByRole("button", { name: "My Messages" }));
+    const messages = await screen.findByRole("button", { name: "My Messages" });
+    expect(messages).toHaveTextContent("");
+    await userEvent.click(messages);
 
     expect(router.state.location.pathname).toBe("/messages");
   });
@@ -72,13 +74,6 @@ describe("the bottom bar", () => {
     expect(
       await screen.findByRole("button", { name: /My Messages, 3 waiting/ })
     ).toBeInTheDocument();
-  });
-
-  it("carries no mark when nothing is waiting", async () => {
-    setup();
-
-    const messages = await screen.findByRole("button", { name: "My Messages" });
-    expect(messages).toHaveTextContent("");
   });
 
   it("stands beside the create button where the pill is not drawn", async () => {
@@ -99,5 +94,13 @@ describe("the bottom bar", () => {
     expect(
       messages.compareDocumentPosition(create) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
+  });
+
+  it.each([true, false])("leaves itself out on My Messages (phone: %s)", async (mobile) => {
+    mocks.mobile.mockReturnValue(mobile);
+    setup("/messages");
+
+    await screen.findByRole("button", { name: "Create" });
+    expect(screen.queryByRole("button", { name: /My Messages/ })).toBeNull();
   });
 });

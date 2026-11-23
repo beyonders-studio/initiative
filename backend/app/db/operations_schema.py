@@ -89,7 +89,8 @@ FILER_TABLE_ACCESS: dict[str, tuple[str, ...]] = {
     "intake_bindings": ("id", "stream", "project_id", "awaiting_filer_status_id"),
     "comments": (
         "id",
-        "task_id",
+        "subject_type",
+        "subject_id",
         "content",
         "created_by",
         "created_by_kind",
@@ -150,7 +151,9 @@ FILER_ROWS: dict[str, str] = {
         'EXISTS (SELECT 1 FROM "{s}".intake_cases c'
         " WHERE c.stream = intake_bindings.stream)"
     ),
-    "comments": f"audience = 'filer' AND task_id = ANY ({_CASES})",
+    "comments": (
+        f"audience = 'filer' AND subject_type = 'task' AND subject_id = ANY ({_CASES})"
+    ),
     "evidence": (
         f"created_by_kind = 'member' AND created_by = {_UID}"
         f" AND case_task_id = ANY ({_CASES})"
@@ -212,17 +215,13 @@ IDEAS_POLICY_READS: dict[str, tuple[str, ...]] = {
             "calendar_events",
             "collections",
             "contacts",
-            "counters",
             "dashboards",
             "files",
             "posts",
             "wiki_pages",
         )
     },
-    **{
-        table: ("id", "initiative_id")
-        for table in ("calendars", "counter_groups", "wikis")
-    },
+    **{table: ("id", "initiative_id") for table in ("calendars", "wikis")},
 }
 
 

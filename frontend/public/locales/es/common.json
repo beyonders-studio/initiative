@@ -4,6 +4,9 @@
   "help": "Ayuda",
   "helpDraft": "Borrador de la solicitud de ayuda",
   "reloadPage": "Recargar la página",
+  "copyPageLink": "Copiar el enlace de esta página",
+  "pageLinkCopied": "Enlace copiado",
+  "pageLinkCopyFailed": "No se pudo copiar el enlace",
   "user": "Usuario",
   "userWithId": "Usuario #{{id}}",
   "formerMember": "Exmiembro",
@@ -75,6 +78,7 @@
     "viewMode": "Modo de vista",
     "noEntries": "Sin eventos",
     "allDay": "Todo el día",
+    "until": "Hasta {{time}}",
     "more": "+{{count}} más",
     "start": "Inicio",
     "due": "Vence"
@@ -330,11 +334,6 @@
       "this": "este archivo",
       "plural": "archivos"
     },
-    "counter_group": {
-      "name": "Grupo de contadores",
-      "this": "este grupo de contadores",
-      "plural": "grupos de contadores"
-    },
     "calendar": {
       "name": "Calendario",
       "this": "este calendario",
@@ -369,11 +368,6 @@
       "name": "Evento",
       "this": "este evento",
       "plural": "eventos"
-    },
-    "counter": {
-      "name": "Contador",
-      "this": "este contador",
-      "plural": "contadores"
     },
     "wiki_page": {
       "name": "Página",

@@ -37,11 +37,11 @@ from app.core.smart_chips import (
 )
 from app.core.user_display import display_name
 from app.db import reference_targets
+from app.db.session import routed_tools
 from app.models.platform.user import User
 from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.calendar_event import CalendarEvent
 from app.models.tenant.contact import Contact
-from app.models.tenant.counter import Counter
 from app.models.tenant.project import Project
 from app.models.tenant.task import (
     Task,
@@ -214,29 +214,6 @@ async def _task_checklist(
     }
 
 
-async def _counter_value(
-    session: AsyncSession, ids: list[int]
-) -> dict[int, SmartChipValue]:
-    """A counter's reading. Where it has a ceiling the chip says so, because a
-    number is worth more against the number it is heading for."""
-    rows = (
-        await session.exec(
-            select(Counter.id, Counter.count, Counter.max).where(
-                Counter.id.in_(ids), Counter.deleted_at.is_(None)
-            )
-        )
-    ).all()
-    values: dict[int, SmartChipValue] = {}
-    for counter_id, count, ceiling in rows:
-        reached = ceiling is not None and count >= ceiling
-        values[counter_id] = SmartChipValue(
-            text=f"{_plain(count)} / {_plain(ceiling)}" if ceiling else _plain(count),
-            tone=SmartChipTone.good if reached else SmartChipTone.neutral,
-            number=count,
-        )
-    return values
-
-
 async def _event_when(
     session: AsyncSession, ids: list[int]
 ) -> dict[int, SmartChipValue]:
@@ -344,12 +321,6 @@ def _first_detail(column: Any) -> Reader:
     return read
 
 
-def _plain(value: Decimal) -> str:
-    """A stored number as a person writes it — ``7`` rather than ``7.0000``."""
-    trimmed = value.normalize()
-    return format(trimmed, "f")
-
-
 #: (kind, aspect) -> how to read it. Adding a chip is one entry here: the
 #: endpoint, the accepted refs and the menu the editor offers all derive from
 #: this, so none of them is a second list to keep in step.
@@ -358,7 +329,6 @@ SMART_CHIP_SOURCES: dict[tuple[SearchEntityType, SmartChipAspect], Reader] = {
     (SearchEntityType.task, SmartChipAspect.assignee): _task_assignee,
     (SearchEntityType.task, SmartChipAspect.due): _task_due,
     (SearchEntityType.task, SmartChipAspect.priority): _task_priority,
-    (SearchEntityType.counter, SmartChipAspect.value): _counter_value,
     (SearchEntityType.project, SmartChipAspect.progress): _project_progress,
     (SearchEntityType.calendar_event, SmartChipAspect.when): _event_when,
     (SearchEntityType.task, SmartChipAspect.checklist): _task_checklist,
@@ -367,9 +337,7 @@ SMART_CHIP_SOURCES: dict[tuple[SearchEntityType, SmartChipAspect], Reader] = {
 }
 
 
-def parse_ref(
-    ref: str,
-) -> tuple[SearchEntityType, int, SmartChipAspect | None] | None:
+def parse_ref(ref: str) -> tuple[str, int, SmartChipAspect | None] | None:
     """``task:12`` or ``task:12:status`` as its parts, or ``None`` for neither.
 
     Two shapes on purpose. A bare reference asks what the thing is called,
@@ -401,7 +369,7 @@ def parse_ref(
 
 
 async def _titles(
-    session: AsyncSession, entity_type: SearchEntityType, ids: list[int]
+    session: AsyncSession, entity_type: str, ids: list[int]
 ) -> dict[int, str]:
     """What these things are called right now.
 
@@ -409,8 +377,9 @@ async def _titles(
     answers with its name and a task with its title without either being
     written down here.
     """
-    table = reference_targets.id_column(entity_type).table
-    title = reference_targets.title_column(entity_type)
+    tools = routed_tools(session)
+    table = reference_targets.id_column(entity_type, tools=tools).table
+    title = reference_targets.title_column(entity_type, tools=tools)
     rows = (
         await session.exec(select(table.c["id"], title).where(table.c["id"].in_(ids)))
     ).all()
@@ -421,9 +390,9 @@ async def _visible(
     session: AsyncSession,
     *,
     user_id: int,
-    wanted: dict[SearchEntityType, set[int]],
+    wanted: dict[str, set[int]],
     need_write: bool = False,
-) -> dict[SearchEntityType, set[int]]:
+) -> dict[str, set[int]]:
     """Which of the things asked about this request may actually open.
 
     Being routed into the guild and being in the initiative is not the whole
@@ -432,13 +401,18 @@ async def _visible(
 
     Done here rather than inside each reader on purpose: a reader is never
     handed an id that did not come back from this, so a chip added later
-    cannot forget it.
+    cannot forget it. A kind the community cannot reference — one it has no
+    tool plug-in for — opens nothing.
     """
-    seen: dict[SearchEntityType, set[int]] = {}
+    tools = routed_tools(session)
+    seen: dict[str, set[int]] = {}
     for entity_type, ids in wanted.items():
+        if not reference_targets.referenceable(entity_type, tools):
+            seen[entity_type] = set()
+            continue
         statement = reference_targets.visible_ids(
-            entity_type, user_id, need_write=need_write
-        ).where(reference_targets.id_column(entity_type).in_(ids))
+            entity_type, user_id, tools=tools, need_write=need_write
+        ).where(reference_targets.id_column(entity_type, tools=tools).in_(ids))
         # A Core-column select yields rows, not scalars.
         rows = (await session.exec(statement)).all()
         seen[entity_type] = {row[0] for row in rows}
@@ -454,8 +428,8 @@ async def read_smart_chips(
     ids. A reference naming something that is gone, or that this caller cannot
     see, is left out of the answer.
     """
-    wanted: dict[tuple[SearchEntityType, SmartChipAspect | None], list[int]] = {}
-    parsed: list[tuple[str, tuple[SearchEntityType, SmartChipAspect | None], int]] = []
+    wanted: dict[tuple[str, SmartChipAspect | None], list[int]] = {}
+    parsed: list[tuple[str, tuple[str, SmartChipAspect | None], int]] = []
     for ref in dict.fromkeys(refs[:MAX_REFS]):
         resolved = parse_ref(ref)
         if resolved is None:
@@ -464,13 +438,13 @@ async def read_smart_chips(
         wanted.setdefault((entity_type, aspect), []).append(entity_id)
         parsed.append((ref, (entity_type, aspect), entity_id))
 
-    by_type: dict[SearchEntityType, set[int]] = {}
+    by_type: dict[str, set[int]] = {}
     for (entity_type, _aspect), ids in wanted.items():
         by_type.setdefault(entity_type, set()).update(ids)
     visible = await _visible(session, user_id=user_id, wanted=by_type)
     # Whether each chip that can be acted on may be, asked at edit level of the
     # same gate — so the page offers the box only where ticking it would land.
-    actionable: dict[SearchEntityType, set[int]] = {}
+    actionable: dict[str, set[int]] = {}
     for (entity_type, aspect), ids in wanted.items():
         if (entity_type, aspect) in ACTIONABLE_CHIP_KINDS:
             actionable.setdefault(entity_type, set()).update(
@@ -486,16 +460,14 @@ async def read_smart_chips(
     # about it. A chip carries the name of its own thing rather than the caller
     # asking for it separately, so showing a fact costs one reference and not
     # two — which is what keeps a long file inside :data:`MAX_REFS`.
-    names: dict[SearchEntityType, dict[int, str]] = {}
+    names: dict[str, dict[int, str]] = {}
     for entity_type, ids in by_type.items():
         allowed = [i for i in ids if i in visible.get(entity_type, ())]
         names[entity_type] = (
             await _titles(session, entity_type, allowed) if allowed else {}
         )
 
-    read: dict[
-        tuple[SearchEntityType, SmartChipAspect | None], dict[int, SmartChipValue]
-    ] = {}
+    read: dict[tuple[str, SmartChipAspect | None], dict[int, SmartChipValue]] = {}
     for pair, ids in wanted.items():
         entity_type, aspect = pair
         allowed = {i for i in ids if i in visible.get(entity_type, ())}
@@ -538,11 +510,11 @@ async def read_smart_chips(
 
 
 async def _descriptions(
-    session: AsyncSession, entity_type: SearchEntityType, ids: list[int]
+    session: AsyncSession, entity_type: str, ids: list[int]
 ) -> dict[int, str]:
     """What these things say about themselves — read from the kind's own
     ``description`` column, so a kind has one here exactly when its table does."""
-    table = reference_targets.id_column(entity_type).table
+    table = reference_targets.id_column(entity_type, tools=routed_tools(session)).table
     if "description" not in table.c:
         return {}
     rows = (
@@ -563,7 +535,7 @@ _PROSE: dict[SearchEntityType, Callable[[Table], ColumnElement[bool]]] = {
 
 
 async def _bodies(
-    session: AsyncSession, entity_type: SearchEntityType, ids: list[int]
+    session: AsyncSession, entity_type: str, ids: list[int]
 ) -> dict[int, dict]:
     """What these things say, in full — for the kinds in :data:`_PROSE`.
 
@@ -575,7 +547,7 @@ async def _bodies(
     prose = _PROSE.get(entity_type)
     if prose is None:
         return {}
-    table = reference_targets.id_column(entity_type).table
+    table = reference_targets.id_column(entity_type, tools=routed_tools(session)).table
     rows = (
         await session.exec(
             select(table.c["id"], table.c["content"]).where(
@@ -594,8 +566,8 @@ async def read_embeds(
     Gated exactly as a chip is — through :func:`_visible` — so an embed of
     something gone or out of reach is left out of the answer.
     """
-    wanted: dict[SearchEntityType, set[int]] = {}
-    parsed: list[tuple[str, SearchEntityType, int]] = []
+    wanted: dict[str, set[int]] = {}
+    parsed: list[tuple[str, str, int]] = []
     for ref in dict.fromkeys(refs[:MAX_EMBEDS]):
         named = parse_bare_ref(ref)
         if named is None:
@@ -605,9 +577,9 @@ async def read_embeds(
         parsed.append((ref, entity_type, entity_id))
 
     visible = await _visible(session, user_id=user_id, wanted=wanted)
-    names: dict[SearchEntityType, dict[int, str]] = {}
-    described: dict[SearchEntityType, dict[int, str]] = {}
-    bodies: dict[SearchEntityType, dict[int, dict]] = {}
+    names: dict[str, dict[int, str]] = {}
+    described: dict[str, dict[int, str]] = {}
+    bodies: dict[str, dict[int, dict]] = {}
     for entity_type, ids in visible.items():
         if not ids:
             continue

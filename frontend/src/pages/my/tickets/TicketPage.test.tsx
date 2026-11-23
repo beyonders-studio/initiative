@@ -2,25 +2,15 @@
  * The filer's view of their own ticket: only what was said to them, the team
  * unnamed, and a box to answer in only where the ticket takes an answer.
  */
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { HttpResponse, http } from "msw";
+import { describe, expect, it } from "vitest";
 
 import { buildUser } from "@/__tests__/factories";
+import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { FiledTicketDetailRead } from "@/api/generated/initiativeAPI.schemas";
-
-const state = vi.hoisted(() => ({ ticket: undefined as FiledTicketDetailRead | undefined }));
-const reply = vi.fn();
-
-vi.mock("@/hooks/useTickets", async () => {
-  const actual = await vi.importActual<typeof import("@/hooks/useTickets")>("@/hooks/useTickets");
-  return {
-    ...actual,
-    useFiledTicket: () => ({ data: state.ticket, isLoading: false }),
-    useReplyToTicket: () => ({ mutate: reply, isPending: false }),
-  };
-});
 
 import { TicketPage } from "./TicketPage";
 
@@ -43,6 +33,38 @@ const ticket = (overrides: Partial<FiledTicketDetailRead> = {}): FiledTicketDeta
   ...overrides,
 });
 
+/** Serves the tickets by id, and records each reply as its body and file names. */
+const serve = (...tickets: FiledTicketDetailRead[]) => {
+  const replies: { body: unknown; files: string[] }[] = [];
+  server.use(
+    http.get("/api/v1/me/tickets/:taskId", ({ params }) =>
+      HttpResponse.json(tickets.find((one) => one.task_id === Number(params.taskId)))
+    ),
+    http.post("/api/v1/me/tickets/:taskId/replies", async ({ request }) => {
+      // Split by hand: newer Node's multipart parser refuses jsdom's File.
+      const boundary = request.headers.get("content-type")?.split("boundary=")[1];
+      const parts = (await request.text())
+        .split(`--${boundary}`)
+        .slice(1, -1)
+        .map((part) => {
+          const end = part.indexOf("\r\n\r\n");
+          const head = part.slice(0, end);
+          return {
+            field: /name="([^"]*)"/.exec(head)?.[1],
+            filename: /filename="([^"]*)"/.exec(head)?.[1],
+            value: part.slice(end + 4, -2),
+          };
+        });
+      replies.push({
+        body: parts.find((part) => part.field === "body")?.value,
+        files: parts.filter((part) => part.field === "files").map((part) => part.filename ?? ""),
+      });
+      return HttpResponse.json(tickets[0]);
+    })
+  );
+  return replies;
+};
+
 const open = () =>
   renderPage(TicketPage, {
     initialRoute: "/my-tickets/$taskId",
@@ -51,13 +73,8 @@ const open = () =>
   });
 
 describe("TicketPage", () => {
-  beforeEach(() => {
-    reply.mockReset();
-    state.ticket = undefined;
-  });
-
   it("shows the conversation, the team unnamed", async () => {
-    state.ticket = ticket();
+    serve(ticket());
     open();
     expect(await screen.findByRole("heading", { name: "Lost my phone" })).toBeInTheDocument();
     expect(screen.getByText("Which phone?")).toBeInTheDocument();
@@ -66,16 +83,16 @@ describe("TicketPage", () => {
   });
 
   it("sends an answer", async () => {
-    state.ticket = ticket();
+    const replies = serve(ticket());
     const user = userEvent.setup();
     open();
     await user.type(await screen.findByRole("textbox"), "The work one.");
     await user.click(screen.getByRole("button", { name: "Send reply" }));
-    expect(reply).toHaveBeenCalledWith({ body: "The work one.", files: [] });
+    await waitFor(() => expect(replies).toEqual([{ body: "The work one.", files: [] }]));
   });
 
   it("sends an answer with a picture, and refuses a kind the ticket does not take", async () => {
-    state.ticket = ticket();
+    const replies = serve(ticket());
     const user = userEvent.setup({ applyAccept: false });
     open();
     const input = await screen.findByTestId("evidence-input");
@@ -84,13 +101,15 @@ describe("TicketPage", () => {
     await user.upload(input, [photo, script]);
     expect(screen.getByRole("img", { name: "screen.png" })).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("run.sh");
-    await user.type(screen.getByRole("textbox"), "This one.");
+    await user.type(screen.getByRole("textbox"), "This one.{Enter}The second.");
     await user.click(screen.getByRole("button", { name: "Send reply" }));
-    expect(reply).toHaveBeenCalledWith({ body: "This one.", files: [photo] });
+    await waitFor(() =>
+      expect(replies).toEqual([{ body: "This one.\r\nThe second.", files: ["screen.png"] }])
+    );
   });
 
   it("starts another ticket's page without the last one's draft", async () => {
-    state.ticket = ticket();
+    serve(ticket(), ticket({ task_id: 8, subject: "Another one" }));
     const user = userEvent.setup();
     const { router } = open();
     const photo = new File(["png"], "screen.png", { type: "image/png" });
@@ -98,7 +117,6 @@ describe("TicketPage", () => {
     await user.type(screen.getByRole("textbox"), "Half an answer");
     expect(screen.getByRole("img", { name: "screen.png" })).toBeInTheDocument();
 
-    state.ticket = ticket({ task_id: 8, subject: "Another one" });
     await router.navigate({ to: "/my-tickets/$taskId", params: { taskId: "8" } });
 
     expect(await screen.findByRole("heading", { name: "Another one" })).toBeInTheDocument();
@@ -107,32 +125,34 @@ describe("TicketPage", () => {
   });
 
   it("shows what the reader sent beside what they said", async () => {
-    state.ticket = ticket({
-      messages: [
-        {
-          id: 1,
-          mine: true,
-          content: "Help.",
-          created_at: now,
-          attachments: [
-            {
-              id: 9,
-              display_name: "notes.pdf",
-              content_type: "application/pdf",
-              size_bytes: 2048,
-              created_at: now,
-            },
-          ],
-        },
-      ],
-    });
+    serve(
+      ticket({
+        messages: [
+          {
+            id: 1,
+            mine: true,
+            content: "Help.",
+            created_at: now,
+            attachments: [
+              {
+                id: 9,
+                display_name: "notes.pdf",
+                content_type: "application/pdf",
+                size_bytes: 2048,
+                created_at: now,
+              },
+            ],
+          },
+        ],
+      })
+    );
     open();
     const link = await screen.findByRole("link", { name: "Open notes.pdf" });
     expect(link).toHaveAttribute("href", "/api/v1/me/tickets/7/evidence/9");
   });
 
   it("explains why a closed ticket takes no answer", async () => {
-    state.ticket = ticket({ state: "closed", can_reply: false });
+    serve(ticket({ state: "closed", can_reply: false }));
     open();
     expect(await screen.findByText(/This ticket is closed/)).toBeInTheDocument();
     expect(screen.queryByRole("textbox")).toBeNull();

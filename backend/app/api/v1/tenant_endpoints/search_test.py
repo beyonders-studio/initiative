@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 
+from app.core.tools import Tool
 from app.db import cohorts
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.engagement_level import LEVEL_MAX, EngagementLevel
@@ -28,6 +29,7 @@ from app.testing import (
     create_wiki_page,
     lexical_body,
     route_system,
+    switch_tools,
 )
 
 ActingUser = Callable[..., Awaitable[Actor]]
@@ -39,15 +41,6 @@ async def _search(client, actor: Actor, **params) -> dict:
     )
     assert response.status_code == 200, response.text
     return response.json()
-
-
-async def test_it_finds_a_task(client, session, acting_user: ActingUser) -> None:
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    await create_task(session, a.project, title="quarterly vendor renewal")
-
-    body = await _search(client, a, search="vendor renewal")
-    assert [h["title"] for h in body["items"]] == ["quarterly vendor renewal"]
-    assert body["total_count"] == 1
 
 
 async def test_a_person_is_found_where_they_are_mentioned(
@@ -125,7 +118,9 @@ async def test_a_hit_carries_what_it_takes_to_reach_it(
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     task = await create_task(session, a.project, title="routable")
 
-    hit = (await _search(client, a, search="routable"))["items"][0]
+    body = await _search(client, a, search="routable")
+    assert body["total_count"] == 1
+    hit = body["items"][0]
     assert hit["entity_type"] == "task"
     assert hit["entity_id"] == task.id
     assert hit["tool"] == "project"
@@ -160,45 +155,6 @@ async def test_a_body_match_returns_a_snippet(
     assert "renewal" in (hit["snippet"] or "")
 
 
-async def test_it_returns_only_what_the_caller_may_see(
-    client, session, acting_user: ActingUser
-) -> None:
-    """A member of the initiative holding no grant on the project."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    b = await acting_user(
-        guild_role=CommunityRole.member,
-        guild=a.guild,
-        initiative=a.initiative,
-        initiative_role="member",
-    )
-    await create_task(session, a.project, title="restricted renewal")
-
-    assert (await _search(client, a, search="restricted"))["total_count"] == 1
-    assert (await _search(client, b, search="restricted"))["items"] == []
-
-
-async def test_the_total_counts_what_the_caller_may_see(
-    client, session, acting_user: ActingUser
-) -> None:
-    """The count is a predicate in the same statement, so it matches the rows —
-    a pager built on it does not stop early or promise a page that is empty."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    b = await acting_user(
-        guild_role=CommunityRole.member,
-        guild=a.guild,
-        initiative=a.initiative,
-        initiative_role="member",
-    )
-    for n in range(3):
-        await create_task(session, a.project, title=f"renewal {n}")
-
-    assert (await _search(client, b, search="renewal"))["total_count"] == 0
-    mine = await _search(client, a, search="renewal", page_size=2)
-    assert mine["total_count"] == 3
-    assert len(mine["items"]) == 2
-    assert mine["has_next"] is True
-
-
 async def test_it_can_be_narrowed_by_type_and_initiative(
     client, session, acting_user: ActingUser
 ) -> None:
@@ -227,22 +183,6 @@ async def test_an_empty_query_is_not_an_error(client, acting_user: ActingUser) -
         "has_prev": False,
         "fuzzy": False,
     }
-
-
-async def test_suggest_returns_titles_to_jump_to(
-    client, session, acting_user: ActingUser
-) -> None:
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    task = await create_task(session, a.project, title="jump target")
-
-    response = await client.get(
-        a.g("/search/suggest"), headers=a.headers, params={"search": "jump"}
-    )
-    assert response.status_code == 200, response.text
-    rows = response.json()
-    assert [r["entity_id"] for r in rows] == [task.id]
-    assert rows[0]["tool_id"] == a.project.id
-    assert "snippet" not in rows[0]
 
 
 async def test_comments_are_reached_by_asking_for_them(
@@ -279,120 +219,17 @@ async def test_comments_are_reached_by_asking_for_them(
     assert items[0]["title"] == opening
 
 
-async def test_suggest_narrows_to_the_types_it_is_given(
-    client, session, acting_user: ActingUser
-) -> None:
-    """The palette's tabs and the results page ask the same question, so the
-    palette can be on one slice while the guild holds matches in another."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    await create_task(session, a.project, title="riverside")
-    tag = await create_tag(session, a.guild, name="riverside")
-
-    tags_only = await client.get(
-        a.g("/search/suggest"),
-        headers=a.headers,
-        params={"search": "riverside", "types": ["tag"]},
-    )
-    assert tags_only.status_code == 200, tags_only.text
-    assert [r["entity_id"] for r in tags_only.json()] == [tag.id]
-
-
 async def test_an_unknown_type_is_refused_rather_than_ignored(
     client, session, acting_user: ActingUser
 ) -> None:
-    """The accepted set is declared, so a name that is not one of them is a bad
-    request — not a search that quietly returns everything."""
+    """A kind the community does not have is not found — not a search that
+    quietly returns everything."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
 
     response = await client.get(
         a.g("/search/"), headers=a.headers, params={"search": "x", "types": ["invoice"]}
     )
-    assert response.status_code == 422, response.text
-
-
-async def test_the_last_word_matches_as_a_prefix(
-    client, session, acting_user: ActingUser
-) -> None:
-    """A results page searches as its reader types, so the word being typed is
-    usually half-finished. Whole-word matching alone reads as nothing found."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    await create_task(session, a.project, title="Barricade the Throne")
-
-    for query in ("thro", "barricade thro"):
-        response = await client.get(
-            a.g("/search/"), headers=a.headers, params={"search": query}
-        )
-        assert response.status_code == 200, response.text
-        assert response.json()["total_count"] == 1, f"{query} found nothing"
-
-
-async def test_what_the_reader_asked_for_exactly_is_left_exact(
-    client, session, acting_user: ActingUser
-) -> None:
-    """A quoted phrase and an exclusion are deliberate, so neither is widened
-    into a prefix.
-
-    Both fall through to the close-match answer, which is itself the proof: a
-    widened query would have matched exactly and never got there.
-    """
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    await create_task(session, a.project, title="Barricade the Throne")
-
-    for query in ('"barricade thro"', "barricade -throne"):
-        response = await client.get(
-            a.g("/search/"),
-            headers=a.headers,
-            params={"search": query},
-        )
-        assert response.status_code == 200, response.text
-        assert response.json()["fuzzy"] is True, f"{query} was widened"
-
-
-async def test_a_typo_is_offered_the_closest_titles(
-    client, session, acting_user: ActingUser
-) -> None:
-    """Whole-word matching cannot answer a misspelling, so a search that finds
-    nothing offers what is closest — flagged, so the reader is told which of
-    the two they are reading."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    await create_task(session, a.project, title="Barricade the Throne")
-
-    response = await client.get(
-        a.g("/search/"), headers=a.headers, params={"search": "thrne"}
-    )
-    assert response.status_code == 200, response.text
-    body = response.json()
-    assert body["fuzzy"] is True
-    assert body["items"][0]["title"] == "Barricade the Throne"
-
-
-async def test_a_search_that_works_is_never_flagged_as_close(
-    client, session, acting_user: ActingUser
-) -> None:
-    """The suggestion never blends into a search that worked."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    await create_task(session, a.project, title="Barricade the Throne")
-
-    response = await client.get(
-        a.g("/search/"), headers=a.headers, params={"search": "throne"}
-    )
-    assert response.status_code == 200, response.text
-    assert response.json()["fuzzy"] is False
-
-
-async def test_nothing_close_stays_nothing(
-    client, session, acting_user: ActingUser
-) -> None:
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    await create_task(session, a.project, title="Barricade the Throne")
-
-    response = await client.get(
-        a.g("/search/"), headers=a.headers, params={"search": "zzzzqqq"}
-    )
-    assert response.status_code == 200, response.text
-    body = response.json()
-    assert body["items"] == []
-    assert body["fuzzy"] is False
+    assert response.status_code == 404, response.text
 
 
 async def test_a_non_member_cannot_search_the_guild(
@@ -441,19 +278,6 @@ async def test_suggest_offers_only_titles_that_match(
     # ...while the full search still finds the body match.
     body = await _search(client, a, search="renewal")
     assert {h["title"] for h in body["items"]} == {"Handbook", "Renewal calendar"}
-
-
-async def test_suggest_matches_a_partly_typed_word(
-    client, session, acting_user: ActingUser
-) -> None:
-    """A palette answers while you are still typing."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    await create_task(session, a.project, title="vendor renewal")
-
-    response = await client.get(
-        a.g("/search/suggest"), headers=a.headers, params={"search": "ven"}
-    )
-    assert [r["title"] for r in response.json()] == ["vendor renewal"]
 
 
 async def test_paging_does_not_repeat_or_drop_a_hit(
@@ -554,46 +378,6 @@ async def test_templates_are_found_by_name_and_pickable_on_their_own(
     ] == [real.id]
 
 
-async def test_suggest_narrows_to_one_initiative(
-    client, session, acting_user: ActingUser
-) -> None:
-    """A picker inside an initiative offers that initiative — a mention has to
-    reach something the reader of the comment can open."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    here = await create_task(session, a.project, title="shared name")
-    b = await acting_user(
-        guild_role=CommunityRole.admin, guild=a.guild, initiative=True, project=True
-    )
-    await create_task(session, b.project, title="shared name")
-
-    response = await client.get(
-        a.g("/search/suggest"),
-        headers=a.headers,
-        params={"search": "shared", "initiative_id": a.initiative.id},
-    )
-    assert response.status_code == 200, response.text
-    assert [r["entity_id"] for r in response.json()] == [here.id]
-
-
-async def test_suggest_leaves_archived_work_out(
-    client, session, acting_user: ActingUser
-) -> None:
-    """A picker offers somewhere to put work, so it offers live work."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    await create_task(
-        session,
-        a.project,
-        title="retired lantern",
-        archived_at=datetime.now(UTC),
-    )
-
-    response = await client.get(
-        a.g("/search/suggest"), headers=a.headers, params={"search": "lantern"}
-    )
-    assert response.status_code == 200, response.text
-    assert response.json() == []
-
-
 async def test_a_template_picker_is_a_wider_net_not_a_looser_one(
     client, session, acting_user: ActingUser
 ) -> None:
@@ -635,55 +419,6 @@ async def _recent(client, actor: Actor, **params) -> list[dict]:
     return response.json()
 
 
-async def test_recent_answers_what_a_picker_opens_with(
-    client, session, acting_user: ActingUser
-) -> None:
-    """A picker opens before anything is typed, which the search cannot answer:
-    it matches words, and there are none yet."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    await create_task(session, a.project, title="older")
-    await create_task(session, a.project, title="newer")
-
-    titles = [item["title"] for item in await _recent(client, a, types="task")]
-    assert set(titles) == {"older", "newer"}
-
-
-async def test_recent_takes_the_same_narrowing_the_search_does(
-    client, session, acting_user: ActingUser
-) -> None:
-    """What a picker suggests and what it finds must be the same set of things,
-    or picking from the list offers what typing could not."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    await create_task(session, a.project, title="a task")
-    await create_file(session, a.initiative, a.user)
-
-    tasks = await _recent(client, a, types="task")
-    assert {item["entity_type"] for item in tasks} == {"task"}
-
-    elsewhere = await _recent(
-        client, a, types="task", initiative_id=a.initiative.id + 999
-    )
-    assert elsewhere == []
-
-
-async def test_recent_stops_at_the_same_gate_the_search_does(
-    client, session, acting_user: ActingUser
-) -> None:
-    """Suggestions are content, so they answer under the sharing that governs
-    the things themselves."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    b = await acting_user(
-        guild_role=CommunityRole.member,
-        guild=a.guild,
-        initiative=a.initiative,
-        initiative_role="member",
-    )
-    await create_task(session, a.project, title="private work")
-
-    assert await _recent(client, a, types="task") != []
-    assert await _recent(client, b, types="task") == []
-
-
 async def test_a_scheduled_notice_is_not_searchable_until_it_goes_up(
     client, session, acting_user: ActingUser
 ) -> None:
@@ -697,9 +432,7 @@ async def test_a_scheduled_notice_is_not_searchable_until_it_goes_up(
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     initiative = a.initiative
     assert initiative is not None
-    initiative.posts_enabled = True
-    session.add(initiative)
-    await session.commit()
+    await switch_tools(session, initiative, {Tool.post: True})
 
     draft = await create_post(
         session,
@@ -719,68 +452,6 @@ async def test_a_scheduled_notice_is_not_searchable_until_it_goes_up(
 
     body = await _search(client, a, search="embargoed")
     assert [h["entity_id"] for h in body["items"]] == [draft.id]
-
-
-async def test_a_picker_is_not_offered_the_thing_it_is_writing_in(
-    client, session, acting_user: ActingUser
-) -> None:
-    """A comment on a file, and the file itself, both compose inside
-    something. Naming it would point at the page the words are already on."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    subject = await create_file(session, a.initiative, a.user, name="the page")
-    other = await create_file(session, a.initiative, a.user, name="another page")
-
-    offered = await _recent(client, a, types="file", subject=f"file:{subject.id}")
-    assert [item["entity_id"] for item in offered] == [other.id]
-
-
-async def test_typing_its_name_does_not_find_it_either(
-    client, session, acting_user: ActingUser
-) -> None:
-    """The list a picker opens with and what typing finds are the same set of
-    things, so both leave the subject out."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    subject = await create_file(session, a.initiative, a.user, name="riverside")
-    other = await create_file(session, a.initiative, a.user, name="riverside annex")
-
-    response = await client.get(
-        a.g("/search/suggest"),
-        headers=a.headers,
-        params={
-            "search": "riverside",
-            "types": ["file"],
-            "subject": f"file:{subject.id}",
-        },
-    )
-    assert response.status_code == 200, response.text
-    assert [r["entity_id"] for r in response.json()] == [other.id]
-
-
-async def test_only_the_subject_itself_is_left_out(
-    client, session, acting_user: ActingUser
-) -> None:
-    """Its kind and its id together — a task numbered the same as the file
-    being written in is a different thing and still offered."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    doc = await create_file(session, a.initiative, a.user, name="the page")
-    task = await create_task(session, a.project, title="the job")
-
-    offered = await _recent(client, a, types=["file", "task"], subject=f"file:{doc.id}")
-    assert [(item["entity_type"], item["entity_id"]) for item in offered] == [
-        ("task", task.id)
-    ]
-
-
-async def test_a_subject_that_names_nothing_narrows_nothing(
-    client, session, acting_user: ActingUser
-) -> None:
-    """Stored content outlives the build that wrote it. A reference this build
-    cannot read costs the exclusion, not the answer."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    doc = await create_file(session, a.initiative, a.user, name="the page")
-
-    offered = await _recent(client, a, types="file", subject="sandwich:3")
-    assert [item["entity_id"] for item in offered] == [doc.id]
 
 
 async def test_a_suggestion_says_whether_it_is_yours_to_change(
@@ -819,53 +490,6 @@ async def test_a_suggestion_says_whether_it_is_yours_to_change(
     # Only one of them is this reader's to change.
     assert by_id[mine.id]["can_write"] is True
     assert by_id[theirs.id]["can_write"] is False
-
-
-async def test_a_suggestion_says_what_it_lives_in(
-    client, session, acting_user: ActingUser
-) -> None:
-    """Two tasks of the same name in different projects are two different
-    tasks, and a picker offering both has to say which is which."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    first = await create_project(session, a.initiative, a.user, name="Harvest")
-    second = await create_project(session, a.initiative, a.user, name="Winterhold")
-    await create_task(session, first, title="Do a thing")
-    await create_task(session, second, title="Do a thing")
-
-    rows = [
-        row
-        for row in await _suggest(client, a, search="Do a thing", types="task")
-        if row["title"] == "Do a thing"
-    ]
-    assert len(rows) == 2
-    assert {row["tool_title"] for row in rows} == {"Harvest", "Winterhold"}
-    assert {row["initiative_name"] for row in rows} == {a.initiative.name}
-
-
-async def test_a_tool_does_not_live_in_itself(
-    client, session, acting_user: ActingUser
-) -> None:
-    """A project's own sharing gate is the project, so naming its container
-    would only repeat its title back."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    await create_project(session, a.initiative, a.user, name="Harvest")
-
-    rows = await _suggest(client, a, search="Harvest", types="project")
-    assert [row["tool_title"] for row in rows] == [None]
-    assert [row["initiative_name"] for row in rows] == [a.initiative.name]
-
-
-async def test_recents_say_where_they_live_too(
-    client, session, acting_user: ActingUser
-) -> None:
-    """A picker that has not been typed in yet shows recents, and they are the
-    same rows — so they cannot be less legible than the ones typing finds."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    project = await create_project(session, a.initiative, a.user, name="Harvest")
-    await create_task(session, project, title="Do a thing")
-
-    rows = await _recent(client, a, types="task")
-    assert [row["tool_title"] for row in rows] == ["Harvest"]
 
 
 def _task_ids(rows: list[dict]) -> list[int]:
@@ -958,3 +582,156 @@ async def test_each_query_puts_the_hit_it_should_first(
             hit["title"] for hit in (await _search(client, a, search=query))["items"]
         ]
         assert titles[:1] == [first], (query, titles)
+
+
+async def test_it_returns_only_what_the_caller_may_see(
+    client, session, acting_user: ActingUser
+) -> None:
+    """A member of the initiative holding no grant on the project gets nothing,
+    though the initiative gate admits the row — from the search, its total and
+    the recents alike; a guild admin in the same seat is not narrowed by
+    sharing. The count is a predicate in the same statement, so a pager built
+    on it does not stop early or promise a page that is empty."""
+    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
+    b, admin = [
+        await acting_user(
+            guild_role=role,
+            guild=a.guild,
+            initiative=a.initiative,
+            initiative_role="member",
+        )
+        for role in (CommunityRole.member, CommunityRole.admin)
+    ]
+    for n in range(3):
+        await create_task(session, a.project, title=f"renewal {n}")
+
+    theirs = await _search(client, b, search="renewal")
+    assert (theirs["items"], theirs["total_count"]) == ([], 0)
+    assert (await _search(client, admin, search="renewal"))["total_count"] == 3
+    mine = await _search(client, a, search="renewal", page_size=2)
+    assert mine["total_count"] == 3
+    assert len(mine["items"]) == 2
+    assert mine["has_next"] is True
+    assert await _recent(client, a, types="task") != []
+    assert await _recent(client, b, types="task") == []
+
+
+async def test_how_a_query_matches_a_title(
+    client, session, acting_user: ActingUser
+) -> None:
+    """A results page searches as its reader types, so the last word matches as
+    a prefix; a quoted phrase and an exclusion are deliberate and stay exact. A
+    misspelling finds nothing whole-word, so the closest titles are offered,
+    flagged — and never blended into a search that worked, nor invented when
+    nothing is close."""
+    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
+    await create_task(session, a.project, title="Barricade the Throne")
+
+    for query in ("thro", "barricade thro"):
+        body = await _search(client, a, search=query)
+        assert body["total_count"] == 1, f"{query} found nothing"
+        assert body["fuzzy"] is False
+    for query in ('"barricade thro"', "barricade -throne", "thrne"):
+        body = await _search(client, a, search=query)
+        assert body["fuzzy"] is True, f"{query} was widened"
+    assert body["items"][0]["title"] == "Barricade the Throne"
+    assert (await _search(client, a, search="throne"))["fuzzy"] is False
+    nothing = await _search(client, a, search="zzzzqqq")
+    assert nothing["items"] == []
+    assert nothing["fuzzy"] is False
+
+
+async def test_suggest_returns_titles_to_jump_to(
+    client, session, acting_user: ActingUser
+) -> None:
+    """A palette answers while its reader is still typing, with no snippet. It
+    narrows to the types it is given, as the results page's tabs do; a picker
+    inside an initiative offers that initiative, so a mention reaches something
+    the comment's reader can open; and it offers live work only."""
+    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
+    task = await create_task(session, a.project, title="jump target")
+    tag = await create_tag(session, a.guild, name="jump")
+    await create_task(
+        session, a.project, title="jump retired", archived_at=datetime.now(UTC)
+    )
+    b = await acting_user(
+        guild_role=CommunityRole.admin, guild=a.guild, initiative=True, project=True
+    )
+    await create_task(session, b.project, title="jump target")
+
+    rows = await _suggest(client, a, search="jum", initiative_id=a.initiative.id)
+    assert [r["entity_id"] for r in rows] == [task.id]
+    assert rows[0]["tool_id"] == a.project.id
+    assert "snippet" not in rows[0]
+    tags_only = await _suggest(client, a, search="jump", types=["tag"])
+    assert [r["entity_id"] for r in tags_only] == [tag.id]
+
+
+async def test_recent_answers_what_a_picker_opens_with(
+    client, session, acting_user: ActingUser
+) -> None:
+    """A picker opens before anything is typed, which the search cannot answer.
+    What it suggests and what it finds must be the same set of things, so it
+    takes the same narrowing."""
+    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
+    await create_task(session, a.project, title="older")
+    await create_task(session, a.project, title="newer")
+    await create_file(session, a.initiative, a.user)
+
+    tasks = await _recent(client, a, types="task")
+    assert {item["title"] for item in tasks} == {"older", "newer"}
+    assert {item["entity_type"] for item in tasks} == {"task"}
+    elsewhere = await _recent(
+        client, a, types="task", initiative_id=a.initiative.id + 999
+    )
+    assert elsewhere == []
+
+
+async def test_a_picker_is_not_offered_the_thing_it_is_writing_in(
+    client, session, acting_user: ActingUser
+) -> None:
+    """A comment on a file, and the file itself, both compose inside something,
+    so the list a picker opens with and what typing finds both leave it out —
+    by its kind and id together: a task numbered the same is still offered. A
+    subject this build cannot read costs the exclusion, not the answer."""
+    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
+    subject = await create_file(session, a.initiative, a.user, name="riverside")
+    other = await create_file(session, a.initiative, a.user, name="riverside annex")
+    task = await create_task(session, a.project, title="the job")
+    pair = {("file", other.id), ("task", task.id)}
+
+    def found(rows: list[dict]) -> set[tuple[str, int]]:
+        return {(row["entity_type"], row["entity_id"]) for row in rows}
+
+    subject_ref = f"file:{subject.id}"
+    kinds = ["file", "task"]
+    assert found(await _recent(client, a, types=kinds, subject=subject_ref)) == pair
+    typed = await _suggest(
+        client, a, search="riverside", types="file", subject=subject_ref
+    )
+    assert found(typed) == {("file", other.id)}
+    unread = await _recent(client, a, types=kinds, subject="sandwich:3")
+    assert found(unread) == pair | {("file", subject.id)}
+
+
+async def test_a_suggestion_says_what_it_lives_in(
+    client, session, acting_user: ActingUser
+) -> None:
+    """Two tasks of the same name in different projects are two different
+    tasks, and a picker offering both has to say which is which — recents too.
+    A project's own sharing gate is the project, so it names no container."""
+    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    first = await create_project(session, a.initiative, a.user, name="Harvest")
+    second = await create_project(session, a.initiative, a.user, name="Winterhold")
+    await create_task(session, first, title="Do a thing")
+    await create_task(session, second, title="Do a thing")
+
+    for rows in (
+        await _suggest(client, a, search="Do a thing", types="task"),
+        await _recent(client, a, types="task"),
+    ):
+        assert sorted(row["tool_title"] for row in rows) == ["Harvest", "Winterhold"]
+        assert {row["initiative_name"] for row in rows} == {a.initiative.name}
+    rows = await _suggest(client, a, search="Harvest", types="project")
+    assert [row["tool_title"] for row in rows] == [None]
+    assert [row["initiative_name"] for row in rows] == [a.initiative.name]

@@ -35,7 +35,7 @@ on the resource, with the tool's write scope beside the sharing scope
 from enum import Enum
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, Path, Query
 
 from app.api import resource_access
 from app.api.actor_route import ActorRoute
@@ -51,6 +51,7 @@ from app.api.deps import (
 from app.api.v1.tenant_endpoints.tool_lists import TOOL_LISTS, ToolListSpec
 from app.core.tools import Tool
 from app.models.platform.user import User
+from app.models.tenant.share_request import MAX_MESSAGE_LENGTH
 from app.schemas.tenant.resource_grant import ResourceGrantSchema
 from app.services.content_sockets import resource_room, sockets
 
@@ -59,6 +60,15 @@ router = APIRouter(route_class=ActorRoute)
 CurrentUserDep = Annotated[User, Depends(get_current_active_user)]
 SharingWrite = Annotated[
     ActorContext, Depends(plugin_scope(resource_access.SHARING_WRITE))
+]
+#: Said to each person the new sharing lets in. A query parameter so the body
+#: stays the grant list every caller already sends.
+GrantNote = Annotated[
+    str | None,
+    Query(
+        max_length=MAX_MESSAGE_LENGTH,
+        description="A note to each person the new sharing lets in.",
+    ),
 ]
 
 
@@ -81,9 +91,16 @@ def _mount(
         grants: list[ResourceGrantSchema],
         current_user: User | None,
         guild_context: ActorContext,
+        note: str | None,
     ):
         await resource_access.set_resource_grants(
-            session, tool, entity_id, current_user, guild_context, grants
+            session,
+            tool,
+            entity_id,
+            current_user,
+            guild_context,
+            grants,
+            note=(note or "").strip() or None,
         )
         result = await spec.read_row(session, entity_id, current_user, guild_context)
         # Whoever the new sharing leaves out is closed now rather than at the
@@ -102,9 +119,10 @@ def _mount(
             session: ActorSessionDep,
             current_user: ActorUserDep,
             guild_context: SharingWrite,
+            note: GrantNote = None,
         ):
             return await replace(
-                session, entity_id, grants, current_user, guild_context
+                session, entity_id, grants, current_user, guild_context, note
             )
 
     else:
@@ -115,12 +133,13 @@ def _mount(
             session: RLSSessionDep,
             current_user: CurrentUserDep,
             guild_context: GuildContextDep,
+            note: GrantNote = None,
         ):
             return await replace(
-                session, entity_id, grants, current_user, guild_context
+                session, entity_id, grants, current_user, guild_context, note
             )
 
-    tags: list[str | Enum] = [spec.tag or tool.plural]
+    tags: list[str | Enum] = [tool.plural]
     router.add_api_route(
         f"/{tool.route_segment}/{{{cfg.path_param}}}/grants",
         set_grants,

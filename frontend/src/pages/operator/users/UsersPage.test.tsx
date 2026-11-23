@@ -142,8 +142,10 @@ describe("UsersPage", () => {
     state.clearSecondFactor.mockClear();
   });
 
-  it("identifies an account by its handle, and shows no address or name", async () => {
+  it("identifies an account by its handle, shows no address or name, and marks its state", async () => {
     const rows = masked();
+    rows[1].sign_in_locked_until = "2026-09-24T12:00:00Z";
+    rows[1].open_case_count = 2;
     renderRoster(rows);
 
     await screen.findByText("owner");
@@ -156,16 +158,22 @@ describe("UsersPage", () => {
     expect(screen.getByText("owner")).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/filter by handle/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Name/ })).not.toBeInTheDocument();
-  });
-
-  it("marks an account whose password sign-in is turned off", async () => {
-    const rows = masked();
-    rows[1].sign_in_locked_until = "2026-09-24T12:00:00Z";
-    renderRoster(rows);
-
-    await screen.findByText("owner");
+    // An account whose password sign-in is turned off, or with open cases, is
+    // marked on its row.
     expect(screen.getAllByText("Password sign-in off")).toHaveLength(1);
     expect(screen.getAllByText(/^Until .*2026/)).toHaveLength(1);
+    expect(screen.getByText("2 open cases")).toBeInTheDocument();
+    expect(screen.getAllByText(/open case/)).toHaveLength(1);
+
+    // A sort control on every identifying column, and only those.
+    for (const label of [/^User ID/, /^Handle/, /^Status/]) {
+      expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+    }
+    expect(screen.queryByRole("button", { name: /^Email/ })).not.toBeInTheDocument();
+    // The role is decided in the sheet now, so it is not a column to sort by;
+    // neither is the actions column something you can order rows by.
+    expect(screen.queryByRole("button", { name: /^Role/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Actions$/ })).not.toBeInTheDocument();
   });
 
   it("searches the server with a whole handle pasted in", async () => {
@@ -182,19 +190,6 @@ describe("UsersPage", () => {
     await waitFor(() => expect(state.search).toBe(whole));
   });
 
-  it("offers a sort control on every identifying column, and only those", async () => {
-    renderRoster(masked());
-
-    for (const label of [/^User ID/, /^Handle/, /^Status/]) {
-      expect(await screen.findByRole("button", { name: label })).toBeInTheDocument();
-    }
-    expect(screen.queryByRole("button", { name: /^Email/ })).not.toBeInTheDocument();
-    // The role is decided in the sheet now, so it is not a column to sort by;
-    // neither is the actions column something you can order rows by.
-    expect(screen.queryByRole("button", { name: /^Role/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^Actions$/ })).not.toBeInTheDocument();
-  });
-
   it("keeps only the export in the row's menu", async () => {
     renderRoster(masked(["delete", "suspend", "reset_password", "clear_second_factor"]));
 
@@ -208,15 +203,6 @@ describe("UsersPage", () => {
     expect(menu).not.toHaveTextContent("Delete user");
     expect(menu).not.toHaveTextContent("Reset password");
     expect(menu).not.toHaveTextContent("Clear two-factor authentication");
-  });
-
-  it("marks an account with open cases on its row", async () => {
-    const rows = masked();
-    rows[1].open_case_count = 2;
-    renderRoster(rows);
-
-    expect(await screen.findByText("2 open cases")).toBeInTheDocument();
-    expect(screen.getAllByText(/open case/)).toHaveLength(1);
   });
 });
 
@@ -236,7 +222,7 @@ describe("UsersPage manage sheet", () => {
       "nothing the row does not name",
       ["rename", "suspend"],
       ["Username", "Suspended"],
-      ["Role", "Profile picture"],
+      ["Role", "Profile picture", "Revoke", "Reset password", "Two-factor authentication"],
     ],
     [
       "a lifted suspension's switch where it can be lifted",
@@ -247,6 +233,7 @@ describe("UsersPage manage sheet", () => {
   ])("offers %s", async (_label, actions, shown, hidden) => {
     const rows = masked(actions);
     rows[1].avatar_url = "/api/v1/users/2/avatar/abc";
+    rows[1].api_key_count = 2;
     renderRoster(rows);
 
     const sheet = await openSheet();
@@ -255,24 +242,15 @@ describe("UsersPage manage sheet", () => {
     for (const name of hidden) expect(lever(sheet, name)).not.toBeInTheDocument();
   });
 
-  it.each<[string, UserAction[], boolean]>([
-    ["revokes the keys that still work where allowed", ["revoke_api_keys"], true],
-    ["offers nothing to revoke where the row does not allow it", ["rename"], false],
-  ])("%s", async (_label, actions, offered) => {
+  it("revokes the keys that still work where allowed", async () => {
     state.revokeApiKeys.mockClear();
-    const rows = masked(actions);
+    const rows = masked(["revoke_api_keys"]);
     rows[1].api_key_count = 2;
     renderRoster(rows, buildUser({ role: "moderator" }));
 
     const sheet = await openSheet();
-    const revoke = within(sheet).queryByRole("button", { name: "Revoke" });
-    if (!offered) {
-      expect(revoke).not.toBeInTheDocument();
-      return;
-    }
-
     // Whatever runs on them stops at once, so it asks first.
-    await userEvent.click(revoke as HTMLElement);
+    await userEvent.click(within(sheet).getByRole("button", { name: "Revoke" }));
     const dialog = await screen.findByRole("alertdialog");
     expect(state.revokeApiKeys).not.toHaveBeenCalled();
     await userEvent.click(within(dialog).getByRole("button", { name: "Revoke" }));
@@ -285,6 +263,8 @@ describe("UsersPage manage sheet", () => {
     renderRoster(rows, buildUser({ role: "moderator" }));
 
     const sheet = await openSheet();
+    // No case to choose where there is none.
+    expect(within(sheet).queryByRole("combobox", { name: "For case" })).toBeNull();
     await userEvent.click(within(sheet).getByRole("button", { name: "Sign out everywhere" }));
     const dialog = await screen.findByRole("alertdialog");
     expect(state.signOutEverywhere).not.toHaveBeenCalled();
@@ -315,13 +295,6 @@ describe("UsersPage manage sheet", () => {
     state.grantCases = [];
   });
 
-  it("offers no case to choose where there is none", async () => {
-    state.grantCases = [];
-    renderRoster(masked(["sign_out_everywhere"]), buildUser({ role: "moderator" }));
-    const sheet = await openSheet();
-    expect(within(sheet).queryByRole("combobox", { name: "For case" })).toBeNull();
-  });
-
   it.each<[UserAction, string, string]>([
     ["clear_display_names", "Clear their names in communities", "display_names"],
     ["clear_custom_status", "Clear status line", "custom_status"],
@@ -349,48 +322,33 @@ describe("UsersPage manage sheet", () => {
     expect(screen.queryByRole("button", { name: /manage account/i })).not.toBeInTheDocument();
   });
 
-  it.each([true, false])(
-    "offers a password reset only where the row allows it (%s)",
-    async (allowed) => {
-      state.resetPassword.mockClear();
-      const rows = masked(allowed ? ["reset_password"] : ["rename"]);
-      renderRoster(rows, buildUser({ role: "moderator" }));
+  it("resets a password where the row allows it, once confirmed", async () => {
+    state.resetPassword.mockClear();
+    const rows = masked(["reset_password"]);
+    renderRoster(rows, buildUser({ role: "moderator" }));
 
-      const sheet = await openSheet();
-      const reset = within(sheet).queryByRole("button", { name: "Reset password" });
-      if (!allowed) {
-        expect(reset).not.toBeInTheDocument();
-        return;
-      }
-      await userEvent.click(reset as HTMLElement);
-      const dialog = await screen.findByRole("alertdialog");
-      expect(state.resetPassword).not.toHaveBeenCalled();
-      await userEvent.click(within(dialog).getByRole("button", { name: "Send" }));
-      expect(state.resetPassword).toHaveBeenCalledWith(rows[1].id);
-    }
-  );
+    const sheet = await openSheet();
+    await userEvent.click(within(sheet).getByRole("button", { name: "Reset password" }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(state.resetPassword).not.toHaveBeenCalled();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Send" }));
+    expect(state.resetPassword).toHaveBeenCalledWith(rows[1].id);
+  });
 
-  it.each([true, false])(
-    "offers to clear an authenticator only where allowed (%s)",
-    async (allowed) => {
-      state.clearSecondFactor.mockClear();
-      const rows = masked(allowed ? ["clear_second_factor"] : ["rename"]);
-      renderRoster(rows, buildUser({ role: "moderator" }));
+  it("clears an authenticator where allowed, once confirmed", async () => {
+    state.clearSecondFactor.mockClear();
+    const rows = masked(["clear_second_factor"]);
+    renderRoster(rows, buildUser({ role: "moderator" }));
 
-      const sheet = await openSheet();
-      const clear = lever(sheet, "Two-factor authentication");
-      if (!allowed) {
-        expect(clear).not.toBeInTheDocument();
-        return;
-      }
-      // It signs them out everywhere, so it asks first.
-      await userEvent.click(within(sheet).getByRole("button", { name: "Clear" }));
-      const dialog = await screen.findByRole("alertdialog");
-      expect(state.clearSecondFactor).not.toHaveBeenCalled();
-      await userEvent.click(within(dialog).getByRole("button", { name: "Clear it" }));
-      expect(state.clearSecondFactor).toHaveBeenCalledWith(rows[1].id);
-    }
-  );
+    const sheet = await openSheet();
+    expect(lever(sheet, "Two-factor authentication")).toBeInTheDocument();
+    // It signs them out everywhere, so it asks first.
+    await userEvent.click(within(sheet).getByRole("button", { name: "Clear" }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(state.clearSecondFactor).not.toHaveBeenCalled();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Clear it" }));
+    expect(state.clearSecondFactor).toHaveBeenCalledWith(rows[1].id);
+  });
 
   it("takes a one-off act and a deletion for the case chosen in the sheet", async () => {
     state.grantCases = [

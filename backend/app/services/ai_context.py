@@ -30,7 +30,7 @@ from app.core.search import SearchEntityType
 from app.core.tools import Tool
 from app.core.user_display import display_name
 from app.models.platform.user_profile_view import MemberProfile
-from app.models.tenant.comment import Comment, in_thread
+from app.models.tenant.comment import Comment, in_thread, said_on
 from app.models.tenant.metadata import MetadataType
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 from app.schemas.tenant.property import PropertySummary
@@ -226,7 +226,7 @@ async def _recent_comments(
     written today under an old conversation goes in before older comments.
     """
     live = (
-        col(Comment.task_id) == task_id,
+        said_on("task", task_id),
         in_thread(),
         col(Comment.deleted_at).is_(None),
         col(Comment.removed_at).is_(None),

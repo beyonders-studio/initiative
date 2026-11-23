@@ -2,7 +2,7 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { buildUser } from "@/__tests__/factories";
+import { buildCommunity, buildUser } from "@/__tests__/factories";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 
 const orderRules = vi.fn();
@@ -35,16 +35,12 @@ vi.mock("@/hooks/useCustomRoles", () => ({
   useCustomRoles: () => ({ data: roles }),
 }));
 
-vi.mock("@/hooks/useCommunities", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/hooks/useCommunities")>()),
-  useCommunities: () => ({ activeCommunity: { closed_surfaces: closedSurfaces } }),
-}));
-
 import { CustomRoleClaimRulesSection } from "./CustomRoleClaimRulesSection";
 
 const render = () =>
   renderWithProviders(<CustomRoleClaimRulesSection communityId={1} />, {
     auth: { user: buildUser() },
+    communities: { activeCommunity: buildCommunity({ closed_surfaces: closedSurfaces }) },
   });
 
 describe("CustomRoleClaimRulesSection", () => {

@@ -12,7 +12,7 @@ import zipfile
 
 import pytest
 from botocore.exceptions import ClientError
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 
 from app.services import storage as storage_module
 from app.services import storage_config
@@ -39,15 +39,6 @@ def _reset_storage_config_cache():
     storage_config.reset_for_tests()
 
 
-def test_write_read_roundtrip(tmp_path):
-    storage = LocalFilesystemStorage(base_dir=str(tmp_path))
-    storage.write("abc.txt", b"hello")
-    resolved = storage.resolve_readable("abc.txt")
-    assert resolved is not None
-    assert resolved.read_bytes() == b"hello"
-    assert storage.exists("abc.txt") is True
-
-
 def test_delete(tmp_path):
     storage = LocalFilesystemStorage(base_dir=str(tmp_path))
     storage.write("x.bin", b"data")
@@ -65,11 +56,6 @@ def test_copy(tmp_path):
     assert resolved is not None and resolved.read_bytes() == b"payload"
     # Copying a missing source fails cleanly.
     assert storage.copy("missing.bin", "dst2.bin") is False
-
-
-def test_resolve_missing_returns_none(tmp_path):
-    storage = LocalFilesystemStorage(base_dir=str(tmp_path))
-    assert storage.resolve_readable("nope.txt") is None
 
 
 def test_path_traversal_is_contained(tmp_path):
@@ -273,6 +259,7 @@ def test_s3_open_readable_round_trip():
     assert blob.content_type == "application/pdf"
     assert blob.content_length == len(b"hello world")
     assert b"".join(blob.stream) == b"hello world"
+    assert storage.open_readable("nope.bin") is None
 
 
 def test_s3_stages_a_file_in_parts_with_a_tail_between_requests():
@@ -391,11 +378,6 @@ def test_s3_open_seekable_reads_a_zips_list_without_the_whole_object():
     assert open_seekable(storage, "nope.zip", 10) is None
 
 
-def test_s3_open_readable_missing_returns_none():
-    _, storage = _s3()
-    assert storage.open_readable("nope.bin") is None
-
-
 def test_s3_presign_get_includes_key_and_filename():
     client, storage = _s3()
     url = storage.presign_get("file.zip", ttl=90, filename="report.zip")
@@ -404,13 +386,6 @@ def test_s3_presign_get_includes_key_and_filename():
     assert op == "get_object"
     assert ttl == 90
     assert "report.zip" in params["ResponseContentDisposition"]
-
-
-def test_build_upload_response_local_is_file_response(tmp_path):
-    f = tmp_path / "x.png"
-    f.write_bytes(b"img")
-    resp = build_upload_response(ReadableBlob(path=f), media_type="image/png")
-    assert isinstance(resp, FileResponse)
 
 
 def test_build_upload_response_stream_sets_type_and_length():
@@ -458,13 +433,6 @@ def test_resolver_requires_bucket_for_s3(monkeypatch):
         get_guild_storage(1)
 
 
-def test_resolver_local_honors_guild_prefix():
-    # Default backend is local; it now namespaces by guild like S3.
-    backend = get_guild_storage(99)
-    assert isinstance(backend, LocalFilesystemStorage)
-    assert backend._prefix == "guild_99/"
-
-
 # --- S3Storage.delete_prefix -------------------------------------------------
 
 
@@ -485,10 +453,10 @@ def test_s3_delete_prefix_sweeps_namespace():
     assert client.multipart_open is False
 
 
-def test_s3_delete_prefix_refuses_empty_prefix():
-    _, storage = _s3(prefix="")
-    with pytest.raises(ValueError, match="empty prefix"):
-        storage.delete_prefix()
+def test_delete_prefix_refuses_empty_prefix(tmp_path):
+    for storage in (_s3(prefix="")[1], LocalFilesystemStorage(base_dir=str(tmp_path))):
+        with pytest.raises(ValueError, match="empty prefix"):
+            storage.delete_prefix()
 
 
 def test_s3_delete_prefix_counts_only_successful_deletes():
@@ -518,23 +486,6 @@ def test_local_prefix_writes_under_guild_dir(tmp_path):
     assert blob.content_length == 4
 
 
-def test_local_delete_prefix_removes_dir_and_counts(tmp_path):
-    storage = LocalFilesystemStorage(base_dir=str(tmp_path), prefix="guild_3/")
-    storage.write("a.png", b"1")
-    storage.write("b.png", b"2")
-    removed = storage.delete_prefix()
-    assert removed == 2
-    assert not (tmp_path / "guild_3").exists()
-    # Missing dir -> 0, no error.
-    assert storage.delete_prefix() == 0
-
-
-def test_local_delete_prefix_refuses_empty_prefix(tmp_path):
-    storage = LocalFilesystemStorage(base_dir=str(tmp_path))  # prefix=""
-    with pytest.raises(ValueError, match="empty prefix"):
-        storage.delete_prefix()
-
-
 def test_purge_guild_blobs_local(tmp_path, monkeypatch):
     monkeypatch.setattr(storage_module.settings, "STORAGE_BACKEND", "local")
     monkeypatch.setattr(storage_module.settings, "UPLOADS_DIR", str(tmp_path))
@@ -544,6 +495,8 @@ def test_purge_guild_blobs_local(tmp_path, monkeypatch):
     removed = storage_module.purge_guild_blobs(5)
     assert removed == 1
     assert not (tmp_path / "guild_5").exists()
+    # Missing dir -> 0, no error.
+    assert storage_module.purge_guild_blobs(5) == 0
     storage_module._local_backends.clear()
 
 

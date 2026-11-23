@@ -33,11 +33,13 @@ from app.core.messages import (
     AuthMessages,
     DirectMessageMessages,
     GuildMessages,
+    KindMessages,
     PluginMessages,
     UserMessages,
 )
 from app.core.plugin_access_token import InstallAccessToken
 from app.core.plugin_scopes import (
+    PluginScopeAccess,
     UnknownPluginScope,
     parse_scope,
     validate_scopes,
@@ -47,7 +49,7 @@ from app.core.security import (
     SESSION_COOKIE_NAME,
     STEP_UP_CHALLENGE,
 )
-from app.core.tools import Tool
+from app.core.tools import Tool, kind_refusal
 from app.db import cohorts
 from app.db.guild_standing import (
     ActorContext,
@@ -66,6 +68,7 @@ from app.db.request_context import (
     SettingsGrantee,
     SignIn,
 )
+from app.db.schema_provisioning import schema_stamp, stamp_tools
 from app.db.session import (
     apply_guild_standing,
     apply_install_standing,
@@ -687,7 +690,10 @@ async def _enforce_guild_api_access(
 
 async def _read_membership_gate(
     session: AsyncSession, guild_id: int, user_id: int
-) -> tuple[GuildMembership, Guild, SecondFactorRequirement, bool, bool] | None:
+) -> (
+    tuple[GuildMembership, Guild, SecondFactorRequirement, bool, bool, str | None]
+    | None
+):
     """The two rows the gate needs about a member, in one query.
 
     ``guild_memberships`` and ``guilds`` both live in ``public`` and are both
@@ -696,7 +702,9 @@ async def _read_membership_gate(
     the same reason — what it asks of an account is decided in the same breath
     as what the community asks of the session, and a read of its own would be a
     round trip on every guild request there is. So does whether the member is
-    timed out, which decides the role the request routes into.
+    timed out, which decides the role the request routes into, and the tool
+    plug-ins the community's rules were rendered with, off its schema's stamp
+    (a catalog any role reads).
 
     Each row still comes back under its own policies — an outer join to a row
     the session may not read yields NULL, exactly as its own SELECT would have.
@@ -711,6 +719,7 @@ async def _read_membership_gate(
                 rules.platform_rule_sql("second_factor_requirement"),
                 rules.platform_rule_sql("community_age_gate_enabled"),
                 moderation_service.live_timeout_end(),
+                schema_stamp(guild_id),
             )
             .select_from(GuildMembership)
             .outerjoin(Guild, Guild.id == GuildMembership.guild_id)
@@ -723,7 +732,7 @@ async def _read_membership_gate(
     ).one_or_none()
     if row is None:
         return None
-    membership, guild, asked, age_gate_on, timed_out_until = row
+    membership, guild, asked, age_gate_on, timed_out_until, stamp = row
     if guild is None:
         raise ValueError(GuildMessages.COMMUNITY_NOT_FOUND)
     return (
@@ -732,25 +741,31 @@ async def _read_membership_gate(
         asked_of_an_account(asked),
         bool(age_gate_on),
         timed_out_until is not None,
+        stamp_tools(stamp),
     )
 
 
 async def _read_grant_gate(
     session: AsyncSession, guild_id: int
-) -> tuple[Guild, SecondFactorRequirement]:
+) -> tuple[Guild, SecondFactorRequirement, str | None]:
     """The same public rows for a grantee, whose PAM context has just been
     applied — a grant reaches the guild row through its own policy leg, so this
-    read cannot be folded into the membership one above."""
+    read cannot be folded into the membership one above — and the stamp's
+    tool plug-ins, as there."""
     row = (
         await session.exec(
-            select(Guild, rules.platform_rule_sql("second_factor_requirement"))
+            select(
+                Guild,
+                rules.platform_rule_sql("second_factor_requirement"),
+                schema_stamp(guild_id),
+            )
             .select_from(Guild)
             .where(Guild.id == guild_id)
         )
     ).one_or_none()
     if row is None:
         raise ValueError(GuildMessages.COMMUNITY_NOT_FOUND)
-    return row[0], asked_of_an_account(row[1])
+    return row[0], asked_of_an_account(row[1]), stamp_tools(row[2])
 
 
 async def _load_guild_context(
@@ -835,7 +850,7 @@ async def _load_guild_context(
                 guild_id=guild_id, user_id=current_user.id, read_write=is_read_write
             ),
         )
-        guild, asked = await _read_grant_gate(session, guild_id)
+        guild, asked, rendered_tools = await _read_grant_gate(session, guild_id)
         # What the deployment asks of the account, before what this community
         # asks of the session. Asked here as well as in the dependency above
         # because the sockets, the keepalive and the stream re-check resolve
@@ -858,8 +873,9 @@ async def _load_guild_context(
             settings_grant_level=(
                 None if settings_grant is None else settings_grant.access_level
             ),
+            rendered_tools=rendered_tools,
         )
-    membership, guild, asked, age_gate_on, timed_out = gate
+    membership, guild, asked, age_gate_on, timed_out, rendered_tools = gate
     # Membership access respects the guild's lifecycle status: the statuses
     # that serve members are named, and every other one is refused, on every
     # surface. A suspended community is in time out — its administrators are
@@ -904,6 +920,7 @@ async def _load_guild_context(
         guild_id=guild_id,
         membership=membership,
         guild_role=membership.role.value,
+        rendered_tools=rendered_tools,
         # The community's content is frozen, or this member is timed out: the
         # same hold, which the standing statement computes from the same rows.
         content_read_only=(
@@ -1783,6 +1800,56 @@ def plugin_scope_by(
         {"by": param, "scopes": dict(sorted(scopes.items()))},
     )
     dependency.__name__ = f"plugin_scope_by_{param}"
+    dependency.__qualname__ = dependency.__name__
+    return dependency
+
+
+def plugin_tool_scope(
+    access: PluginScopeAccess,
+) -> Callable[..., Awaitable[ActorContext]]:
+    """:func:`plugin_scope` for a route that serves any tool plug-in's rows,
+    named by the path parameter ``kind``, its tool's or one of its items': an
+    installed plug-in's request needs that tool's scope at ``access``
+    (``<tool kind>:read``, ``<tool kind>:write``), which the install's standing
+    names once it is computed, and a kind its community does not have is not
+    found. A person passes through to the ordinary seam, as with
+    :func:`plugin_scope`.
+
+    Carries ``{"tool": "kind", "access": …}`` on
+    :data:`PLUGIN_SCOPE_DECLARATION_ATTRIBUTE`, and no fixed scope on
+    :data:`PLUGIN_SCOPES_ATTRIBUTE`.
+    """
+
+    async def dependency(
+        request: Request,
+        session: SessionDep,
+        guild_id: CommunityIdPath,
+        person: Annotated[User | None, Depends(get_actor_user)],
+    ) -> ActorContext:
+        if person is None:
+            from app.db.tool_rows import locate
+
+            context = await _establish_install_request(request, session, None)
+            kind = str(request.path_params.get("kind"))
+            located = locate(context.tools, kind)
+            if located is None:
+                raise kind_refusal(kind, KindMessages.NOT_FOUND, 404)
+            if not context.holds(f"{located.tool.scope}:{access.value}"):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=PluginMessages.SCOPE_REQUIRED,
+                )
+            return context
+        return await get_guild_membership(request, session, person, guild_id)
+
+    setattr(dependency, PLUGIN_SCOPE_ATTRIBUTE, f"tool of kind:{access.value}")
+    setattr(dependency, PLUGIN_SCOPES_ATTRIBUTE, frozenset())
+    setattr(
+        dependency,
+        PLUGIN_SCOPE_DECLARATION_ATTRIBUTE,
+        {"tool": "kind", "access": access.value},
+    )
+    dependency.__name__ = f"plugin_tool_scope_{access.value}"
     dependency.__qualname__ = dependency.__name__
     return dependency
 

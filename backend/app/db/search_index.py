@@ -18,18 +18,26 @@ from __future__ import annotations
 
 import enum
 import hashlib
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
+from functools import lru_cache, partial
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Enum, MetaData
+from sqlalchemy import JSON, DateTime, Enum, MetaData, Table
 from sqlmodel import SQLModel
 
 from app.core.file_types import FileType
 from app.core.identity_boundary import STORED_MENTION
 from app.core.search import SearchEntityType
-from app.core.tools import KINDS, Tool
-from app.db.initiative_rls import COMMENT_PARENTS, initiative_locator
+from app.core.tool_set import BUILTIN_TOOLS, KEPT_TOOL_SETS, ToolRecord, ToolSet
+from app.core.tools import Kind, Tool
+from app.db.initiative_rls import (
+    comment_parents,
+    governing_walk,
+    initiative_locator,
+    paths_for,
+)
+from app.db.names import object_name
 
 #: How a row reaches the trigger's dynamic lookups: as ``$1`` in an EXECUTE.
 ROW = "($1)"
@@ -70,6 +78,13 @@ class SearchDependency:
     column: str
     #: How the dependent source's rows tie back to it.
     local_column: str
+    #: Where the source names what it is on as a pair, the kind that pair
+    #: holds for this table's rows.
+    local_kind: str | None = None
+
+    def rows_under(self, row: str) -> str:
+        """The source rows under the ``$2`` this trigger fired for."""
+        return _tied(row, self.local_column, self.local_kind, "= $2")
 
 
 @dataclass(frozen=True)
@@ -89,33 +104,56 @@ class ArchiveParent:
     column: str
     #: ``(table, column)`` between the two, where the row names the step.
     through: tuple[str, str] | None = None
+    #: Where the source names what it is on as a pair, the kind that pair
+    #: holds for this parent (or for the step to it); ``column`` is its id.
+    kind: str | None = None
+
+    @property
+    def label(self) -> str:
+        """What its trigger is named by: the column, or ``<kind>_id`` for a
+        pair, which is the name a comment's column for the kind had (a tool
+        plug-in's ``.`` spelled ``_``)."""
+        return self.column if self.kind is None else f"{self.kind.replace('.', '_')}_id"
 
     def archived(self, row: str) -> str:
         if self.through is None:
-            return (
+            exists = (
                 f"EXISTS (SELECT 1 FROM {self.table} a WHERE a.id = {row}.{self.column}"
                 " AND a.archived_at IS NOT NULL)"
             )
-        step, fk = self.through
-        return (
-            f"EXISTS (SELECT 1 FROM {step} s JOIN {self.table} a ON a.id = s.{fk}"
-            f" WHERE s.id = {row}.{self.column} AND a.archived_at IS NOT NULL)"
-        )
+        else:
+            step, fk = self.through
+            exists = (
+                f"EXISTS (SELECT 1 FROM {step} s JOIN {self.table} a ON a.id = s.{fk}"
+                f" WHERE s.id = {row}.{self.column} AND a.archived_at IS NOT NULL)"
+            )
+        if self.kind is None:
+            return exists
+        return f"({row}.subject_type = '{self.kind}' AND {exists})"
 
     def rows_under(self, row: str) -> str:
         """The source rows under the ``$2`` this trigger fired for."""
         if self.through is None:
-            return f"{row}.{self.column} = $2"
+            return _tied(row, self.column, self.kind, "= $2")
         step, fk = self.through
-        return f"{row}.{self.column} IN (SELECT id FROM {step} WHERE {fk} = $2)"
+        return _tied(
+            row, self.column, self.kind, f"IN (SELECT id FROM {step} WHERE {fk} = $2)"
+        )
+
+
+def _tied(row: str, column: str, kind: str | None, match: str) -> str:
+    """``row.column`` matching, and, for a pair, of ``kind``."""
+    tie = f"{row}.{column} {match}"
+    return tie if kind is None else f"{row}.subject_type = '{kind}' AND {tie}"
 
 
 @dataclass(frozen=True)
 class SearchSource:
     """How one table's rows become search entries."""
 
-    #: Value stored in ``search_entries.entity_type``.
-    entity_type: SearchEntityType
+    #: Value stored in ``search_entries.entity_type``: the kind of what is
+    #: indexed.
+    entity_type: str
     #: Column holding the row's display title (weighted 'A'). Also the column
     #: whose change makes the entry stale, even where ``title_sql`` builds the
     #: stored value from it.
@@ -133,7 +171,7 @@ class SearchSource:
     #: The tool whose sharing governs this row, and the column naming the
     #: resource id to test. ``dac_id=None`` means the row's own ``id``.
     #: ``dac_tool=None`` means the row carries no sharing gate (a tag).
-    dac_tool: Tool | None = None
+    dac_tool: ToolRecord | None = None
     dac_id: str | None = None
     #: Builds ``(tool, id)`` from a row alias, for a source whose governing tool
     #: differs per row. Takes precedence over the pair above.
@@ -151,8 +189,13 @@ class SearchSource:
     @property
     def trigger_name(self) -> str:
         """Stem for this table's triggers; INSERT/DELETE and UPDATE are split
-        (a WHEN clause naming OLD is invalid on INSERT)."""
-        return f"search_{self.entity_type.value}"
+        (a WHEN clause naming OLD is invalid on INSERT). A tool plug-in's kind
+        holds a ``.``, which a name spells ``_``."""
+        return f"search_{self.entity_type.replace('.', '_')}"
+
+    def trigger(self, suffix: str) -> str:
+        """One of this table's triggers, by what it does."""
+        return object_name("search", self.trigger_name.removeprefix("search_"), suffix)
 
 
 def _json_text(row: str, path: str, *, column: str = "content") -> str:
@@ -279,50 +322,60 @@ def _comment_preview(row: str) -> str:
     )
 
 
-def _comment_archive_parents() -> tuple[ArchiveParent, ...]:
+def _comment_archive_parents(tools: ToolSet) -> tuple[ArchiveParent, ...]:
     """What archiving takes a comment with: the thing it is on, or, where that
     cannot be archived itself, the tool it is part of (a wiki page's wiki)."""
     parents: list[ArchiveParent] = []
-    tables = SQLModel.metadata.tables
-    for column, parent in COMMENT_PARENTS.items():
+    tables = tools.tables
+    for kind, parent in comment_parents(tools).items():
         if "archived_at" in tables[parent.table].columns:
-            parents.append(ArchiveParent(parent.table, column))
+            parents.append(ArchiveParent(parent.table, "subject_id", kind=kind))
         elif parent.tool_fk is not None and parent.governed_by is not None:
             parents.append(
                 ArchiveParent(
-                    parent.governed_by.plural,
-                    column,
+                    parent.governed_by.table.name,
+                    "subject_id",
                     through=(parent.table, parent.tool_fk),
+                    kind=kind,
                 )
             )
     return tuple(parents)
 
 
-def _comment_dac(row: str) -> tuple[str, str]:
+def _comment_dac(row: str, tools: ToolSet) -> tuple[str, str]:
     """Which tool's sharing governs a comment, and which of its entities.
 
-    A comment hangs off exactly one parent, and the parents are declared once
-    for the RLS policies — so the legs are derived from that same list rather
-    than restated here. A parent that is not itself a tool row names the tool
-    it is shared as part of: a task by its project, a wiki page by its wiki.
+    A comment is said on one subject, and the subjects are declared once for
+    the RLS policies — so the legs are derived from that same list rather than
+    restated here. A subject that is not itself a tool row names the tool it is
+    shared as part of: a task by its project, a wiki page by its wiki.
     """
-    tools: list[str] = []
+    governing: list[str] = []
     ids: list[str] = []
-    for column, parent in COMMENT_PARENTS.items():
+    for kind, parent in comment_parents(tools).items():
         if parent.governed_by is None:
             # No sharing to stamp: the entry is reached as the comment is.
             continue
-        ident = (
-            f"{row}.{column}"
-            if parent.tool_fk is None
-            else f"(SELECT {parent.tool_fk} FROM {parent.table} "
-            f"WHERE id = {row}.{column})"
-        )
-        tools.append(
-            f"WHEN {row}.{column} IS NOT NULL THEN '{parent.governed_by.value}'"
-        )
-        ids.append(f"WHEN {row}.{column} IS NOT NULL THEN {ident}")
-    return f"(CASE {' '.join(tools)} END)", f"(CASE {' '.join(ids)} END)"
+        if parent.tool_fk is not None:
+            ident = (
+                f"(SELECT {parent.tool_fk} FROM {parent.table} "
+                f"WHERE id = {row}.subject_id)"
+            )
+        elif parent.table == parent.governed_by.table.name:
+            ident = f"{row}.subject_id"
+        else:
+            # Under its tool by more than one hop: the tool is the outermost
+            # row its walk reaches.
+            ident = (
+                f"(SELECT {parent.chain[-1][1]} FROM {parent.frm} "
+                f"WHERE {parent.tie} = {row}.subject_id)"
+            )
+        governing.append(f"WHEN '{kind}' THEN '{parent.governed_by.kind}'")
+        ids.append(f"WHEN '{kind}' THEN {ident}")
+    return (
+        f"(CASE {row}.subject_type {' '.join(governing)} END)",
+        f"(CASE {row}.subject_type {' '.join(ids)} END)",
+    )
 
 
 def _title_expr(source: SearchSource, row: str = ROW) -> str:
@@ -338,7 +391,7 @@ def _title_expr(source: SearchSource, row: str = ROW) -> str:
 FLAG_COLUMNS: dict[str, str] = {"archived": "archived_at", "template": "is_template"}
 
 
-def _flag_expr(table: str, flag: str, row: str) -> str | None:
+def _flag_expr(table: Table, flag: str, row: str) -> str | None:
     """Row expression for one flag, or ``None`` where the table cannot carry it.
 
     A flag is a boolean either way, but the column behind it need not be: a
@@ -347,7 +400,7 @@ def _flag_expr(table: str, flag: str, row: str) -> str | None:
     saying how to read it.
     """
     column = FLAG_COLUMNS[flag]
-    columns = SQLModel.metadata.tables[table].columns
+    columns = table.columns
     if column not in columns:
         return None
     if isinstance(columns[column].type, DateTime):
@@ -355,39 +408,41 @@ def _flag_expr(table: str, flag: str, row: str) -> str | None:
     return f"{row}.{column}"
 
 
-def archive_parents(table: str, source: SearchSource) -> tuple[ArchiveParent, ...]:
+def archive_parents(
+    table: Table, source: SearchSource, tables: Mapping[str, Table]
+) -> tuple[ArchiveParent, ...]:
     """What archiving takes a row of ``source`` with. A row that carries its
     own ``archived_at`` is stamped by the cascade and needs none; any other
     sits under its governing tool."""
     if source.archive_parents is not None:
         return source.archive_parents()
-    tables = SQLModel.metadata.tables
-    if "archived_at" in tables[table].columns or not (
-        source.dac_tool and source.dac_id
-    ):
+    if "archived_at" in table.columns or not (source.dac_tool and source.dac_id):
         return ()
-    tool = source.dac_tool.plural
+    tool = source.dac_tool.table.name
     if "archived_at" not in tables[tool].columns:
         return ()
     return (ArchiveParent(tool, source.dac_id),)
 
 
-def _archived_expr(table: str, source: SearchSource, row: str) -> str | None:
+def _archived_expr(
+    table: Table, source: SearchSource, row: str, tables: Mapping[str, Table]
+) -> str | None:
     """Whether a row is archived: stamped itself, or under something that is."""
     legs = [_flag_expr(table, "archived", row)]
-    legs += [parent.archived(row) for parent in archive_parents(table, source)]
+    legs += [parent.archived(row) for parent in archive_parents(table, source, tables)]
     present = [leg for leg in legs if leg]
     return f"({' OR '.join(present)})" if present else None
 
 
-def _written(table: str, source: SearchSource) -> tuple[str, ...]:
+def _written(table: Table, source: SearchSource) -> tuple[str, ...]:
     """The body columns somebody writes in: all of them, less a column that only
     names a kind (an enum, in the database or on the model) or another row (a
     foreign key)."""
     from app.db.base import MODELS_BY_TABLE
 
-    columns = SQLModel.metadata.tables[table].columns
-    fields = MODELS_BY_TABLE[table].model_fields
+    columns = table.columns
+    model = MODELS_BY_TABLE.get(table.name)
+    fields = model.model_fields if model is not None else {}
 
     def names_a_kind(column: str) -> bool:
         annotation = fields[column].annotation if column in fields else None
@@ -400,13 +455,13 @@ def _written(table: str, source: SearchSource) -> tuple[str, ...]:
     )
 
 
-def _mentions_expr(table: str, source: SearchSource, row: str = ROW) -> str:
+def _mentions_expr(table: Table, source: SearchSource, row: str = ROW) -> str:
     """Row expression yielding the people a source's body mentions, as words.
 
     A markdown mention in any written column, and in an editor state a mention
     node's ``mentionUserId`` as well. Empty where the source writes nothing.
     """
-    columns = SQLModel.metadata.tables[table].columns
+    columns = table.columns
     markdown = STORED_MENTION.pattern
     found: list[str] = []
     for column in _written(table, source):
@@ -437,104 +492,126 @@ def _body_expr(source: SearchSource, row: str = ROW) -> str:
     return " || ' ' || ".join(parts) if len(parts) > 1 else parts[0]
 
 
-#: How a tool indexes when it says nothing: its own name and description, gated
-#: by its own sharing. Stated once and applied to every member of ``Tool``, so a
-#: seventh tool is searchable the day its table exists.
-def _tool_source(tool: Tool) -> SearchSource:
-    return SearchSource(
-        SearchEntityType(tool.value),
-        title="name",
-        body=("description",),
-        dac_tool=tool,
+def _text(table: Table) -> tuple[str, ...]:
+    """What a row says beyond its name: a model's ``description``, or the
+    columns a tool plug-in declared as text."""
+    return tuple(
+        c.name
+        for c in table.columns
+        if c.info.get("field", "text" if c.name == "description" else None) == "text"
     )
 
 
-def _inside(kind: SearchEntityType, **fields: Any) -> SearchSource:
-    """A row inside a tool, gated by the sharing of the tool it lives in."""
-    inside = KINDS[kind.value]
+def _two_hop_dac(
+    row: str, kind: str, hops: tuple[tuple[str, str], ...]
+) -> tuple[str, str]:
+    """The sharing gate of an item two hops under its tool: the tool's kind,
+    and the id its middle row names."""
+    (fk, mid), (mid_fk, _) = hops
+    return f"'{kind}'::text", f"(SELECT {mid_fk} FROM {mid} WHERE id = {row}.{fk})"
+
+
+def _kind_source(kind: Kind, tools: ToolSet) -> SearchSource:
+    """A kind inside a tool, by its name and its text, gated by the sharing of
+    the tool it lives in, which its path walks to. A kind in no one instance
+    of its tool (a collection) stamps no sharing: its entry is reached as the
+    row itself is (``initiative_rls.named_tool_path``)."""
+    table = tools.tables[kind.table]
+    if kind.standalone:
+        return SearchSource(kind.value, title="name", body=_text(table))
+    walk = governing_walk(kind.table, paths_for(tools))
+    assert walk is not None, kind.table
+    tool, hops = walk
+    # The key to its parent moves it, and under two hops so does the middle
+    # row's key to the tool.
+    gate: dict[str, Any] = {"dac_id": hops[0][0]}
+    if len(hops) == 2:
+        (fk, mid), (mid_fk, _) = hops
+        gate["dac_sql"] = partial(_two_hop_dac, kind=tool.kind, hops=hops)
+        gate["depends_on"] = (SearchDependency(mid, mid_fk, fk),)
     return SearchSource(
-        kind, dac_tool=inside.parent, dac_id=inside.parent_column, **fields
+        kind.value, title="name", body=_text(table), dac_tool=tool, **gate
     )
 
 
-#: Where a tool's text is not simply its name and description. A tool absent
-#: from here is not an omission — it is a tool that takes the shape above.
-TOOL_OVERRIDES: dict[Tool, dict[str, object]] = {
-    Tool.file: {
+#: Where a tool's or a kind's text is not its name and its text
+#: (:func:`_text`). A kind absent from here is not an omission — it takes that
+#: shape.
+TEXT_OVERRIDES: dict[str, dict[str, object]] = {
+    Tool.file.value: {
         "body": ("content", "file_type", "current_version_id"),
         "body_sql": _file_text,
     },
     # A post's text is what it says, not a summary of it: the headline is the
     # title and the Lexical body is the body. There is no `description`.
-    Tool.post: {"body": ("body",), "body_sql": _post_text},
+    Tool.post.value: {"body": ("body",), "body_sql": _post_text},
     # A contact is found by its name. How to reach one is not text somebody
     # writes in, which is what a body is (``written_columns``).
-    Tool.contact: {"body": ()},
-}
-
-#: table -> how its rows are indexed.
-#:
-#: The six tools are derived; what is written out is what a tool does not
-#: describe — the entities that live INSIDE one, the guild's vocabulary, and
-#: comments. Those differ from each other in ways no rule covers, like which
-#: column is the title; which tool's sharing governs one inside a tool is its
-#: kind's (``KINDS``).
-SEARCH_SOURCES: dict[str, SearchSource] = {
-    **{
-        tool.plural: replace(_tool_source(tool), **TOOL_OVERRIDES.get(tool, {}))
-        for tool in Tool
+    Tool.contact.value: {"body": ()},
+    "task": {
+        "title": "title",
+        "body": ("description", "checklist"),
+        "body_sql": _task_text,
     },
-    "tasks": _inside(
-        SearchEntityType.task,
-        title="title",
-        body=("description", "checklist"),
-        body_sql=_task_text,
-    ),
-    "counters": _inside(
-        SearchEntityType.counter,
-        title="name",
-    ),
-    "calendar_events": _inside(
-        SearchEntityType.calendar_event,
-        title="title",
-        body=("description", "location"),
-    ),
-    # A collection is found by its name and what it is described as. It has no
-    # sharing to stamp: its entry is reached as the collection itself is
-    # (``initiative_rls.named_tool_path``).
-    "collections": SearchSource(
-        SearchEntityType.collection, title="name", body=("description",)
-    ),
+    "calendar_event": {"title": "title", "body": ("description", "location")},
     # A page is found by its title and by what is written on it. Its body is a
     # Lexical state, the same shape a lexical file's is, so it is read by the
     # same extractor rather than a second one.
-    "wiki_pages": _inside(
-        SearchEntityType.wiki_page,
-        title="title",
-        body=("content",),
-        body_sql=_wiki_page_text,
-    ),
-    # Guild-level vocabulary: no initiative, no sharing gate. Reaching the query
-    # at all means being in the guild, which is the whole gate for a tag.
-    "tags": SearchSource(SearchEntityType.tag, title="name"),
-    # What people said on the content above. Out of the default scope: it is the
-    # highest-volume table in a busy guild, and a caller that wants it says so —
-    # which is what the results page's own tab does.
-    "comments": SearchSource(
-        SearchEntityType.comment,
-        title="content",
-        title_sql=_comment_preview,
-        body=("content",),
-        dac_sql=_comment_dac,
-        in_default_scope=False,
-        # A comment on a task is governed by the task's project, and a task can
-        # move between projects. Nothing about the comment changes when it does,
-        # so the entry is rewritten from the table that moved. Every other
-        # parent names its own initiative and cannot move between them.
-        depends_on=(SearchDependency("tasks", "project_id", "task_id"),),
-        archive_parents=_comment_archive_parents,
-    ),
+    "wiki_page": {"title": "title", "body": ("content",), "body_sql": _wiki_page_text},
 }
+
+
+@lru_cache(KEPT_TOOL_SETS)
+def search_sources(tools: ToolSet) -> dict[str, SearchSource]:
+    """table -> how its rows are indexed, in a community with ``tools``: every
+    tool's own table and every kind inside one, derived; the guild's tags; and
+    the comments on any of them."""
+    derived = [
+        *(
+            (
+                t.table.name,
+                SearchSource(t.kind, title="name", body=_text(t.table), dac_tool=t),
+            )
+            for t in tools
+        ),
+        *((kind.table, _kind_source(kind, tools)) for kind in tools.child_kinds),
+    ]
+    return {
+        **{
+            table: replace(source, **TEXT_OVERRIDES.get(source.entity_type, {}))
+            for table, source in derived
+        },
+        # Guild-level vocabulary, in no tool: no initiative, no sharing gate.
+        # Reaching the query at all means being in the guild, which is the
+        # whole gate for a tag.
+        "tags": SearchSource(SearchEntityType.tag.value, title="name"),
+        # What people said on the content above. Out of the default scope: it
+        # is the highest-volume table in a busy guild, and a caller that wants
+        # it says so — which is what the results page's own tab does.
+        "comments": SearchSource(
+            SearchEntityType.comment.value,
+            title="content",
+            title_sql=_comment_preview,
+            body=("content",),
+            dac_sql=partial(_comment_dac, tools=tools),
+            in_default_scope=False,
+            # A comment on a task is governed by the task's project, and a task
+            # can move between projects. Nothing about the comment changes when
+            # it does, so the entry is rewritten from the table that moved.
+            # Every other parent names its own initiative and cannot move
+            # between them.
+            depends_on=(
+                SearchDependency(
+                    "tasks", "project_id", "subject_id", local_kind="task"
+                ),
+            ),
+            archive_parents=partial(_comment_archive_parents, tools),
+        ),
+    }
+
+
+#: :func:`search_sources` of the built-in tools.
+SEARCH_SOURCES: dict[str, SearchSource] = search_sources(BUILTIN_TOOLS)
 
 
 def written_columns() -> dict[type[SQLModel], tuple[str, ...]]:
@@ -544,7 +621,7 @@ def written_columns() -> dict[type[SQLModel], tuple[str, ...]]:
     from app.db.base import MODELS_BY_TABLE
 
     written = {
-        MODELS_BY_TABLE[table]: _written(table, source)
+        MODELS_BY_TABLE[table]: _written(SQLModel.metadata.tables[table], source)
         for table, source in SEARCH_SOURCES.items()
     }
     return {model: columns for model, columns in written.items() if columns}
@@ -604,17 +681,16 @@ def addressable_tables(metadata: MetaData) -> set[str]:
     }
 
 
-def entity_types(*, default_scope_only: bool = False) -> tuple[SearchEntityType, ...]:
-    """Indexed entity types, sorted. The default-scope subset is what a query
-    naming no types searches."""
+def entity_types(
+    tools: ToolSet = BUILTIN_TOOLS, *, default_scope_only: bool = False
+) -> tuple[str, ...]:
+    """The entity types indexed in a community with ``tools``, sorted. The
+    default-scope subset is what a query naming no types searches."""
     return tuple(
         sorted(
-            (
-                s.entity_type
-                for s in SEARCH_SOURCES.values()
-                if s.in_default_scope or not default_scope_only
-            ),
-            key=lambda t: t.value,
+            s.entity_type
+            for s in search_sources(tools).values()
+            if s.in_default_scope or not default_scope_only
         )
     )
 
@@ -624,7 +700,7 @@ def _quoted(expr: str) -> str:
     return "'" + expr.replace("'", "''") + "'"
 
 
-def _when_clause(table: str, source: SearchSource) -> str:
+def _when_clause(table: Table, source: SearchSource) -> str:
     """Columns whose change makes a row's index entry stale.
 
     The trigger does not fire unless one of these actually changed, so the
@@ -640,8 +716,7 @@ def _when_clause(table: str, source: SearchSource) -> str:
     # notice: no trigger fires on the passage of time, but the write that
     # records the publication is a write like any other.
     watched.extend(("deleted_at", "published_at", "held_at", "removed_at"))
-    columns = SQLModel.metadata.tables[table].columns
-    present = [c for c in dict.fromkeys(watched) if c in columns]
+    present = [c for c in dict.fromkeys(watched) if c in table.columns]
     return " OR ".join(f"OLD.{c} IS DISTINCT FROM NEW.{c}" for c in present)
 
 
@@ -818,7 +893,7 @@ def _dac_exprs(source: SearchSource) -> tuple[str, str]:
     if source.dac_tool is None:
         return "", ""
     dac_id = f"{ROW}.{source.dac_id}" if source.dac_id else f"{ROW}.id"
-    return f"'{source.dac_tool.value}'::text", dac_id
+    return f"'{source.dac_tool.kind}'::text", dac_id
 
 
 DEPENDENT_FUNCTION = "public.refresh_search_dependents"
@@ -838,7 +913,7 @@ $dep$;
 """
 
 
-def _live_clause(table: str, row: str) -> str:
+def _live_clause(table: Table, row: str) -> str:
     """Restricts to rows that have an entry at all.
 
     Trash is browsed through the trash surface, not found by searching; a row
@@ -847,7 +922,7 @@ def _live_clause(table: str, row: str) -> str:
     tombstone has no words left to find. Each mirrors the same test in the
     trigger function, so the sweep and the triggers index the same set.
     """
-    columns = SQLModel.metadata.tables[table].columns
+    columns = table.columns
     parts = []
     if "deleted_at" in columns:
         parts.append(f" AND {row}.deleted_at IS NULL")
@@ -860,12 +935,15 @@ def _live_clause(table: str, row: str) -> str:
     return "".join(parts)
 
 
-def _write_call(table: str, source: SearchSource, row: str, schema: str) -> str:
+def _write_call(
+    tools: ToolSet, name: str, source: SearchSource, row: str, schema: str
+) -> str:
     """The ``search_entry_write`` call for one row of a source, as SQL.
 
     The sweep and the dependency triggers both go through this, so a row
     rewritten by either is written identically.
     """
+    table = tools.tables[name]
     dac_tool_expr, dac_id_expr = _dac_exprs(source)
     dac_tool = dac_tool_expr.replace(ROW, row) if dac_tool_expr else "NULL::text"
     dac_id = (
@@ -874,21 +952,27 @@ def _write_call(table: str, source: SearchSource, row: str, schema: str) -> str:
         else "NULL::integer"
     )
     body = _body_expr(source, row) or "''"
-    archived = _archived_expr(table, source, row) or "false"
+    archived = _archived_expr(table, source, row, tools.tables) or "false"
     template = _flag_expr(table, "template", row) or "false"
     mentions = _mentions_expr(table, source, row) or "NULL::text[]"
     return (
-        f"{WRITE_FUNCTION}({schema}, '{source.entity_type.value}', {row}.id,"
-        f" ({initiative_locator(table)(row)})::integer,"
+        f"{WRITE_FUNCTION}({schema}, '{source.entity_type}', {row}.id,"
+        f" ({initiative_locator(name, paths_for(tools))(row)})::integer,"
         f" {dac_tool}, {dac_id}, {_title_expr(source, row)}, {body},"
         f" {archived}, {template}, {mentions})"
     )
 
 
 def _rewrite_trigger(
-    name: str, table: str, source: SearchSource, on: str, column: str, rows: str
+    tools: ToolSet,
+    trigger: str,
+    name: str,
+    source: SearchSource,
+    on: str,
+    column: str,
+    rows: str,
 ) -> str:
-    """DDL for a trigger on ``on`` that rewrites the entries of the ``table``
+    """DDL for a trigger on ``on`` that rewrites the entries of the ``name``
     rows ``rows`` selects whenever ``column`` changes there.
 
     ``$1`` is the guild schema and ``$2`` the id of the row that changed. The
@@ -897,14 +981,14 @@ def _rewrite_trigger(
     """
     row = "t"
     statement = (
-        f"SELECT {_write_call(table, source, row, '$1')}"
-        f" FROM {table} {row}"
-        f" WHERE {rows.format(row=row)}{_live_clause(table, row)}"
+        f"SELECT {_write_call(tools, name, source, row, '$1')}"
+        f" FROM {name} {row}"
+        f" WHERE {rows.format(row=row)}{_live_clause(tools.tables[name], row)}"
     )
     return "\n".join(
         [
-            f"DROP TRIGGER IF EXISTS {name} ON {on};",
-            f"CREATE TRIGGER {name}",
+            f"DROP TRIGGER IF EXISTS {trigger} ON {on};",
+            f"CREATE TRIGGER {trigger}",
             f"  AFTER UPDATE ON {on}",
             f"  FOR EACH ROW WHEN (OLD.{column} IS DISTINCT FROM NEW.{column})",
             f"  EXECUTE FUNCTION {DEPENDENT_FUNCTION}({_quoted(statement)});",
@@ -913,25 +997,29 @@ def _rewrite_trigger(
 
 
 def _dependency_block(
-    table: str, source: SearchSource, dependency: SearchDependency
+    tools: ToolSet, name: str, source: SearchSource, dependency: SearchDependency
 ) -> str:
     """The trigger that rewrites entries when a row moves under them."""
     return _rewrite_trigger(
-        f"{source.trigger_name}_from_{dependency.table}",
-        table,
+        tools,
+        source.trigger(f"from_{dependency.table}"),
+        name,
         source,
         dependency.table,
         dependency.column,
-        f"{{row}}.{dependency.local_column} = $2",
+        dependency.rows_under("{row}"),
     )
 
 
-def _archive_block(table: str, source: SearchSource, parent: ArchiveParent) -> str:
+def _archive_block(
+    tools: ToolSet, name: str, source: SearchSource, parent: ArchiveParent
+) -> str:
     """The trigger that rewrites entries when what they sit under is archived
     or brought back."""
     return _rewrite_trigger(
-        f"{source.trigger_name}_archived_by_{parent.column}",
-        table,
+        tools,
+        source.trigger(f"archived_by_{parent.label}"),
+        name,
         source,
         parent.table,
         "archived_at",
@@ -939,51 +1027,52 @@ def _archive_block(table: str, source: SearchSource, parent: ArchiveParent) -> s
     )
 
 
-def _call_args(table: str, source: SearchSource) -> list[str]:
+def _call_args(tools: ToolSet, name: str, source: SearchSource) -> list[str]:
     """The ten trigger arguments, shared by both triggers on a table.
 
     An argument is the empty string where the source has nothing to say — no
     body, no sharing gate, no flag column, nobody it could mention — and the
     function skips it.
     """
-    locator = initiative_locator(table)
+    table = tools.tables[name]
+    locator = initiative_locator(name, paths_for(tools))
     dac_tool, dac_id = _dac_exprs(source)
     return [
         f"    {_quoted(locator(ROW))},",
-        f"    '{source.entity_type.value}',",
+        f"    '{source.entity_type}',",
         f"    {_quoted(f'{ROW}.id')},",
         f"    {_quoted(_title_expr(source))},",
         f"    {_quoted(_body_expr(source))},",
         f"    {_quoted(dac_tool)},",
         f"    {_quoted(dac_id)},",
-        f"    {_quoted(_archived_expr(table, source, ROW) or '')},",
+        f"    {_quoted(_archived_expr(table, source, ROW, tools.tables) or '')},",
         f"    {_quoted(_flag_expr(table, 'template', ROW) or '')},",
         f"    {_quoted(_mentions_expr(table, source))}",
     ]
 
 
-def _trigger_block(table: str, source: SearchSource) -> str:
+def _trigger_block(tools: ToolSet, name: str, source: SearchSource) -> str:
     """DDL installing the two refresh triggers on one source table.
 
     Split by operation because the UPDATE one carries a ``WHEN`` clause naming
     ``OLD``, which is invalid on INSERT. That clause is the point: an update
     touching none of the indexed columns never enters the function.
     """
-    args = _call_args(table, source)
-    ins, upd = f"{source.trigger_name}_ins", f"{source.trigger_name}_upd"
+    args = _call_args(tools, name, source)
+    ins, upd = source.trigger("ins"), source.trigger("upd")
     lines = [
-        f"DROP TRIGGER IF EXISTS {source.trigger_name} ON {table};",
-        f"DROP TRIGGER IF EXISTS {ins} ON {table};",
+        f"DROP TRIGGER IF EXISTS {source.trigger_name} ON {name};",
+        f"DROP TRIGGER IF EXISTS {ins} ON {name};",
         f"CREATE TRIGGER {ins}",
-        f"  AFTER INSERT OR DELETE ON {table}",
+        f"  AFTER INSERT OR DELETE ON {name}",
         f"  FOR EACH ROW EXECUTE FUNCTION {SEARCH_FUNCTION}(",
         *args,
         "  );",
         "",
-        f"DROP TRIGGER IF EXISTS {upd} ON {table};",
+        f"DROP TRIGGER IF EXISTS {upd} ON {name};",
         f"CREATE TRIGGER {upd}",
-        f"  AFTER UPDATE ON {table}",
-        f"  FOR EACH ROW WHEN ({_when_clause(table, source)})",
+        f"  AFTER UPDATE ON {name}",
+        f"  FOR EACH ROW WHEN ({_when_clause(tools.tables[name], source)})",
         f"  EXECUTE FUNCTION {SEARCH_FUNCTION}(",
         *args,
         "  );",
@@ -1041,46 +1130,46 @@ def _index_block(opclass: str | None) -> str:
     )
 
 
-def render_guild_search_ddl(opclass: str | None = None) -> str:
+def render_guild_search_ddl(opclass: str | None, tools: ToolSet) -> str:
     """Per-table trigger DDL plus the index, applied inside each guild schema.
 
     ``opclass`` is the operator class the index is built on, or ``None`` for the
     stock one.
     """
-    blocks = [
-        _trigger_block(table, source)
-        for table, source in sorted(SEARCH_SOURCES.items())
-    ]
+    sources = sorted(search_sources(tools).items())
+    blocks = [_trigger_block(tools, name, source) for name, source in sources]
     blocks.extend(
-        _dependency_block(table, source, dependency)
-        for table, source in sorted(SEARCH_SOURCES.items())
+        _dependency_block(tools, name, source, dependency)
+        for name, source in sources
         for dependency in source.depends_on
     )
     blocks.extend(
-        _archive_block(table, source, parent)
-        for table, source in sorted(SEARCH_SOURCES.items())
-        for parent in archive_parents(table, source)
+        _archive_block(tools, name, source, parent)
+        for name, source in sources
+        for parent in archive_parents(tools.tables[name], source, tools.tables)
     )
     blocks.append(_index_block(opclass))
     return _HEADER + "\n\n" + "\n\n".join(blocks) + "\n"
 
 
-def search_generation() -> str:
-    """Digest of WHAT is indexed and HOW, for deciding when to reindex.
+def search_generation(tools: ToolSet = BUILTIN_TOOLS) -> str:
+    """Digest of WHAT a community with ``tools`` indexes and HOW, for deciding
+    when to reindex it.
 
     Covers the per-source declarations and the chunking rules, so adding a
-    source or changing an extraction re-sweeps. Deliberately excludes the index
-    definition: swapping the operator class rebuilds the index, which does not
-    change a single stored row.
+    source or changing an extraction re-sweeps, and a community's tool
+    plug-ins' sources move its own generation alone. Deliberately excludes the
+    index definition: swapping the operator class rebuilds the index, which
+    does not change a single stored row.
     """
     digest = hashlib.sha256()
-    for table, source in sorted(SEARCH_SOURCES.items()):
-        digest.update(_trigger_block(table, source).encode())
+    for name, source in sorted(search_sources(tools).items()):
+        digest.update(_trigger_block(tools, name, source).encode())
     digest.update(WRITE_FUNCTION_SQL.encode())
     return f"search:{digest.hexdigest()[:16]}"
 
 
-def reindex_statement(table: str, source: SearchSource) -> str:
+def _reindex_statement(tools: ToolSet, name: str, source: SearchSource) -> str:
     """One batch of a source table's rows, re-written through the same function
     the trigger uses.
 
@@ -1091,9 +1180,9 @@ def reindex_statement(table: str, source: SearchSource) -> str:
     row = "t"
     return (
         f"SELECT {row}.id AS id,"
-        f" {_write_call(table, source, row, ':schema')}"
-        f" FROM {table} {row}"
-        f" WHERE {row}.id > :cursor{_live_clause(table, row)}"
+        f" {_write_call(tools, name, source, row, ':schema')}"
+        f" FROM {name} {row}"
+        f" WHERE {row}.id > :cursor{_live_clause(tools.tables[name], row)}"
         f" ORDER BY {row}.id LIMIT :batch"
         # Locks each row for the duration of the write, so the values written
         # are the row's current ones: a concurrent write to the same row
@@ -1103,9 +1192,10 @@ def reindex_statement(table: str, source: SearchSource) -> str:
     )
 
 
-def reindex_plan() -> list[tuple[str, str]]:
-    """``(entity_type, statement)`` for every indexed source, in a stable order."""
+def reindex_plan(tools: ToolSet = BUILTIN_TOOLS) -> list[tuple[str, str]]:
+    """``(entity_type, statement)`` for every source indexed in a community
+    with ``tools``, in a stable order."""
     return [
-        (source.entity_type.value, reindex_statement(table, source))
-        for table, source in sorted(SEARCH_SOURCES.items())
+        (source.entity_type, _reindex_statement(tools, name, source))
+        for name, source in sorted(search_sources(tools).items())
     ]

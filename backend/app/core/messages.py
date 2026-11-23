@@ -66,6 +66,18 @@ class KindMessages:
     GRANTEE_LACKS_ACCESS = "GRANTEE_LACKS_ACCESS"
 
 
+class ToolPluginMessages:
+    """Refusals about a tool plug-in's rows, which its declaration decides."""
+
+    #: A value its field does not take, or a field its table does not declare.
+    FIELD_INVALID = "TOOL_PLUGIN_FIELD_INVALID"
+    #: A new row says where it goes as its kind does not: a tool's row names
+    #: an initiative, and an item the row it sits under.
+    PLACEMENT_INVALID = "TOOL_PLUGIN_PLACEMENT_INVALID"
+    #: An action the row's table does not declare.
+    ACTION_NOT_FOUND = "TOOL_PLUGIN_ACTION_NOT_FOUND"
+
+
 class AuthMessages:
     #: A sign-in rule nothing the deployment permits could answer.
     AUTH_RULE_NOT_OFFERED = "AUTH_RULE_NOT_OFFERED"
@@ -340,6 +352,15 @@ class ShareRequestMessages:
     CANNOT_ANSWER = "SHARE_REQUEST_CANNOT_ANSWER"
 
 
+class SendMessages:
+    #: Nobody to send it to but the sender.
+    NOBODY = "SEND_NOBODY"
+    #: Somebody named can't open it and isn't in its initiative.
+    NOT_IN_INITIATIVE = "SEND_NOT_IN_INITIATIVE"
+    #: Access was to be given with it, and it has no sharing of its own.
+    NOTHING_TO_SHARE = "SEND_NOTHING_TO_SHARE"
+
+
 class InitiativeMessages:
     NOT_FOUND = "INITIATIVE_NOT_FOUND"
     MANAGER_REQUIRED = "INITIATIVE_MANAGER_REQUIRED"
@@ -376,6 +397,8 @@ class InitiativeMessages:
     SET_BY_COMMUNITY = "INITIATIVE_SET_BY_COMMUNITY"
     # The community keeps its initiatives to their built-in roles.
     CUSTOM_ROLES_OFF = "INITIATIVE_CUSTOM_ROLES_OFF"
+    # A tool switch or role permission names a tool the community does not have.
+    TOOL_UNKNOWN = "INITIATIVE_TOOL_UNKNOWN"
     # Only the community's admins set what every initiative starts from.
     DEFAULTS_ADMIN_ONLY = "INITIATIVE_DEFAULTS_ADMIN_ONLY"
     # A PAM grant confers content read/write for a window; a membership row
@@ -1052,6 +1075,9 @@ class ExportMessages:
 
 class ImportEngineMessages:
     IMPORT_UNKNOWN_TYPE = "IMPORT_UNKNOWN_TYPE"
+    #: A counter group in a backup from before Counters became a plug-in,
+    #: which a restore skips.
+    IMPORT_COUNTERS_NOT_RESTORED = "IMPORT_COUNTERS_NOT_RESTORED"
     IMPORT_INVALID_ENVELOPE = "IMPORT_INVALID_ENVELOPE"
     IMPORT_SCHEMA_VERSION_UNSUPPORTED = "IMPORT_SCHEMA_VERSION_UNSUPPORTED"
     IMPORT_ARCHIVE_TOO_OLD = "IMPORT_ARCHIVE_TOO_OLD"
@@ -1071,6 +1097,9 @@ class ImportEngineMessages:
     IMPORT_CREATOR_INACTIVE = "IMPORT_CREATOR_INACTIVE"
     IMPORT_PERMISSION_REQUIRED = "IMPORT_PERMISSION_REQUIRED"
     IMPORT_TOOL_DISABLED = "IMPORT_TOOL_DISABLED"
+    #: A tool plug-in's content restored into a new initiative its plug-in
+    #: could not be placed in.
+    IMPORT_TOOL_NOT_PLACED = "IMPORT_TOOL_NOT_PLACED"
     #: A zip that does not hold exactly one export at its top level.
     IMPORT_ARCHIVE_NO_ENVELOPE = "IMPORT_ARCHIVE_NO_ENVELOPE"
     #: An export of a different tool than the one it was imported from.
@@ -1360,8 +1389,8 @@ class MarketplaceMessages:
     #: deployment does not serve: a newer one, or another major version.
     LISTING_PLUGIN_API_INCOMPATIBLE = "MARKETPLACE_LISTING_PLUGIN_API_INCOMPATIBLE"
     #: A dashboard that ships with a plug-in, asked for by a guild that does not
-    #: have that plug-in installed. Its tiles draw that plug-in's widgets, so there
-    #: would be nothing behind any of them.
+    #: have that plug-in installed, or has a version older than the dashboard's.
+    #: Its tiles draw that plug-in's widgets and tables.
     LISTING_NEEDS_PLUGIN = "MARKETPLACE_LISTING_NEEDS_PLUGIN"
     #: An upgrade was asked for on a dashboard that was authored here, not
     #: installed — there is no listing to re-pin it to.
@@ -1437,23 +1466,24 @@ class MarketplaceRegistryMessages:
     SOURCE_CONFLICT = "MARKETPLACE_REGISTRY_SOURCE_CONFLICT"
     #: This deployment's operator added a publisher with the same prefix.
     PUBLISHER_CONFLICT = "MARKETPLACE_REGISTRY_PUBLISHER_CONFLICT"
-    #: The listing itself was refused by the catalog's validator.
+    #: The listing's uid or name is held by a different registry listing here,
+    #: or it moved into or out of a plug-in it was published as part of.
+    IDENTITY_CONFLICT = "MARKETPLACE_REGISTRY_IDENTITY_CONFLICT"
+    #: A version this deployment already holds came back with different
+    #: content. A published version is immutable: the publisher has to publish
+    #: the change as a new version.
+    VERSION_REUSED = "MARKETPLACE_REGISTRY_VERSION_REUSED"
+    #: The listing's contents were refused by the catalog's validator. Every
+    #: refusal with a more specific reason has its own code above.
     LISTING_REJECTED = "MARKETPLACE_REGISTRY_LISTING_REJECTED"
     #: A package's terms for a listing are not in the expected format, or name
     #: a combination terms never take. The listing keeps the terms it had.
     TERMS_INVALID = "MARKETPLACE_REGISTRY_TERMS_INVALID"
 
 
-class CounterMessages:
-    VIEW_MODE_REQUIRES_BOUNDS = "COUNTER_VIEW_MODE_REQUIRES_BOUNDS"
-    MIN_GREATER_THAN_MAX = "COUNTER_MIN_GREATER_THAN_MAX"
-    STEP_MUST_BE_POSITIVE = "COUNTER_STEP_MUST_BE_POSITIVE"
-
-
 class TrashMessages:
     NOT_FOUND = "TRASH_ITEM_NOT_FOUND"
     PURGE_REQUIRES_ADMIN = "TRASH_PURGE_REQUIRES_ADMIN"
-    UNKNOWN_ENTITY_TYPE = "TRASH_UNKNOWN_ENTITY_TYPE"
 
 
 class GuildPluginMessages:
@@ -1468,6 +1498,12 @@ class GuildPluginMessages:
     #: GUILD_INSTALLABLE_PLUGIN_KINDS. Publishable and browsable, not installable
     #: here, and told so by name rather than half-mounted.
     KIND_NOT_INSTALLABLE = "COMMUNITY_PLUGIN_KIND_NOT_INSTALLABLE"
+    #: Removing a tool plug-in deletes its tool's content once the deletion
+    #: window ends, and the request did not consent to that.
+    TOOL_DELETION_UNCONFIRMED = "COMMUNITY_PLUGIN_TOOL_DELETION_UNCONFIRMED"
+    #: The tool plug-in's tables could not be made as its version declares
+    #: them, so it was not installed or updated.
+    TOOL_NOT_PROVISIONED = "COMMUNITY_PLUGIN_TOOL_NOT_PROVISIONED"
 
     # --- configuration ---
     #: The request named a connection the pinned definition does not declare.
@@ -1512,9 +1548,9 @@ class GuildPluginMessages:
     #: The plug-in could not be asked to check what was typed into the
     #: connection, or answered something that cannot be stored; nothing was.
     CONNECTION_NOT_CHECKED = "COMMUNITY_PLUGIN_CONNECTION_NOT_CHECKED"
-    #: Another community holds the account the plug-in checked these values
-    #: against; nothing was stored.
-    CONNECTION_TAKEN = "COMMUNITY_PLUGIN_CONNECTION_TAKEN"
+    #: The platform connected this connection for every community, so no
+    #: community connects or disconnects it.
+    CONNECTION_HELD_BY_PLATFORM = "COMMUNITY_PLUGIN_CONNECTION_HELD_BY_PLATFORM"
     #: A connection the plug-in checks is saved on its own, not beside others.
     CONNECTION_CHECKED_ALONE = "COMMUNITY_PLUGIN_CONNECTION_CHECKED_ALONE"
     #: The plug-in is installed but turned off, so nothing flows through it.
@@ -1626,8 +1662,8 @@ class PluginServiceMessages:
     #: The registration's plug-in facts come from the registry, whose next refresh
     #: would bring it back, so it is switched off rather than removed.
     REGISTRY_MANAGED = "PLUGIN_SERVICE_REGISTRY_MANAGED"
-    #: An address, origin or key given for a declarative plug-in, whose calls
-    #: Initiative makes itself.
+    #: An address, origin or key given for a plug-in that runs no container: a
+    #: declarative one, whose calls Initiative makes itself, or a tool plug-in.
     DECLARATIVE_NOT_PLACED = "PLUGIN_SERVICE_DECLARATIVE_NOT_PLACED"
     #: A vendor value named a field the plug-in's manifest does not declare.
     UNKNOWN_VENDOR_FIELD = "PLUGIN_SERVICE_UNKNOWN_VENDOR_FIELD"
@@ -1653,9 +1689,22 @@ class PluginServiceMessages:
     VENDOR_SETUP_EXPIRED = "PLUGIN_SERVICE_VENDOR_SETUP_EXPIRED"
     #: The vendor did not answer the setup's code with the new client's values.
     VENDOR_SETUP_FAILED = "PLUGIN_SERVICE_VENDOR_SETUP_FAILED"
-    #: Sharing is turned off while a vendor installation is connected to more
-    #: than one community.
-    SHARED_ROUTES_IN_USE = "PLUGIN_SERVICE_SHARED_ROUTES_IN_USE"
+    #: A row of the plug-in's vendor check refused the vendor's answer, so the
+    #: values were not saved. Raised with ``params``: ``fields``, the vendor
+    #: fields the row names, one a line; ``message``, its localized text as
+    #: JSON; and ``shows``, what its ``shows`` answered, when it did.
+    VENDOR_CHECK_REFUSED = "PLUGIN_SERVICE_VENDOR_CHECK_REFUSED"
+    #: The vendor value the check signs with is not a key that can sign.
+    #: Raised with ``params`` ``fields``: that value's key.
+    VENDOR_KEY_UNUSABLE = "PLUGIN_SERVICE_VENDOR_KEY_UNUSABLE"
+    #: The vendor values changed while the vendor check ran on them, so what
+    #: was checked is not what would be written. Saving again checks again.
+    VENDOR_VALUES_CHANGED = "PLUGIN_SERVICE_VENDOR_VALUES_CHANGED"
+    #: The connection is not one the platform can connect for every
+    #: community: the plug-in does not declare it, or it is not a community
+    #: connection whose token is minted from the vendor values and that
+    #: Initiative checks itself.
+    CONNECTION_NOT_FOR_PLATFORM = "PLUGIN_SERVICE_CONNECTION_NOT_FOR_PLATFORM"
 
 
 class PluginSignInMessages:

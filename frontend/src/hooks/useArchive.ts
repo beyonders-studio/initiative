@@ -10,12 +10,16 @@
  * broadly rather than by kind.
  */
 import { archiveEntity, unarchiveEntity } from "@/api/generated/archive/archive";
-import type { ArchivableType, ArchiveResponse } from "@/api/generated/initiativeAPI.schemas";
+import type { ArchiveResponse, ContentKind } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
 import type { MutationOpts } from "@/types/mutation";
 
-export type ArchiveTarget = { entityType: ArchivableType; entityId: number };
+/** What a built-in archive names: a tool, a kind inside one, or an initiative. */
+export type ArchivableType = ContentKind | "initiative";
+
+/** What is archived: a built-in kind, or a kind of a tool plug-in's. */
+export type ArchiveTarget = { entityType: string; entityId: number };
 
 // Everything the community shows. Not a wide net for its own sake: archiving
 // cascades, so an initiative going away takes every tool in it and a project

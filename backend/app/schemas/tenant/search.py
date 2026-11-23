@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
-from app.core.search import SearchEntityType
-from app.core.tools import Tool
 from app.schemas.base import MentionStr
 from app.schemas.query import PageMeta
 
@@ -21,12 +19,12 @@ class SearchHit(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    entity_type: SearchEntityType
+    entity_type: str
     entity_id: int
     title: str
     snippet: str | None = None
     initiative_id: int | None = None
-    tool: Tool | None = None
+    tool: str | None = None
     tool_id: int | None = None
 
 
@@ -42,13 +40,13 @@ class SearchSuggestion(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    entity_type: SearchEntityType
+    entity_type: str
     entity_id: int
     #: A comment's is the start of what was written, so it mentions as the
     #: comment does.
     title: MentionStr
     initiative_id: int | None = None
-    tool: Tool | None = None
+    tool: str | None = None
     tool_id: int | None = None
     #: Whether this reader may change the thing, not only open it. A picker
     #: needs it to know which links are theirs to make: a relation describing

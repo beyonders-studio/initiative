@@ -20,11 +20,11 @@ from httpx2 import AsyncClient
 from app.models.platform.guild import CommunityRole
 from app.testing import (
     create_calendar,
-    create_counter_group,
     create_dashboard,
     create_file,
     create_initiative,
     create_project,
+    create_wiki,
 )
 
 # Every tool the guild home can show: its list path, and the factory that
@@ -33,28 +33,10 @@ from app.testing import (
 TOOL_LISTS = [
     pytest.param("/projects/", create_project, id="projects"),
     pytest.param("/files/", create_file, id="files"),
-    pytest.param("/counter-groups/", create_counter_group, id="counter-groups"),
+    pytest.param("/wikis/", create_wiki, id="wikis"),
     pytest.param("/calendars/", create_calendar, id="calendars"),
     pytest.param("/dashboards/", create_dashboard, id="dashboards"),
 ]
-
-# Projects and files are core (always on); the rest are opt-in switches
-# that default to off, and a tool has to be on for its list to return anything
-# at all — so every initiative these tests make has all of them on.
-ALL_TOOLS_ON = {
-    "counter_groups_enabled": True,
-    "calendars_enabled": True,
-    "dashboards_enabled": True,
-}
-
-
-async def _workspace(session, acting_user):
-    """A guild admin and an initiative with every tool switched on."""
-    actor = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    initiative = await create_initiative(
-        session, actor.guild, actor.user, name="Home", **ALL_TOOLS_ON
-    )
-    return actor, initiative
 
 
 async def _names(client: AsyncClient, actor, path: str, **params) -> list[str]:
@@ -65,97 +47,56 @@ async def _names(client: AsyncClient, actor, path: str, **params) -> list[str]:
 
 
 @pytest.mark.parametrize("path,factory", TOOL_LISTS)
-async def test_search_narrows_to_matching_names(
+async def test_search_and_sort_answer_over_the_whole_set(
     client: AsyncClient, session, acting_user, path, factory
 ):
-    """``search`` is a case-insensitive substring of the name, and it counts."""
-    a, home = await _workspace(session, acting_user)
-    await factory(session, home, a.user, name="Barovia Arc")
-    await factory(session, home, a.user, name="Waterdeep Docks")
+    """``search`` is a case-insensitive substring of the name, and it counts.
+    ``sort_by=name`` orders case-insensitively, ``initiative`` by the
+    initiative's *name* — the column the table shows — not its id, and
+    ``updated_at`` (``desc`` is the guild home's default) most-recently-touched
+    first. A sort field nobody offers is ignored, not an error."""
+    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    # Made in the opposite order to their names, so an id ordering would fail.
+    zebra = await create_initiative(session, a.guild, a.user, name="Zebra")
+    aardvark = await create_initiative(session, a.guild, a.user, name="Aardvark")
+    now = datetime.now(UTC)
+    # Each ordering below differs from the others.
+    for name, initiative, age in (
+        ("Zulu", zebra, 1),
+        ("alpha", zebra, 3),
+        ("Mike", aardvark, 0),
+    ):
+        await factory(
+            session, initiative, a.user, name=name, updated_at=now - timedelta(days=age)
+        )
 
-    response = await client.get(
-        a.g(path), headers=a.headers, params={"search": "barovia"}
-    )
-
+    response = await client.get(a.g(path), headers=a.headers, params={"search": "zUL"})
     assert response.status_code == 200, response.text
     body = response.json()
-    assert [item["name"] for item in body["items"]] == ["Barovia Arc"]
+    assert [item["name"] for item in body["items"]] == ["Zulu"]
     # The count is of what matched, not of what the guild holds — the pager
     # below the table reads it.
     assert body["total_count"] == 1
 
-
-@pytest.mark.parametrize("path,factory", TOOL_LISTS)
-async def test_sort_by_name(client: AsyncClient, session, acting_user, path, factory):
-    """``sort_by=name`` orders the whole set, in either direction."""
-    a, home = await _workspace(session, acting_user)
-    for name in ("Zulu", "alpha", "Mike"):
-        await factory(session, home, a.user, name=name)
-
-    ascending = await _names(client, a, path, sort_by="name")
-    descending = await _names(client, a, path, sort_by="name", sort_dir="desc")
-
-    # Case-insensitively, or "alpha" would sort after "Zulu".
-    assert ascending == ["alpha", "Mike", "Zulu"]
-    assert descending == ["Zulu", "Mike", "alpha"]
-
-
-@pytest.mark.parametrize("path,factory", TOOL_LISTS)
-async def test_sort_by_initiative(
-    client: AsyncClient, session, acting_user, path, factory
-):
-    """``sort_by=initiative`` orders by the initiative's *name* — the column
-    the table shows — not by its id."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    # Made in the opposite order to their names, so an id ordering would fail.
-    zebra = await create_initiative(
-        session, a.guild, a.user, name="Zebra", **ALL_TOOLS_ON
-    )
-    aardvark = await create_initiative(
-        session, a.guild, a.user, name="Aardvark", **ALL_TOOLS_ON
-    )
-    await factory(session, zebra, a.user, name="In Zebra")
-    await factory(session, aardvark, a.user, name="In Aardvark")
-
-    ascending = await _names(client, a, path, sort_by="initiative")
-    descending = await _names(client, a, path, sort_by="initiative", sort_dir="desc")
-
-    assert ascending == ["In Aardvark", "In Zebra"]
-    assert descending == ["In Zebra", "In Aardvark"]
-
-
-@pytest.mark.parametrize("path,factory", TOOL_LISTS)
-async def test_sort_by_last_updated(
-    client: AsyncClient, session, acting_user, path, factory
-):
-    """``sort_by=updated_at&sort_dir=desc`` is what the guild home asks for by
-    default, so it has to mean most-recently-touched first everywhere."""
-    a, home = await _workspace(session, acting_user)
-    now = datetime.now(UTC)
-    await factory(
-        session, home, a.user, name="Stale", updated_at=now - timedelta(days=3)
-    )
-    await factory(session, home, a.user, name="Fresh", updated_at=now)
-    await factory(
-        session, home, a.user, name="Middling", updated_at=now - timedelta(days=1)
-    )
-
-    newest_first = await _names(client, a, path, sort_by="updated_at", sort_dir="desc")
-    oldest_first = await _names(client, a, path, sort_by="updated_at", sort_dir="asc")
-
-    assert newest_first == ["Fresh", "Middling", "Stale"]
-    assert oldest_first == ["Stale", "Middling", "Fresh"]
-
-
-@pytest.mark.parametrize("path,factory", TOOL_LISTS)
-async def test_unknown_sort_falls_back_to_the_tool_default(
-    client: AsyncClient, session, acting_user, path, factory
-):
-    """A sort field nobody offers is ignored, not an error — the list still
-    answers in the tool's own order rather than failing the page."""
-    a, home = await _workspace(session, acting_user)
-    await factory(session, home, a.user, name="Only One")
-
+    assert await _names(client, a, path, sort_by="name") == ["alpha", "Mike", "Zulu"]
+    assert await _names(client, a, path, sort_by="name", sort_dir="desc") == [
+        "Zulu",
+        "Mike",
+        "alpha",
+    ]
+    assert (await _names(client, a, path, sort_by="initiative"))[0] == "Mike"
+    assert (await _names(client, a, path, sort_by="initiative", sort_dir="desc"))[
+        -1
+    ] == "Mike"
+    assert await _names(client, a, path, sort_by="updated_at", sort_dir="desc") == [
+        "Mike",
+        "Zulu",
+        "alpha",
+    ]
+    assert await _names(client, a, path, sort_by="updated_at", sort_dir="asc") == [
+        "alpha",
+        "Zulu",
+        "Mike",
+    ]
     names = await _names(client, a, path, sort_by="whatever", sort_dir="sideways")
-
-    assert names == ["Only One"]
+    assert sorted(names) == ["Mike", "Zulu", "alpha"]

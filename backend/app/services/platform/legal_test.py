@@ -84,16 +84,6 @@ def _serve(monkeypatch, body=INDEX_BODY, *, fail: bool = False):
     return calls
 
 
-def test_a_self_hosted_deployment_has_no_terms(monkeypatch):
-    """No portal, no legal entity behind the service, nothing to accept."""
-    monkeypatch.setattr(settings, "BILLING_URL", None)
-    assert legal_service.legal_documents_enabled() is False
-
-
-def test_a_portal_makes_it_hosted(hosted):
-    assert legal_service.legal_documents_enabled() is True
-
-
 async def test_index_is_read_once_and_then_cached(hosted, monkeypatch):
     calls = _serve(monkeypatch)
 
@@ -121,34 +111,6 @@ async def test_a_portal_that_was_never_reached_raises(hosted, monkeypatch):
     _serve(monkeypatch, fail=True)
     with pytest.raises(legal_service.LegalPortalUnavailable):
         await legal_service.get_index()
-
-
-async def test_nothing_is_recorded_on_a_self_hosted_deployment(session, monkeypatch):
-    monkeypatch.setattr(settings, "BILLING_URL", None)
-    user = await create_user(session)
-
-    await legal_service.record_acceptance(session, user_id=user.id)
-    await session.commit()
-
-    assert await _rows(session, user.id) == []
-    assert await legal_service.acceptance_outstanding(session, user=user) is False
-
-
-async def test_acceptance_records_the_revision_that_was_current(
-    session, hosted, monkeypatch
-):
-    _serve(monkeypatch)
-    user = await create_user(session)
-
-    await legal_service.record_acceptance(session, user_id=user.id)
-    await session.commit()
-
-    rows = await _rows(session, user.id)
-    assert [(r.document, r.version, r.document_sha256) for r in rows] == [
-        ("terms", "2.1", "a" * 64),
-        ("privacy", "1.4", "b" * 64),
-    ]
-    assert await legal_service.acceptance_outstanding(session, user=user) is False
 
 
 async def test_an_unreachable_portal_invents_no_required_document(

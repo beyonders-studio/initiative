@@ -12,13 +12,16 @@
  * is: it has no sharing to widen, so the entry would refuse everyone who clicked
  * it. The server says which plug-ins those are; this only honors the answer.
  *
- * And every visible entry leads somewhere: a plug-in with a surface opens it, an
- * plug-in with a credential to supply opens that form, and a plug-in with neither
- * waits under "show more" rather than spending a row on a dead click.
+ * And every visible entry leads somewhere: a plug-in with a surface opens it, a
+ * plug-in that asks each member for an account opens that, and a plug-in with
+ * neither waits under "show more" rather than spending a row on a dead click.
+ * The gear is there only when it opens something: the member's own account, or
+ * for the seat, the plug-in's community settings.
  */
 import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { buildCommunity } from "@/__tests__/factories";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { CommunityPluginRead } from "@/api/generated/initiativeAPI.schemas";
 import { SidebarProvider } from "@/components/sidebar/sidebar";
@@ -45,49 +48,56 @@ const plugin = (overrides: Partial<CommunityPluginRead> = {}) =>
 
 // The section is built from sidebar primitives, so it needs the providers it
 // would have in the real shell.
-const render = (isCommunityAdmin: boolean) =>
-  renderPage(() => (
-    <TooltipProvider>
-      <SidebarProvider>
-        <PluginsSection isCommunityAdmin={isCommunityAdmin} open onOpenChange={() => {}} />
-      </SidebarProvider>
-    </TooltipProvider>
-  ));
+const render = (isCommunityAdmin: boolean, role?: "superadmin") => {
+  const community = role ? buildCommunity({ role }) : undefined;
+  return renderPage(
+    () => (
+      <TooltipProvider>
+        <SidebarProvider>
+          <PluginsSection isCommunityAdmin={isCommunityAdmin} open onOpenChange={() => {}} />
+        </SidebarProvider>
+      </TooltipProvider>
+    ),
+    community
+      ? {
+          communities: {
+            communities: [community],
+            activeCommunityId: community.id,
+            activeCommunity: community,
+          },
+        }
+      : {}
+  );
+};
 
 beforeEach(() => {
   plugins = [];
 });
 
 describe("PluginsSection", () => {
-  it("points a member at the store when the community has no plug-ins", async () => {
-    // They cannot add one, but they can look and ask, so the shelf is worth
-    // pointing at rather than hiding.
-    render(false);
-    expect(await screen.findByText("Plug-ins")).toBeInTheDocument();
-    expect(screen.getByText("Browse the marketplace")).toBeInTheDocument();
-    expect(screen.queryByText("Add a plug-in")).toBeNull();
-  });
+  // A member cannot add one, but they can look and ask, so the shelf is worth
+  // pointing at rather than hiding; an admin is invited to add one.
+  it.each([
+    [false, "Browse the marketplace", "Add a plug-in"],
+    [true, "Add a plug-in", "Browse the marketplace"],
+  ])(
+    "offers a way in when the community has no plug-ins (admin: %s)",
+    async (admin, offered, absent) => {
+      render(admin);
+      expect(await screen.findByText("Plug-ins")).toBeInTheDocument();
+      expect(screen.getByText(offered)).toBeInTheDocument();
+      expect(screen.queryByText(absent)).toBeNull();
+    }
+  );
 
-  it("invites an admin to add one when the community has no plug-ins", async () => {
-    render(true);
-    expect(await screen.findByText("Plug-ins")).toBeInTheDocument();
-    expect(screen.getByText("Add a plug-in")).toBeInTheDocument();
-    expect(screen.queryByText("Browse the marketplace")).toBeNull();
-  });
-
-  it("lists installed plug-ins for a member", async () => {
+  it("lists installed plug-ins for a member, each linked to what it mounted", async () => {
     plugins = [plugin()];
     render(false);
     expect(await screen.findByText("Community calendar")).toBeInTheDocument();
     // No add affordance: installing is a community-admin action.
     expect(screen.queryByText("Add a plug-in")).toBeNull();
     expect(screen.getByText("Browse the marketplace")).toBeInTheDocument();
-  });
-
-  it("links a plug-in to what it mounted", async () => {
-    plugins = [plugin()];
-    render(false);
-    const link = (await screen.findByText("Community calendar")).closest("a");
+    const link = screen.getByText("Community calendar").closest("a");
     // The list, not one of them: a member may add calendars to the plug-in, so its
     // entry leads to everything it holds.
     expect(link?.getAttribute("href")).toContain("/calendars");
@@ -103,20 +113,15 @@ describe("PluginsSection", () => {
     expect(link?.getAttribute("href")).toContain("/calendars");
   });
 
-  it("hides a disabled plug-in", async () => {
-    // Turned off means gone from the sidebar; community settings is where it comes
-    // back, which is also the only place the switch lives.
+  // Turned off means gone from the sidebar; community settings is where it comes
+  // back, which is also the only place the switch lives. A member is still
+  // offered the store.
+  it.each([true, false])("hides a disabled plug-in (admin: %s)", async (admin) => {
     plugins = [plugin({ enabled: false })];
-    render(true);
+    render(admin);
     await screen.findByText("Plug-ins");
     expect(screen.queryByText("Community calendar")).toBeNull();
-  });
-
-  it("still offers the store to a member when every plug-in is disabled", async () => {
-    plugins = [plugin({ enabled: false })];
-    render(false);
-    expect(await screen.findByText("Browse the marketplace")).toBeInTheDocument();
-    expect(screen.queryByText("Community calendar")).toBeNull();
+    if (!admin) expect(screen.getByText("Browse the marketplace")).toBeInTheDocument();
   });
 
   it("opens a service plug-in's own page", async () => {
@@ -187,10 +192,7 @@ describe("PluginsSection", () => {
     expect(screen.queryByText("1 more")).toBeNull();
   });
 
-  it("gives every plug-in a settings gear, whatever else its entry does", async () => {
-    // Three shapes of entry — a page, a credential form, nothing at all — and
-    // the gear is on all of them, because every plug-in has something a person may
-    // want to check or take back.
+  it("gives a member the gear only where they have an account to connect", async () => {
     plugins = [
       plugin(),
       plugin({
@@ -203,14 +205,26 @@ describe("PluginsSection", () => {
     ];
     render(false);
     await screen.findByText("Community calendar");
-    expect(screen.getByLabelText("Community calendar settings")).toBeInTheDocument();
-    expect(screen.getByLabelText("GitHub settings")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Community calendar settings")).toBeNull();
+    expect(screen.getByRole("button", { name: "GitHub settings" })).toBeInTheDocument();
   });
 
-  it("gives the gear to a plug-in with nothing to open, once it is shown", async () => {
+  it("leaves a plug-in with nothing to open, and nothing of the member's, inert", async () => {
     plugins = [plugin({ name: "Widgets only", tool: null, artifacts: [] })];
     render(false);
     (await screen.findByText("1 more")).click();
-    expect(await screen.findByLabelText("Widgets only settings")).toBeInTheDocument();
+    expect(await screen.findByText("Widgets only")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Widgets only/ })).toBeNull();
+    expect(screen.queryByLabelText("Widgets only settings")).toBeNull();
+  });
+
+  it("sends the seat's gear straight to the plug-in's community settings", async () => {
+    plugins = [plugin({ id: 5, name: "Widgets only", tool: null, artifacts: [] })];
+    render(true, "superadmin");
+    (await screen.findByText("1 more")).click();
+    expect(await screen.findByRole("link", { name: "Widgets only settings" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("/settings/integrations?plugin=5")
+    );
   });
 });

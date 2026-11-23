@@ -16,8 +16,7 @@
 
 import { useMemo } from "react";
 
-import type { Tool } from "@/api/generated/initiativeAPI.schemas";
-import type { CommentEntity } from "@/components/comments/CommentSection";
+import type { ContentKind } from "@/api/generated/initiativeAPI.schemas";
 import { CommentSection } from "@/components/comments/CommentSection";
 import {
   type CommentThreadParams,
@@ -29,13 +28,13 @@ import type { ToolCommentEntity } from "@/lib/tools";
 import { StatusMessage } from "@/ui/status-message";
 
 interface ToolCommentsPanelProps {
-  /** Which tool answers for the thread — its switch, its sharing. */
-  tool: Tool;
+  /** Which tool answers for the thread, by its kind — its switch, its
+   *  sharing. */
+  tool: string;
   /** The tool entity itself, as its read schema returns it. */
   entity: ToolCommentEntity;
-  /** The thread itself, where it is not the tool entity's own — a wiki page.
-   *  Its `type` is the comment target's field name. */
-  target?: { type: CommentEntity; id: number };
+  /** The thread itself, where it is not the tool entity's own — a wiki page. */
+  target?: { type: ContentKind; id: number };
   title?: string;
   /** Called with +1/-1 when the thread grows or shrinks, for a page that shows
    *  a comment count of its own. */
@@ -49,26 +48,25 @@ export const ToolCommentsPanel = ({
   title,
   onCountChange,
 }: ToolCommentsPanelProps) => {
-  const targetType: CommentEntity = target?.type ?? tool;
+  const targetType: string = target?.type ?? tool;
   const entityId = target?.id ?? entity.id;
   const enabled = entity.comments_enabled ?? true;
   // A community-level entity (an plugin-installed calendar) belongs to no initiative;
   // 0 is what the mention lookups read as "no initiative to search".
   const initiativeId = entity.initiative_id ?? 0;
 
-  const params = useMemo<CommentThreadParams>(() => {
-    const next: CommentThreadParams = {};
-    next[`${targetType}_id`] = entityId;
-    return next;
-  }, [targetType, entityId]);
+  const subject = useMemo<CommentThreadParams>(
+    () => ({ subject_type: targetType, subject_id: entityId }),
+    [targetType, entityId]
+  );
 
-  const commentsQuery = useComments(params, { enabled: Number.isFinite(entityId) && enabled });
-  const thread = useCommentThreadState(params, {
+  const commentsQuery = useComments(subject, { enabled: Number.isFinite(entityId) && enabled });
+  const thread = useCommentThreadState(subject, {
     enabled: Number.isFinite(entityId) && enabled,
   });
   // Write the new row straight into this thread's cache, so the comment
   // appears under the box the moment it posts.
-  const cache = useCommentsCache(params);
+  const cache = useCommentsCache(subject);
 
   if (!enabled) return null;
 

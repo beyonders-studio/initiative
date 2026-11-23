@@ -26,7 +26,7 @@ class ArchiveResponse(SanitizedBaseModel):
     wants the whole row reads it back from the route that already serves it.
     """
 
-    entity_type: ArchivableType
+    entity_type: str
     entity_id: int
     archived_at: datetime | None = None
 

@@ -3,7 +3,7 @@ import fs from "fs";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig, loadEnv, type ProxyOptions } from "vite";
 
 import { contentPolicy } from "./electron/content-policy";
 import { buildNotices } from "./scripts/third-party-notices.mjs";
@@ -35,10 +35,21 @@ const CLOUD_ORIGIN = fs
   .readFileSync(path.resolve(import.meta.dirname, "../CLOUD_ORIGIN"), "utf-8")
   .trim();
 
-const createProxyConfig = (supportsWebSocket = false) => ({
+// A WebSocket upgrade keeps the Host the browser sent, so the backend sees the
+// address the page was served from, as it does behind a production proxy.
+type DevProxy = Parameters<NonNullable<ProxyOptions["configure"]>>[0];
+
+const keepHostOnUpgrade = (proxy: DevProxy) => {
+  proxy.on("proxyReqWs", (proxyReq, req) => {
+    if (req.headers.host) proxyReq.setHeader("host", req.headers.host);
+  });
+};
+
+const createProxyConfig = (supportsWebSocket = false): ProxyOptions => ({
   target: devProxyTarget,
   changeOrigin: true,
   ws: supportsWebSocket,
+  configure: supportsWebSocket ? keepHostOnUpgrade : undefined,
 });
 
 // The emoji picker (frimousse) fetches its dataset at runtime from
@@ -216,11 +227,9 @@ const thirdPartyNoticesPlugin = () => ({
   },
 });
 
-// Use relative paths for Capacitor builds (mobile apps load from file:// or local server)
 const isCapacitorBuild = process.env.CAPACITOR_BUILD === "true";
 
 export default defineConfig({
-  base: isCapacitorBuild ? "" : "/",
   define: {
     __APP_VERSION__: JSON.stringify(getVersion()),
     __CLOUD_ORIGIN__: JSON.stringify(CLOUD_ORIGIN),
@@ -321,6 +330,7 @@ export default defineConfig({
         ws: true,
         // Log proxy events for debugging
         configure: (proxy) => {
+          keepHostOnUpgrade(proxy);
           proxy.on("error", (err) => {
             console.log("Proxy error:", err);
           });

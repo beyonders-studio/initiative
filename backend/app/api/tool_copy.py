@@ -4,11 +4,12 @@ A copy is a create whose values come from another row. Every tool's copy takes
 the same steps in the same order here: who may copy, where the copy may go,
 what it is called, which columns come along, who it is shared with, and the
 tags, properties and files it carries. What differs from tool to tool is what
-lives inside it, and that is all ``TOOL_COPIERS`` holds.
+lives inside it, and that is all ``TOOL_COPIERS`` holds. A tool plug-in's tool
+is copied the same way, with the items under it.
 
 ``tool_lifecycle.py`` mounts ``POST /{tool}/{id}/duplicate`` for every tool
-here, and a project made from a template is a copy as well
-(``create_project``).
+here, ``plugin_tools.py`` for every tool plug-in's, and a project made from a
+template is a copy as well (``create_project``).
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ from collections.abc import Awaitable, Callable, Collection, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from fastapi import HTTPException, status
 from sqlalchemy import or_
@@ -26,9 +27,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api import resource_access
 from app.core.messages import FileMessages
+from app.core.tool_set import ToolRecord
 from app.core.tools import Tool
 from app.db.guild_standing import ActorContext, InstallContext
-from app.db.session import require_actor_context
+from app.db.session import require_actor_context, routed_tools
+from app.db.tool_rows import Located, ToolRow, table_of, text_columns
 from app.models.platform.user import User
 from app.models.tenant._mixins import (
     ArchiveMixin,
@@ -38,7 +41,6 @@ from app.models.tenant._mixins import (
 )
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
-from app.models.tenant.counter import Counter
 from app.models.tenant.metadata import MetadataDefinition
 from app.models.tenant.post import Post
 from app.models.tenant.post_poll import PostPoll, PostPollOption
@@ -48,11 +50,13 @@ from app.models.tenant.wiki import Wiki, WikiPage
 from app.schemas.base import RESERVED_SIGIL_CODE, RESERVED_SIGILS
 from app.schemas.tenant.resource_grant import ResourceGrantSchema
 from app.services import notifications as notifications_service
+from app.services.permissions import grants_of
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import calendar_occurrences as occurrences_service
 from app.services.tenant import (
     content_references,
     named_people,
+    plugin_tool_rows,
     project_grants,
     relationships,
     task_creation,
@@ -106,13 +110,13 @@ _NOT_CARRIED = frozenset(
 )
 
 
-def _carried(model: Any, skip: Collection[str] = ()) -> list[str]:
-    """The columns a copy takes from its source: everything the row says about
-    itself, but not its identity, its lifecycle, the rows it points at, which
-    are the copy's own, or ``skip``."""
+def _carried(table: Any, skip: Collection[str] = ()) -> list[str]:
+    """The columns a copy takes from its source's ``table``: everything the
+    row says about itself, but not its identity, its lifecycle, the rows it
+    points at, which are the copy's own, or ``skip``."""
     return [
         column.name
-        for column in model.__table__.columns
+        for column in table.columns
         if not column.primary_key
         and not column.foreign_keys
         and column.name not in _NOT_CARRIED
@@ -125,31 +129,61 @@ def _clone(source: Any, reset: Mapping[str, Any] | None = None, **values: Any) -
     with ``reset`` and ``values`` set on top. ``source`` is loaded."""
     reset = reset or {}
     model = type(source)
-    carried = {c: deepcopy(getattr(source, c)) for c in _carried(model, reset)}
+    carried = {
+        c: deepcopy(getattr(source, c)) for c in _carried(model.__table__, reset)
+    }
     return model(**{**carried, **reset, **values})
 
 
+async def _made(session: AsyncSession, source: Any, columns: Mapping[str, Any]) -> Any:
+    """A new row of ``source``'s table holding ``columns``, written: a model's
+    instance, or a tool plug-in's row."""
+    if isinstance(source, ToolRow):
+        row_id = await plugin_tool_rows.insert(session, source.table, columns)
+        return ToolRow(source.table, {**columns, "id": row_id})
+    copy = type(source)(**columns)
+    session.add(copy)
+    await session.flush()
+    return copy
+
+
 async def _record_references(session: AsyncSession, rows: Sequence[Any]) -> None:
-    """Record what the copies' own text points at, for a model whose body
-    makes links (``content_references.BODY_COLUMNS``)."""
-    found = next(
-        (
-            (kind, column)
-            for kind, (model, column) in content_references.BODY_COLUMNS.items()
-            if rows and type(rows[0]) is model
-        ),
-        None,
-    )
-    if found is None:
+    """Record what the copies' own text points at: a model's body
+    (``content_references.BODY_COLUMNS``), or a tool plug-in's row's text
+    fields."""
+    if not rows:
         return
-    kind, column = found
+    tools = routed_tools(session)
+    if isinstance(rows[0], ToolRow):
+        kind = tools.table_kinds[rows[0].table.name]
+        texts = [column.name for column in text_columns(rows[0].table)]
+
+        def body(row: Any) -> Any:
+            return content_references.texts_body(row.values[t] for t in texts)
+
+    else:
+        found = next(
+            (
+                (kind, column)
+                for kind, (model, column) in content_references.BODY_COLUMNS.items()
+                if type(rows[0]) is model
+            ),
+            None,
+        )
+        if found is None:
+            return
+        kind, column = found
+
+        def body(row: Any) -> Any:
+            return getattr(row, column)
+
     author_id = require_actor_context(session).user_id
     for row in rows:
-        if getattr(row, column):
+        if text := body(row):
             await content_references.sync_for_entity(
                 session,
-                Endpoint(kind, row.id),
-                body=getattr(row, column),
+                Endpoint.of(tools, kind, row.id),
+                body=text,
                 author_id=author_id,
             )
 
@@ -157,20 +191,25 @@ async def _record_references(session: AsyncSession, rows: Sequence[Any]) -> None
 async def _copy_extras(
     session: AsyncSession, pairs: Sequence[tuple[Any, Any]], *, beside: bool
 ) -> None:
-    """The tags, links and text references of rows copied inside a tool, one
-    model at a time, and their property values when the copy stays in its
-    initiative."""
+    """The tags, links and text references of rows copied, of one table at a
+    time, and their property values when the copy stays in its initiative."""
     if not pairs:
         return
-    model = type(pairs[0][0])
+    source = pairs[0][0]
+    tools = routed_tools(session)
+    kind = tools.table_kinds.get(table_of(source).name)
     copies = {source.id: copy.id for source, copy in pairs}
-    spec = next((s for s in tags_service.TAG_LINKS.values() if s.entity is model), None)
+    spec = tags_service.tag_links(tools).get(kind or "")
     if spec is not None:
         await tags_service.copy_entity_tags(session, spec, copies)
         await relationships.copy_links(session, spec.kind, copies)
     await _record_references(session, [copy for _, copy in pairs])
-    if beside and model in metadata_service.PROPERTY_LINKS_BY_MODEL:
-        await metadata_service.copy_values(session, model, copies)
+    # Definitions belong to an initiative, so values only go where they apply.
+    if beside and (
+        isinstance(source, ToolRow)
+        or type(source) in metadata_service.PROPERTY_LINKS_BY_MODEL
+    ):
+        await metadata_service.copy_values(session, source, copies)
 
 
 async def _copy_children(
@@ -211,9 +250,26 @@ async def load_source(
     return source
 
 
+def _named(source: Any, name: str | None, *, beside: bool, sigils: bool) -> str:
+    """What a copy of ``source`` is called: ``name`` where given, beside its
+    source "<name> (Copy)", and elsewhere its source's name. A name carrying
+    the reserved sigils is refused unless the tool's names may (``sigils``)."""
+    name = (name or "").strip() or (
+        copy_name(source.name, _length(table_of(source), "name"))
+        if beside
+        else source.name
+    )
+    if not sigils and RESERVED_SIGILS.intersection(name):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=RESERVED_SIGIL_CODE,
+        )
+    return name
+
+
 async def duplicate(
     session: AsyncSession,
-    tool: Tool,
+    tool: Tool | ToolRecord,
     source: Any,
     *,
     initiative_id: int | None,
@@ -228,27 +284,22 @@ async def duplicate(
     what a create there is held to. Beside its source the copy is called
     "<name> (Copy)" unless ``name`` is given; elsewhere it keeps the name,
     unless the source's initiative keeps its content in, which refuses it.
+    ``source`` is a tool's model instance, or a tool plug-in's tool's row.
 
     ``values`` overrides carried columns (a project made from a template takes
     its own dates), and ``grants`` replaces the source's sharing. Raises
     ``StorageQuotaExceededError`` when its files do not fit. The caller
     commits.
     """
-    copier = TOOL_COPIERS[tool]
-    model = type(source)
+    copier = TOOL_COPIERS.get(tool, _INSTALLED)
+    table = table_of(source)
     initiative_id = initiative_id or source.initiative_id
     beside = initiative_id == source.initiative_id
     await resource_access.require_stays_in(session, source.initiative_id, initiative_id)
     await resource_access.prepare_create(session, tool, initiative_id, user, actor)
-    name = (name or "").strip() or (
-        copy_name(source.name, _length(model, "name")) if beside else source.name
-    )
-    if not copier.name_takes_sigils and RESERVED_SIGILS.intersection(name):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=RESERVED_SIGIL_CODE,
-        )
+    name = _named(source, name, beside=beside, sigils=copier.name_takes_sigils)
     if copier.name_taken is not None:
+        model = type(source)
         await ensure_name_free(
             session,
             model.name,
@@ -257,20 +308,26 @@ async def duplicate(
             detail=copier.name_taken,
         )
 
-    columns = _carried(model, copier.reset)
-    # Deferred columns (a file's body) are read too.
-    await session.refresh(source, columns)
-    copy = model(
-        **{
+    columns = _carried(table, copier.reset)
+    if not isinstance(source, ToolRow):
+        # Deferred columns (a file's body) are read too.
+        await session.refresh(source, columns)
+    copy = await _made(
+        session,
+        source,
+        {
             **{column: deepcopy(getattr(source, column)) for column in columns},
             **copier.reset,
             **(values or {}),
             "name": name,
             "initiative_id": initiative_id,
-        }
+        },
     )
-    session.add(copy)
-    await session.flush()
+    if grants is None:
+        held = await grants_of(session, tool.value, [source.id])
+        grants = resource_access.duplicate_sharing(
+            held.get(source.id, []), beside=beside
+        )
     await resource_access.grant_initial_sharing(
         session,
         actor,
@@ -279,11 +336,7 @@ async def duplicate(
         resource_id=copy.id,
         initiative_id=initiative_id,
         payload=payload,
-        grants=(
-            resource_access.duplicate_sharing(source, initiative_id=initiative_id)
-            if grants is None
-            else grants
-        ),
+        grants=grants,
     )
     # Everything inside is reached through the copy, so its sharing lands first.
     await session.flush()
@@ -293,15 +346,91 @@ async def duplicate(
         if copier.contents
         else []
     )
-    spec = tags_service.TOOL_TAG_LINKS[tool]
-    await tags_service.copy_entity_tags(session, spec, {source.id: copy.id})
-    await relationships.copy_links(session, spec.kind, {source.id: copy.id})
-    await _record_references(session, [copy])
-    # Definitions belong to an initiative, so values only go where they apply.
-    if beside and model in metadata_service.PROPERTY_LINKS_BY_MODEL:
-        await metadata_service.copy_values(session, model, {source.id: copy.id})
+    await _copy_extras(session, [(source, copy)], beside=beside)
     # Files kept for another initiative are copied for the copy's.
     await attachments_service.claim_uploads(session, copy, *rows)
+    return copy
+
+
+async def _copy_rows(
+    session: AsyncSession,
+    located: Located,
+    sources: Sequence[ToolRow],
+    *,
+    beside: bool,
+    values: Mapping[str, Any],
+) -> list[tuple[ToolRow, ToolRow]]:
+    """Copy ``sources``, rows of a tool plug-in's ``located`` table, with
+    ``values`` set on each, as :func:`_copy_children` copies a model's, and
+    the items under each under its copy; returns the pairs."""
+    columns = _carried(located.table)
+    pairs = [
+        (
+            source,
+            await _made(
+                session,
+                source,
+                {**{c: deepcopy(source.values[c]) for c in columns}, **values},
+            ),
+        )
+        for source in sources
+    ]
+    await _copy_extras(session, pairs, beside=beside)
+    for source, copy in pairs:
+        await _copy_items(session, located, source.id, copy.id, beside=beside)
+    return pairs
+
+
+async def _copy_items(
+    session: AsyncSession,
+    located: Located,
+    source_id: int,
+    copy_id: int,
+    *,
+    beside: bool,
+) -> None:
+    """Copy the items directly under ``source_id``, a row of a tool plug-in's
+    ``located`` table, to sit under ``copy_id``, and theirs under theirs."""
+    tools = routed_tools(session)
+    for child in plugin_tool_rows.children(located, tools):
+        await _copy_rows(
+            session,
+            child,
+            await plugin_tool_rows.rows_under(session, child, tools, source_id),
+            beside=beside,
+            values={cast(str, plugin_tool_rows.parent_column(child)): copy_id},
+        )
+
+
+async def _installed_contents(
+    session: AsyncSession, source: ToolRow, copy: ToolRow, actor: ActorContext
+) -> list[Any]:
+    """The items under a tool plug-in's tool's row."""
+    tools = routed_tools(session)
+    located = plugin_tool_rows.located_kind(tools, tools.table_kinds[source.table.name])
+    await _copy_items(
+        session, located, source.id, copy.id, beside=_beside(source, copy)
+    )
+    return []
+
+
+async def duplicate_item(
+    session: AsyncSession, located: Located, source: ToolRow, *, name: str | None
+) -> ToolRow:
+    """Copy ``source``, an item of a tool plug-in's tool, beside itself as
+    "<name> (Copy)" unless ``name`` is given, with the items under it, as
+    :func:`duplicate_child` copies a built-in tool's. The caller commits."""
+    parent = cast(str, plugin_tool_rows.parent_column(located))
+    ((_, copy),) = await _copy_rows(
+        session,
+        located,
+        [source],
+        beside=True,
+        values={
+            parent: source.values[parent],
+            "name": _named(source, name, beside=True, sigils=False),
+        },
+    )
     return copy
 
 
@@ -364,28 +493,6 @@ async def _announce_project(session: AsyncSession, project_id: int, user: User) 
 
 def _beside(source: Any, copy: Any) -> bool:
     return source.initiative_id == copy.initiative_id
-
-
-def _rows_inside(model: type) -> Contents:
-    """The contents of a tool that is a list of ``model`` rows: each copied
-    into the copy."""
-    parent = resource_access.parent_column(model)
-
-    async def contents(
-        session: AsyncSession, source: Any, copy: Any, actor: ActorContext
-    ) -> list[Any]:
-        rows = (
-            await session.exec(select(model).where(getattr(model, parent) == source.id))
-        ).all()
-        pairs = await _copy_children(
-            session,
-            rows,
-            beside=_beside(source, copy),
-            values=lambda row: {parent: copy.id},
-        )
-        return [clone for _, clone in pairs]
-
-    return contents
 
 
 async def _post_contents(
@@ -521,14 +628,14 @@ async def _wiki_contents(
     return [clone for _, clone in pairs]
 
 
-def _length(model: Any, column: str) -> int | None:
-    return getattr(model.__table__.c[column].type, "length", None)
+def _length(table: Any, column: str) -> int | None:
+    return getattr(table.c[column].type, "length", None)
 
 
 def copied_name(source: Any) -> str:
     """What a copy of ``source``, a row inside a tool, is called beside it."""
     column = resource_access.SUB_TOOLS[type(source)].name
-    return copy_name(getattr(source, column), _length(type(source), column))
+    return copy_name(getattr(source, column), _length(table_of(source), column))
 
 
 async def duplicate_child(session: AsyncSession, source: Any, **values: Any) -> Any:
@@ -615,6 +722,9 @@ async def duplicate_event(
     return copy
 
 
+#: A tool plug-in's tool's: the items under its row.
+_INSTALLED = ToolCopier(contents=_installed_contents)
+
 TOOL_COPIERS: dict[Tool, ToolCopier] = {
     Tool.project: ToolCopier(
         copies=frozenset({Task}),
@@ -627,9 +737,6 @@ TOOL_COPIERS: dict[Tool, ToolCopier] = {
         reset={"is_template": False, "yjs_state": None, "yjs_updated_at": None},
         name_taken=FileMessages.NAME_ALREADY_EXISTS,
         name_takes_sigils=True,
-    ),
-    Tool.counter_group: ToolCopier(
-        copies=frozenset({Counter}), contents=_rows_inside(Counter)
     ),
     Tool.dashboard: ToolCopier(),
     Tool.calendar: ToolCopier(

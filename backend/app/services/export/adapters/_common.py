@@ -4,10 +4,13 @@ is built on.
 A tool's export is the same shape every time: take the selection out of the
 job params, fetch each entity under the caller's RLS session, count the rows
 it is worth, and turn it into a render item named after the entity and the
-date. ``ToolExportAdapter`` holds that shape and derives the registry key and
+date. ``ToolExportAdapter`` holds that shape, derives the registry key and
 the envelope suffix from the tool's own ``Tool`` value, the way
-``tool_envelope_type`` already does — so a per-tool module states only which
-rows it loads and how one row serialises.
+``tool_envelope_type`` already does, and writes every tool's envelope the same
+way (``export.envelope``) — so a per-tool module states only which rows it
+loads and the formats of its own. It reads the tool as the community has it
+(its ``ToolRecord``), so a tool plug-in's source (``adapters.installed``) is
+built on it too.
 """
 
 from __future__ import annotations
@@ -22,13 +25,13 @@ from sqlalchemy import ColumnElement
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.messages import ExportMessages, InitiativeMessages
+from app.core.messages import ExportMessages, InitiativeMessages, KindMessages
 from app.core.relationships import Related
-from app.core.tools import Tool, tool_envelope_type, tool_export_source
+from app.core.tool_set import ToolRecord
+from app.core.tools import Tool, kind_refusal, tool_envelope_type, tool_export_source
 from app.core.user_input_validators import resolve_zone
 from app.db import session as db_session
 from app.models.platform.user import User
-from app.models.tenant._mixins import tool_models
 from app.models.tenant.file import File, FileVersion
 from app.models.tenant.project import Project
 from app.models.tenant.task import Task
@@ -38,8 +41,8 @@ from app.services.export.engine import ExportError
 from app.services.export.filters import narrow, parse_filters
 from app.services.export.i18n import et, export_locale
 from app.services.permissions import (
-    DAC_RESOURCES,
     EXPORT_ACCESS,
+    DacResource,
     require_export_access,
 )
 from app.services.platform.csv_export import safe_filename_component
@@ -192,7 +195,7 @@ async def get_for_export(
     session: AsyncSession,
     user: User,
     guild_id: int,
-    tool: Tool,
+    tool: Tool | ToolRecord,
     entity_id: int,
     load: Callable[[AsyncSession, int], Awaitable[Any]],
     /,
@@ -213,12 +216,12 @@ async def get_for_export(
             user.id,
             guild_id,
         )
-    if row.initiative is not None and not await tool_on_in(
-        session, row.initiative, tool
-    ):
+    # A tool plug-in's row is loaded on its tool's switch.
+    initiative = getattr(row, "initiative", None)
+    if initiative is not None and not await tool_on_in(session, initiative, tool):
         raise tool.disabled()
     require_export_access(
-        DAC_RESOURCES[tool],
+        DacResource(tool),
         row,
         context=db_session.guild_context(session),
         access=access,
@@ -283,23 +286,29 @@ class ToolExportAdapter:
     """The per-tool export source: a selection of entities, each rendered as
     one item.
 
-    A subclass names its ``Tool`` and fills in the tool-shaped hooks —
+    A subclass names its ``Tool`` (or, for a tool plug-in's, its ``kind``)
+    and fills in the tool-shaped hooks —
     :meth:`get_row` (how one row loads, when not the tool's registered
     loader), :meth:`in_initiative` (which of them one initiative's export
     holds, when not every row the initiative has), :meth:`rows` (how many
-    rows one entity is worth) and :meth:`item` (how one entity serialises). Everything else — the registry key, the selection
-    params, counting, and the ``RenderRequest`` — is the same for every tool
-    and lives here.
+    rows one entity is worth), :meth:`fields` (what its envelope carries that
+    the row does not hold as it is) and :meth:`item` (how one entity
+    serialises in a format of the tool's own). Everything else — the registry
+    key, the selection params, counting, the envelope, and the
+    ``RenderRequest`` — is the same for every tool and lives here.
     """
 
     tool: Tool
+    #: Its kind, as the community's tools name it (``ToolSet.by_kind``).
+    kind: str
     source: str
     # Required by the SourceAdapter protocol; a json envelope renders no
     # template. A tool with report formats names its own.
     template_id: str = "data-table"
     #: The formats this tool exports in, in the order its route publishes
-    #: them.
-    formats: tuple[str, ...] = ("json",)
+    #: them: its record's (``ToolSpec.export_formats``), or, for a tool whose
+    #: formats depend on each row, the adapter's own.
+    formats: tuple[str, ...]
     #: What a marketplace listing of this tool shows beside what it installs.
     #: A tool made of content previews with an example the publisher filled in;
     #: a tool made of queries over the community's data previews with sample
@@ -312,7 +321,21 @@ class ToolExportAdapter:
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
-        cls.source = tool_export_source(cls.tool)
+        tool = cls.__dict__.get("tool")
+        if tool is None:
+            return
+        cls.kind = tool.value
+        cls.source = tool_export_source(tool)
+        if (formats := tool.spec.export_formats) is not None:
+            cls.formats = formats
+
+    def record(self, session: AsyncSession) -> ToolRecord:
+        """The tool, as the community ``session`` is routed into has it: not
+        found where it has none of this kind."""
+        found = db_session.routed_tools(session).by_kind.get(self.kind)
+        if found is None:
+            raise kind_refusal(self.kind, KindMessages.NOT_FOUND, 404)
+        return found
 
     # -- what a tool states --------------------------------------------------
 
@@ -330,7 +353,13 @@ class ToolExportAdapter:
         session (:func:`get_for_export`). A tool whose export carries more
         than the row extends this."""
         return await get_for_export(
-            session, user, guild_id, self.tool, entity_id, self.get_row, access=access
+            session,
+            user,
+            guild_id,
+            self.record(session),
+            entity_id,
+            self.get_row,
+            access=access,
         )
 
     async def get_row(self, session: AsyncSession, entity_id: int, /) -> Any:
@@ -341,14 +370,17 @@ class ToolExportAdapter:
         config = RESOURCE_ACCESS[self.tool]
         return await (config.hydrated_loader or config.loader)(session, entity_id)
 
-    def in_initiative(self, initiative_id: int, /) -> list[ColumnElement[bool]]:
-        """The WHERE legs naming this tool's rows that an initiative or
-        community export of one initiative may include: that initiative's,
-        where it has the tool switched on."""
-        model = tool_models()[self.tool.plural]
+    def in_initiative(
+        self, record: ToolRecord, initiative_id: int, /
+    ) -> list[ColumnElement[bool]]:
+        """The WHERE legs naming the live rows of ``record``'s table that an
+        initiative or community export of one initiative may include: that
+        initiative's, where it has the tool switched on."""
+        table = record.table
         return [
-            model.initiative_id == initiative_id,
-            initiative_switch_clause(self.tool, model),
+            table.c.initiative_id == initiative_id,
+            table.c.deleted_at.is_(None),
+            initiative_switch_clause(record, table.c),
         ]
 
     async def initiative_ids(
@@ -356,12 +388,12 @@ class ToolExportAdapter:
     ) -> list[int]:
         """The ids of this tool's entities in one initiative that an initiative
         or community export may include, in id order."""
-        model = tool_models()[self.tool.plural]
+        record = self.record(session)
         return list(
             await session.exec(
-                select(model.id)
-                .where(*self.in_initiative(initiative_id))
-                .order_by(model.id.asc())
+                select(record.table.c.id)
+                .where(*self.in_initiative(record, initiative_id))
+                .order_by(record.table.c.id.asc())
             )
         )
 
@@ -376,8 +408,20 @@ class ToolExportAdapter:
         return 1
 
     def item(self, entity: Any, ctx: BuildContext, /) -> RenderItem:
-        """Serialise one entity into its render item."""
-        raise NotImplementedError
+        """Serialise one entity into its render item: its envelope, which every
+        tool writes the same way (``export.envelope``). A tool with formats of
+        its own writes those."""
+        from app.services.export.envelope import envelope
+
+        return RenderItem(
+            key=envelope_key(self.tool, self.title(entity), ctx.date),
+            data=envelope(self.tool, entity, **self.fields(entity, ctx)),
+        )
+
+    def fields(self, entity: Any, ctx: BuildContext, /) -> dict[str, Any]:
+        """What the entity's envelope carries that its row does not hold as it
+        is: none, unless the tool says."""
+        return {}
 
     def items(self, entity: Any, ctx: BuildContext, /) -> tuple[RenderItem, ...]:
         """Every file one entity becomes. One, unless its contents travel
@@ -418,15 +462,28 @@ class ToolExportAdapter:
         many entities gains by loading them all before building any."""
         return type(self).prepare is not ToolExportAdapter.prepare
 
+    def filters_of(self, raw: Any) -> BaseModel | None:
+        """The tool's export filters from a job's params, or ``None``."""
+        return parse_filters(self.tool, raw)
+
+    async def narrow(
+        self,
+        session: AsyncSession,
+        user: User,
+        filters: BaseModel | None,
+        ids: list[int],
+    ) -> list[int]:
+        """The ids, in their order, that the tool's list answers with
+        ``filters`` (``export.filters.narrow``)."""
+        return await narrow(session, user, self.tool, filters, ids)
+
     # -- the shape every tool shares -----------------------------------------
 
     def selection(self, params: dict) -> list[int]:
         """The ids this request selected, read from the tool's own selector
-        keys (``{tool}_ids``, or the single ``{tool}_id``)."""
+        keys (``{kind}_ids``, or the single ``{kind}_id``)."""
         return selection_ids(
-            params,
-            single_key=f"{self.tool.value}_id",
-            multi_key=f"{self.tool.value}_ids",
+            params, single_key=f"{self.kind}_id", multi_key=f"{self.kind}_ids"
         )
 
     async def load(
@@ -439,18 +496,17 @@ class ToolExportAdapter:
     ) -> list[Any]:
         """Every selected entity, fetched and authorized one by one, then
         narrowed to those the tool's filters leave. A selection is refused
-        whole if any of it is, filtered out or not."""
+        whole if any of it is, filtered out or not, and in a format the tool
+        does not export in."""
+        if format not in (self.record(session).spec.export_formats or self.formats):
+            raise ExportError(ExportMessages.EXPORT_INVALID_FORMAT)
         ids = self.selection(params)
         entities = [
             await self.fetch(session, user, guild_id, entity_id) for entity_id in ids
         ]
         kept = set(
-            await narrow(
-                session,
-                user,
-                self.tool,
-                parse_filters(self.tool, params.get("filters")),
-                ids,
+            await self.narrow(
+                session, user, self.filters_of(params.get("filters")), ids
             )
         )
         return [entity for entity_id, entity in zip(ids, entities) if entity_id in kept]
@@ -484,7 +540,7 @@ class ToolExportAdapter:
             # One clock read: the filename date and the subtitle timestamp
             # must not straddle midnight into disagreeing dates.
             now=datetime.now(resolve_zone(params.get("tz"))),
-            filters=parse_filters(self.tool, params.get("filters")),
+            filters=self.filters_of(params.get("filters")),
         )
         ctx = replace(ctx, prepared=await self.prepare(session, entities, ctx))
         batch = self.batch(entities, ctx)

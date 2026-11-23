@@ -64,8 +64,6 @@ const renderPage = (role: "owner" | "operator" = "owner") =>
     auth: { user: buildUser({ role }) },
   });
 
-const toggle = () => screen.getByLabelText("Run a community directory");
-
 // For every test in the file, so none starts on what another left.
 beforeEach(() => {
   updateMutate.mockClear();
@@ -80,53 +78,41 @@ beforeEach(() => {
 });
 
 describe("CommunityPage", () => {
-  it("starts off, matching a deployment that has never turned it on", async () => {
+  // Each switch writes only its own half beside the directory value: omitting
+  // the others is what leaves them as they were (the age gate on, messaging
+  // and guests off here), since they are separate decisions on one endpoint.
+  it.each([
+    ["Run a community directory", {}, { community_directory_enabled: true }],
+    [
+      "Run a community directory",
+      { communityDirectory: true, directMessages: false },
+      { community_directory_enabled: false },
+    ],
+    ["Let communities rank results by engagement", {}, { engagement_ranking_enabled: false }],
+    ["Check members' age", { ageGate: false }, { age_gate_enabled: true }],
+    ["Let people message each other", { directMessages: false }, { direct_messages_enabled: true }],
+    ["Allow guests", {}, { guests_enabled: true }],
+    ["Let anyone sign up", {}, { public_registration_enabled: false }],
+    ["Let anyone create a community", {}, { community_creation_enabled: false }],
+  ] as const)("flips %s without asking (%o)", (label, overrides, patch) => {
+    Object.assign(config, overrides);
     renderPage();
+    const value = Object.values(patch).at(-1);
+    const toggle = screen.getByRole("switch", { name: label, checked: !value });
 
-    expect(await screen.findByLabelText("Run a community directory")).not.toBeChecked();
-  });
-
-  it("turns the directory on", async () => {
-    renderPage();
-    fireEvent.click(await screen.findByLabelText("Run a community directory"));
-
-    expect(updateMutate).toHaveBeenCalledWith({ community_directory_enabled: true });
-  });
-
-  it("turns it back off", async () => {
-    config.communityDirectory = true;
-    renderPage();
-
-    expect(toggle()).toBeChecked();
-    fireEvent.click(toggle());
-
-    expect(updateMutate).toHaveBeenCalledWith({ community_directory_enabled: false });
-  });
-
-  it("turns engagement ranking off for every community", async () => {
-    renderPage();
-    const ranking = await screen.findByLabelText("Let communities rank results by engagement");
-
-    expect(ranking).toBeChecked();
-    fireEvent.click(ranking);
+    fireEvent.click(toggle);
 
     expect(updateMutate).toHaveBeenCalledWith({
-      community_directory_enabled: false,
-      engagement_ranking_enabled: false,
+      community_directory_enabled: config.communityDirectory,
+      ...patch,
     });
-  });
-
-  const ageToggle = () => screen.getByLabelText("Check members' age");
-
-  it("starts asking members their age", async () => {
-    renderPage();
-
-    expect(await screen.findByLabelText("Check members' age")).toBeChecked();
   });
 
   it("only stops asking once the owner asserts everyone here is an adult", async () => {
     renderPage();
-    fireEvent.click(ageToggle());
+    const ageToggle = screen.getByLabelText("Check members' age");
+    expect(ageToggle).toBeChecked();
+    fireEvent.click(ageToggle);
 
     // The switch alone writes nothing — the assertion is the confirmation.
     expect(updateMutate).not.toHaveBeenCalled();
@@ -139,39 +125,12 @@ describe("CommunityPage", () => {
     });
   });
 
-  it("turns the question back on without asking anything", () => {
-    config.ageGate = false;
-    renderPage();
-
-    expect(ageToggle()).not.toBeChecked();
-    fireEvent.click(ageToggle());
-
-    expect(updateMutate).toHaveBeenCalledWith({
-      community_directory_enabled: false,
-      age_gate_enabled: true,
-    });
-  });
-
-  it("carries the age gate through a directory toggle unchanged", () => {
-    renderPage();
-    fireEvent.click(toggle());
-
-    // The directory switch writes only its own half; omitting the other is
-    // what leaves the owner's assertion alone.
-    expect(updateMutate).toHaveBeenCalledWith({ community_directory_enabled: true });
-  });
-
-  const messagesToggle = () => screen.getByLabelText("Let people message each other");
-
-  it("starts on, matching a deployment that upgraded into the switch", async () => {
-    renderPage();
-
-    expect(await screen.findByLabelText("Let people message each other")).toBeChecked();
-  });
-
   it("only turns messaging off once the owner confirms", async () => {
     renderPage();
-    fireEvent.click(messagesToggle());
+    // On, matching a deployment that upgraded into the switch.
+    const messagesToggle = screen.getByLabelText("Let people message each other");
+    expect(messagesToggle).toBeChecked();
+    fireEvent.click(messagesToggle);
 
     // The switch alone writes nothing: this takes a feature away from
     // everybody using it.
@@ -183,29 +142,6 @@ describe("CommunityPage", () => {
       community_directory_enabled: false,
       direct_messages_enabled: false,
     });
-  });
-
-  it("turns messaging back on without asking anything", () => {
-    config.directMessages = false;
-    renderPage();
-
-    expect(messagesToggle()).not.toBeChecked();
-    fireEvent.click(messagesToggle());
-
-    expect(updateMutate).toHaveBeenCalledWith({
-      community_directory_enabled: false,
-      direct_messages_enabled: true,
-    });
-  });
-
-  it("leaves messaging alone when the directory is toggled", () => {
-    config.directMessages = false;
-    renderPage();
-    fireEvent.click(toggle());
-
-    // Omitting it is what leaves it as it was; the two are separate decisions
-    // on one endpoint.
-    expect(updateMutate).toHaveBeenCalledWith({ community_directory_enabled: true });
   });
 
   it("is not offered below the owner tier", () => {
@@ -225,18 +161,13 @@ const change = (rule: string) =>
 const save = () => screen.getByRole("button", { name: "Save" });
 
 describe("the policy new accounts start on", () => {
-  it("shows what this deployment ships with", async () => {
-    renderPage();
-    expect(await screen.findByLabelText("Direct messages for new accounts")).toHaveTextContent(
-      "Private"
-    );
-  });
-
-  it("changes it without disturbing the directory switch", async () => {
+  it("shows what this deployment ships with, and changes it without disturbing the directory switch", async () => {
     config.communityDirectory = true;
     renderPage();
 
-    await userEvent.click(screen.getByLabelText("Direct messages for new accounts"));
+    const policy = screen.getByLabelText("Direct messages for new accounts");
+    expect(policy).toHaveTextContent("Private");
+    await userEvent.click(policy);
     await userEvent.click(await screen.findByRole("option", { name: "My communities" }));
 
     // The directory value is carried through: the endpoint takes it on every
@@ -246,51 +177,96 @@ describe("the policy new accounts start on", () => {
       default_dm_policy: "community",
     });
   });
-
-  it("states the policy while messaging is off, rather than offering it", () => {
-    config.directMessages = false;
-    renderPage();
-
-    expect(screen.queryByLabelText("Direct messages for new accounts")).not.toBeInTheDocument();
-    expect(screen.getByText("Private")).toBeInTheDocument();
-    expect(screen.getByText(/used once direct messages are on/)).toBeInTheDocument();
-  });
 });
 
-describe("how long deleted communities are kept", () => {
-  it("shows the deployment's window and saves a new one", async () => {
-    config.communityDirectory = true;
-    renderPage();
-    expect(screen.getByText("90 days")).toBeInTheDocument();
+describe("the figures", () => {
+  it.each([
+    [
+      "Keeping deleted communities",
+      "Keep communities for (days)",
+      {},
+      "90 days",
+      "90",
+      "30",
+      { deleted_community_retention_days: 30 },
+    ],
+    // A blank box is never destroy.
+    [
+      "Keeping deleted communities",
+      "Keep communities for (days)",
+      {},
+      "90 days",
+      "90",
+      "",
+      { deleted_community_retention_days: null },
+    ],
+    [
+      "Deleting communities on hold",
+      "Delete after (days on hold)",
+      {},
+      "30 days",
+      "30",
+      "60",
+      { on_hold_community_deletion_days: 60 },
+    ],
+    // A blank box is never delete.
+    [
+      "Deleting communities on hold",
+      "Delete after (days on hold)",
+      {},
+      "30 days",
+      "30",
+      "",
+      { on_hold_community_deletion_days: null },
+    ],
+    [
+      "Longest guest stay",
+      "Longest a guest may stay (days)",
+      { guests: true },
+      "365 days",
+      "365",
+      "30",
+      { max_guest_days: 30 },
+    ],
+    // 0 is no daily limit.
+    [
+      "Daily limit per account",
+      "Communities one account may create per day",
+      {},
+      "5 communities a day",
+      "5",
+      "0",
+      { community_creation_daily_limit: 0 },
+    ],
+    [
+      "Time between exports",
+      "Hours between community exports",
+      {},
+      "48 hours",
+      "48",
+      "24",
+      { community_export_cooldown_hours: 24 },
+    ],
+  ] as const)(
+    "saves %s from its box %s",
+    async (rule, label, overrides, shown, start, typed, patch) => {
+      Object.assign(config, overrides);
+      renderPage();
+      expect(screen.getByText(shown)).toBeInTheDocument();
 
-    await change("Keeping deleted communities");
-    const box = screen.getByLabelText("Keep communities for (days)") as HTMLInputElement;
-    expect(box.value).toBe("90");
+      await change(rule);
+      const box = screen.getByLabelText(label) as HTMLInputElement;
+      expect(box.value).toBe(start);
 
-    await userEvent.clear(box);
-    await userEvent.type(box, "30");
-    await userEvent.click(save());
+      await userEvent.clear(box);
+      if (typed) await userEvent.type(box, typed);
+      await userEvent.click(save());
 
-    expect(updateMutate).toHaveBeenCalledWith({
-      community_directory_enabled: true,
-      deleted_community_retention_days: 30,
-    });
-  });
+      expect(updateMutate).toHaveBeenCalledWith({ community_directory_enabled: false, ...patch });
+    }
+  );
 
-  it("takes a blank box as never destroy", async () => {
-    renderPage();
-
-    await change("Keeping deleted communities");
-    await userEvent.clear(screen.getByLabelText("Keep communities for (days)"));
-    await userEvent.click(save());
-
-    expect(updateMutate).toHaveBeenCalledWith({
-      community_directory_enabled: false,
-      deleted_community_retention_days: null,
-    });
-  });
-
-  it("shows a blank box where the deployment keeps them", async () => {
+  it("shows a blank box where the deployment keeps deleted communities", async () => {
     config.retentionDays = null;
     renderPage();
     expect(screen.getByText("Never destroy")).toBeInTheDocument();
@@ -301,152 +277,8 @@ describe("how long deleted communities are kept", () => {
     // Nothing to save until it is changed.
     expect(save()).toBeDisabled();
   });
-});
 
-describe("how long communities stay on hold", () => {
-  it("shows the deployment's window and saves a new one", async () => {
-    renderPage();
-
-    await change("Deleting communities on hold");
-    const box = screen.getByLabelText("Delete after (days on hold)") as HTMLInputElement;
-    expect(box.value).toBe("30");
-
-    await userEvent.clear(box);
-    await userEvent.type(box, "60");
-    await userEvent.click(save());
-
-    expect(updateMutate).toHaveBeenCalledWith({
-      community_directory_enabled: false,
-      on_hold_community_deletion_days: 60,
-    });
-  });
-
-  it("takes a blank box as never delete", async () => {
-    renderPage();
-
-    await change("Deleting communities on hold");
-    await userEvent.clear(screen.getByLabelText("Delete after (days on hold)"));
-    await userEvent.click(save());
-
-    expect(updateMutate).toHaveBeenCalledWith({
-      community_directory_enabled: false,
-      on_hold_community_deletion_days: null,
-    });
-  });
-});
-
-describe("guests", () => {
-  it("lets communities have guests", async () => {
-    renderPage();
-    fireEvent.click(await screen.findByLabelText("Allow guests"));
-
-    expect(updateMutate).toHaveBeenCalledWith({
-      community_directory_enabled: false,
-      guests_enabled: true,
-    });
-  });
-
-  it("states the longest stay while guests are off, rather than offering it", () => {
-    renderPage();
-
-    expect(screen.getByText("365 days")).toBeInTheDocument();
-    expect(screen.getByText(/used once guests are allowed/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Change Longest guest stay" })).toBeNull();
-  });
-
-  it("saves the longest a guest may stay", async () => {
-    config.guests = true;
-    renderPage();
-
-    await change("Longest guest stay");
-    const box = screen.getByLabelText("Longest a guest may stay (days)") as HTMLInputElement;
-    expect(box.value).toBe("365");
-
-    await userEvent.clear(box);
-    await userEvent.type(box, "30");
-    await userEvent.click(save());
-
-    expect(updateMutate).toHaveBeenCalledWith({
-      community_directory_enabled: false,
-      max_guest_days: 30,
-    });
-  });
-});
-
-describe("who may join and create", () => {
-  it("closes sign-up to people without an invite", async () => {
-    renderPage();
-    const registration = await screen.findByLabelText("Let anyone sign up");
-
-    expect(registration).toBeChecked();
-    fireEvent.click(registration);
-
-    expect(updateMutate).toHaveBeenCalledWith({
-      community_directory_enabled: false,
-      public_registration_enabled: false,
-    });
-  });
-
-  it("stops accounts creating communities", async () => {
-    renderPage();
-    fireEvent.click(await screen.findByLabelText("Let anyone create a community"));
-
-    expect(updateMutate).toHaveBeenCalledWith({
-      community_directory_enabled: false,
-      community_creation_enabled: false,
-    });
-  });
-
-  it("saves 0 as no daily limit", async () => {
-    renderPage();
-    expect(screen.getByText("5 communities a day")).toBeInTheDocument();
-
-    await change("Daily limit per account");
-    const box = screen.getByLabelText(
-      "Communities one account may create per day"
-    ) as HTMLInputElement;
-    expect(box.value).toBe("5");
-
-    await userEvent.clear(box);
-    await userEvent.type(box, "0");
-    await userEvent.click(save());
-
-    expect(updateMutate).toHaveBeenCalledWith({
-      community_directory_enabled: false,
-      community_creation_daily_limit: 0,
-    });
-  });
-
-  it("states the daily limit while creation is off, rather than offering it", () => {
-    config.creation = false;
-    renderPage();
-
-    expect(screen.getByText("5 communities a day")).toBeInTheDocument();
-    expect(screen.getByText(/used once anyone can create a community/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Change Daily limit per account" })).toBeNull();
-  });
-});
-
-describe("the time between community exports", () => {
-  it("saves a new wait", async () => {
-    renderPage();
-    expect(screen.getByText("48 hours")).toBeInTheDocument();
-
-    await change("Time between exports");
-    const box = screen.getByLabelText("Hours between community exports") as HTMLInputElement;
-    expect(box.value).toBe("48");
-
-    await userEvent.clear(box);
-    await userEvent.type(box, "24");
-    await userEvent.click(save());
-
-    expect(updateMutate).toHaveBeenCalledWith({
-      community_directory_enabled: false,
-      community_export_cooldown_hours: 24,
-    });
-  });
-
-  it("will not save a blank box", async () => {
+  it("will not save a blank time between exports", async () => {
     renderPage();
 
     await change("Time between exports");
@@ -454,4 +286,35 @@ describe("the time between community exports", () => {
 
     expect(save()).toBeDisabled();
   });
+
+  it.each([
+    [
+      { directMessages: false },
+      "Private",
+      /used once direct messages are on/,
+      () => screen.queryByLabelText("Direct messages for new accounts"),
+    ],
+    [
+      {},
+      "365 days",
+      /used once guests are allowed/,
+      () => screen.queryByRole("button", { name: "Change Longest guest stay" }),
+    ],
+    [
+      { creation: false },
+      "5 communities a day",
+      /used once anyone can create a community/,
+      () => screen.queryByRole("button", { name: "Change Daily limit per account" }),
+    ],
+  ])(
+    "states a figure whose switch is off, rather than offering it (%o)",
+    (overrides, shown, note, control) => {
+      Object.assign(config, overrides);
+      renderPage();
+
+      expect(screen.getByText(shown)).toBeInTheDocument();
+      expect(screen.getByText(note)).toBeInTheDocument();
+      expect(control()).toBeNull();
+    }
+  );
 });

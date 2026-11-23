@@ -24,9 +24,15 @@ import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { useFeedback } from "@/components/tickets/FeedbackDialog";
 import { UpdateButton } from "@/components/updates/UpdateButton";
 import { PresenceDot } from "@/components/user/PresenceDot";
+import { PresenceMenu } from "@/components/user/PresenceMenu";
 import { PresenceMenuItems } from "@/components/user/PresenceMenuItems";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
-import { isStatusEmpty, StatusBubble, StatusEditor } from "@/components/user/ProfileStatus";
+import {
+  StatusBubble,
+  StatusDialog,
+  StatusLine,
+  useStatusEmpty,
+} from "@/components/user/ProfileStatus";
 import { UserHandle } from "@/components/user/UserHandle";
 import { openExternal } from "@/lib/openExternal";
 import { presenceLabelKey } from "@/lib/presence";
@@ -47,7 +53,6 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
-import { Popover, PopoverAnchor, PopoverContent } from "@/ui/popover";
 
 import { SidebarFooter } from "./sidebar";
 
@@ -84,6 +89,7 @@ export const SidebarUserFooter = ({
   const handle = getUrlHandle(user);
   const banner = resolveDecoration(user?.profile_decorations?.banner, "banner");
   const [statusOpen, setStatusOpen] = useState(false);
+  const statusEmpty = useStatusEmpty(user?.custom_status);
   // Asking for the editor only writes this down. It is opened once the menu has
   // gone (below), because the two are dismissable layers and a layer raised
   // while the one over it is still closing is a layer the closing one can take
@@ -101,322 +107,335 @@ export const SidebarUserFooter = ({
             a profile, because the sidebar is a strip and a bubble spends the
             height of a whole second row saying the same thing.
 
-            The dot rides the picture here as it does everywhere else the person
-            appears; it is no longer its own button, so setting it moved into
-            the menu the row already opens, next to setting the status. */}
-        <Popover open={statusOpen} onOpenChange={setStatusOpen}>
-          <PopoverAnchor asChild>
-            <div className="flex items-center gap-2 p-2">
-              {/* modal={false}: a modal dropdown nested in the non-modal mobile
+            The row opens the account menu. The dot on the picture and the
+            status line are their own buttons laid over it, so each is set in
+            one click; the menu offers both too, for a finger on a phone. */}
+        <div className="flex items-center gap-2 p-2">
+          <div className="relative flex min-w-0 flex-1">
+            {/* modal={false}: a modal dropdown nested in the non-modal mobile
                   sidebar drawer dismisses the drawer on open. Matches the
                   notification-bell popover, which is non-modal and doesn't. */}
-              {/* Every opening starts at the top of the menu, however deep it
+            {/* Every opening starts at the top of the menu, however deep it
                   was left — but only once it is closed, so nothing shifts
                   under the fingers on the way out. */}
-              <DropdownMenu
-                modal={false}
-                onOpenChange={(open) => {
-                  if (open) {
-                    setDrill(null);
-                    wantsStatus.current = false;
-                  }
-                }}
-              >
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="h-auto min-w-0 flex-1 justify-start gap-2 px-2 py-1.5"
-                  >
-                    {/* Wearing the frame it is wearing on the profile: what you
+            <DropdownMenu
+              modal={false}
+              onOpenChange={(open) => {
+                if (open) {
+                  setDrill(null);
+                  wantsStatus.current = false;
+                }
+              }}
+            >
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="h-auto min-w-0 flex-1 justify-start gap-2 px-2 py-1.5"
+                >
+                  {/* Wearing the frame it is wearing on the profile: what you
                         picked is on you everywhere you appear, not only where
                         the picking happened. */}
-                    <ProfileAvatar
-                      user={user}
-                      decorations={user?.profile_decorations}
-                      presence={user?.presence}
-                      className="size-8 text-xs"
-                    />
-                    <div className="flex min-w-0 flex-1 flex-col items-start overflow-hidden text-left">
-                      <span className="w-full truncate font-medium text-sm leading-tight">
-                        {displayName}
-                      </span>
-                      {user ? (
-                        <span className="flex w-full min-w-0 items-center gap-1 pt-0.5 font-normal text-muted-foreground text-xs leading-tight">
-                          {/* An emoji on its own is a status. The invitation is
-                              for somebody who has said nothing at all — either
-                              half standing alone is still something said. */}
-                          {isStatusEmpty(user.custom_status) ? (
-                            <span className="truncate">{t("profiles:status.empty")}</span>
-                          ) : (
-                            <>
-                              {user.custom_status.emoji ? (
-                                <span aria-hidden="true">{user.custom_status.emoji}</span>
-                              ) : null}
-                              {user.custom_status.text ? (
-                                <span className="truncate">{user.custom_status.text}</span>
-                              ) : null}
-                            </>
-                          )}
-                        </span>
-                      ) : null}
-                    </div>
-                    {/* The desktop app's title bar marks its own Help button. */}
-                    {helpDraft && !titleBarShown ? (
-                      <span className="flex shrink-0 items-center">
-                        <span className="sr-only">{t("common:helpDraft")}</span>
-                        <span aria-hidden="true" className="size-2 rounded-full bg-primary" />
-                      </span>
-                    ) : null}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  className="w-72"
-                  // The menu is gone by the time this runs, which is the moment
-                  // the editor can have the screen to itself. The focus is not
-                  // handed back to the row on the way, because the editor is
-                  // about to take it.
-                  onCloseAutoFocus={(event) => {
-                    if (!wantsStatus.current) return;
-                    wantsStatus.current = false;
-                    event.preventDefault();
-                    setStatusOpen(true);
-                  }}
-                >
-                  {drill ? (
-                    <>
-                      <DropdownMenuItem
-                        onSelect={(event) => {
-                          event.preventDefault();
-                          setDrill(null);
-                        }}
-                      >
-                        <ChevronLeft className="h-4 w-4" /> {t("common:back")}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      {drill === "presence" && user ? (
-                        <>
-                          <DropdownMenuLabel>{t("profiles:presence.edit")}</DropdownMenuLabel>
-                          <PresenceMenuItems presence={user.presence} onChanged={refreshUser} />
-                        </>
-                      ) : (
-                        <AppearanceMenuItems />
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      {user ? (
-                        <>
-                          {/* The menu opens onto the person rather than onto a
+                  <ProfileAvatar
+                    user={user}
+                    decorations={user?.profile_decorations}
+                    hidePresence
+                    className="size-8 text-xs"
+                  />
+                  <div className="flex min-w-0 flex-1 flex-col items-start overflow-hidden text-left">
+                    <span className="w-full truncate font-medium text-sm leading-tight">
+                      {displayName}
+                    </span>
+                    {/* Held open for the status button laid over it. */}
+                    {user ? <span aria-hidden="true" className="h-4 pt-0.5" /> : null}
+                  </div>
+                  {/* The desktop app's title bar marks its own Help button. */}
+                  {helpDraft && !titleBarShown ? (
+                    <span className="flex shrink-0 items-center">
+                      <span className="sr-only">{t("common:helpDraft")}</span>
+                      <span aria-hidden="true" className="size-2 rounded-full bg-primary" />
+                    </span>
+                  ) : null}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="w-72"
+                // The menu is gone by the time this runs, which is the moment
+                // the editor can have the screen to itself. The focus is not
+                // handed back to the row on the way, because the editor is
+                // about to take it.
+                onCloseAutoFocus={(event) => {
+                  if (!wantsStatus.current) return;
+                  wantsStatus.current = false;
+                  event.preventDefault();
+                  setStatusOpen(true);
+                }}
+              >
+                {drill ? (
+                  <>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        setDrill(null);
+                      }}
+                    >
+                      <ChevronLeft className="h-4 w-4" /> {t("common:back")}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {drill === "presence" && user ? (
+                      <>
+                        <DropdownMenuLabel>{t("profiles:presence.edit")}</DropdownMenuLabel>
+                        <PresenceMenuItems presence={user.presence} onChanged={refreshUser} />
+                      </>
+                    ) : (
+                      <AppearanceMenuItems />
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {user ? (
+                      <>
+                        {/* The menu opens onto the person rather than onto a
                           heading that says "My Account" — the banner, the
                           picture wearing whatever it wears, and the handle are
                           a better answer to "whose menu is this" than the
                           words are. The bubble comes back here, over the
                           banner where there is room for it, and is still the
                           way to change what it says. */}
-                          <div className="relative -mx-1 -mt-1 mb-1 overflow-hidden rounded-t-md">
-                            <div
-                              className="h-16 w-full bg-center bg-cover bg-muted"
-                              style={
-                                banner
-                                  ? {
-                                      backgroundImage: `url(${decorationSrc(banner, user.profile_decorations?.grad_year)})`,
-                                    }
-                                  : undefined
-                              }
+                        <div className="relative -mx-1 -mt-1 mb-1 overflow-hidden rounded-t-md">
+                          <div
+                            className="h-16 w-full bg-center bg-cover bg-muted"
+                            style={
+                              banner
+                                ? {
+                                    backgroundImage: `url(${decorationSrc(banner, user.profile_decorations?.grad_year)})`,
+                                  }
+                                : undefined
+                            }
+                          />
+                          {statusEmpty ? null : (
+                            <DropdownMenuItem
+                              className="absolute top-1.5 right-2 max-w-[70%] rounded-2xl p-0 focus:bg-transparent focus-visible:outline-2 focus-visible:outline-ring"
+                              aria-label={t("profiles:status.edit")}
+                              onSelect={openStatusEditor}
+                            >
+                              <StatusBubble status={user.custom_status} className="text-xs" />
+                            </DropdownMenuItem>
+                          )}
+                          <div className="flex items-end gap-2 px-3 pb-2">
+                            <ProfileAvatar
+                              user={user}
+                              decorations={user.profile_decorations}
+                              presence={user.presence}
+                              ring
+                              className="-mt-6 size-14"
                             />
-                            {isStatusEmpty(user.custom_status) ? null : (
-                              <DropdownMenuItem
-                                className="absolute top-1.5 right-2 max-w-[70%] rounded-2xl p-0 focus:bg-transparent focus-visible:outline-2 focus-visible:outline-ring"
-                                aria-label={t("profiles:status.edit")}
-                                onSelect={openStatusEditor}
-                              >
-                                <StatusBubble status={user.custom_status} className="text-xs" />
-                              </DropdownMenuItem>
-                            )}
-                            <div className="flex items-end gap-2 px-3 pb-2">
-                              <ProfileAvatar
+                            <div className="min-w-0 flex-1 pb-0.5">
+                              <UserHandle
                                 user={user}
-                                decorations={user.profile_decorations}
-                                presence={user.presence}
-                                ring
-                                className="-mt-6 size-14"
+                                className="max-w-full font-semibold text-sm"
+                                nameClassName="truncate"
                               />
-                              <div className="min-w-0 flex-1 pb-0.5">
-                                <UserHandle
-                                  user={user}
-                                  className="max-w-full font-semibold text-sm"
-                                  nameClassName="truncate"
-                                />
-                              </div>
                             </div>
                           </div>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onSelect={openStatusEditor}>
-                            <ThoughtBubble className="h-4 w-4" /> {t("profiles:status.set")}
-                          </DropdownMenuItem>
-                          {/* Named by the answer rather than by the question: the
+                        </div>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={openStatusEditor}>
+                          <ThoughtBubble className="h-4 w-4" /> {t("profiles:status.set")}
+                        </DropdownMenuItem>
+                        {/* Named by the answer rather than by the question: the
                           row is already showing which one you are on, so the
                           word that earns its place is "Online". */}
-                          {isMobile ? (
-                            <DropdownMenuItem
-                              onSelect={(event) => {
-                                event.preventDefault();
-                                setDrill("presence");
-                              }}
-                            >
-                              {/* Sized and boxed to the slot an icon takes on
+                        {isMobile ? (
+                          <DropdownMenuItem
+                            onSelect={(event) => {
+                              event.preventDefault();
+                              setDrill("presence");
+                            }}
+                          >
+                            {/* Sized and boxed to the slot an icon takes on
                                   every other row, so the words start on one
                                   line down the menu. */}
+                            <span className="flex size-4 shrink-0 items-center justify-center">
+                              <PresenceDot presence={user.presence} className="size-3" />
+                            </span>
+                            {t(`profiles:${presenceLabelKey(user.presence)}`)}
+                            <ChevronRight className="ml-auto h-4 w-4" />
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuSub>
+                            <DropdownMenuSubTrigger>
                               <span className="flex size-4 shrink-0 items-center justify-center">
                                 <PresenceDot presence={user.presence} className="size-3" />
                               </span>
                               {t(`profiles:${presenceLabelKey(user.presence)}`)}
-                              <ChevronRight className="ml-auto h-4 w-4" />
-                            </DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuSub>
-                              <DropdownMenuSubTrigger>
-                                <span className="flex size-4 shrink-0 items-center justify-center">
-                                  <PresenceDot presence={user.presence} className="size-3" />
-                                </span>
-                                {t(`profiles:${presenceLabelKey(user.presence)}`)}
-                              </DropdownMenuSubTrigger>
-                              <DropdownMenuPortal>
-                                <DropdownMenuSubContent className="w-60">
-                                  <PresenceMenuItems
-                                    presence={user.presence}
-                                    onChanged={refreshUser}
-                                  />
-                                </DropdownMenuSubContent>
-                              </DropdownMenuPortal>
-                            </DropdownMenuSub>
-                          )}
-                          <DropdownMenuSeparator />
-                        </>
-                      ) : (
-                        <>
-                          <DropdownMenuLabel>{t("myAccount")}</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                        </>
-                      )}
-                      {handle ? (
-                        <DropdownMenuItem asChild>
-                          <Link to="/u/$handle" params={{ handle }}>
-                            <CircleUserRound className="h-4 w-4" /> {t("myProfile")}
-                          </Link>
-                        </DropdownMenuItem>
-                      ) : null}
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuPortal>
+                              <DropdownMenuSubContent className="w-60">
+                                <PresenceMenuItems
+                                  presence={user.presence}
+                                  onChanged={refreshUser}
+                                />
+                              </DropdownMenuSubContent>
+                            </DropdownMenuPortal>
+                          </DropdownMenuSub>
+                        )}
+                        <DropdownMenuSeparator />
+                      </>
+                    ) : (
+                      <>
+                        <DropdownMenuLabel>{t("myAccount")}</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
+                    {handle ? (
                       <DropdownMenuItem asChild>
-                        <Link to="/">
-                          <House className="h-4 w-4" /> {t("home")}
+                        <Link to="/u/$handle" params={{ handle }}>
+                          <CircleUserRound className="h-4 w-4" /> {t("myProfile")}
                         </Link>
                       </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link to="/profile">
-                          <UserCog className="h-4 w-4" /> {t("mySettings")}
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => openHelp()}>
-                        <CircleQuestionMark className="h-4 w-4" /> {t("common:help")}
-                        {helpDraft ? (
-                          <span className="ml-auto flex items-center">
-                            <span className="sr-only">{t("common:helpDraft")}</span>
-                            <span aria-hidden="true" className="size-2 rounded-full bg-primary" />
-                          </span>
-                        ) : null}
-                      </DropdownMenuItem>
-                      {feedback.offered ? (
-                        <DropdownMenuItem onSelect={feedback.open}>
-                          <MessageSquareHeart className="h-4 w-4" /> {t("sendFeedback")}
-                        </DropdownMenuItem>
+                    ) : null}
+                    <DropdownMenuItem asChild>
+                      <Link to="/">
+                        <House className="h-4 w-4" /> {t("home")}
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/profile">
+                        <UserCog className="h-4 w-4" /> {t("mySettings")}
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => openHelp()}>
+                      <CircleQuestionMark className="h-4 w-4" /> {t("common:help")}
+                      {helpDraft ? (
+                        <span className="ml-auto flex items-center">
+                          <span className="sr-only">{t("common:helpDraft")}</span>
+                          <span aria-hidden="true" className="size-2 rounded-full bg-primary" />
+                        </span>
                       ) : null}
-                      {storeListing ? (
-                        <DropdownMenuItem onSelect={() => openExternal(storeListing)}>
-                          <Star className="h-4 w-4" /> {t("rateApp")}
-                        </DropdownMenuItem>
-                      ) : null}
-                      {isMobile ? (
-                        <DropdownMenuItem
-                          onSelect={(event) => {
-                            event.preventDefault();
-                            setDrill("theme");
-                          }}
-                        >
+                    </DropdownMenuItem>
+                    {feedback.offered ? (
+                      <DropdownMenuItem onSelect={feedback.open}>
+                        <MessageSquareHeart className="h-4 w-4" /> {t("sendFeedback")}
+                      </DropdownMenuItem>
+                    ) : null}
+                    {storeListing ? (
+                      <DropdownMenuItem onSelect={() => openExternal(storeListing)}>
+                        <Star className="h-4 w-4" /> {t("rateApp")}
+                      </DropdownMenuItem>
+                    ) : null}
+                    {isMobile ? (
+                      <DropdownMenuItem
+                        onSelect={(event) => {
+                          event.preventDefault();
+                          setDrill("theme");
+                        }}
+                      >
+                        <ThemeIcon className="size-4" /> {t("theme")}
+                        <ChevronRight className="ml-auto h-4 w-4" />
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>
                           <ThemeIcon className="size-4" /> {t("theme")}
-                          <ChevronRight className="ml-auto h-4 w-4" />
-                        </DropdownMenuItem>
-                      ) : (
-                        <DropdownMenuSub>
-                          <DropdownMenuSubTrigger>
-                            <ThemeIcon className="size-4" /> {t("theme")}
-                          </DropdownMenuSubTrigger>
-                          <DropdownMenuPortal>
-                            <DropdownMenuSubContent className="w-40">
-                              <AppearanceMenuItems />
-                            </DropdownMenuSubContent>
-                          </DropdownMenuPortal>
-                        </DropdownMenuSub>
-                      )}
-                      {/* Running the place, kept apart from being in it: these
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuPortal>
+                          <DropdownMenuSubContent className="w-40">
+                            <AppearanceMenuItems />
+                          </DropdownMenuSubContent>
+                        </DropdownMenuPortal>
+                      </DropdownMenuSub>
+                    )}
+                    {/* Running the place, kept apart from being in it: these
                           are somebody's other hat, not another thing about
                           their account. The rule only appears for the people
                           who have them. */}
-                      {(canAccessOperatorDashboard || canManagePlatformConfig) && (
-                        <>
-                          <DropdownMenuSeparator />
-                          {canAccessOperatorDashboard && (
-                            <DropdownMenuItem asChild>
-                              <Link to="/settings/operator">
-                                <ShieldCheck className="h-4 w-4" /> {t("operatorDashboard")}
-                              </Link>
-                            </DropdownMenuItem>
-                          )}
-                          {canManagePlatformConfig && (
-                            <DropdownMenuItem asChild>
-                              <Link to="/settings/platform">
-                                <Settings className="h-4 w-4" /> {t("platformSettings")}
-                              </Link>
-                            </DropdownMenuItem>
-                          )}
-                        </>
-                      )}
-                      <DropdownMenuSeparator />
-                      {/* The one entry here that undoes rather than goes
+                    {(canAccessOperatorDashboard || canManagePlatformConfig) && (
+                      <>
+                        <DropdownMenuSeparator />
+                        {canAccessOperatorDashboard && (
+                          <DropdownMenuItem asChild>
+                            <Link to="/settings/operator">
+                              <ShieldCheck className="h-4 w-4" /> {t("operatorDashboard")}
+                            </Link>
+                          </DropdownMenuItem>
+                        )}
+                        {canManagePlatformConfig && (
+                          <DropdownMenuItem asChild>
+                            <Link to="/settings/platform">
+                              <Settings className="h-4 w-4" /> {t("platformSettings")}
+                            </Link>
+                          </DropdownMenuItem>
+                        )}
+                      </>
+                    )}
+                    <DropdownMenuSeparator />
+                    {/* The one entry here that undoes rather than goes
                           somewhere, so it is coloured as the way out. */}
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onSelect={() => onLogout()}
-                      >
-                        <LogOut className="h-4 w-4" /> {t("signOut")}
-                      </DropdownMenuItem>
-                    </>
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onSelect={() => onLogout()}
+                    >
+                      <LogOut className="h-4 w-4" /> {t("signOut")}
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {user ? (
+              <>
+                {/* Over the picture's corner, where the dot is drawn on
+                      everyone else's. */}
+                <PresenceMenu presence={user.presence} onChanged={refreshUser} side="top">
+                  <button
+                    type="button"
+                    className="absolute bottom-1.5 left-8 rounded-full ring-2 ring-sidebar transition-transform hover:scale-125 focus-visible:outline-2 focus-visible:outline-ring"
+                    aria-label={t("profiles:presence.change", {
+                      state: t(`profiles:${presenceLabelKey(user.presence)}`),
+                    })}
+                  >
+                    <PresenceDot presence={user.presence} className="size-2.5" />
+                  </button>
+                </PresenceMenu>
+                {/* An emoji on its own is a status. The invitation is for
+                      somebody who has said nothing at all. */}
+                <button
+                  type="button"
+                  className="absolute right-1 bottom-1.5 left-12 flex h-4 min-w-0 items-center rounded-sm text-left text-xs leading-tight hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+                  aria-label={t("profiles:status.edit")}
+                  onClick={() => setStatusOpen(true)}
+                >
+                  {statusEmpty ? (
+                    <span className="truncate text-muted-foreground">
+                      {t("profiles:status.empty")}
+                    </span>
+                  ) : (
+                    <StatusLine status={user.custom_status} />
                   )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                </button>
+              </>
+            ) : null}
+          </div>
 
-              {/* Only what is worth a glance without opening anything rides
+          {/* Only what is worth a glance without opening anything rides
                   out here: the bell, and an update while one waits. The theme
                   and Help went into the menu, and the width they were holding
                   is the width the status line reads in. */}
-              {user ? (
-                <div className="flex shrink-0 items-center gap-1">
-                  {titleBarShown ? null : <UpdateButton />}
-                  <NotificationBell />
-                </div>
-              ) : null}
-            </div>
-          </PopoverAnchor>
           {user ? (
-            <PopoverContent side="top" align="start" className="w-80 space-y-3">
-              <StatusEditor
-                status={user.custom_status}
-                onSaved={refreshUser}
-                onDone={() => setStatusOpen(false)}
-              />
-            </PopoverContent>
+            <div className="flex shrink-0 items-center gap-1">
+              {titleBarShown ? null : <UpdateButton />}
+              <NotificationBell />
+            </div>
           ) : null}
-        </Popover>
+        </div>
+        {user ? (
+          <StatusDialog
+            open={statusOpen}
+            onOpenChange={setStatusOpen}
+            status={user.custom_status}
+            onSaved={refreshUser}
+          />
+        ) : null}
       </div>
     </SidebarFooter>
   );

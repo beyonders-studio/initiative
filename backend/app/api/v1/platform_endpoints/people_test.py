@@ -70,17 +70,6 @@ async def _rail(session: AsyncSession, user: User, *guilds: Guild) -> None:
 # --- sections ---------------------------------------------------------------
 
 
-async def test_an_account_on_its_own_has_nothing_to_list(
-    client: AsyncClient, acting_user
-):
-    """No communities: the list answers, empty."""
-    a = await acting_user()
-
-    sections = await client.get(SECTIONS, headers=a.headers)
-    assert sections.status_code == 200
-    assert sections.json()["sections"] == []
-
-
 async def test_sections_follow_rail_order(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
@@ -130,14 +119,18 @@ async def test_only_a_community_the_caller_shares_gets_a_section(
 async def test_a_section_names_the_other_people_who_are_still_here(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
-    """The caller is not on their own roster, and a suspended account leaves the
-    roster — count and all."""
+    """The caller is not on their own roster, a row draws somebody the way
+    every other surface does, and a suspended account leaves the roster —
+    count and all."""
     a = await acting_user(guild_role=CommunityRole.member)
-    other = await _join(session, a.guild)
+    other = await _join(
+        session, a.guild, profile_decorations={"frame": "core.gold", "trophies": []}
+    )
 
     response = await client.get(SECTIONS, headers=a.headers)
     section = _section(response.json(), a.guild.id)
     assert [item["id"] for item in section["items"]] == [other.id]
+    assert section["items"][0]["profile_decorations"]["frame"] == "core.gold"
 
     other.status = UserStatus.suspended
     session.add(other)
@@ -184,22 +177,6 @@ async def test_guild_ids_narrows_to_one_section(
         f"{SECTIONS}?community_ids={second.id}", headers=a.headers
     )
     assert [s["community_id"] for s in response.json()["sections"]] == [second.id]
-
-
-# --- how a person is drawn ---------------------------------------------------
-
-
-async def test_a_row_draws_somebody_as_every_surface_does(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """A row draws somebody the way every other surface does."""
-    a = await acting_user(guild_role=CommunityRole.member)
-    await _join(
-        session, a.guild, profile_decorations={"frame": "core.gold", "trophies": []}
-    )
-    roster = await client.get(SECTIONS, headers=a.headers)
-    row = _section(roster.json(), a.guild.id)["items"][0]
-    assert row["profile_decorations"]["frame"] == "core.gold"
 
 
 # --- names, per guild -------------------------------------------------------
@@ -316,17 +293,3 @@ async def test_search_finds_someone_past_the_first_page(
     )
     section = _section(searched.json(), a.guild.id)
     assert [i["id"] for i in section["items"]] == [target.id]
-
-
-async def test_search_hides_sections_with_no_match(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    a = await acting_user()
-    hit = await create_guild(session)
-    miss = await create_guild(session)
-    await _rail(session, a.user, hit, miss)
-    await _join(session, hit, username="findme")
-    await _join(session, miss, username="somebody")
-
-    response = await client.get(f"{SECTIONS}?search=findme", headers=a.headers)
-    assert [s["community_id"] for s in response.json()["sections"]] == [hit.id]

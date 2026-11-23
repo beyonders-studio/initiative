@@ -26,13 +26,12 @@
     "tag": "Étiquette",
     "calendar": "Calendrier",
     "calendar_event": "Événement de calendrier",
-    "counter_group": "Groupe de compteurs",
-    "counter": "Compteur",
     "dashboard": "Tableau de bord",
     "post": "Publication",
     "wiki": "Wiki",
     "wiki_page": "Page",
     "contact": "Contact",
-    "collection": "Collection"
+    "collection": "Collection",
+    "pluginItem": "Élément de plug-in"
   }
 }

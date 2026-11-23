@@ -72,7 +72,6 @@
     "projects": "Projets",
     "calendars": "Calendrier",
     "dashboards": "Tableaux de bord",
-    "counterGroups": "Compteurs",
     "posts": "Publications",
     "wikis": "Wikis",
     "contacts": "Contacts"
@@ -150,6 +149,7 @@
     "rolesDescription": "Ce que chaque rôle peut voir, et ce qu'il peut créer. Les gestionnaires ont tout.",
     "addCustomRole": "Ajouter un rôle personnalisé",
     "setByCommunity": "Ta communauté définit ce réglage pour toutes les initiatives.",
+    "pluginToolDescription": "Un outil du plug-in {{plugin}}.",
     "customRolesOff": "Ta communauté limite les initiatives à leurs rôles intégrés.",
     "builtIn": "Intégré",
     "manager": "Responsable",
@@ -200,7 +200,6 @@
       "projects": "Projets",
       "calendars": "Événements",
       "dashboards": "Tableaux de bord",
-      "counterGroups": "Compteurs",
       "posts": "Publications",
       "wikis": "Wikis",
       "contacts": "Contacts"
@@ -214,8 +213,6 @@
       "createCalendars": "Créer des événements",
       "viewDashboards": "Voir les tableaux de bord",
       "createDashboards": "Créer des tableaux de bord",
-      "viewCounterGroups": "Voir les compteurs",
-      "createCounterGroups": "Créer des compteurs",
       "viewPosts": "Voir les publications",
       "createPosts": "Créer des publications",
       "viewShort": "Voir",
@@ -224,6 +221,8 @@
       "createWikis": "Créer des wikis",
       "viewContacts": "Voir les contacts",
       "createContacts": "Créer des contacts",
+      "viewTool": "Voir {{tool}}",
+      "createTool": "Créer dans {{tool}}",
       "dashboards_run_as_initiative": "Exécuter les tableaux de bord en tant qu'Initiative"
     },
     "handleColumn": "Identifiant",
@@ -262,8 +261,6 @@
   "calendarsFeatureDescription": "Ce qui se passe à une heure donnée. Réponses, rappels, et un seul endroit où regarder avant que quelqu'un demande si c'est ce jeudi.",
   "dashboardsFeature": "Tableaux de bord",
   "dashboardsFeatureDescription": "Où en est le travail, pour la personne qui demande sans cesse où en est le travail. Graphiques et totaux tirés de ce qui existe déjà, en lecture seule.",
-  "counterGroupsFeature": "Compteurs",
-  "counterGroupsFeatureDescription": "Des nombres qui bougent. Décomptes, totaux, scores, places restantes, points de vie — un seul nombre sur lequel toute la salle est d'accord.",
   "postsFeature": "Publications",
   "postsFeatureDescription": "Un panneau d'affichage. Annonces, sondages, qui les a lues — l'importante épinglée en haut, pour que quatre personnes ne la ratent pas.",
   "projectsFeature": "Projets",
@@ -315,7 +312,6 @@
       "dashboards": "tableaux de bord",
       "files": "fichiers",
       "posts": "publications",
-      "counterGroups": "compteurs",
       "wikis": "wikis",
       "projects": "projets"
     },

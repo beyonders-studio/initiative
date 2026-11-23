@@ -213,33 +213,11 @@ class TestWhatAGuildPayloadSays:
         )
         return admin, member, guild
 
-    async def test_no_address_reaches_the_guild(self, client, guild_with_member):
-        """An account is a person's, not a tenant's — not even on the guild's
-        own member-management surface."""
-        admin, _member, guild = guild_with_member
-
-        response = await client.get(
-            f"/api/v1/c/{guild.id}/users/", headers=get_auth_headers(admin)
-        )
-
-        assert response.status_code == 200
-        for row in response.json()["items"]:
-            assert "email" not in row
-
-    async def test_handles_are_always_there(self, client, guild_with_member):
-        admin, member, guild = guild_with_member
-
-        response = await client.get(
-            f"/api/v1/c/{guild.id}/users/", headers=get_auth_headers(admin)
-        )
-
-        row = next(r for r in response.json()["items"] if r["id"] == member.id)
-        assert row["username"] == "member"
-        assert row["discriminator"] == 77
-
-    async def test_the_name_set_in_the_guild_does(
+    async def test_handles_are_always_there_and_names_where_set(
         self, client, session, guild_with_member
     ):
+        """No address reaches the guild: an account is a person's, not a
+        tenant's — not even on the guild's own member-management surface."""
         admin, member, guild = guild_with_member
         await create_guild_membership(
             session, user=member, guild=guild, display_name="Mem"
@@ -249,7 +227,11 @@ class TestWhatAGuildPayloadSays:
             f"/api/v1/c/{guild.id}/users/", headers=get_auth_headers(admin)
         )
 
+        assert response.status_code == 200
+        assert all("email" not in row for row in response.json()["items"])
         row = next(r for r in response.json()["items"] if r["id"] == member.id)
+        assert row["username"] == "member"
+        assert row["discriminator"] == 77
         assert row["display_name"] == "Mem"
 
 
@@ -292,36 +274,25 @@ class TestFindingSomeone:
         assert response.status_code == 200, response.text
         return response.json()["items"]
 
-    async def test_a_name_part_matches_a_family_of_handles(
-        self, client, searchable_guild
+    @pytest.mark.parametrize(
+        ("term", "found"),
+        [
+            # A name part matches a family of handles.
+            ("jordan", {("jordan", 1234), ("jordan", 5678)}),
+            # The whole handle pins one.
+            ("jordan#5678", {("jordan", 5678)}),
+            # The number renders zero-padded, so a prefix is a prefix of what
+            # is on screen: ``#00`` finds ``0012``.
+            ("morgan#00", {("morgan", 12)}),
+            # A display name is searchable.
+            ("Three", {("morgan", 12)}),
+        ],
+    )
+    async def test_a_search_finds_what_was_typed(
+        self, client, searchable_guild, term, found
     ):
         admin, guild = searchable_guild
 
-        items = await self._search(client, admin, guild, "jordan")
+        items = await self._search(client, admin, guild, term)
 
-        assert {item["discriminator"] for item in items} == {1234, 5678}
-
-    async def test_the_whole_handle_pins_one(self, client, searchable_guild):
-        admin, guild = searchable_guild
-
-        items = await self._search(client, admin, guild, "jordan#5678")
-
-        assert [item["discriminator"] for item in items] == [5678]
-
-    async def test_a_partial_number_is_a_prefix_of_the_four_digits(
-        self, client, searchable_guild
-    ):
-        """The number renders zero-padded, so a prefix is a prefix of what is
-        on screen: ``#00`` finds ``0012``."""
-        admin, guild = searchable_guild
-
-        items = await self._search(client, admin, guild, "morgan#00")
-
-        assert [item["discriminator"] for item in items] == [12]
-
-    async def test_a_display_name_is_searchable(self, client, searchable_guild):
-        admin, guild = searchable_guild
-
-        items = await self._search(client, admin, guild, "Three")
-
-        assert [item["username"] for item in items] == ["morgan"]
+        assert {(item["username"], item["discriminator"]) for item in items} == found

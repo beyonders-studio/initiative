@@ -5,7 +5,6 @@ from typing import Any
 
 from pydantic import ConfigDict, Field, model_validator
 
-from app.core.tools import Tool
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.platform.user import UserPublic
@@ -41,7 +40,8 @@ class OwnedContentItem(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    tool: Tool
+    #: Its tool's kind: a built-in tool's, or an installed tool plug-in's.
+    tool: str
     id: int
     name: str
 
@@ -49,7 +49,7 @@ class OwnedContentItem(SanitizedBaseModel):
 class OwnedContentResponse(SanitizedBaseModel):
     """What a user owns in this guild, or what no current member owns.
 
-    ``counts`` is per tool, keyed by the ``Tool`` value, so the dialog can say
+    ``counts`` is per tool, keyed by the tool's kind, so the dialog can say
     "3 projects, 1 calendar" without walking the list. ``eligible_plugins`` are the
     installed plug-ins that may own every item listed, which the dialog offers
     beside the community's admins.

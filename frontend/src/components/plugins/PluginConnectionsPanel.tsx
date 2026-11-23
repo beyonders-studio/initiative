@@ -38,17 +38,17 @@ import {
 } from "@/hooks/useCommunityPluginDetail";
 import { toast } from "@/lib/mascotToast";
 import { openExternal } from "@/lib/openExternal";
-import { localized } from "@/lib/widgets/widgetMeta";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { localized } from "@/ui/lib/localized";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Switch } from "@/ui/switch";
 
 /** One typed input in a connection's form, as the pinned definition declares
- *  it. The read carries fields and the access hint untyped, because their shape
+ *  it. The read carries fields untyped, because their shape
  *  is the manifest's rather than the API's. */
 interface PluginConnectionField {
   key: string;
@@ -103,7 +103,7 @@ export function PluginConnectionsPanel({
   );
 }
 
-/** The shared frame: name, what it wants access to, and whether it is set. */
+/** The shared frame: name and whether it is set. */
 function ConnectionShell({
   connection,
   icon,
@@ -117,7 +117,6 @@ function ConnectionShell({
 }) {
   const { t, i18n } = useTranslation(["plugins"]);
   const name = localized(connection.label, i18n.language) ?? connection.id;
-  const hint = connection.access_hint as { api?: string; scopes?: string[] } | null;
 
   return (
     <section className="space-y-3 rounded-lg border p-4">
@@ -131,19 +130,6 @@ function ConnectionShell({
           <Badge variant="outline">{t("plugins:connections.notSet")}</Badge>
         )}
       </header>
-
-      {/* Truth in advertising: the API and permissions this asks for, so an
-          admin can mint the smallest credential that works. */}
-      {hint?.api || hint?.scopes?.length ? (
-        <p className="text-muted-foreground text-xs">
-          {t("plugins:connections.accessHint", {
-            api: hint.api ?? "—",
-            scopes: hint.scopes?.length
-              ? hint.scopes.join(", ")
-              : t("plugins:connections.noScopes"),
-          })}
-        </p>
-      ) : null}
 
       {children}
     </section>
@@ -175,8 +161,11 @@ function CommunityConnection({
   // so a connection whose every field is managed has no form at all — which is
   // exactly the case a flow exists for.
   const fields = connection.fields as unknown as PluginConnectionField[];
-  const typed = fields.filter((field) => !field.managed);
-  const vendorFlow = connection.runs_flow;
+  // The server's operator connected it for every community: it is shown, and
+  // only they can change it.
+  const platform = connection.platform;
+  const typed = platform ? [] : fields.filter((field) => !field.managed);
+  const vendorFlow = connection.runs_flow && !platform;
 
   // What the flow recorded, shown rather than reduced to "Set". Otherwise the
   // admin who just chose an account at a vendor has no way to see which one
@@ -222,9 +211,13 @@ function CommunityConnection({
     >
       {canManage ? (
         <>
-          {vendorFlow && (
+          {(vendorFlow || platform) && (
             <p className="text-muted-foreground text-sm">
-              {t("plugins:connections.communityFlowExplainer")}
+              {t(
+                platform
+                  ? "plugins:connections.platformExplainer"
+                  : "plugins:connections.communityFlowExplainer"
+              )}
             </p>
           )}
           {connection.account_label && (
@@ -277,7 +270,7 @@ function CommunityConnection({
                 {t("common:save")}
               </Button>
             )}
-            {connection.satisfied && (
+            {connection.satisfied && !platform && (
               <Button
                 size="sm"
                 variant="outline"

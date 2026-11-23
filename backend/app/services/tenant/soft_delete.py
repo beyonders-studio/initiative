@@ -34,20 +34,25 @@ the doomed files are also removed.
 
 from collections.abc import Iterable
 from datetime import datetime, timedelta
+from typing import Any
 
+from sqlalchemy import Table
 from sqlalchemy.orm import undefer
 from sqlmodel import col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.clock import utcnow
+from app.core.tool_set import ToolSet
 from app.db import gucs
+from app.db.base import MODELS_BY_TABLE
 from app.db.frozen import PARK, RELEASED_NAMES
 from app.db.query import ids_in
-from app.db.session import raise_flag
+from app.db.session import raise_flag, routed_tools
 from app.db.soft_delete_filter import select_including_deleted
+from app.db.tool_rows import table_of
 from app.models.tenant._mixins import ActorKind, SoftDeleteMixin
 from app.models.tenant.batched_notice import BatchedNotice
-from app.models.tenant.comment import Comment
+from app.models.tenant.comment import Comment, said_on
 from app.models.tenant.file import File
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.task import Task
@@ -55,6 +60,7 @@ from app.services.tenant.held import refuse_if_held
 from app.services.tenant.lifecycle_tree import (
     CASCADE_CHILDREN,
     Level,
+    cascade_children,
     delete_rows,
     set_columns,
     subtree_levels,
@@ -144,9 +150,10 @@ async def _write_level(
     written one at a time, so a sibling reclaiming after it sees the name it
     took. The level is flushed before this returns.
     """
-    for model, ids in level.items():
+    for table, ids in level.items():
+        model = MODELS_BY_TABLE.get(table.name)
         if model not in RELEASED_NAMES:
-            await set_columns(session, model, ids, values)
+            await set_columns(session, table, ids, values)
             continue
         rows = (
             await session.exec(
@@ -166,7 +173,7 @@ async def _write_level(
 
 async def trash(
     session: AsyncSession,
-    entity: SoftDeleteMixin,
+    entity: Any,
     *,
     deleted_by_user_id: int | None,
 ) -> int | None:
@@ -185,24 +192,26 @@ async def trash(
     return retention_days
 
 
-def _live_and_not_held(model: type):
+def _live_and_not_held(table: Table):
     """What trashing a parent takes with it: what is not in the trash already,
     and not held. A held row stays where it is when its parent goes
     (``app.db.holds``)."""
-    live = model.deleted_at.is_(None)
-    if hasattr(model, "held_at"):
-        return live & model.held_at.is_(None)
+    live = table.c.deleted_at.is_(None)
+    if "held_at" in table.c:
+        return live & table.c.held_at.is_(None)
     return live
 
 
 async def soft_delete_entity(
     session: AsyncSession,
-    entity: SoftDeleteMixin,
+    entity: Any,
     *,
     deleted_by_user_id: int | None,
     retention_days: int | None,
 ) -> None:
-    """Stamp the entity and every active descendant as soft-deleted.
+    """Stamp the entity and every active descendant as soft-deleted. The
+    entity is a model's instance or a tool plug-in's row
+    (``app.db.tool_rows.ToolRow``).
 
     Idempotent: re-stamping an already-soft-deleted entity is a no-op so
     callers can safely retry. The caller is responsible for committing.
@@ -235,14 +244,14 @@ def _settle_collections(
     collections they are in, which settle once the change commits."""
     from app.services.tenant.collections import settle_after_commit
 
-    files = [i for level in levels for i in level.get(File, ())]
+    files = [i for level in levels for i in level.get(File.__table__, ())]
     if files:
         settle_after_commit(session, **{files_did: files})
 
 
 async def restore_entity(
     session: AsyncSession,
-    entity: SoftDeleteMixin,
+    entity: Any,
 ) -> None:
     """Restore the entity and its cascaded descendants.
 
@@ -257,7 +266,7 @@ async def restore_entity(
     # written while its parent is still trashed. Collected before anything is
     # cleared, because the set is defined by the timestamp being cleared.
     levels = await subtree_levels(
-        session, [entity], where=lambda model: model.deleted_at == matching
+        session, [entity], where=lambda table: table.c.deleted_at == matching
     )
     cleared = {
         "deleted_at": None,
@@ -270,20 +279,23 @@ async def restore_entity(
     _settle_collections(session, levels, "restored_files")
 
 
-async def _purge_references(session: AsyncSession, doomed: Level) -> None:
+async def _purge_references(
+    session: AsyncSession, doomed: Level, tools: ToolSet
+) -> None:
     """Drop every row that names one of these by ``(kind, id)``: edges,
     reactions, recent views, engagement levels, batched notices, metadata
-    values (plug-ins' among them) and a tool's views.
+    values (plug-ins' among them), a tool's views and the comments said on
+    them.
 
     Nothing carries those out with the row they name, and once it is gone
     their policies have nothing to ask, so they go first. Each kind is read
-    from the registry that lets the table name it, and the model already
-    knows its table.
+    from the registry that lets the table name it, in the community with
+    ``tools``, whose tool plug-ins' kinds are named as a built-in tool's are.
+    The comments go last, once the reactions on them have gone with the rest.
     """
     from app.core.reactions import ReactionTarget
-    from app.core.relationships import ENDPOINT_KINDS
-    from app.core.tools import LAYOUT_INSTANCE_TABLES
-    from app.db.initiative_rls import CONTENT_KIND_TABLES
+    from app.core.tools import KINDS, LAYOUT_INSTANCE_TABLES
+    from app.db.initiative_rls import comment_parents
     from app.services.tenant import (
         engagement_levels,
         metadata,
@@ -293,19 +305,30 @@ async def _purge_references(session: AsyncSession, doomed: Level) -> None:
         tool_layouts,
     )
 
-    edge_kinds = {endpoint.table: kind for kind, endpoint in ENDPOINT_KINDS.items()}
+    content_kinds_by_kind = tools.kind_tables
+    content_kinds = {table: kind for kind, table in content_kinds_by_kind.items()}
+    installed = {table.name for table in tools.installed_tables}
+    # What an edge may name that has a row: everything in a tool, and a tag.
+    edge_codes = {
+        table: tools.endpoint_codes[kind]
+        for table, kind in {**content_kinds, KINDS["tag"].table: "tag"}.items()
+    }
     reaction_targets = {target.table: target for target in ReactionTarget}
-    content_kinds = {table: kind for kind, table in CONTENT_KIND_TABLES.items()}
-    layout_tools = {table: target for target, table in LAYOUT_INSTANCE_TABLES.items()}
-    for model, ids in doomed.items():
-        table = getattr(model, "__tablename__", "")
+    # The layouts each row lays out: an instance's, and a tool plug-in's row's
+    # item tables', each its own target under the row.
+    layout_tools = {table: [target] for target, table in LAYOUT_INSTANCE_TABLES.items()}
+    for item, parent in tools.item_parents.items():
+        layout_tools.setdefault(content_kinds_by_kind[parent], []).append(item)
+    commented = {parent.table: kind for kind, parent in comment_parents(tools).items()}
+    for table, ids in doomed.items():
+        name = table.name
         if not ids:
             continue
-        if (kind := edge_kinds.get(table)) is not None:
-            await relationships.purge_for_entities(session, kind, ids)
-        if (target := reaction_targets.get(table)) is not None:
+        if (code := edge_codes.get(name)) is not None:
+            await relationships.purge_for_entities(session, code, ids)
+        if (target := reaction_targets.get(name)) is not None:
             await reactions.purge_reactions_for(session, target=target, target_ids=ids)
-        if (content := content_kinds.get(table)) is not None:
+        if (content := content_kinds.get(name)) is not None:
             await personal_items.purge_for_entities(session, content, ids)
             await engagement_levels.purge_for_entities(session, content, ids)
             # A queued line about it would point at nothing.
@@ -315,10 +338,21 @@ async def _purge_references(session: AsyncSession, doomed: Level) -> None:
                     col(BatchedNotice.target_id).in_(ids),
                 )
             )
+        model = MODELS_BY_TABLE.get(name)
         if (spec := metadata.PROPERTY_LINKS_BY_MODEL.get(model)) is not None:
             await metadata.drop_values(session, spec.target, ids)
-        if (tool := layout_tools.get(table)) is not None:
+        elif name in installed:
+            await metadata.drop_values(session, content_kinds[name], ids)
+        for tool in layout_tools.get(name, ()):
             await tool_layouts.drop_for_instances(session, tool, ids)
+    for table, ids in doomed.items():
+        kind = commented.get(table.name)
+        if ids and kind is not None:
+            await session.exec(
+                delete(Comment)
+                .where(said_on(kind, ids))
+                .execution_options(synchronize_session=False)
+            )
 
 
 #: The tables whose rows the purge hooks read, not just their ids, with the
@@ -330,7 +364,16 @@ _PURGE_LOADS: dict[type, tuple] = {
 }
 
 
-async def _answered(session: AsyncSession, comments: list[Comment]) -> set[int]:
+def _doomed(level: Level, model: type) -> list[int]:
+    """The ids of ``model``'s rows among these."""
+    return level.get(model.__table__, [])  # type: ignore[attr-defined]
+
+
+def _is_comment(row: Any) -> bool:
+    return table_of(row) is Comment.__table__
+
+
+async def _answered(session: AsyncSession, comments: list[Any]) -> set[int]:
     """Which of these comments have a reply under them, at any depth, that is
     not in the trash. Asked as the platform when ``session`` is a person's: a
     reply held for the platform reads as absent to them, and is still there.
@@ -406,20 +449,21 @@ async def _leave_tombstones(session: AsyncSession, ids: set[int]) -> set[str]:
     return released
 
 
-async def hard_purge_entity(
-    session: AsyncSession,
-    entity: SoftDeleteMixin,
-) -> set[str]:
+async def hard_purge_entity(session: AsyncSession, entity: Any) -> set[str]:
     """Hard-delete the entity and every descendant. See ``hard_purge_entities``."""
     return await hard_purge_entities(session, [entity])
 
 
 async def hard_purge_entities(
     session: AsyncSession,
-    entities: Iterable[SoftDeleteMixin],
+    entities: Iterable[Any],
+    *,
+    tools: ToolSet | None = None,
 ) -> set[str]:
     """Hard-delete these entities and every descendant, and return the stored
-    names of the uploads that went with them.
+    names of the uploads that went with them. The entities are models'
+    instances or tool plug-ins' rows, in a community with ``tools``: the tools
+    of the community the session is routed into when not given.
 
     The caller's ``session`` must be able to clear the RESTRICTIVE FOR DELETE
     policies on these tables — either a routed **guild-admin** RLS session (the
@@ -457,30 +501,33 @@ async def hard_purge_entities(
     # A comment its author deleted with replies still under it keeps its
     # place for them: the trash lets go of its words, not of it.
     released: set[str] = set()
-    kept = await _answered(session, [r for r in roots if isinstance(r, Comment)])
+    kept = await _answered(session, [r for r in roots if _is_comment(r)])
     if kept:
         released |= await _leave_tombstones(session, kept)
-        roots = [r for r in roots if not (isinstance(r, Comment) and r.id in kept)]
+        roots = [r for r in roots if not (_is_comment(r) and r.id in kept)]
         if not roots:
             return released
 
-    levels = await subtree_levels(session, roots)
+    if tools is None:
+        tools = routed_tools(session)
+    tree = cascade_children(tools)
+    levels = await subtree_levels(session, roots, tree=tree)
     doomed: Level = {}
     for level in levels:
-        for model, ids in level.items():
-            doomed.setdefault(model, []).extend(ids)
+        for table, ids in level.items():
+            doomed.setdefault(table, []).extend(ids)
     # Held content is never destroyed by a purge of what it sits in: the purge
     # waits until the platform releases it (app.db.holds).
-    await refuse_if_held(session, roots, doomed)
+    await refuse_if_held(session, roots, doomed, tree=tree)
 
     loaded: dict[type, list] = {}
     for model, options in _PURGE_LOADS.items():
-        if doomed.get(model):
+        if ids := _doomed(doomed, model):
             loaded[model] = list(
                 (
                     await session.exec(
                         select_including_deleted(model)
-                        .where(ids_in(model.id, doomed[model]))
+                        .where(ids_in(model.id, ids))
                         .options(*options)
                     )
                 ).all()
@@ -502,24 +549,24 @@ async def hard_purge_entities(
             await unlink_references_to_file(session, deleted_file_id=doc.id)
 
     # What is left of an initiative's files goes with it.
-    if doomed.get(Initiative):
-        released |= await purge_initiative_uploads(session, doomed[Initiative])
+    initiatives = _doomed(doomed, Initiative)
+    if initiatives:
+        released |= await purge_initiative_uploads(session, initiatives)
 
     # Files attached to a doomed case or report, which go with their rows.
-    if doomed.get(Task) or doomed.get(Initiative):
+    tasks = _doomed(doomed, Task)
+    if tasks or initiatives:
         from app.services.platform.evidence import released_by_purge
 
         released |= await released_by_purge(
-            session,
-            task_ids=doomed.get(Task, ()),
-            initiative_ids=doomed.get(Initiative, ()),
+            session, task_ids=tasks, initiative_ids=initiatives
         )
 
     # Tombstones go with the edges: what one remembers is a link between two
     # things, and one of them is about to stop existing. Last of the sweeps,
     # because the step above reads the edges pointing at a doomed file to
     # find the files whose links have to be blanked.
-    await _purge_references(session, doomed)
+    await _purge_references(session, doomed, tools)
     await session.flush()
 
     # Leaves before parents: most of the keys between these tables do not

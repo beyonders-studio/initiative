@@ -7,11 +7,7 @@
 import { createContext, Fragment, useContext, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import type {
-  DetailLayoutReadKind,
-  EndpointRef,
-  Tool,
-} from "@/api/generated/initiativeAPI.schemas";
+import type { DetailLayoutReadKind, EndpointRef } from "@/api/generated/initiativeAPI.schemas";
 import { EntityLinkField } from "@/components/entities/EntityLinkField";
 import type { RelationsLayout } from "@/components/entities/RelationsSection";
 import { ToolRelationsPanel } from "@/components/entities/ToolRelationsPanel";
@@ -53,7 +49,7 @@ export interface ItemLinks {
  *  community's own tool, opened in one of its tools, its links kept. */
 type InitiativeHome = {
   initiativeId: number | null;
-  canOpen: { tool: Tool; id: number };
+  canOpen: { tool: string; id: number };
   links: ItemLinks;
 };
 

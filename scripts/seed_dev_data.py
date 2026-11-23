@@ -61,6 +61,7 @@ from seed import (
     ideas,
     initiatives,
     operations,
+    plugins,
     posts,
     projects,
     properties,
@@ -85,6 +86,7 @@ AREAS = (
     counters,
     dashboards,
     calendars,
+    plugins,
     properties,
     posts,
     collections,
@@ -109,6 +111,7 @@ async def seed() -> None:
     async with SystemSessionLocal() as session:
         print("  Creating users...")
         users = await accounts.seed(session, ids)
+        await counters.list_plugin(session)
 
         seeded = {}
         for key, spec in guilds.COMMUNITIES.items():

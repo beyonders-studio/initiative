@@ -59,7 +59,13 @@ from app.models.tenant.comment import Comment, CommentAudience
 from app.models.tenant.intake import DEDUPE_KEY_LENGTH, IntakeBinding, IntakeCase
 from app.models.tenant.metadata import MetadataDefinition, MetadataType, MetadataValue
 from app.models.tenant.project import Project
-from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory, TaskType
+from app.models.tenant.task import (
+    Task,
+    TaskPriority,
+    TaskStatus,
+    TaskStatusCategory,
+    TaskType,
+)
 from app.schemas.tenant.property import PropertyValueInput
 from app.services.platform import case_activity, case_notices
 from app.services.tenant import descriptions as descriptions_service
@@ -509,6 +515,7 @@ async def open_case(
     evidence_by: int | None = None,
     topic: str | None = None,
     device: DeviceContext | None = None,
+    priority: TaskPriority | None = None,
 ) -> CaseOutcome | None:
     """File ``stream``'s work as a task in the project bound to it.
 
@@ -539,6 +546,9 @@ async def open_case(
     ``topic`` is what the case is about within its stream, as the filer
     chose. It is recorded on a new case, and a topic with a cap of its own
     (``IntakeStreamMeta.topic_open_caps``) is held to it.
+
+    ``priority`` is a new case's task priority, where the caller can say how
+    urgent it is; otherwise the case's task type decides.
     """
     from app.services.platform import evidence as evidence_service
 
@@ -652,10 +662,10 @@ async def open_case(
         task_type = await _case_type(session, binding, project)
         description = _with_device(body, device)
         fields: dict[str, object] = {"title": title, "description": description}
+        if priority is not None:
+            fields["priority"] = priority
         lines = task_creation_service.start_from_type(
-            task_type,
-            fields,
-            sent={"title", "description"} if description else {"title"},
+            task_type, fields, sent={name for name, value in fields.items() if value}
         )
         task = await task_creation_service.create_task_row(
             session,
@@ -708,7 +718,8 @@ async def open_case(
             # Named explicitly: the routing carries no user, so the trigger
             # would otherwise leave the author empty.
             opening = Comment(
-                task_id=task.id,
+                subject_type="task",
+                subject_id=task.id,
                 content=filer.words,
                 created_by=filer.user_id,
                 created_by_kind=ActorKind.member,
@@ -798,7 +809,8 @@ async def add_filer_reply(
         if state is FilerState.closed:
             return False
         comment = Comment(
-            task_id=task_id,
+            subject_type="task",
+            subject_id=task_id,
             content=words,
             created_by=filer.id,
             created_by_kind=ActorKind.member,

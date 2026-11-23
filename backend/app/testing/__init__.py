@@ -10,7 +10,7 @@ guild's ``guild_<id>`` schema before touching the database (see
 ``route_session_to_guild``.
 """
 
-from app.testing.actor import Actor, guild_url, make_actor
+from app.testing.actor import Actor, guild_url, make_actor, thread_path
 from app.testing.audit import emitted
 from app.testing.captcha import captcha_switched_on
 from app.testing.factories import (
@@ -30,8 +30,6 @@ from app.testing.factories import (
     create_collection,
     create_comment,
     create_contact,
-    create_counter,
-    create_counter_group,
     create_dashboard,
     create_export_job,
     create_federated_identity,
@@ -87,6 +85,7 @@ from app.testing.factories import (
     set_notification_prefs,
     signed_in_headers,
     strip_non_owner_grants,
+    switch_tools,
 )
 from app.testing.notices import drain_notices
 from app.testing.passkeys import (
@@ -106,12 +105,25 @@ from app.testing.routing import (
 )
 from app.testing.schema_harness import guild_of, route_session_to_guild
 from app.testing.server import in_request_tasks
+from app.testing.tool_plugins import (
+    COUNTERS_UID,
+    add_counter,
+    convert_counters,
+    counters_listing,
+    counters_tool_manifest,
+    counters_tool_set,
+    install_counters,
+    install_tool_plugin,
+    list_counters,
+)
 
 __all__ = [
+    "COUNTERS_UID",
     "NARROWED_CLAIM",
     "NARROWED_VALUE",
     "TOOL_FACTORIES",
     "Actor",
+    "add_counter",
     "as_role",
     "assertion_for",
     "assign_tag",
@@ -119,6 +131,10 @@ __all__ = [
     "captcha_switched_on",
     "checklist_items",
     "community_plan",
+    "convert_counters",
+    "counters_listing",
+    "counters_tool_manifest",
+    "counters_tool_set",
     "create_access_grant",
     "create_auth_provider",
     "create_calendar",
@@ -128,8 +144,6 @@ __all__ = [
     "create_collection",
     "create_comment",
     "create_contact",
-    "create_counter",
-    "create_counter_group",
     "create_dashboard",
     "create_export_job",
     "create_federated_identity",
@@ -180,7 +194,10 @@ __all__ = [
     "guild_of",
     "guild_url",
     "in_request_tasks",
+    "install_counters",
+    "install_tool_plugin",
     "lexical_body",
+    "list_counters",
     "make_actor",
     "make_operations_community",
     "marketplace_uid",
@@ -202,4 +219,6 @@ __all__ = [
     "strip_non_owner_grants",
     "stub_assertion",
     "stub_registration",
+    "switch_tools",
+    "thread_path",
 ]

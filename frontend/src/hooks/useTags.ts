@@ -26,13 +26,7 @@ import type { MutationOpts } from "@/types/mutation";
 /** Refresh every list that embeds TagSummary chips — a rename/recolor or
  * delete must reach all of them, not just the tags list. */
 const invalidateTagBearers = () => {
-  void invalidate(
-    q.allTasks(),
-    q.allProjects(),
-    q.allFiles(),
-    q.allCounterGroups(),
-    q.allCalendars()
-  );
+  void invalidate(q.allTasks(), q.allProjects(), q.allFiles(), q.allCalendars());
 };
 
 export const useTags = (options?: { enabled?: boolean }) => {
@@ -98,8 +92,8 @@ export const useUpdateTag = (
 
 export const useDeleteTag = (
   options?: MutationOpts<void, number> & {
-    /** Skip the per-delete success toast — for batch callers that show one
-     * summary toast instead. Error toasts still fire per tag. */
+    /** Skip the per-delete toasts, success and error — for batch callers that
+     * show one summary toast instead. */
     silent?: boolean;
   }
 ) => {
@@ -117,7 +111,7 @@ export const useDeleteTag = (
         void invalidate(q.allTags());
         invalidateTagBearers();
       },
-      errorKey: "tags:deleteError",
+      errorKey: silent ? undefined : "tags:deleteError",
     },
     rest
   );

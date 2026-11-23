@@ -9,6 +9,11 @@ to none of them in particular — including how one is READ back out of somethin
 somebody wrote, which is the same question whether the body is a Lexical editor
 state or the running text of a comment.
 
+A reference names a built-in kind (``task:12``) or a tool plug-in's
+(``counter.tsjvtcm0s7gv2x:12``): its key, ``.`` and its plug-in's uid in lower
+case. Reading one checks only that shape; whether the community has that kind
+is the tool set's to say, where a reference is resolved.
+
 What a reference RESOLVES to — the column holding the name, the resource whose
 sharing gates it — is derived from the search registry in
 :mod:`app.db.reference_targets`, which needs the models.
@@ -39,20 +44,18 @@ REFERENCEABLE_TYPES: tuple[SearchEntityType, ...] = tuple(
 )
 
 
-def is_referenceable(entity_type: SearchEntityType) -> bool:
+def is_referenceable(entity_type: str) -> bool:
     """Whether a reference may name this kind."""
     return entity_type not in NOT_REFERENCEABLE
 
 
-def format_ref(
-    entity_type: SearchEntityType, entity_id: int, aspect: Enum | None = None
-) -> str:
+def format_ref(entity_type: str, entity_id: int, aspect: Enum | None = None) -> str:
     """A reference as it is stored and asked for.
 
     ``task:12`` names the thing, which resolves to what it is called now.
     ``task:12:status`` names a fact about it.
     """
-    parts = [entity_type.value, str(entity_id)]
+    parts = [getattr(entity_type, "value", entity_type), str(entity_id)]
     if aspect is not None:
         parts.append(aspect.value)
     return REF_SEPARATOR.join(parts)
@@ -70,15 +73,18 @@ MAX_ENTITY_ID = 2_147_483_647
 _ID_DIGITS = frozenset("0123456789")
 
 
-def _kind(value: str) -> SearchEntityType | None:
-    """The kind a reference names, or None if nothing is called that."""
+def _kind(value: str) -> str | None:
+    """The kind a reference names, or None if nothing could be called that: a
+    built-in kind as its member, or a tool plug-in's as it is written."""
+    from app.db.plugin_tools import is_plugin_kind
+
     try:
         return SearchEntityType(value)
     except ValueError:
-        return None
+        return value if is_plugin_kind(value) else None
 
 
-def parse_ref(ref: str) -> tuple[SearchEntityType, int] | None:
+def parse_ref(ref: str) -> tuple[str, int] | None:
     """The thing a bare reference names, or ``None`` for a string that names none.
 
     The inverse of :func:`format_ref` without an aspect. A reference that does
@@ -86,7 +92,8 @@ def parse_ref(ref: str) -> tuple[SearchEntityType, int] | None:
     that wrote it, and a kind this build no longer offers should cost a reader
     the reference, not the page it is on. A reference arriving from a client is
     read the same way, so a malformed one narrows nothing instead of failing
-    the request.
+    the request. A tool plug-in's kind reads here whichever community it is
+    asked in; the tool set that resolves it drops one the community lacks.
     """
     kind, separator, raw_id = ref.partition(REF_SEPARATOR)
     if not separator or not raw_id or not _ID_DIGITS.issuperset(raw_id):
@@ -117,7 +124,7 @@ REFERENCE_NODES: dict[str, str] = {
 BLOCK_REFERENCE_NODES = frozenset({"reference-embed"})
 
 
-def reference_node_kind(node: dict[str, Any]) -> SearchEntityType | None:
+def reference_node_kind(node: dict[str, Any]) -> str | None:
     """The kind a reference node names. A chip spells it as the first half of
     its ``task:status``."""
     chip_kind = node.get("chipKind")
@@ -163,23 +170,30 @@ def reference_as_text(node: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+#: The word after ``#`` that names a kind in running text: a built-in kind
+#: (``task``, ``wiki-page``), and for a tool plug-in's, ``.`` and its uid
+#: (``counter-group.tsjvtcm0s7gv2x``), as ``/go`` spells it.
+TRIGGER_WORD = r"[\w-]+(?:\.[a-z0-9]+)?"
+
 #: A reference written into running text: ``#task[Fix the bug](12)``. The kind
 #: is part of the syntax, so one pattern reads every kind rather than one
 #: pattern per kind. The word after ``#`` is spelled the way the composer
 #: writes it — see :func:`kind_for_trigger`.
-TEXT_REFERENCE = re.compile(r"#([\w-]+)\[([^\]]*)\]\((\d+)\)")
+TEXT_REFERENCE = re.compile(rf"#({TRIGGER_WORD})\[([^\]]*)\]\((\d+)\)")
 
 
-def kind_for_trigger(word: str) -> SearchEntityType | None:
+def kind_for_trigger(word: str) -> str | None:
     """The kind the word after a ``#`` names in running text.
 
-    The composer writes a kind kebabed — ``#wiki-page``, ``#counter-group`` —
-    and the kind's own spelling reads too.
+    The composer writes a kind kebabed — ``#wiki-page``, ``#calendar-event``,
+    ``#counter-group.tsjvtcm0s7gv2x`` — and the kind's own spelling reads too.
+    A key holds no ``-`` and a uid neither ``-`` nor ``_``, so each ``-`` is a
+    ``_`` of the kind.
     """
     return _kind(word.replace("-", "_"))
 
 
-def references_in_body(content: Any) -> set[tuple[SearchEntityType, int]]:
+def references_in_body(content: Any) -> set[tuple[str, int]]:
     """Every thing a Lexical body points at.
 
     Walks the editor state for reference nodes, chips included.
@@ -187,7 +201,7 @@ def references_in_body(content: Any) -> set[tuple[SearchEntityType, int]]:
     if not isinstance(content, dict):
         return set()
 
-    found: set[tuple[SearchEntityType, int]] = set()
+    found: set[tuple[str, int]] = set()
 
     def walk(node: Any) -> None:
         if not isinstance(node, dict):
@@ -209,11 +223,11 @@ def references_in_body(content: Any) -> set[tuple[SearchEntityType, int]]:
     return found
 
 
-def references_in_text(content: str | None) -> set[tuple[SearchEntityType, int]]:
+def references_in_text(content: str | None) -> set[tuple[str, int]]:
     """Every thing a plain-text body points at — what a comment is written in."""
     if not content:
         return set()
-    found: set[tuple[SearchEntityType, int]] = set()
+    found: set[tuple[str, int]] = set()
     for raw_kind, _label, raw_id in TEXT_REFERENCE.findall(content):
         kind = kind_for_trigger(raw_kind)
         if kind is not None:
@@ -222,7 +236,7 @@ def references_in_text(content: str | None) -> set[tuple[SearchEntityType, int]]
 
 
 def unlink_references(
-    content: dict[str, Any], entity_type: SearchEntityType, entity_id: int
+    content: dict[str, Any], entity_type: str, entity_id: int
 ) -> bool:
     """Make every reference to one thing that is going away the words it was
     written with, in place. Returns whether anything changed."""
@@ -244,7 +258,7 @@ def unlink_references(
             if (
                 field is not None
                 and child.get(field) == entity_id
-                and reference_node_kind(child) is entity_type
+                and reference_node_kind(child) == entity_type
             ):
                 children[index] = reference_as_text(child)
                 changed = True

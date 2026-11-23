@@ -23,6 +23,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import PluginDataMessages
+from app.db.session import routed_tools
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.services.marketplace import plugin_data
 from app.services.marketplace.registration_lookup import registration_for_definition
@@ -154,7 +155,7 @@ def resolved_with(
     if refused is not None:
         raise refused
     rows = {entry.call: entry for entry in mine if isinstance(entry, PluginRows)}
-    return resolve(sql, rows) if rows else statement
+    return resolve(sql, rows, statement.tools) if rows else statement
 
 
 async def with_rows(
@@ -166,8 +167,9 @@ async def with_rows(
     fetch: bool = True,
 ) -> ResolvedQuery:
     """*sql*, resolved with what its ``plugin()`` calls read in
-    *initiative_id*. Its spreadsheets are read where it runs."""
-    statement = resolve(sql)
+    *initiative_id*, naming the datasets of the community *session* is routed
+    into. Its spreadsheets are read where it runs."""
+    statement = resolve(sql, tools=routed_tools(session))
     prepared = await prepare(
         session,
         statement.unread,

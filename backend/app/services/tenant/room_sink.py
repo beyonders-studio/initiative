@@ -15,7 +15,8 @@ Three things follow from taking it off the log rather than off the call sites:
   ``LISTEN``/``NOTIFY``, so every worker holding a socket for that guild reads
   the same committed rows. A signal raised on one worker no longer stops there.
 * **The envelope is the log's.** ``resource``, ``parents``, ``action`` — ids
-  and names, never a value, exactly as a webhook subscriber receives them. The
+  and names, never a value, exactly as a webhook subscriber receives them,
+  a tool plug-in's tables named by their kinds as its routes address them. The
   client refetches through the RLS-gated REST path, which stays the only
   authorization decision point.
 
@@ -62,9 +63,13 @@ from sqlalchemy import or_
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tool_set import ToolSet
+from app.core.webhook_events import resource_name
 from app.db import cohorts
 from app.db.event_capture import OUTBOX_CHANNEL
+from app.db.plugin_tools import tool_set
 from app.db.request_context import SystemGuild
+from app.db.schema_provisioning import schema_stamp, stamp_tools
 from app.db.session import set_rls_context
 from app.models.tenant.event_outbox import EventOutbox
 from app.models.tenant.initiative import InitiativeMember
@@ -141,21 +146,27 @@ def schema_guild_id(schema: str) -> int | None:
     return int(tail) if tail.isdigit() else None
 
 
-def _change(row: EventOutbox, changed: set[str]) -> dict[str, Any]:
+def _change(row: EventOutbox, changed: set[str], tools: ToolSet) -> dict[str, Any]:
     """One log row as the client reads it: what moved, what it sits in, the
     initiative it belongs to (``None`` for the guild's own), and which of its
     columns an update touched — names, never values. The columns are what
     tells a client whether a rename can have moved anything it counts."""
     return {
-        "resource": {"type": row.resource_type, "id": row.resource_id},
-        "parents": list(row.parents),
+        "resource": {
+            "type": resource_name(row.resource_type, tools),
+            "id": row.resource_id,
+        },
+        "parents": [
+            {**parent, "type": resource_name(parent["type"], tools)}
+            for parent in row.parents
+        ],
         "initiative_id": row.initiative_id,
         "action": row.action,
         "changed": sorted(changed),
     }
 
 
-def _frame(rows: list[EventOutbox]) -> dict[str, Any]:
+def _frame(rows: list[EventOutbox], tools: ToolSet) -> dict[str, Any]:
     """One room's share of a batch.
 
     Repeats collapse: a row written three times in one transaction is one thing
@@ -171,7 +182,7 @@ def _frame(rows: list[EventOutbox]) -> dict[str, Any]:
         changed.update(row.changed)
     if len(seen) > MAX_CHANGES:
         return dict(EVERYTHING)
-    return {"changes": [_change(row, changed) for row, changed in seen.values()]}
+    return {"changes": [_change(row, changed, tools) for row, changed in seen.values()]}
 
 
 async def _open_new_rooms(
@@ -205,7 +216,9 @@ async def _open_new_rooms(
     await sockets.refresh_users(guild_id, watching & members)
 
 
-async def _fan_out(guild_id: int, rows: list[EventOutbox]) -> None:
+async def _fan_out(
+    session: AsyncSession, guild_id: int, rows: list[EventOutbox]
+) -> None:
     """Send each initiative its own changes, and the guild's to everyone.
 
     A row with no initiative belongs to none — a tag, an installed plug-in — and is
@@ -214,11 +227,14 @@ async def _fan_out(guild_id: int, rows: list[EventOutbox]) -> None:
     """
     if not rows:
         return
+    # The set this process keeps for the schema's stamp, built where it has none.
+    stamp = await session.scalar(select(schema_stamp(guild_id)))
+    tools = await tool_set(session, stamp_tools(stamp))
     by_room: dict[int | None, list[EventOutbox]] = {}
     for row in rows:
         by_room.setdefault(row.initiative_id, []).append(row)
     for initiative_id, batch in by_room.items():
-        message = _frame(batch)
+        message = _frame(batch, tools)
         if initiative_id is None:
             sockets.emit_json(guild_room(guild_id), message)
         else:
@@ -309,7 +325,7 @@ async def deliver(payload: str) -> None:
                 # and this transaction, which is news, is not.
                 _delivered[guild_id] = _ids(await _rows_in_window(session)) - _ids(rows)
             await _open_new_rooms(session, guild_id, rows)
-            await _fan_out(guild_id, rows)
+            await _fan_out(session, guild_id, rows)
     except Exception:
         logger.exception("room sink: fan-out failed for guild %s", guild_id)
 
@@ -350,7 +366,9 @@ async def process_room_sweep() -> None:
                     # not knowable, so the room is told that much.
                     sockets.emit_json(guild_room(guild_id), EVERYTHING)
                 else:
-                    await _fan_out(guild_id, [r for r in rows if r.id not in sent])
+                    await _fan_out(
+                        session, guild_id, [r for r in rows if r.id not in sent]
+                    )
                 # Everything in the window has now been sent, and anything that
                 # has fallen out of it will not be read again — so this is both
                 # the record and the pruning of it.

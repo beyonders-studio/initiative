@@ -9,8 +9,8 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import text
 
-from app.db.tool_layouts_migration_test import _load
 from app.testing import create_user
+from app.testing.later_revisions import load_revision
 
 _BEFORE = ("displacer", "strahd", "aboleth", "kobold", "orc")
 _AFTER = ("catppuccin", "dracula", "monokai", "kobold", "orc")
@@ -18,7 +18,7 @@ _AFTER = ("catppuccin", "dracula", "monokai", "kobold", "orc")
 
 async def test_renamed_themes_move_and_move_back(session) -> None:
     users = [await create_user(session, color_theme=theme) for theme in _BEFORE]
-    migration = _load("20261110_0605_themes_take_their_own_names")
+    migration = load_revision("20261110_0605_themes_take_their_own_names")
 
     async def run(step) -> tuple[str, ...]:
         def apply(sync_session) -> None:

@@ -17,7 +17,6 @@ from app.core.email_masking import mask_email
 from app.core.guild_auth_options import CommunityAuthOption
 from app.core.login_methods import LoginMethod
 from app.core.messages import GuildMessages
-from app.core.tools import Tool
 from app.models.platform.guild import (
     DEFAULT_BANNER,
     MEMBER_DISPLAY_NAME_MAX_LENGTH,
@@ -325,8 +324,9 @@ class CommunityInviteGrant(SanitizedBaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     initiative_id: int
-    #: The item and its level, all three or none.
-    resource_type: Tool | None = None
+    #: The item and its level, all three or none. A tool's kind, one of the
+    #: community's tools.
+    resource_type: str | None = None
     resource_id: int | None = None
     level: Literal["read", "write"] | None = None
 

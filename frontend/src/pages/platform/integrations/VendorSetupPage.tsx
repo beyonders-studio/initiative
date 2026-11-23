@@ -12,7 +12,7 @@ import { Button } from "@/ui/button";
  *
  * The vendor returns with a code and the state the setup began with; this page
  * hands both to the server, which exchanges the code and writes the vendor
- * values, and then returns to the plug-in services list.
+ * values, and then returns to the plug-in's own page.
  */
 export const VendorSetupPage = () => {
   const { t } = useTranslation("settings");
@@ -35,9 +35,16 @@ export const VendorSetupPage = () => {
     complete.mutate(
       { registrationId: id, code, state },
       {
-        onSuccess: () => {
+        onSuccess: (saved) => {
           toast.success(t("pluginServices.vendorSetupDone"));
-          void navigate({ to: "/settings/platform/integrations", replace: true });
+          if (saved.vendor_check === "not_run") {
+            toast.warning(t("pluginServices.vendorCheckNotRunSetup"));
+          }
+          void navigate({
+            to: "/settings/platform/integrations/plugins/$registrationId",
+            params: { registrationId: String(id) },
+            replace: true,
+          });
         },
         onError: (err) =>
           setError(getErrorMessage(err, "settings:pluginServices.vendorSetupFailed")),

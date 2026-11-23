@@ -8,21 +8,11 @@ rewrite itself: what each binding becomes, and what the downgrade puts back.
 from __future__ import annotations
 
 import copy
-import importlib.util
-from pathlib import Path
 
 from app.services.query.resolve import PluginCall, resolve
+from app.testing.later_revisions import load_revision
 
-_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "alembic"
-    / "versions"
-    / "20261107_0588_plugin_bindings_become_queries.py"
-)
-_spec = importlib.util.spec_from_file_location(_PATH.stem, _PATH)
-assert _spec and _spec.loader
-revision = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(revision)
+revision = load_revision("20261107_0588_plugin_bindings_become_queries")
 
 
 def test_a_builtin_widgets_plugin_binding_becomes_its_statement():

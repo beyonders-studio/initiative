@@ -39,10 +39,12 @@ from app.core.messages import (
     ProjectMessages,
     SharingMessages,
 )
-from app.core.tools import Tool
+from app.core.tool_set import ToolRecord
+from app.core.tools import Tool, ToolRefusals
 from app.db.authorization import standing_arg
 from app.db.frozen import ancestor_is_frozen, row_is_frozen
 from app.db.guild_standing import ActorContext, InstallContext
+from app.db.tool_rows import ToolRow
 from app.models.platform.guild import GuildMembership
 from app.models.tenant.initiative import InitiativeMember, InitiativeRoleModel
 from app.models.tenant.project import Project
@@ -54,7 +56,7 @@ from app.services import audit as audit_service
 
 
 def granted_scope_clause(
-    tool: Tool,
+    tool: Tool | ToolRecord,
     id_col: ColumnElement[int],
     user_id: int | None,
     *,
@@ -96,7 +98,7 @@ def granted_scope_clause(
 
 
 def listing_scope_clause(
-    tool: Tool,
+    tool: Tool | ToolRecord,
     id_col: ColumnElement[int],
     user_id: int | None,
     *,
@@ -134,10 +136,10 @@ def listing_scope_clause(
 
 @dataclass(frozen=True)
 class DacResource:
-    """One tool's DAC identity. Its refusals come from the tool (``Tool``), so
-    a new member arrives with its full set."""
+    """One tool's DAC identity. Its refusals come from the tool (a ``Tool``,
+    or a tool plug-in's record), so a new member arrives with its full set."""
 
-    name: Tool
+    name: ToolRefusals
 
 
 #: Every tool, by construction — ``tools_test`` has nothing to catch up on.
@@ -156,9 +158,29 @@ def _grant_level(level: Any) -> str:
 SHARING_READ = "sharing:read"
 
 
-def serialize_grants(row: Any, *, context: ActorContext | None) -> list:
-    """Serialize a resource's eager-loaded ``grants`` into the unified grant list
-    — one ``ResourceGrantSchema`` per ``resource_grants`` row (user, role,
+async def grants_of(
+    session: Any, kind: str, ids: Iterable[int]
+) -> dict[int, list[ResourceGrant]]:
+    """Who each of a tool's rows ``ids`` is shared with, by id."""
+    grants: dict[int, list[ResourceGrant]] = {}
+    ids = list(ids)
+    if not ids:
+        return grants
+    for grant in (
+        await session.exec(
+            select(ResourceGrant).where(
+                ResourceGrant.resource_type == kind,
+                ResourceGrant.resource_id.in_(ids),  # type: ignore[attr-defined]
+            )
+        )
+    ).all():
+        grants.setdefault(grant.resource_id, []).append(grant)
+    return grants
+
+
+def serialize_grants(grants: Iterable[Any], *, context: ActorContext | None) -> list:
+    """Serialize a resource's ``grants`` into the unified grant list — one
+    ``ResourceGrantSchema`` per ``resource_grants`` row (user, role,
     all-initiative-members, or an installed plug-in), owner included.
 
     An installed plug-in sees the list only with ``sharing:read``; without it the
@@ -175,14 +197,15 @@ def serialize_grants(row: Any, *, context: ActorContext | None) -> list:
             all_initiative_members=bool(getattr(g, "all_initiative_members", False)),
             plugin_install_id=getattr(g, "plugin_install_id", None),
         )
-        for g in getattr(row, "grants", None) or []
+        for g in grants
     ]
 
 
 async def audience(
-    session: Any, tool: Tool, rows: Iterable[Any]
+    session: Any, tool: Tool | ToolRecord, rows: Iterable[Any]
 ) -> dict[int, set[int]]:
-    """Who each of ``rows`` (``tool`` rows) is shared with and can open now, by
+    """Who each of ``rows`` (``tool`` rows, a built-in tool's or an installed
+    one's) is shared with and can open now, by
     id: the schema's ``resource_audience``, narrowed to
     :func:`named_people.readers_of`. The people a notification goes to and a
     notice is read by. Rows that reach nobody are absent.
@@ -298,7 +321,7 @@ async def replace_resource_grants(
     grants: Any,
     actor_user_id: int | None = None,
     by_install: bool = False,
-) -> None:
+) -> tuple[dict[_Grantee, str], dict[_Grantee, str]]:
     """Rebuild a resource's non-owner grants from ``grants`` (a list of
     ResourceAccessGrant rows). Each row is sorted by grantee kind — all-members,
     per-user, or per-role. The owner grant is preserved; owner-level entries and
@@ -315,7 +338,9 @@ async def replace_resource_grants(
     and the move of every grantee whose level actually changed is recorded in
     the same transaction. ``by_install`` records an installed plug-in's change the
     same way, with no person as its actor. Left at neither, nothing is
-    recorded."""
+    recorded.
+
+    Returns the level each grantee held before and holds after."""
     all_members_level: str | None = None
     user_levels: dict[int, str] = {}
     role_levels: dict[int, str] = {}
@@ -392,11 +417,10 @@ async def replace_resource_grants(
     # belongs to no initiative, so no initiative role speaks for it.
     if not guild_scoped:
         # Local: rls imports this module.
-        from app.models.tenant.initiative import PermissionKey
+        from app.db.session import routed_tools
         from app.services import rls as rls_service
 
-        tool = Tool(resource_type)
-        view_key = PermissionKey(tool.view_permission)
+        tool = routed_tools(session).by_kind[resource_type]
 
         async def permitted(reader: Any) -> tuple[set[int], set[int]]:
             return (
@@ -404,13 +428,13 @@ async def replace_resource_grants(
                     reader,
                     initiative_id=initiative_id,
                     user_ids=valid_users,
-                    permission_key=view_key,
+                    tool=tool,
                 ),
                 await rls_service.roles_permitting(
                     reader,
                     initiative_id=initiative_id,
                     role_ids=valid_roles,
-                    permission_key=view_key,
+                    tool=tool,
                 ),
             )
 
@@ -474,24 +498,24 @@ async def replace_resource_grants(
         if rid in valid_roles
     )
 
+    after: dict[_Grantee, str] = {}
+    if all_members_level is not None:
+        after[("all_members", None)] = all_members_level
+    after.update(
+        {
+            ("user", uid): level
+            for uid, level in user_levels.items()
+            if uid in valid_users
+        }
+    )
+    after.update(
+        {
+            ("role", rid): level
+            for rid, level in role_levels.items()
+            if rid in valid_roles
+        }
+    )
     if actor_user_id is not None or by_install:
-        after: dict[_Grantee, str] = {}
-        if all_members_level is not None:
-            after[("all_members", None)] = all_members_level
-        after.update(
-            {
-                ("user", uid): level
-                for uid, level in user_levels.items()
-                if uid in valid_users
-            }
-        )
-        after.update(
-            {
-                ("role", rid): level
-                for rid, level in role_levels.items()
-                if rid in valid_roles
-            }
-        )
         await _record_grant_changes(
             session,
             actor_user_id=actor_user_id,
@@ -502,12 +526,13 @@ async def replace_resource_grants(
             before=before,
             after=after,
         )
+    return before, after
 
 
 async def share_with(
     session: Any,
     *,
-    resource_type: Tool,
+    resource_type: str,
     resource_id: int,
     guild_id: int,
     initiative_id: int | None,
@@ -603,8 +628,11 @@ def actions_of(row: Any) -> frozenset[str]:
     schema's ``resource_actions`` in the SELECT that loaded the row, so it was
     answered for the reader the session is routed as, under the standing the
     seam computed. A row loaded without it came through a loader that does not
-    decide or serialize, which is where to ask for it.
+    decide or serialize, which is where to ask for it. A tool plug-in's row
+    carries its tool's (``app.db.tool_rows``).
     """
+    if isinstance(row, ToolRow):
+        return row.actions
     if "actions" in inspect(row).unloaded:
         raise RuntimeError(
             f"{type(row).__name__} was loaded without its actions; "
@@ -635,7 +663,7 @@ def _refusal(
     if action is Action.export:
         initiative = (
             None
-            if "initiative" in inspect(row).unloaded
+            if isinstance(row, ToolRow) or "initiative" in inspect(row).unloaded
             else getattr(row, "initiative", None)
         )
         return HTTPException(

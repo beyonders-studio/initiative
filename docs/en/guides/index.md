@@ -104,7 +104,7 @@ If you're not sure how the pieces fit together yet, [How Initiative is organized
 
 -   :material-storefront-outline: __Plug-ins & the marketplace__
 
-    Ready-made dashboards, projects and plug-ins that other groups built.
+    Ready-made dashboards, projects and plug-ins, including whole new tools.
 
     [:octicons-arrow-right-24: Plug-ins & the marketplace](plugins-and-marketplace.md)
 
@@ -113,6 +113,12 @@ If you're not sure how the pieces fit together yet, [How Initiative is organized
     Set a plug-in up, decide what it can reach, and keep it current.
 
     [:octicons-arrow-right-24: Managing plug-ins](managing-plugins.md)
+
+-   :material-source-pull: __GitHub__
+
+    Tasks that know their branches, pull requests and checks.
+
+    [:octicons-arrow-right-24: GitHub](github.md)
 
 </div>
 

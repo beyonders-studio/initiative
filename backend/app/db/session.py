@@ -29,6 +29,7 @@ from app.core import metrics
 from app.core.config import settings
 from app.core.identify import bearer_plugin_token
 from app.core.plugin_access_token import InstallAccessToken
+from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.core.tools import Tool
 from app.db import (
     base,  # noqa: F401  # ensure models are imported for Alembic
@@ -534,7 +535,19 @@ async def apply_guild_standing(
     returned row completes ``context``, which replaces the one the stored shape
     carries, so the replay hook re-applies routing and standing together.
     """
-    completed = context.with_standing(await compute_guild_standing(session))
+    from app.db.plugin_tools import tool_set
+    from app.models.platform.guild import CommunityRole
+
+    # The tools the community's rules were rendered with, its tool plug-ins'
+    # among them, named by its schema's stamp. A guest's role reads no
+    # install, and reaches no tool plug-in's tables.
+    if context.guild_role != CommunityRole.guest.value:
+        context = replace(
+            context, tools=await tool_set(session, context.rendered_tools)
+        )
+    completed = context.with_standing(
+        await compute_guild_standing(session, context.tools)
+    )
     _record_standing(session, completed)
     return completed
 
@@ -549,12 +562,36 @@ async def apply_install_standing(
     The second half of the install seam, as :func:`apply_guild_standing` is of
     the person seam. ``named_refs`` are the references the request names; the
     same statement resolves them in the install's own sector.
+
+    The statement is rendered from the community's tools, which its schema's
+    stamp names and the statement reads back: it is rendered from the tools
+    the community's last install request found, and again from the stamp's
+    where they changed since. A set this process does not keep is built from
+    the community's installs as the system engine reads them, which the
+    install's own role does not.
     """
-    completed = context.with_standing(
-        await compute_install_standing(session, named_refs)
-    )
+    from app.db.plugin_tools import kept_tool_set, provisioned_tools
+    from app.db.schema_provisioning import stamp_tools
+
+    tools = _INSTALL_TOOLS.get(context.guild_id, BUILTIN_TOOLS)
+    row = await compute_install_standing(session, named_refs, tools)
+    stamped = stamp_tools(row.get("schema_stamp"))
+    if stamped != tools.digest:
+        tools = (
+            BUILTIN_TOOLS
+            if stamped is None
+            else kept_tool_set(stamped) or await provisioned_tools(context.guild_id)
+        )
+        row = await compute_install_standing(session, named_refs, tools)
+    _INSTALL_TOOLS[context.guild_id] = tools
+    completed = replace(context, tools=tools).with_standing(row)
     _record_standing(session, completed)
     return completed
+
+
+#: The tools each community's last install request rendered its standing
+#: from, by community: shared sets, so one reference each.
+_INSTALL_TOOLS: dict[int, ToolSet] = {}
 
 
 def routed_guild_id(session: AsyncSession) -> int | None:
@@ -603,6 +640,25 @@ def require_guild_context(session: AsyncSession) -> GuildContext:
             "must run before a decision is made from one"
         )
     return context
+
+
+def routed_tools(session: AsyncSession) -> ToolSet:
+    """The tools of the community this session is routed into, as its
+    standing carries them, a person's or an installed plug-in's: the built-in
+    tools for the system's own reads."""
+    context = actor_context(session)
+    return context.tools if context is not None else BUILTIN_TOOLS
+
+
+async def session_tools(session: AsyncSession) -> ToolSet:
+    """:func:`routed_tools` for a session routed with a standing; for one
+    routed with none (a sweep's, the system's own reads), the community's
+    tools as its installs stand."""
+    if actor_context(session) is not None:
+        return routed_tools(session)
+    from app.db.plugin_tools import tool_set
+
+    return await tool_set(session)
 
 
 def install_context(session: AsyncSession) -> InstallContext | None:

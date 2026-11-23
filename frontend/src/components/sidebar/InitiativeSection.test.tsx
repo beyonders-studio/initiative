@@ -1,0 +1,100 @@
+/**
+ * An initiative's tools in the sidebar: the built-in ones, then the tools the
+ * community's tool plug-ins declare, each where the reader may open it.
+ */
+import { screen, within } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
+import { describe, expect, it } from "vitest";
+
+import {
+  buildInitiative,
+  buildToolPlugin,
+  initiativeCan,
+  TOOL_PLUGIN_UID,
+} from "@/__tests__/factories";
+import { server } from "@/__tests__/helpers/msw-server";
+import { renderPage } from "@/__tests__/helpers/render";
+import { Tool } from "@/api/generated/initiativeAPI.schemas";
+import { SidebarProvider } from "@/components/sidebar/sidebar";
+import { TOOLS } from "@/lib/tools";
+import { TooltipProvider } from "@/ui/tooltip";
+
+import { InitiativeSection } from "./InitiativeSection";
+
+const kind = `shelf.${TOOL_PLUGIN_UID.toLowerCase()}`;
+
+const counts = Object.fromEntries(TOOLS.map((tool) => [tool, 0])) as Record<Tool, number>;
+
+const render = (view: string[], create: string[] = []) => {
+  const initiative = buildInitiative({
+    id: 3,
+    can: initiativeCan({ view, create }),
+  });
+  return renderPage(() => (
+    <TooltipProvider>
+      <SidebarProvider>
+        <InitiativeSection
+          initiative={initiative}
+          projects={[]}
+          activeProjectId={null}
+          counts={counts}
+          plugins={[buildToolPlugin()]}
+          activeCommunityId={1}
+        />
+      </SidebarProvider>
+    </TooltipProvider>
+  ));
+};
+
+describe("InitiativeSection", () => {
+  it("lists an installed tool after the built-in ones, with its add link where the reader may", async () => {
+    render([Tool.wiki, kind, Tool.project], [kind]);
+
+    const row = await screen.findByRole("link", { name: "Reading" });
+    expect(row).toHaveAttribute("href", `/c/1/i/3/t/${kind}`);
+    const links = screen.getAllByRole("link").map((link) => link.textContent);
+    expect(links.indexOf("Reading")).toBeGreaterThan(
+      links.findIndex((text) => text?.startsWith("Wikis"))
+    );
+    // Projects stay last, so their list opens beneath them.
+    expect(links.findIndex((text) => text?.startsWith("Projects"))).toBeGreaterThan(
+      links.indexOf("Reading")
+    );
+    // The tool's list, its add dialog open, as a built-in tool's create link.
+    expect(screen.getByRole("link", { name: "New Shelf" })).toHaveAttribute(
+      "href",
+      expect.stringContaining(`/c/1/i/3/t/${kind}?create=`)
+    );
+  });
+
+  it("marks an installed tool with unread activity as a built-in tool's row", async () => {
+    server.use(
+      http.get("/api/v1/notifications/unread", () =>
+        HttpResponse.json({
+          places: [
+            {
+              community_id: 1,
+              initiative_id: 3,
+              tool: kind,
+              resource_id: null,
+              subject_type: null,
+              subject_id: null,
+            },
+          ],
+        })
+      )
+    );
+    render([kind]);
+
+    const row = await screen.findByRole("link", { name: /Reading/ });
+    expect(await within(row).findByRole("img", { name: "Unread activity" })).toBeInTheDocument();
+  });
+
+  it("leaves out a tool the reader may not open here", async () => {
+    render([Tool.wiki]);
+
+    expect(await screen.findByRole("link", { name: /Wikis/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Reading" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "New Shelf" })).toBeNull();
+  });
+});

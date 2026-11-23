@@ -17,6 +17,7 @@ import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { AskToEdit } from "@/components/access/RequestAccess";
+import { SendButton } from "@/components/access/SendTo";
 import { useFullBleed } from "@/components/banners/PageBanner";
 import { useListedInitiative } from "@/hooks/useInitiatives";
 import { useCommunityPath } from "@/lib/communityUrl";
@@ -134,6 +135,7 @@ export const ToolPageHeader = ({
                   initiativeId={initiativeId}
                 />
                 <SubscribeButton kind={tool} entityId={starId} />
+                <SendButton kind={tool} entityId={starId} />
               </div>
             ) : null}
             {titleExtras}

@@ -6,8 +6,10 @@ import io
 import pytest
 from sqlmodel import select
 
+from app.core.audit_events import AuditEventType
 from app.models.platform.user import User, UserRole, UserStatus
 from app.services.platform import users as users_service
+from app.testing import emitted
 from app.testing.factories import create_user
 
 #: Every test here drives the API through the real app and a real database.
@@ -40,10 +42,12 @@ def _export_id(people: dict, name: str) -> int:
     return _NO_SUCH_USER.get(name) or people[name].user.id
 
 
-async def test_export_platform_users_csv_as_operator(client, platform_people):
+async def test_export_platform_users_csv_as_operator(client, platform_people, capfd):
     """Operators export every account as a BOM'd CSV attachment, with
-    the addresses masked the way the roster it exports masks them."""
+    the addresses masked the way the roster it exports masks them. The export
+    is recorded with its count, as a read."""
     operator = platform_people["operator"]
+    capfd.readouterr()
 
     response = await client.get(
         "/api/v1/operator/users/export.csv", headers=operator.headers
@@ -75,6 +79,16 @@ async def test_export_platform_users_csv_as_operator(client, platform_people):
     }
     assert not any("@example.com" in row[1] for row in data_rows)
 
+    (line,) = emitted(capfd, AuditEventType.PLATFORM_USERS_EXPORTED)
+    assert (line["actor_user_id"], line["target_user_id"], line["guild_id"]) == (
+        operator.user.id,
+        None,
+        None,
+    )
+    assert line["target"] is None
+    assert line["detail"] == {"count": len(data_rows), "subset": False}
+    assert line["is_write"] is False
+
 
 @pytest.mark.parametrize(
     ("ask", "expect"),
@@ -85,21 +99,27 @@ async def test_export_platform_users_csv_as_operator(client, platform_people):
     ],
 )
 async def test_export_platform_users_csv_returns_the_accounts_asked_for(
-    client, platform_people, ask, expect
+    client, platform_people, capfd, ask, expect
 ):
     """``user_id`` narrows the export to the accounts it names, and a request
-    that resolves to nobody is a 404. A single account files under its handle;
-    any wider export files under the platform."""
+    that resolves to nobody is a 404 and records nothing. A single account
+    files under its handle; any wider export files under the platform."""
     operator = platform_people["operator"]
     query = "&".join(f"user_id={_export_id(platform_people, name)}" for name in ask)
+    capfd.readouterr()
 
     response = await client.get(
         f"/api/v1/operator/users/export.csv?{query}", headers=operator.headers
     )
 
+    exported = emitted(capfd, AuditEventType.PLATFORM_USERS_EXPORTED)
     if not expect:
         assert response.status_code == 404
+        assert exported == []
         return
+    assert [line["detail"] for line in exported] == [
+        {"count": len(expect), "subset": True}
+    ]
 
     assert response.status_code == 200
     _, data_rows = _parse_csv(response.content)

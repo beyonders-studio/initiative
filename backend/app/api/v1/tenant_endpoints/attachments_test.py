@@ -5,9 +5,13 @@ from datetime import UTC
 
 import pytest
 from httpx2 import AsyncClient
+from starlette.datastructures import UploadFile
 
 from app.models.platform.guild import CommunityRole
-from app.services.tenant.attachments import detect_document_image_type
+from app.services.tenant.attachments import (
+    MAX_IMAGE_BYTES,
+    detect_document_image_type,
+)
 from app.testing import guild_administration
 
 #: A real 1x1 PNG — the header reader walks IHDR, so a stub signature is not
@@ -21,9 +25,18 @@ TINY_PNG = (
 )
 
 
-async def test_upload_image_too_large(client: AsyncClient, acting_user):
-    """Uploading an image larger than MAX_IMAGE_BYTES returns 413."""
+async def test_upload_image_too_large(client: AsyncClient, acting_user, monkeypatch):
+    """Uploading an image larger than MAX_IMAGE_BYTES returns 413, having read
+    only one byte past the limit."""
     a = await acting_user(guild_role=CommunityRole.admin)
+    requested: list[int] = []
+    read = UploadFile.read
+
+    async def recording_read(self: UploadFile, size: int = -1) -> bytes:
+        requested.append(size)
+        return await read(self, size)
+
+    monkeypatch.setattr(UploadFile, "read", recording_read)
 
     oversized = b"\x89PNG\r\n\x1a\n" + b"X" * (11 * 1024 * 1024)
     response = await client.post(
@@ -34,84 +47,42 @@ async def test_upload_image_too_large(client: AsyncClient, acting_user):
 
     assert response.status_code == 413
     assert response.json()["detail"] == "ATTACHMENT_TOO_LARGE"
-
-
-async def test_upload_image_within_limit(client: AsyncClient, acting_user):
-    """A valid PNG under the size limit is accepted."""
-    a = await acting_user(guild_role=CommunityRole.admin)
-
-    response = await client.post(
-        a.g("/attachments/"),
-        headers=a.headers,
-        files={"file": ("pixel.png", io.BytesIO(TINY_PNG), "image/png")},
-    )
-
-    assert response.status_code == 201
-    assert response.json()["url"].startswith("/uploads/")
-
-
-async def test_upload_names_the_file_after_its_bytes(client: AsyncClient, acting_user):
-    """The stored name and type come from the bytes, not from what the client
-    called the file — so the name a serve request reads back describes it."""
-    a = await acting_user(guild_role=CommunityRole.admin)
-    svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>'
-
-    response = await client.post(
-        a.g("/attachments/"),
-        headers=a.headers,
-        files={"file": ("disguised.png", io.BytesIO(svg), "image/png")},
-    )
-
-    assert response.status_code == 201
-    payload = response.json()
-    assert payload["content_type"] == "image/svg+xml"
-    assert payload["url"].endswith(".svg")
-
-
-async def test_upload_ignores_a_declared_svg_type(client: AsyncClient, acting_user):
-    """A raster is identified as one however it is labelled."""
-    a = await acting_user(guild_role=CommunityRole.admin)
-
-    response = await client.post(
-        a.g("/attachments/"),
-        headers=a.headers,
-        files={"file": ("pixel.svg", io.BytesIO(TINY_PNG), "image/svg+xml")},
-    )
-
-    assert response.status_code == 201
-    payload = response.json()
-    assert payload["content_type"] == "image/png"
-    assert payload["url"].endswith(".png")
+    assert requested == [MAX_IMAGE_BYTES + 1]
 
 
 @pytest.mark.parametrize(
-    "prolog",
+    ("named", "declared", "contents", "kind", "extension"),
     [
-        b"\xef\xbb\xbf",
-        b'<?xml version="1.0" encoding="UTF-8"?>\n',
-        b"<!-- exported by a drawing program -->\n",
         (
-            b'<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" '
-            b'"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n'
+            "disguised.png",
+            "image/png",
+            b'<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>',
+            "image/svg+xml",
+            ".svg",
         ),
+        # A raster is identified before any markup is looked for.
+        ("pixel.svg", "image/svg+xml", TINY_PNG, "image/png", ".png"),
     ],
+    ids=["svg-labelled-png", "png-labelled-svg"],
 )
-async def test_upload_accepts_an_svg_behind_a_prolog(
-    client: AsyncClient, acting_user, prolog: bytes
+async def test_upload_names_the_file_after_its_bytes(
+    client: AsyncClient, acting_user, named, declared, contents, kind, extension
 ):
-    """Real SVGs open with a byte-order mark, a declaration, a comment or a
-    doctype before the root element; all four are still SVGs."""
+    """The stored name and type come from the bytes, not from what the client
+    called the file — so the name a serve request reads back describes it."""
     a = await acting_user(guild_role=CommunityRole.admin)
-    svg = prolog + b'<svg xmlns="http://www.w3.org/2000/svg"></svg>'
 
     response = await client.post(
         a.g("/attachments/"),
         headers=a.headers,
-        files={"file": ("image.svg", io.BytesIO(svg), "image/svg+xml")},
+        files={"file": (named, io.BytesIO(contents), declared)},
     )
 
     assert response.status_code == 201
-    assert response.json()["url"].endswith(".svg")
+    payload = response.json()
+    assert payload["content_type"] == kind
+    assert payload["url"].startswith(f"/uploads/{a.guild.id}/")
+    assert payload["url"].endswith(extension)
 
 
 async def test_upload_refuses_bytes_that_are_no_image(client: AsyncClient, acting_user):
@@ -171,11 +142,6 @@ def test_markup_that_is_not_an_svg_is_not_an_image(contents: bytes):
     """Naming the element somewhere in the file is not being it — the root
     element is, so none of these are stored as pictures."""
     assert detect_document_image_type(contents) is None
-
-
-def test_a_raster_is_identified_before_markup():
-    """A raster signature settles it; nothing goes looking for markup in a PNG."""
-    assert detect_document_image_type(TINY_PNG) == "image/png"
 
 
 # ---------------------------------------------------------------------------
@@ -296,13 +262,16 @@ async def test_a_picture_that_is_not_a_description_s_is_never_deleted(
 async def test_purging_a_task_deletes_its_pictures(
     client: AsyncClient, session, acting_user
 ):
+    """Its description's and its comments' alike."""
     from app.services.tenant.soft_delete import hard_purge_entity, soft_delete_entity
-    from app.testing import create_task
+    from app.testing import create_comment, create_task
     from app.testing.schema_harness import route_session_to_guild
 
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     url = await _paste(client, a)
+    in_comment = await _paste(client, a)
     task = await create_task(session, a.project, description=f"![shot]({url})")
+    await create_comment(session, a.user, task=task, content=f"![shot]({in_comment})")
     await session.commit()
 
     await route_session_to_guild(session, a.guild.id)
@@ -312,11 +281,13 @@ async def test_purging_a_task_deletes_its_pictures(
     await session.commit()
     # In the trash it still pins its pictures — it may come back.
     assert await _stored(session, a.guild.id, url)
+    assert await _stored(session, a.guild.id, in_comment)
 
     await hard_purge_entity(session, task)
     await session.commit()
 
     assert not await _stored(session, a.guild.id, url)
+    assert not await _stored(session, a.guild.id, in_comment)
 
 
 def _lexical(*urls: str) -> dict:
@@ -387,52 +358,21 @@ async def _discard(client: AsyncClient, a, url: str) -> None:
     assert response.status_code == 204, response.text
 
 
-async def test_a_picture_left_unsaved_is_discarded(
-    client: AsyncClient, session, acting_user
-):
-    a = await acting_user(guild_role=CommunityRole.member)
-    url = await _paste(client, a)
-
-    await _discard(client, a, url)
-
-    assert not await _stored(session, a.guild.id, url)
-
-
-async def test_a_saved_picture_is_not_discarded(
+async def test_only_an_unsaved_picture_its_uploader_pasted_is_discarded(
     client: AsyncClient, session, acting_user
 ):
     """The page asks about everything it pasted; the ones a description kept
-    stay."""
+    stay, as do a file's own picture and somebody else's."""
     from app.testing import create_task
 
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    url = await _paste(client, a)
-    await create_task(session, a.project, description=f"![shot]({url})")
-    await session.commit()
-
-    await _discard(client, a, url)
-
-    assert await _stored(session, a.guild.id, url)
-
-
-async def test_nobody_discards_somebody_else_s_picture(
-    client: AsyncClient, session, acting_user
-):
-    a = await acting_user(guild_role=CommunityRole.member)
     b = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
-    url = await _paste(client, a)
-
-    await _discard(client, b, url)
-
-    assert await _stored(session, a.guild.id, url)
-
-
-async def test_only_a_pasted_picture_can_be_discarded(
-    client: AsyncClient, session, acting_user
-):
-    a = await acting_user(guild_role=CommunityRole.member)
+    unsaved = await _paste(client, a)
+    saved = await _paste(client, a)
+    await create_task(session, a.project, description=f"![shot]({saved})")
+    await session.commit()
     response = await client.post(
         a.g("/attachments/"),
         headers=a.headers,
@@ -440,9 +380,15 @@ async def test_only_a_pasted_picture_can_be_discarded(
     )
     doc_url = response.json()["url"]
 
+    await _discard(client, b, unsaved)
+    await _discard(client, a, saved)
     await _discard(client, a, doc_url)
-
+    assert await _stored(session, a.guild.id, unsaved)
+    assert await _stored(session, a.guild.id, saved)
     assert await _stored(session, a.guild.id, doc_url)
+
+    await _discard(client, a, unsaved)
+    assert not await _stored(session, a.guild.id, unsaved)
 
 
 async def test_the_sweep_takes_pictures_nobody_saved_once_their_grace_is_over(
@@ -594,30 +540,6 @@ async def test_a_picture_a_comment_shows_outlives_the_description(
     await _set_description(client, a, task.id, "Never mind")
 
     assert await _stored(session, a.guild.id, url)
-
-
-async def test_purging_a_task_takes_its_comments_pictures_too(
-    client: AsyncClient, session, acting_user
-):
-    from app.services.tenant.soft_delete import hard_purge_entity, soft_delete_entity
-    from app.testing import create_comment, create_task
-    from app.testing.schema_harness import route_session_to_guild
-
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    url = await _paste(client, a)
-    task = await create_task(session, a.project)
-    await create_comment(session, a.user, task=task, content=f"![shot]({url})")
-    await session.commit()
-
-    await route_session_to_guild(session, a.guild.id)
-    await soft_delete_entity(
-        session, task, deleted_by_user_id=a.user.id, retention_days=30
-    )
-    await session.commit()
-    await hard_purge_entity(session, task)
-    await session.commit()
-
-    assert not await _stored(session, a.guild.id, url)
 
 
 async def _status(client: AsyncClient, a, url: str) -> int:

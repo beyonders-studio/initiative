@@ -39,8 +39,8 @@ describe("recentRoute", () => {
 
 describe("getActiveRecentKey", () => {
   it("reads community, initiative, tool and entity out of a nested path", () => {
-    expect(getActiveRecentKey("/c/3/i/5/counter-groups/7")).toEqual({
-      entityType: "counter_group",
+    expect(getActiveRecentKey("/c/3/i/5/wikis/7")).toEqual({
+      entityType: "wiki",
       entityId: 7,
       communityId: 3,
       initiativeId: 5,

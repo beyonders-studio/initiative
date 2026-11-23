@@ -16,7 +16,9 @@ import {
   buildInitiative,
   buildInitiativeMember,
   buildPage,
+  buildToolPlugin,
   buildUserSummary,
+  TOOL_PLUGIN_UID,
 } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
@@ -172,10 +174,20 @@ describe("InitiativesPage project managers", () => {
     });
   });
 
-  it("unticking an ordinary manager leaves them in the initiative as a member", async () => {
+  // An ordinary manager stays in the initiative as a member; a community admin
+  // holds no other role there, so their membership goes.
+  it.each([
+    [
+      "an ordinary manager",
+      MEMBER_ID,
+      "Bo Diddley",
+      { method: "PATCH", body: { role_id: MEMBER_ROLE.id } },
+    ],
+    ["a community admin", ADMIN_ID, "Ada Lovelace", { method: "DELETE" }],
+  ])("unticking %s", async (_label, userId, name, call) => {
     const calls = stubTable([
       buildInitiativeMember({
-        user: buildUserSummary({ id: MEMBER_ID, username: "bo" }),
+        user: buildUserSummary({ id: userId }),
         role_id: PM_ROLE.id,
         role_name: "project_manager",
         is_manager: true,
@@ -184,32 +196,10 @@ describe("InitiativesPage project managers", () => {
     const user = userEvent.setup();
     render();
 
-    await pick(user, "Bo Diddley");
+    await pick(user, name);
 
     await waitFor(() => expect(calls).toHaveLength(1));
-    expect(calls[0]).toMatchObject({
-      method: "PATCH",
-      url: String(MEMBER_ID),
-      body: { role_id: MEMBER_ROLE.id },
-    });
-  });
-
-  it("unticking a community admin takes their membership away, since they hold no other role", async () => {
-    const calls = stubTable([
-      buildInitiativeMember({
-        user: buildUserSummary({ id: ADMIN_ID, username: "ada" }),
-        role_id: PM_ROLE.id,
-        role_name: "project_manager",
-        is_manager: true,
-      }),
-    ]);
-    const user = userEvent.setup();
-    render();
-
-    await pick(user, "Ada Lovelace");
-
-    await waitFor(() => expect(calls).toHaveLength(1));
-    expect(calls[0]).toMatchObject({ method: "DELETE", url: String(ADMIN_ID) });
+    expect(calls[0]).toMatchObject({ ...call, url: String(userId) });
   });
 });
 
@@ -291,6 +281,7 @@ describe("InitiativesPage roster and rules", () => {
             {
               id: 3,
               name: "CI",
+              definition: {},
               placed_initiative_ids: [INITIATIVE_ID],
               permissions: [
                 { id: "use", level: "initiative", name: null, members: false },
@@ -340,6 +331,73 @@ describe("InitiativesPage roster and rules", () => {
           { install_id: 3, permission: "use", enabled: true },
           { install_id: 3, permission: "export", enabled: null },
         ],
+      })
+    );
+  });
+
+  it("rules a tool plug-in's tool as a tool, changing only where it is placed", async () => {
+    const shelf = `shelf.${TOOL_PLUGIN_UID.toLowerCase()}`;
+    stubTable([]);
+    let saved: unknown;
+    server.use(
+      communityHttp.get("/initiatives/", () =>
+        HttpResponse.json([
+          buildInitiative({ id: INITIATIVE_ID, name: "Apollo" }),
+          buildInitiative({ id: 8, name: "Gemini" }),
+        ])
+      ),
+      communityHttp.get("/plugins/", () =>
+        HttpResponse.json({
+          items: [
+            // Switched off in the community: its rule is still the community's.
+            buildToolPlugin({
+              enabled: false,
+              placed_initiative_ids: [INITIATIVE_ID],
+              permissions: [{ id: "use", level: "initiative", name: null, members: false }],
+            }),
+          ],
+        })
+      ),
+      communityHttp.get("/initiatives/defaults", () =>
+        HttpResponse.json({
+          tools: {},
+          member_permissions: { [`${shelf}:create`]: true },
+          plugin_member_permissions: [],
+          custom_roles: true,
+          // Both have it switched on of their own; only Apollo has it placed.
+          own_tools: { [shelf]: [INITIATIVE_ID, 8] },
+          own_member_permissions: {},
+          own_plugin_member_permissions: [],
+        })
+      ),
+      communityHttp.patch("/initiatives/defaults", async ({ request }) => {
+        saved = await request.json();
+        return HttpResponse.json({});
+      })
+    );
+    const user = userEvent.setup();
+    render();
+
+    expect(await screen.findByText("Members can create Reading.")).toBeInTheDocument();
+
+    // The install is not offered beside its tool.
+    await user.click(screen.getByRole("button", { name: "Add a rule" }));
+    await user.click(within(await screen.findByRole("dialog")).getByRole("combobox"));
+    expect(await screen.findByRole("option", { name: "Posts" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Reading" })).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await user.click(screen.getByRole("button", { name: "Edit the Reading rule" }));
+    await user.click(await screen.findByRole("radio", { name: "Off in every initiative" }));
+    expect(
+      screen.getByText("Turns Reading off in Apollo. Nothing in it is deleted.")
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save rule" }));
+    await waitFor(() =>
+      expect(saved).toEqual({
+        tools: { [shelf]: false },
+        member_permissions: { [`${shelf}:enabled`]: null, [`${shelf}:create`]: null },
       })
     );
   });

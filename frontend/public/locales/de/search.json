@@ -24,8 +24,6 @@
     "project": "Projekt",
     "task": "Aufgabe",
     "file": "Datei",
-    "counter_group": "Zählergruppe",
-    "counter": "Zähler",
     "calendar": "Kalender",
     "calendar_event": "Termin",
     "dashboard": "Dashboard",

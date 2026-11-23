@@ -12,37 +12,31 @@ import {
 } from "./formats";
 
 describe("fileSelectionFormats", () => {
-  it("keeps the type's own labels for a single-type selection", () => {
-    const formats = fileSelectionFormats(["lexical", "lexical"]);
-    expect(formats.map((f) => f.format)).toEqual(["pdf", "md", "docx", "json"]);
-    expect(formats.find((f) => f.format === "json")?.labelKey).toBe("export.formatJson");
+  // A mixed selection intersects its types' formats; smart links share md and
+  // the json envelope with text files, whiteboards and spreadsheets share json.
+  it.each([
+    [
+      ["lexical", "lexical"],
+      ["pdf", "md", "docx", "json"],
+    ],
+    [["lexical", "sheet"], ["json"]],
+    [["lexical", "pdf"], []],
+    [[], []],
+    [["excalidraw", "sheet"], ["json"]],
+    [["url"], ["md", "json"]],
+    [
+      ["lexical", "url"],
+      ["md", "json"],
+    ],
+  ] as [FileType[], string[]][])("offers %j the formats %j", (types, expected) => {
+    expect(fileSelectionFormats(types).map((f) => f.format)).toEqual(expected);
   });
 
-  it("intersects formats across a mixed selection with generic labels", () => {
-    const formats = fileSelectionFormats(["lexical", "sheet"]);
-    expect(formats.map((f) => f.format)).toEqual(["json"]);
-    // Mixed selection: the generic label, since entries differ per type.
-    expect(formats[0].labelKey).toBe("export.formatJson");
-  });
-
-  it("returns empty when the types share no format", () => {
-    expect(fileSelectionFormats(["lexical", "pdf"])).toEqual([]);
-    expect(fileSelectionFormats([])).toEqual([]);
-  });
-
-  it("whiteboards and spreadsheets share the json envelope", () => {
-    expect(fileSelectionFormats(["excalidraw", "sheet"]).map((f) => f.format)).toEqual(["json"]);
-  });
-});
-
-describe("smart link formats", () => {
-  it("smart links offer markdown and the importable json envelope", () => {
-    const formats = fileSelectionFormats(["url"]);
-    expect(formats.map((f) => f.format)).toEqual(["md", "json"]);
-  });
-
-  it("smart links now intersect with text files on md and json", () => {
-    expect(fileSelectionFormats(["lexical", "url"]).map((f) => f.format)).toEqual(["md", "json"]);
+  it("labels json the same for a single-type selection and a mixed one", () => {
+    expect(fileSelectionFormats(["lexical"]).find((f) => f.format === "json")?.labelKey).toBe(
+      "export.formatJson"
+    );
+    expect(fileSelectionFormats(["lexical", "sheet"])[0].labelKey).toBe("export.formatJson");
   });
 });
 

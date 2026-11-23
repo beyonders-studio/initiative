@@ -51,8 +51,7 @@ from fastapi import HTTPException
 from fastapi import status as http_status
 from jwt import PyJWK
 from jwt.exceptions import InvalidKeyError, PyJWKError
-from sqlalchemy import delete, update
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import delete, func, or_
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -60,12 +59,16 @@ from app.core.audit_events import AuditEventType
 from app.core.clock import utcnow
 from app.core.config import settings
 from app.core.messages import GuildMessages, PluginServiceMessages
-from app.core.plugin_scopes import ALL_SCOPES, plugin_scope_target
+from app.core.plugin_scopes import ALL_SCOPES, is_known_scope
 from app.core.security import plugin_platform_signing_enabled
-from app.db.errors import dbapi_constraint
+from app.db.query import paginated_query
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.guild import Guild
-from app.models.platform.plugin_install import EXCLUSIVE_ROUTE_INDEX, PluginInstall
+from app.models.platform.marketplace import (
+    MarketplaceListing,
+    MarketplaceListingVersion,
+)
+from app.models.platform.plugin_install import PluginInstall
 from app.models.platform.plugin_service_registration import (
     IMAGE_REFERENCE_MAX_LENGTH,
     LISTING_STATED_FIELDS,
@@ -84,6 +87,7 @@ from app.models.platform.publisher import (
 from app.services import audit as audit_service
 from app.services.marketplace import plugin_installs
 from app.services.marketplace import vendor_values as vendor_values_service
+from app.services.marketplace.definitions import published_by_us
 from app.services.marketplace.plugin_keys import (
     PRIVATE_JWK_MEMBERS,
     KeySetUnreadableError,
@@ -100,6 +104,7 @@ from app.services.marketplace.registration_lookup import (
     live_registration_clause,
     service_public_id,
 )
+from app.services.marketplace.tool_plugins import is_tool_plugin
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +122,6 @@ AUDITED_FIELDS: tuple[str, ...] = (
     "scope_ceiling",
     "mandatory",
     "availability",
-    "shared_routes",
     "suspended_at",
     "source",
     "image_digest",
@@ -153,6 +157,7 @@ __all__ = [
     "published_keys",
     "read_listing_registration",
     "reconcile_from_config",
+    "registration_page",
     "registration_views",
     "row_browser_base",
     "update_registration",
@@ -434,29 +439,49 @@ async def list_registrations(
 
 @dataclass(frozen=True)
 class RegistrationView:
-    """A registration with its publisher, whether it is live, and the
-    communities on its beta list, by id and name."""
+    """A registration with its publisher, whether it is live, what its listing
+    says it is called, looks like and is on, and the communities on its beta
+    list, by id and name."""
 
     row: PluginServiceRegistration
     publisher: Publisher
     live: bool
+    #: The listing's name, art and latest version; null until it arrives.
+    name: str | None = None
+    avatar_url: str | None = None
+    version: str | None = None
+    #: This project publishes its listing (:func:`published_by_us`).
+    first_party: bool = False
     beta_communities: tuple[tuple[int, str], ...] = ()
 
 
-async def registration_views(
-    session: AsyncSession, registration_id: int | None = None
-) -> list[RegistrationView]:
-    """Every registration, or the one ``registration_id`` names, each with its
-    publisher and whether it is live, in one statement, and their beta lists
-    in a second."""
-    query = (
-        select(PluginServiceRegistration, Publisher, live_registration_clause())
+def _views_query() -> Any:
+    return (
+        select(
+            PluginServiceRegistration,
+            Publisher,
+            live_registration_clause(),
+            MarketplaceListing.name,
+            MarketplaceListing.avatar_url,
+            MarketplaceListing.source,
+            MarketplaceListing.public_id,
+            MarketplaceListingVersion.version,
+        )
         .join(Publisher, Publisher.id == PluginServiceRegistration.publisher_id)
-        .order_by(PluginServiceRegistration.public_id.asc())
+        .outerjoin(
+            MarketplaceListing,
+            MarketplaceListing.uid == PluginServiceRegistration.listing_uid,
+        )
+        .outerjoin(
+            MarketplaceListingVersion,
+            MarketplaceListingVersion.id == MarketplaceListing.latest_version_id,
+        )
     )
-    if registration_id is not None:
-        query = query.where(PluginServiceRegistration.id == registration_id)
-    rows = (await session.exec(query)).all()
+
+
+async def _views(session: AsyncSession, rows: Sequence[Any]) -> list[RegistrationView]:
+    """The views of ``rows`` from :func:`_views_query`, with their beta lists
+    read in one more statement."""
     picked: dict[str, list[tuple[int, str]]] = {}
     for listing_uid, guild_id, name in (
         await session.exec(
@@ -464,7 +489,7 @@ async def registration_views(
             .join(Guild, col(Guild.id) == PluginBetaCommunity.community_id)
             .where(
                 col(PluginBetaCommunity.listing_uid).in_(
-                    [row.listing_uid for row, _, _ in rows if row.listing_uid]
+                    [row.listing_uid for row, *_ in rows if row.listing_uid]
                 )
             )
             .order_by(Guild.name, Guild.id)
@@ -476,10 +501,60 @@ async def registration_views(
             row=row,
             publisher=publisher,
             live=bool(live),
+            name=name,
+            avatar_url=avatar_url,
+            version=version,
+            first_party=listing_source is not None
+            and published_by_us(listing_source, listing_public_id),
             beta_communities=tuple(picked.get(row.listing_uid or "", ())),
         )
-        for row, publisher, live in rows
+        for (
+            row,
+            publisher,
+            live,
+            name,
+            avatar_url,
+            listing_source,
+            listing_public_id,
+            version,
+        ) in rows
     ]
+
+
+async def registration_views(
+    session: AsyncSession, registration_id: int
+) -> list[RegistrationView]:
+    """The registration ``registration_id`` names, as a view, or none."""
+    rows = (
+        await session.exec(
+            _views_query().where(PluginServiceRegistration.id == registration_id)
+        )
+    ).all()
+    return await _views(session, rows)
+
+
+async def registration_page(
+    session: AsyncSession, *, search: str | None, page: int, page_size: int
+) -> tuple[list[RegistrationView], int, int]:
+    """One page of the registrations by ``public_id``, those whose id or
+    publisher's name holds ``search`` when one is given, with the total and the
+    page answered."""
+    query = _views_query()
+    if search and (term := search.strip()):
+        query = query.where(
+            or_(
+                col(PluginServiceRegistration.public_id).ilike(f"%{term}%"),
+                col(Publisher.display_name).ilike(f"%{term}%"),
+            )
+        )
+    rows, total_count, actual_page = await paginated_query(
+        session,
+        query.order_by(PluginServiceRegistration.public_id.asc()),
+        select(func.count()).select_from(query.subquery()),
+        page=page,
+        page_size=page_size,
+    )
+    return await _views(session, rows), total_count, actual_page
 
 
 async def get_registration(
@@ -609,21 +684,22 @@ async def update_registration(
     jwks: dict | None = None,
     jwks_uri: str | None = None,
     mandatory: bool | None = None,
-    shared_routes: bool | None = None,
     suspended: bool | None = None,
     beta_community_ids: Iterable[int] | None = None,
     vendor_values: dict[str, str | None] | None = None,
+    vendor_values_checked: Mapping[str, Any] | None = None,
     actor_user_id: int | None = None,
 ) -> PluginServiceRegistration:
     """Edit a registration's deployment facts, suspend or lift it, or
     replace a beta plug-in's list of communities.
 
+    ``vendor_values_checked`` is the stored vendor values a vendor check ran
+    against, unlocked; when the row no longer holds them, the write is refused
+    (409) rather than writing values over ones nobody checked them with.
+
     An empty ``page_origin`` clears it, putting both surfaces back on
     ``base_url``; an empty ``jwks_uri`` clears it. A ``jwks_uri`` kept while
-    ``base_url`` moves is checked against the new origin. ``shared_routes``
-    is written to the registration's installs in the install index in the same
-    transaction, and turning it off is refused (409) while a vendor
-    installation routes to more than one community. A suspension, its lift,
+    ``base_url`` moves is checked against the new origin. A suspension, its lift,
     or a new beta list is told for each install (:func:`reach_moved`). A list
     for a plug-in that is not beta is refused (409), and so is one naming a
     community that does not exist (400).
@@ -631,6 +707,13 @@ async def update_registration(
     # Locked first: two saves reading the same list would otherwise each
     # write their own difference from it.
     row = await get_registration(session, registration_id, lock=True)
+    if vendor_values_checked is not None and dict(row.vendor_values or {}) != dict(
+        vendor_values_checked
+    ):
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail=PluginServiceMessages.VENDOR_VALUES_CHANGED,
+        )
     beta: set[int] | None = None
     if beta_community_ids is not None:
         if row.availability != PluginAvailability.beta.value or row.listing_uid is None:
@@ -649,12 +732,12 @@ async def update_registration(
     before = audit_service.snapshot(row, AUDITED_FIELDS)
     was_suspended, was_reach = row.suspended_at is not None, await _reach(session, row)
     placement = (base_url, page_origin, allowed_origins, jwks, jwks_uri)
-    if row.kind == RegistrationKind.DECLARATIVE and any(
+    if row.kind != RegistrationKind.CONTAINER and any(
         value is not None for value in placement
     ):
         raise _bad_request(
             PluginServiceMessages.DECLARATIVE_NOT_PLACED,
-            "a declarative plug-in has no address, origins or keys",
+            "a plug-in that runs no container has no address, origins or keys",
         )
     _write_placement(
         row,
@@ -666,8 +749,6 @@ async def update_registration(
     )
     if mandatory is not None:
         row.mandatory = mandatory
-    if shared_routes is not None:
-        row.shared_routes = shared_routes
     if suspended is not None and suspended != was_suspended:
         row.suspended_at = utcnow() if suspended else None
         row.suspended_by = actor_user_id if suspended else None
@@ -676,8 +757,6 @@ async def update_registration(
 
     row.updated_at = utcnow()
     session.add(row)
-    if shared_routes is not None and row.listing_uid:
-        await _write_exclusive(session, row)
     changed = audit_service.changed_fields(
         before, audit_service.snapshot(row, AUDITED_FIELDS)
     )
@@ -729,34 +808,6 @@ async def update_registration(
     # drops it rather than waiting out its TTL.
     invalidate_registrations()
     return row
-
-
-async def _write_exclusive(
-    session: AsyncSession, row: PluginServiceRegistration
-) -> None:
-    """Write each of the registration's installs ``exclusive`` as
-    ``shared_routes`` now says. The registration's row is written first: a
-    connect claiming a route reads it under a share lock, so it comes wholly
-    before this write or after it."""
-    exclusive = not row.shared_routes
-    await session.flush()
-    try:
-        await session.exec(
-            update(PluginInstall)
-            .where(
-                PluginInstall.listing_uid == row.listing_uid,
-                PluginInstall.exclusive != exclusive,
-            )
-            .values(exclusive=exclusive)
-        )
-    except IntegrityError as exc:
-        await session.rollback()
-        if dbapi_constraint(exc) != EXCLUSIVE_ROUTE_INDEX:
-            raise
-        raise HTTPException(
-            status_code=http_status.HTTP_409_CONFLICT,
-            detail=PluginServiceMessages.SHARED_ROUTES_IN_USE,
-        ) from exc
 
 
 def _write_placement(
@@ -976,7 +1027,7 @@ class ListingRegistration:
     listing_uid: str
     #: The catalog source of the listing (``registry``, ``operator``, …).
     source: str
-    #: ``container`` or ``declarative`` (``RegistrationKind``).
+    #: ``container``, ``declarative`` or ``tool`` (``RegistrationKind``).
     kind: str
     image: str | None
     scope_ceiling: list[str]
@@ -1096,8 +1147,9 @@ async def read_listing_registration(
 ) -> ListingRegistration:
     """Read a listing's ``registration`` block, before the listing is written.
 
-    The block is the same from every source: ``kind`` — ``container``, or
-    ``declarative`` for a plug-in with no service block — an optional ``image``
+    The block is the same from every source: ``kind`` — ``container``,
+    ``declarative`` for a plug-in with no service block, or ``tool`` for a
+    tool plug-in, which holds no scopes — an optional ``image``
     pinned by digest and its Compose service (a container's only), the
     and the ``scope_ceiling``. It names no location and no keys. The registration it writes is
     the one for the plug-in the listing's definition names, under the listing's own
@@ -1105,9 +1157,20 @@ async def read_listing_registration(
     """
     if not isinstance(spec, Mapping):
         raise ListingRegistrationError("registration is not an object")
-    declarative = is_declarative(definition)
-    kind = RegistrationKind.DECLARATIVE if declarative else RegistrationKind.CONTAINER
-    service_id = service_public_id(definition, listing_public_id=listing_public_id)
+    tool = is_tool_plugin(definition)
+    kind = (
+        RegistrationKind.TOOL
+        if tool
+        else RegistrationKind.DECLARATIVE
+        if is_declarative(definition)
+        else RegistrationKind.CONTAINER
+    )
+    # A tool plug-in, like a declarative one, is named by its listing.
+    service_id = (
+        listing_public_id
+        if tool
+        else service_public_id(definition, listing_public_id=listing_public_id)
+    )
     if service_id is None:
         raise ListingRegistrationError("only a service plug-in carries a registration")
     try:
@@ -1119,8 +1182,14 @@ async def read_listing_registration(
         raise ListingRegistrationError("the service is published under another prefix")
     if spec.get("kind") != kind:
         raise ListingRegistrationError(f'registration.kind must be "{kind}"')
-    if declarative and any(key in spec for key in ("image", "compose")):
-        raise ListingRegistrationError("a declarative plug-in runs no container")
+    if kind != RegistrationKind.CONTAINER and any(
+        key in spec for key in ("image", "compose")
+    ):
+        raise ListingRegistrationError(f"a {kind} plug-in runs no container")
+    if tool and spec.get("scope_ceiling"):
+        raise ListingRegistrationError(
+            "a tool plug-in runs no code, so it holds no scopes"
+        )
     stated = [key for key in _DEPLOYMENT_KEYS if key in spec]
     if stated:
         raise ListingRegistrationError(
@@ -1143,7 +1212,7 @@ async def read_listing_registration(
             for scope in (
                 declared_ceiling if isinstance(declared_ceiling, list) else []
             )
-            if isinstance(scope, str) and plugin_scope_target(scope) is not None
+            if isinstance(scope, str) and is_known_scope(scope)
         ),
         what=f"{public_id} ceiling",
     )
@@ -1189,7 +1258,7 @@ async def apply_listing_registration(
     before = {} if created else audit_service.snapshot(row, AUDITED_FIELDS)
     row.listing_uid = registration.listing_uid
     row.kind = registration.kind
-    if registration.kind == RegistrationKind.DECLARATIVE:
+    if registration.kind != RegistrationKind.CONTAINER:
         # Runs nowhere and signs nothing: a location and keys a container
         # version left behind go with it.
         row.base_url = row.page_origin = row.jwks = row.jwks_uri = None
@@ -1474,7 +1543,7 @@ def apply_deployment_facts(
         )
 
     was = state()
-    if row.kind == RegistrationKind.DECLARATIVE:
+    if row.kind != RegistrationKind.CONTAINER:
         # Runs nowhere and signs nothing: an entry's placement does not apply.
         facts = replace(facts, base_url=None, allowed_origins=None)
     _write_placement(

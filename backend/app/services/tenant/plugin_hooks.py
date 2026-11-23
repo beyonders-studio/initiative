@@ -38,7 +38,10 @@ matches or that no matched install's secret verifies.
 
 The index row that routes a delivery is written only when a community's
 connect stored the routed value, which the plug-in's ``after_connect`` hook
-checked at the vendor.
+checked at the vendor. While the platform holds the routed connection for
+every community (:mod:`app.services.marketplace.platform_connections`), only
+its value routes, to every install of the listing, and a ``status`` the
+delivery maps is written to the platform's connection.
 """
 
 from __future__ import annotations
@@ -75,6 +78,7 @@ from app.models.tenant.plugin_hook_delivery import (
 from app.services.marketplace import (
     community_hooks,
     declarative,
+    platform_connections,
     plugin_installs,
     registration_lookup,
 )
@@ -96,7 +100,13 @@ from app.services.tenant.plugin_channels import (
     owns_install,
     set_connection_state,
 )
-from app.services.tenant.plugin_config import install_settings, without_tokens
+from app.services.tenant.plugin_config import (
+    REMOVED_AT,
+    effective_config,
+    install_settings,
+    static_maps,
+    without_tokens,
+)
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
@@ -174,13 +184,57 @@ def _vendor_headers(headers: Mapping[str, str], signature: str) -> dict[str, str
     }
 
 
-async def _webhooks(registration: RegistrationSnapshot) -> dict[str, Any] | None:
-    """The ``webhooks`` block of the listing's current definition, which
-    checks and routes a delivery before any install is known."""
+async def _current(registration: RegistrationSnapshot) -> dict[str, Any]:
+    """The listing's current definition, whose ``webhooks`` check and route a
+    delivery before any install is known."""
     async with db_session.SystemSessionLocal() as session:
         definitions = await listing_definitions(session, [registration.listing_uid])
-    webhooks = definitions.get(registration.listing_uid or "", {}).get("webhooks")
-    return webhooks if isinstance(webhooks, dict) else None
+    return definitions.get(registration.listing_uid or "", {})
+
+
+async def _platform_status(
+    registration: RegistrationSnapshot,
+    definition: Mapping[str, Any],
+    headers: Mapping[str, str],
+    body: bytes,
+) -> bool:
+    """What a delivery for the connection the platform holds says of its
+    account, mapped by the listing's current definition and kept once for
+    every community, whether or not any community has the plug-in. False
+    when the mapping may answer if asked again: the delivery is then refused,
+    so the vendor sends it again."""
+    route = definition["webhooks"]["route"]
+    held = registration.platform_connections.get(str(route.get("connection")))
+    value = (held or {}).get(str(route.get("field")))
+    if value is None or _route_value(route, headers, body) != str(value):
+        return True
+    try:
+        payload: Any = json.loads(body)
+    except ValueError:
+        payload = None
+    try:
+        delivered = await declarative.map_delivery(
+            definition,
+            headers=headers,
+            payload=payload,
+            connection=without_tokens(held),
+            installed={"settings": {}, "aliases": {}},
+        )
+    except ExpressionError as exc:
+        logger.warning(
+            "plug-in hooks: %s could not map a delivery for the platform's "
+            "connection (%s)",
+            registration.public_id,
+            type(exc).__name__,
+        )
+        return not exc.transient
+    if delivered.status is not None and delivered.status[0] == route.get("connection"):
+        await platform_connections.set_state(
+            registration.public_id,
+            *delivered.status,
+            about={str(route.get("field")): value},
+        )
+    return True
 
 
 def _route_spec(route: Any) -> tuple[str, str] | None:
@@ -214,18 +268,28 @@ async def _route_specs(listing_uid: str) -> set[tuple[str, str]]:
 
 
 async def _routed(
-    listing_uid: str,
+    registration: RegistrationSnapshot,
+    route: Mapping[str, Any],
     specs: set[tuple[str, str]],
     headers: Mapping[str, str],
     body: bytes,
 ) -> list[plugin_installs.IndexedInstall]:
     """The installs a delivery's route values name, one index lookup for each
-    value the listing's versions read from it."""
+    value the listing's versions read from it. While the platform holds the
+    routed connection (``route``, the current version's), only its value
+    routes, and to every install of the listing."""
+    listing_uid = registration.listing_uid or ""
     values = {
         value
         for kind, where in specs
         if (value := _route_value({kind: where}, headers, body)) is not None
     }
+    held = registration.platform_connections.get(str(route.get("connection")))
+    if held is not None:
+        value = held.get(str(route.get("field")))
+        if REMOVED_AT in held or value is None or str(value) not in values:
+            return []
+        return await plugin_installs.listing_installs(listing_uid, str(value))
     found: dict[tuple[int, int], plugin_installs.IndexedInstall] = {}
     for value in sorted(values):
         for install in await plugin_installs.routed(listing_uid, value):
@@ -275,7 +339,10 @@ async def _queue(
         ):
             return False
         pinned = (plugin.definition or {}).get("webhooks")
-        indexed = plugin_installs.hook_route(plugin.definition, plugin.config)
+        indexed = plugin_installs.hook_route(
+            plugin.definition,
+            effective_config(plugin, registration.platform_connections),
+        )
         if (
             not isinstance(pinned, dict)
             or indexed is None
@@ -441,7 +508,11 @@ async def run_due(session: AsyncSession, guild_id: int) -> datetime | None:
             or not isinstance(pinned, dict)
             or not plugin.enabled
             or not owns_install(plugin, registration)
-            or plugin_installs.hook_route(plugin.definition, plugin.config) != row.route
+            or plugin_installs.hook_route(
+                plugin.definition,
+                effective_config(plugin, registration.platform_connections),
+            )
+            != row.route
         ):
             await _settle(session, row, done=True)
             continue
@@ -542,7 +613,11 @@ async def _map(
             plugin.definition,
             headers=headers,
             payload=payload,
-            connection=without_tokens((plugin.config or {}).get(route["connection"])),
+            connection=without_tokens(
+                static_maps(
+                    plugin, route["connection"], registration.platform_connections
+                )[0]
+            ),
             installed=install_settings(plugin),
         )
     except ExpressionError as exc:
@@ -596,7 +671,12 @@ async def _map(
                 install.guild_id,
                 exc.code,
             )
-    if delivered.status is not None:
+    if (
+        delivered.status is not None
+        # The platform's connection's state is kept once, as the delivery
+        # arrives (:func:`_platform_status`).
+        and delivered.status[0] not in registration.platform_connections
+    ):
         locked = await guild_plugins_service.lock_install(session, plugin.id)
         if (
             locked is not None
@@ -616,8 +696,9 @@ async def receive(public_id: str, headers: Mapping[str, str], body: bytes) -> in
     registration = (await registration_lookup.load_registrations()).get(public_id)
     if registration is None or not registration.live or not registration.listing_uid:
         return 404
-    webhooks = await _webhooks(registration)
-    if webhooks is None:
+    definition = await _current(registration)
+    webhooks = definition.get("webhooks")
+    if not isinstance(webhooks, dict):
         return 404
     verify = webhooks["verify"]
     vendor = await load_vendor_values(public_id)
@@ -635,9 +716,19 @@ async def receive(public_id: str, headers: Mapping[str, str], body: bytes) -> in
     current = _route_spec(webhooks["route"])
     if current is not None:
         specs.add(current)
+    if (
+        registration.declarative
+        and not by_connection
+        # Checked under the vendor's secret above.
+        and not await _platform_status(registration, definition, headers, body)
+    ):
+        metrics.plugin_hook_deliveries.labels(outcome="retry").inc()
+        return 503
     installs = [
         install
-        for install in await _routed(registration.listing_uid, specs, headers, body)
+        for install in await _routed(
+            registration, webhooks["route"], specs, headers, body
+        )
         if registration.serves(install.guild_id)
     ]
     if not installs and not by_connection:

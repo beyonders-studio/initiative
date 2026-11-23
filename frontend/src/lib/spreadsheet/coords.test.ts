@@ -10,77 +10,43 @@ import {
 } from "./coords";
 
 describe("colIndexToLetter / letterToColIndex", () => {
-  it("round-trips single-letter columns", () => {
-    expect(colIndexToLetter(0)).toBe("A");
-    expect(colIndexToLetter(25)).toBe("Z");
-    expect(letterToColIndex("A")).toBe(0);
-    expect(letterToColIndex("Z")).toBe(25);
+  it.each([
+    [0, "A"],
+    [25, "Z"],
+    [26, "AA"],
+    [51, "AZ"],
+    [52, "BA"],
+    [701, "ZZ"],
+    [702, "AAA"],
+  ])("round-trips column %i as %s", (index, letter) => {
+    expect(colIndexToLetter(index)).toBe(letter);
+    expect(letterToColIndex(letter)).toBe(index);
   });
 
-  it("round-trips double-letter columns at the boundary", () => {
-    expect(colIndexToLetter(26)).toBe("AA");
-    expect(colIndexToLetter(51)).toBe("AZ");
-    expect(colIndexToLetter(52)).toBe("BA");
-    expect(colIndexToLetter(701)).toBe("ZZ");
-    expect(letterToColIndex("AA")).toBe(26);
-    expect(letterToColIndex("AZ")).toBe(51);
-    expect(letterToColIndex("ZZ")).toBe(701);
-  });
-
-  it("handles triple-letter columns", () => {
-    expect(colIndexToLetter(702)).toBe("AAA");
-    expect(letterToColIndex("AAA")).toBe(702);
-  });
-
-  it("is case-insensitive on parse", () => {
+  it("parses case-insensitively, and refuses what is not a column", () => {
     expect(letterToColIndex("aa")).toBe(26);
     expect(letterToColIndex("Aa")).toBe(26);
-  });
-
-  it("returns -1 for invalid letter input", () => {
-    expect(letterToColIndex("")).toBe(-1);
-    expect(letterToColIndex("A1")).toBe(-1);
-    expect(letterToColIndex("@")).toBe(-1);
-  });
-
-  it("returns empty string for invalid index input", () => {
+    for (const bad of ["", "A1", "@"]) expect(letterToColIndex(bad)).toBe(-1);
     expect(colIndexToLetter(-1)).toBe("");
     expect(colIndexToLetter(0.5)).toBe("");
   });
 });
 
 describe("keyOf / parseKey", () => {
-  it("round-trips r:c keys", () => {
+  it("round-trips r:c keys and rejects malformed ones", () => {
     expect(keyOf(0, 0)).toBe("0:0");
     expect(keyOf(7, 12)).toBe("7:12");
     expect(parseKey("7:12")).toEqual([7, 12]);
-  });
-
-  it("rejects malformed keys", () => {
-    expect(parseKey("A1")).toBeNull();
-    expect(parseKey("0,0")).toBeNull();
-    expect(parseKey("0")).toBeNull();
-    expect(parseKey("")).toBeNull();
+    for (const bad of ["A1", "0,0", "0", ""]) expect(parseKey(bad)).toBeNull();
   });
 });
 
 describe("boundingBox", () => {
-  it("returns 0×0 for an empty map", () => {
+  it("is max + 1 in each dimension, for a record or a Map, ignoring malformed keys", () => {
     expect(boundingBox({})).toEqual({ rows: 0, cols: 0 });
     expect(boundingBox(new Map())).toEqual({ rows: 0, cols: 0 });
-  });
-
-  it("returns max + 1 dimensions for a populated map", () => {
-    const cells = { "0:0": "a", "2:5": 42, "1:7": true };
-    expect(boundingBox(cells)).toEqual({ rows: 3, cols: 8 });
-  });
-
-  it("ignores malformed keys", () => {
-    const cells = { "0:0": "a", garbage: 1, "5:5": 2 };
-    expect(boundingBox(cells)).toEqual({ rows: 6, cols: 6 });
-  });
-
-  it("works on a Map<string, CellValue>", () => {
+    expect(boundingBox({ "0:0": "a", "2:5": 42, "1:7": true })).toEqual({ rows: 3, cols: 8 });
+    expect(boundingBox({ "0:0": "a", garbage: 1, "5:5": 2 })).toEqual({ rows: 6, cols: 6 });
     const map = new Map<string, string | number>([
       ["0:0", "a"],
       ["3:1", 99],
@@ -90,19 +56,16 @@ describe("boundingBox", () => {
 });
 
 describe("parseA1Range", () => {
-  it("parses a single cell to a degenerate box", () => {
-    expect(parseA1Range("B12")).toEqual({ r1: 11, c1: 1, r2: 11, c2: 1 });
-    expect(parseA1Range("A1")).toEqual({ r1: 0, c1: 0, r2: 0, c2: 0 });
-  });
-
-  it("parses a range and normalizes endpoint order", () => {
-    expect(parseA1Range("A1:C3")).toEqual({ r1: 0, c1: 0, r2: 2, c2: 2 });
-    expect(parseA1Range("C3:A1")).toEqual({ r1: 0, c1: 0, r2: 2, c2: 2 });
-  });
-
-  it("is case-insensitive, tolerates whitespace and $ anchors", () => {
-    expect(parseA1Range("  aa2  ")).toEqual({ r1: 1, c1: 26, r2: 1, c2: 26 });
-    expect(parseA1Range("$A$1:$B$2")).toEqual({ r1: 0, c1: 0, r2: 1, c2: 1 });
+  it.each([
+    ["B12", { r1: 11, c1: 1, r2: 11, c2: 1 }],
+    ["A1", { r1: 0, c1: 0, r2: 0, c2: 0 }],
+    ["A1:C3", { r1: 0, c1: 0, r2: 2, c2: 2 }],
+    // Endpoint order is normalized; case, whitespace and $ anchors are tolerated.
+    ["C3:A1", { r1: 0, c1: 0, r2: 2, c2: 2 }],
+    ["  aa2  ", { r1: 1, c1: 26, r2: 1, c2: 26 }],
+    ["$A$1:$B$2", { r1: 0, c1: 0, r2: 1, c2: 1 }],
+  ])("parses %j", (text, expected) => {
+    expect(parseA1Range(text)).toEqual(expected);
   });
 
   it("rejects non-references", () => {

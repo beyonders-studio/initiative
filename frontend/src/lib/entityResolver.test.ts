@@ -8,7 +8,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
-import { isEntityRefType, linkedCommentId, resolveEntityPath } from "@/lib/entityResolver";
+import {
+  entityRefTypeFor,
+  isEntityRefType,
+  linkedCommentId,
+  resolveEntityPath,
+} from "@/lib/entityResolver";
 
 const COMMUNITY = 1;
 let queryClient: QueryClient;
@@ -25,6 +30,26 @@ describe("resolveEntityPath", () => {
     await expect(resolveEntityPath(queryClient, COMMUNITY, "project", 7)).resolves.toBe(
       "/i/5/projects/7"
     );
+  });
+
+  it("opens a tool plug-in's row on the page every plug-in's rows share", async () => {
+    // As a notice's link names it: the key kebab-cased, the uid as it is.
+    server.use(
+      communityHttp.get("/plugin-tools/:kind/:id", ({ params }) =>
+        params.kind === "counter_group.abc123"
+          ? HttpResponse.json({ id: 8, initiative_id: 6 })
+          : new HttpResponse(null, { status: 404 })
+      )
+    );
+    await expect(
+      resolveEntityPath(queryClient, COMMUNITY, "counter-group.abc123", 8)
+    ).resolves.toBe("/i/6/t/counter_group.abc123/8");
+  });
+
+  it("addresses a reference to a tool plug-in's row as its /go link spells it", () => {
+    expect(entityRefTypeFor("counter_group.abc123")).toBe("counter-group.abc123");
+    expect(entityRefTypeFor("calendar_event")).toBe("calendar-event");
+    expect(entityRefTypeFor("counter_group.ABC")).toBeNull();
   });
 
   it("nests a task under the project that owns it", async () => {
@@ -124,6 +149,27 @@ describe("resolveEntityPath", () => {
     await expect(resolveEntityPath(queryClient, COMMUNITY, "file", 99)).resolves.toBeNull();
   });
 
+  it("opens what the reader can't open but may know is there, to ask for it", async () => {
+    server.use(
+      communityHttp.get("/files/:id", () => new HttpResponse(null, { status: 404 })),
+      communityHttp.get("/tasks/:id", () => new HttpResponse(null, { status: 404 })),
+      communityHttp.get("/share-requests/standing", ({ request }) => {
+        const kind = new URL(request.url).searchParams.get("kind");
+        return HttpResponse.json(
+          kind === "task"
+            ? { resource_type: "project", resource_id: 4, initiative_id: 2, level: null }
+            : { resource_type: "file", resource_id: 99, initiative_id: 3, level: null }
+        );
+      })
+    );
+    await expect(resolveEntityPath(queryClient, COMMUNITY, "file", 99)).resolves.toBe(
+      "/i/3/files/99"
+    );
+    await expect(resolveEntityPath(queryClient, COMMUNITY, "task", 9)).resolves.toBe(
+      "/i/2/projects/4/tasks/9"
+    );
+  });
+
   it("returns null for an unknown ref type or a non-numeric id", async () => {
     await expect(resolveEntityPath(queryClient, COMMUNITY, "widget", 1)).resolves.toBeNull();
     await expect(
@@ -132,9 +178,9 @@ describe("resolveEntityPath", () => {
   });
 
   it("recognises exactly the ref types it can resolve", () => {
-    expect(isEntityRefType("counter-group")).toBe(true);
+    expect(isEntityRefType("wiki")).toBe(true);
     expect(isEntityRefType("calendar-event")).toBe(true);
-    expect(isEntityRefType("counter_group")).toBe(false);
+    expect(isEntityRefType("calendar_event")).toBe(false);
     expect(isEntityRefType("user")).toBe(false);
     expect(isEntityRefType("collection")).toBe(true);
   });

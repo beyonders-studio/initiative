@@ -61,36 +61,21 @@ const reaching = {
 };
 
 describe("the word being typed", () => {
-  it("is what precedes the caret", () => {
-    expect(wordAt("SELECT ti", 9)).toEqual({ word: "ti", start: 7 });
-  });
-
-  it("is nothing where a name could not go", () => {
-    expect(wordAt("SELECT ", 7)).toBeNull();
-    expect(wordAt("", 0)).toBeNull();
-  });
-
-  it("is nothing from inside a word", () => {
-    // Completing here would replace only the left half of `title`.
-    expect(wordAt("SELECT title", 9)).toBeNull();
-  });
-
-  it("stops at what a name cannot contain", () => {
-    expect(wordAt("count(ti", 8)).toEqual({ word: "ti", start: 6 });
-  });
-
-  it("reads the name a word is written under", () => {
-    expect(wordAt("WHERE t.pri", 11)).toEqual({ word: "pri", start: 8, qualifier: "t" });
-  });
-
-  it("is a name and no word at all, straight after a dot", () => {
-    // What may follow one is short and closed, so there is something to offer
-    // before anything is typed.
-    expect(wordAt("SELECT assignee.", 16)).toEqual({
-      word: "",
-      start: 16,
-      qualifier: "assignee",
-    });
+  it.each([
+    ["SELECT ti", 9, { word: "ti", start: 7 }],
+    // Nothing where a name could not go.
+    ["SELECT ", 7, null],
+    ["", 0, null],
+    // Nothing from inside a word: completing would replace only `title`'s left half.
+    ["SELECT title", 9, null],
+    // It stops at what a name cannot contain.
+    ["count(ti", 8, { word: "ti", start: 6 }],
+    ["WHERE t.pri", 11, { word: "pri", start: 8, qualifier: "t" }],
+    // Straight after a dot it is a name and no word at all: what may follow one
+    // is short and closed, so there is something to offer before anything is typed.
+    ["SELECT assignee.", 16, { word: "", start: 16, qualifier: "assignee" }],
+  ])("in %j at %i is %j", (text, caret, expected) => {
+    expect(wordAt(text, caret)).toEqual(expected);
   });
 });
 
@@ -112,12 +97,9 @@ describe("what is offered", () => {
     expect(kinds).toEqual(new Set(["dataset", "field", "function"]));
   });
 
-  it("offers the reader beside them", () => {
+  it("offers the reader beside them, where the server names a token", () => {
     const found = completionsFor("m", { ...vocabulary, tokens: ["me"] });
     expect(found).toContainEqual({ name: "me", kind: "token" });
-  });
-
-  it("offers no token where the server names none", () => {
     const kinds = completionsFor("m", vocabulary).map((entry) => entry.kind);
     expect(kinds).not.toContain("token");
   });
@@ -149,40 +131,30 @@ describe("what is offered", () => {
 });
 
 describe("the datasets a statement names", () => {
-  it("are the ones written as whole words", () => {
-    expect(datasetsNamed("SELECT title FROM tasks", DATASETS)).toEqual(["tasks"]);
-  });
-
-  it("do not include one that is only a prefix of a word", () => {
-    expect(datasetsNamed("SELECT task_status_id FROM x", DATASETS)).toEqual([]);
-  });
-
-  it("include every one a join names", () => {
-    expect(
-      datasetsNamed("SELECT p.name FROM projects p JOIN tasks t ON t.project_id = p.id", DATASETS)
-    ).toEqual(["tasks", "projects"]);
+  it.each([
+    ["SELECT title FROM tasks", ["tasks"]],
+    // Not one that is only a prefix of a word.
+    ["SELECT task_status_id FROM x", []],
+    ["SELECT p.name FROM projects p JOIN tasks t ON t.project_id = p.id", ["tasks", "projects"]],
+  ])("in %j are %j", (statement, expected) => {
+    expect(datasetsNamed(statement, DATASETS)).toEqual(expected);
   });
 });
 
 describe("accepting one", () => {
-  it("replaces the word being typed", () => {
-    expect(applyCompletion("SELECT ti", 7, 9, { name: "title", kind: "field" })).toEqual({
-      text: "SELECT title",
-      caret: 12,
-    });
-  });
-
-  it("opens the bracket on a function", () => {
-    expect(applyCompletion("SELECT co", 7, 9, { name: "count", kind: "function" })).toEqual({
-      text: "SELECT count(",
-      caret: 13,
-    });
-  });
-
-  it("keeps what follows the caret", () => {
-    expect(applyCompletion("SELECT ti FROM tasks", 7, 9, { name: "title", kind: "field" })).toEqual(
-      { text: "SELECT title FROM tasks", caret: 12 }
-    );
+  it.each([
+    ["SELECT ti", 9, { name: "title", kind: "field" }, { text: "SELECT title", caret: 12 }],
+    // A function opens its bracket.
+    ["SELECT co", 9, { name: "count", kind: "function" }, { text: "SELECT count(", caret: 13 }],
+    // What follows the caret is kept.
+    [
+      "SELECT ti FROM tasks",
+      9,
+      { name: "title", kind: "field" },
+      { text: "SELECT title FROM tasks", caret: 12 },
+    ],
+  ] as const)("in %j replaces the word being typed", (text, end, completion, expected) => {
+    expect(applyCompletion(text, 7, end, completion)).toEqual(expected);
   });
 });
 

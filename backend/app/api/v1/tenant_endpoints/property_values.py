@@ -1,10 +1,11 @@
 """Custom property values on any tool or sub-tool — the one write route.
 
-Every target in ``PROPERTY_TARGETS`` is written here and nowhere else; each
-target's read carries its values as ``properties``. Which tool governs a target
-and how a row reaches it come from the properties seam
-(``metadata_service.PROPERTY_LINKS``), so a new tool is writable here the
-moment it exists.
+Every target in ``PROPERTY_TARGETS``, and every kind of the community's tool
+plug-ins, is written here and nowhere else; each target's read carries its
+values as ``properties``. Which tool governs a built-in target and how a row
+reaches it come from the properties seam (``metadata_service.PROPERTY_LINKS``),
+so a new tool is writable here the moment it exists; a tool plug-in's row is
+loaded as its own routes load it (``resource_access.load_kind``).
 """
 
 from typing import Annotated, Any
@@ -22,12 +23,10 @@ from app.api.deps import (
 )
 from app.core.errors import CodedError
 from app.core.plugin_scopes import tool_resource
-from app.core.tools import KINDS
-from app.schemas.tenant.property import (
-    PropertySummary,
-    PropertyTarget,
-    PropertyValuesSetRequest,
-)
+from app.core.tools import KINDS, PROPERTY_TARGETS
+from app.db.session import routed_tools
+from app.schemas.kinds import require_kind
+from app.schemas.tenant.property import PropertySummary, PropertyValuesSetRequest
 from app.services.tenant import metadata as metadata_service
 from app.services.tenant import required_fields
 
@@ -51,7 +50,7 @@ PropertiesWrite = Annotated[
 
 @router.put("/{target}/{entity_id}", response_model=list[PropertySummary])
 async def set_properties(
-    target: PropertyTarget,
+    target: str,
     entity_id: int,
     payload: PropertyValuesSetRequest,
     session: ActorSessionDep,
@@ -69,9 +68,15 @@ async def set_properties(
     type and options. An installed plug-in names the person a person-valued
     property holds by its reference for them. An empty list clears them all.
     """
-    spec = metadata_service.PROPERTY_LINKS[target.value]
+    require_kind(routed_tools(session), target, PROPERTY_TARGETS)
+    spec = metadata_service.PROPERTY_LINKS.get(target)
     row: Any
-    if not spec.shared:
+    if spec is None:
+        row = await resource_access.load_kind(
+            session, target, entity_id, current_user, guild_context, access="write"
+        )
+        initiative_id = row.tool["initiative_id"]
+    elif not spec.shared:
         row = await resource_access.load_child(
             session, spec.model, entity_id, access="write"
         )
@@ -86,7 +91,7 @@ async def set_properties(
             await session.exec(select(spec.model).where(spec.model.id == entity_id))
         ).one_or_none()
         if row is None:
-            raise KINDS[target.value].not_found()
+            raise KINDS[target].not_found()
         governing = await resource_access.load_authorized(
             session,
             spec.tool,
@@ -113,7 +118,5 @@ async def set_properties(
         await session.rollback()
         raise
     await session.commit()
-    summaries = await metadata_service.summaries_by_id(
-        session, target.value, [entity_id]
-    )
+    summaries = await metadata_service.summaries_by_id(session, target, [entity_id])
     return summaries.get(entity_id, [])

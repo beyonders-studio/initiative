@@ -26,15 +26,16 @@ from app.api.deps import (
     plugin_scope_checked,
 )
 from app.core.references import parse_ref
-from app.core.search import SearchEntityType
 from app.db.guild_standing import InstallContext
 from app.db.plugin_rls import SEARCH_ENTRY_READ_SCOPE
 from app.db.search_index import entity_types
+from app.db.session import routed_tools
 from app.models.platform.user import User
 from app.schemas.tenant.search import SearchResults, SearchSuggestion
 from app.services.tenant import search as search_service
 
 router = APIRouter(route_class=ActorRoute)
+
 
 #: ``/suggest`` for a person or an installed plug-in. A plug-in needs the read scope
 #: of each kind it asks for, which the service checks once it has ``types``.
@@ -63,7 +64,7 @@ _SUBJECT_DESCRIPTION = (
 )
 _TYPE_DESCRIPTION = (
     "Restrict to these entity types. Omit for the default scope "
-    f"({', '.join(t.value for t in entity_types(default_scope_only=True))}); "
+    f"({', '.join(entity_types(default_scope_only=True))}); "
     "naming a type "
     "reaches it explicitly."
 )
@@ -75,9 +76,7 @@ async def search_community(
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
     search: str = Query(description="What to search for.", max_length=1000),
-    types: list[SearchEntityType] | None = Query(
-        default=None, description=_TYPE_DESCRIPTION
-    ),
+    types: list[str] | None = Query(default=None, description=_TYPE_DESCRIPTION),
     initiative_id: int | None = Query(
         default=None, description="Restrict to one initiative."
     ),
@@ -96,6 +95,7 @@ async def search_community(
         query=search,
         filters=search_service.Filters(
             types=types,
+            tools=routed_tools(session),
             initiative_id=initiative_id,
             include_archived=include_archived,
             template=is_template,
@@ -110,9 +110,7 @@ async def recent_community(
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
-    types: list[SearchEntityType] | None = Query(
-        default=None, description=_TYPE_DESCRIPTION
-    ),
+    types: list[str] | None = Query(default=None, description=_TYPE_DESCRIPTION),
     initiative_id: int | None = Query(
         default=None, description="Restrict to one initiative."
     ),
@@ -131,6 +129,7 @@ async def recent_community(
         user_id=current_user.id,
         filters=search_service.Filters(
             types=types,
+            tools=routed_tools(session),
             initiative_id=initiative_id,
             template=is_template,
             subject=parse_ref(subject) if subject else None,
@@ -144,9 +143,7 @@ async def suggest_community(
     session: ActorSessionDep,
     guild_context: SuggestByEntityType,
     search: str = Query(description="What to jump to.", max_length=200),
-    types: list[SearchEntityType] | None = Query(
-        default=None, description=_TYPE_DESCRIPTION
-    ),
+    types: list[str] | None = Query(default=None, description=_TYPE_DESCRIPTION),
     initiative_id: int | None = Query(
         default=None, description="Restrict to one initiative."
     ),
@@ -171,6 +168,7 @@ async def suggest_community(
         user_id=guild_context.user_id,
         filters=search_service.Filters(
             types=types,
+            tools=routed_tools(session),
             initiative_id=initiative_id,
             template=is_template,
             subject=parse_ref(subject) if subject else None,

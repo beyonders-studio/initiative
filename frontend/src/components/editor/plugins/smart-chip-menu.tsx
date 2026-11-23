@@ -2,7 +2,6 @@ import {
   CalendarClock,
   CircleDot,
   Flag,
-  Gauge,
   ListChecks,
   Mail,
   Phone,
@@ -18,7 +17,7 @@ import { SmartChipKind } from "@/api/generated/initiativeAPI.schemas";
  * typing finds it.
  *
  * Keyed by the generated pair, so a chip the server adds cannot be silently
- * missing here — `smart-chip-picker-plugin.test.ts` fails if one is.
+ * missing here: the type refuses a menu without it.
  *
  * Its own module because both ways in read it: the `/` menu builds an entry per
  * fact from it, and the toolbar's dialog uses it to name the facts a chosen
@@ -52,11 +51,6 @@ export const SMART_CHIP_MENU: Record<
     labelKey: "smartChips.taskChecklist",
     icon: <SquareCheck className="size-4" />,
     keywords: ["checklist", "checkbox", "tick", "todo", "done", "attendance", "task", "chip"],
-  },
-  [SmartChipKind["counter:value"]]: {
-    labelKey: "smartChips.counterValue",
-    icon: <Gauge className="size-4" />,
-    keywords: ["counter", "count", "number", "value", "chip"],
   },
   [SmartChipKind["project:progress"]]: {
     labelKey: "smartChips.projectProgress",

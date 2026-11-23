@@ -11,14 +11,18 @@ import { Tool } from "@/api/generated/initiativeAPI.schemas";
 
 import { ToolCommentsPanel } from "./ToolCommentsPanel";
 
-/** Records the query the panel derived for the thread it wants. The first
- *  page names an older one behind it; that one is the end of the thread. */
+/** Records the query the panel derived for the thread it wants, as
+ *  `subject_type:subject_id`, and its query. The first page names an older
+ *  one behind it; that one is the end of the thread. */
 const captureList = () => {
-  const seen: URLSearchParams[] = [];
+  const seen: { thread: string; params: URLSearchParams }[] = [];
   server.use(
     communityHttp.get("/comments/", ({ request }) => {
       const params = new URL(request.url).searchParams;
-      seen.push(params);
+      seen.push({
+        thread: `${params.get("subject_type")}:${params.get("subject_id")}`,
+        params,
+      });
       return HttpResponse.json(
         params.get("cursor") === "older"
           ? { comments: [buildComment({ content: "Earlier" })], next_cursor: null }
@@ -30,32 +34,18 @@ const captureList = () => {
 };
 
 describe("ToolCommentsPanel", () => {
-  it("derives the thread's query param from the tool", async () => {
-    const requests = captureList();
-
-    renderPage(() => (
-      <ToolCommentsPanel
-        tool={Tool.counter_group}
-        entity={{ id: 9, initiative_id: 4, comments_enabled: true }}
-      />
-    ));
-
-    await waitFor(() => expect(requests).toHaveLength(1));
-    expect(requests[0].get("counter_group_id")).toBe("9");
-  });
-
-  it("uses the same derivation for a different tool, with no per-tool wiring", async () => {
+  it("derives the thread's subject from the tool", async () => {
     const requests = captureList();
 
     renderPage(() => (
       <ToolCommentsPanel
         tool={Tool.dashboard}
-        entity={{ id: 12, initiative_id: 4, comments_enabled: true }}
+        entity={{ id: 9, initiative_id: 4, comments_enabled: true }}
       />
     ));
 
     await waitFor(() => expect(requests).toHaveLength(1));
-    expect(requests[0].get("dashboard_id")).toBe("12");
+    expect(requests[0].thread).toBe("dashboard:9");
   });
 
   it("asks for the target's thread, not the tool's, when one is given", async () => {
@@ -70,39 +60,31 @@ describe("ToolCommentsPanel", () => {
     ));
 
     await waitFor(() => expect(requests).toHaveLength(1));
-    expect(requests[0].get("wiki_page_id")).toBe("42");
-    expect(requests[0].get("wiki_id")).toBeNull();
+    expect(requests[0].thread).toBe("wiki_page:42");
   });
 
-  it("still lets the tool answer for whether a target's thread exists", async () => {
-    const requests = captureList();
+  // A target's thread still exists only where the tool says so.
+  it.each([
+    [Tool.wiki, { type: "wiki_page", id: 42 }],
+    [Tool.dashboard, undefined],
+  ] as const)(
+    "renders nothing and asks for nothing when the %s has comments off",
+    async (tool, target) => {
+      const requests = captureList();
 
-    const { container } = renderPage(() => (
-      <ToolCommentsPanel
-        tool={Tool.wiki}
-        entity={{ id: 7, initiative_id: 4, comments_enabled: false }}
-        target={{ type: "wiki_page", id: 42 }}
-      />
-    ));
+      const { container } = renderPage(() => (
+        <ToolCommentsPanel
+          tool={tool}
+          entity={{ id: 7, initiative_id: 4, comments_enabled: false }}
+          target={target}
+        />
+      ));
 
-    expect(container).toBeEmptyDOMElement();
-    expect(requests).toHaveLength(0);
-  });
-
-  it("renders nothing and asks for nothing when the entity has comments off", async () => {
-    const requests = captureList();
-
-    const { container } = renderPage(() => (
-      <ToolCommentsPanel
-        tool={Tool.counter_group}
-        entity={{ id: 3, initiative_id: 4, comments_enabled: false }}
-      />
-    ));
-
-    expect(container).toBeEmptyDOMElement();
-    // Nothing to wait on — assert the absence after a tick of the query client.
-    await waitFor(() => expect(requests).toHaveLength(0));
-  });
+      expect(container).toBeEmptyDOMElement();
+      // Nothing to wait on — assert the absence after a tick of the query client.
+      await waitFor(() => expect(requests).toHaveLength(0));
+    }
+  );
 
   it("shows the newest conversations and loads older ones on demand", async () => {
     const requests = captureList();
@@ -117,13 +99,13 @@ describe("ToolCommentsPanel", () => {
 
     expect(await screen.findByText("Existing")).toBeInTheDocument();
     expect(screen.queryByText("Earlier")).not.toBeInTheDocument();
-    expect(requests[0].get("cursor")).toBeNull();
+    expect(requests[0].params.get("cursor")).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "Load older comments" }));
 
     expect(await screen.findByText("Earlier")).toBeInTheDocument();
-    expect(requests[1].get("cursor")).toBe("older");
-    expect(requests[1].get("project_id")).toBe("1");
+    expect(requests[1].params.get("cursor")).toBe("older");
+    expect(requests[1].thread).toBe("project:1");
     expect(screen.queryByRole("button", { name: "Load older comments" })).not.toBeInTheDocument();
   });
 });

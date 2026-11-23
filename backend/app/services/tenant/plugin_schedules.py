@@ -427,15 +427,21 @@ async def _check_health(
 ) -> str | None:
     """Run one community connection's health check and report what it read:
     ``ok`` at once, any other state once two checks in a row have read
-    something other than ``ok``. A connection not yet made is not checked,
-    and answers ``None``, as does one made again while it was checked, whose
+    something other than ``ok``. A connection not yet made, or one the
+    platform holds, is not checked, and answers ``None``, as does one made again while it was checked, whose
     check read the connection it replaced. Once a report commits, a state
     that moved, or any ``removed``, is written to the install index from the
     install as it then stands."""
     connection_id = run.schedule_id
     health = _health_checks(plugin.definition).get(connection_id)
     stored = (plugin.config or {}).get(connection_id)
-    if health is None or not stored:
+    if (
+        health is None
+        or not stored
+        or connection_id in registration.platform_connections
+    ):
+        # Not made, or the platform's, which is checked once for every
+        # community (``platform_connections.check_health``).
         return None
     checked = _made(plugin, connection_id)
     try:

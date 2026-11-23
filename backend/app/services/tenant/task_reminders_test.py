@@ -70,9 +70,17 @@ async def _set(client, a, task_id: int, remind_at: datetime) -> dict:
 
 
 async def test_a_reminder_is_set_moved_and_cleared(client, session, acting_user):
+    """Only for a task the reader can open."""
     a = await acting_user(guild_role="member", initiative=True, project=True)
     task = await create_task(session, a.project)
     at = datetime(2026, 11, 2, 9, tzinfo=UTC)
+    outsider = await acting_user(guild_role="member", guild=a.guild)
+    response = await client.put(
+        outsider.g(f"/personal-items/reminder/task/{task.id}"),
+        headers=outsider.headers,
+        json={"remind_at": at.isoformat()},
+    )
+    assert response.status_code == 404
 
     state = await _set(client, a, task.id, at)
     assert datetime.fromisoformat(state["remind_at"]) == at
@@ -92,20 +100,6 @@ async def test_a_reminder_is_set_moved_and_cleared(client, session, acting_user)
     # The reminder was all the row held, so the row goes with it.
     await route_session_to_guild(session, a.guild.id)
     assert (await session.exec(select(PersonalItem))).all() == []
-
-
-async def test_a_reminder_is_only_for_a_task_the_reader_can_open(
-    client, session, acting_user
-):
-    a = await acting_user(guild_role="member", initiative=True, project=True)
-    task = await create_task(session, a.project)
-    outsider = await acting_user(guild_role="member", guild=a.guild)
-    response = await client.put(
-        outsider.g(f"/personal-items/reminder/task/{task.id}"),
-        headers=outsider.headers,
-        json={"remind_at": datetime.now(UTC).isoformat()},
-    )
-    assert response.status_code == 404
 
 
 async def _next(client, a) -> dict:
@@ -209,13 +203,7 @@ async def test_a_due_reminder_is_told_once(client, session, acting_user):
     assert rows[task.id].reminded_at is not None
     assert rows[future.id].reminded_at is None
 
-
-async def test_setting_a_sent_reminder_again_arms_it(client, session, acting_user):
-    a = await acting_user(guild_role="member", initiative=True, project=True)
-    task = await create_task(session, a.project)
-    now = datetime.now(UTC)
-    await _set(client, a, task.id, now - timedelta(minutes=1))
-    await _sweep(session, now)
+    # Setting a sent reminder again arms it.
     await _set(client, a, task.id, now - timedelta(seconds=30))
     await _sweep(session, now)
     assert len(await _reminders(session, a.user.id)) == 2

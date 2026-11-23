@@ -46,6 +46,7 @@ __all__ = [
     "IssuedSession",
     "LiveSession",
     "RefreshOutcome",
+    "Replay",
     "RotationResult",
     "create_session",
     "delete_all_for_user",
@@ -164,10 +165,46 @@ class RotationResult:
     #: still say whose chain was killed. ``None`` for a token that matched
     #: nothing at all.
     user_id: int | None = None
+    #: What the renewal a ``REUSED`` token was spent on says about it.
+    replay: Replay | None = None
 
     @property
     def ok(self) -> bool:
         return self.outcome is RefreshOutcome.ROTATED
+
+
+@dataclass(frozen=True)
+class Replay:
+    """A token presented again after it was renewed, beside that renewal.
+
+    A device whose renewal answer never reached it — it slept, or the app
+    closed, as the answer came back — still holds the token it sent, and
+    presents it next time. The session that renewal opened is then still
+    unused, and the token comes back from the device that renewed it.
+    """
+
+    #: How long ago the token was renewed.
+    since_renewal: timedelta
+    #: Whether the session it was renewed into was still unused: never
+    #: renewed itself, and not ended.
+    successor_unused: bool
+    #: Whether it came from the device the renewal did: the same address and
+    #: browser, and for an app the same install.
+    same_device: bool
+
+    @property
+    def lost_reply(self) -> bool:
+        """A device presenting again what it renewed, the answer never reached."""
+        return self.successor_unused and self.same_device
+
+    def as_detail(self) -> dict[str, Any]:
+        """For the audit line the replay is recorded with."""
+        return {
+            "lost_reply": self.lost_reply,
+            "since_renewal_seconds": int(self.since_renewal.total_seconds()),
+            "successor_unused": self.successor_unused,
+            "same_device": self.same_device,
+        }
 
 
 # Revoke every session in a token's rotation chain, in both directions, given any
@@ -273,6 +310,47 @@ async def create_session(
     return IssuedSession(session=row, refresh_token=raw)
 
 
+async def _answer_ended(
+    session: AsyncSession,
+    row: AuthSession,
+    *,
+    now: datetime,
+    ip: str | None,
+    user_agent: str | None,
+    install_id: uuid.UUID | None,
+) -> RotationResult:
+    """The answer to a token whose session has already ended."""
+    successor = (
+        await session.exec(
+            select(AuthSession)
+            .where(AuthSession.parent_id == row.id)
+            .order_by(col(AuthSession.created_at).desc())
+            .limit(1)
+        )
+    ).first()
+    if successor is None:
+        # Ended without being renewed (signed out, ended from another device,
+        # gone idle): no session came of it, so it is simply over.
+        return RotationResult(RefreshOutcome.EXPIRED, user_id=row.user_id)
+    # The renewal records the address and browser that sent it; an app's
+    # install is carried from its sign-in, so for an app it is asked as well,
+    # not instead.
+    same_device = (
+        ip is not None
+        and user_agent is not None
+        and str(successor.ip) == ip
+        and successor.user_agent == user_agent
+        and (successor.install_id is None or install_id == successor.install_id)
+    )
+    replay = Replay(
+        since_renewal=now - successor.created_at,
+        successor_unused=successor.revoked_at is None,
+        same_device=same_device,
+    )
+    await revoke_chain(session, session_id=row.id, now=now)
+    return RotationResult(RefreshOutcome.REUSED, user_id=row.user_id, replay=replay)
+
+
 async def rotate_session(
     session: AsyncSession,
     *,
@@ -282,6 +360,7 @@ async def rotate_session(
     provider_auth: dict[str, Any] | None = None,
     user_agent: str | None = None,
     ip: str | None = None,
+    install_id: uuid.UUID | None = None,
     device_name: str | None = None,
     refresh_ttl: timedelta | None = None,
     idle: timedelta = timedelta(0),
@@ -298,6 +377,13 @@ async def rotate_session(
     client renewing on its own keeps the session no longer than the person's
     last input allows. A session whose window has already run out from there
     is ended, and answers ``EXPIRED``.
+
+    A token whose session has ended is ``REUSED`` only where it was renewed:
+    then it has been presented twice, the chain is ended, and the result's
+    :class:`Replay` says how that renewal went. One ended any other way —
+    signed out, ended from another device, gone idle — answers ``EXPIRED``.
+    ``install_id``, ``ip`` and ``user_agent`` are the request's, which the
+    replay is held against.
 
     **Returns** a :class:`RotationResult` (never raises for a bad token) —
     ``ROTATED`` carries the new :class:`IssuedSession`; ``UNKNOWN``/``EXPIRED``/
@@ -321,10 +407,9 @@ async def rotate_session(
     if row is None:
         return RotationResult(RefreshOutcome.UNKNOWN)
 
-    # Already spent (rotated or explicitly revoked) ⇒ replay of a dead token.
+    presented = {"ip": ip, "user_agent": user_agent, "install_id": install_id}
     if row.revoked_at is not None:
-        await revoke_chain(session, session_id=row.id, now=issued)
-        return RotationResult(RefreshOutcome.REUSED, user_id=row.user_id)
+        return await _answer_ended(session, row, now=issued, **presented)
 
     if row.expires_at <= issued:
         return RotationResult(RefreshOutcome.EXPIRED, user_id=row.user_id)
@@ -362,9 +447,9 @@ async def rotate_session(
         )
     ).first()
     if claimed is None:
-        # Lost the race to a concurrent rotation — treated as reuse.
-        await revoke_chain(session, session_id=row.id, now=issued)
-        return RotationResult(RefreshOutcome.REUSED, user_id=row.user_id)
+        # Ended between the read and the claim: by a concurrent renewal with
+        # the same token, a replay like any other, or by something else.
+        return await _answer_ended(session, row, now=issued, **presented)
     # Keep the in-session parent honest (the raw UPDATE bypassed the ORM).
     await session.refresh(row)
 

@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
 from app.testing import (
     assign_tag,
@@ -19,6 +20,7 @@ from app.testing import (
     create_property_definition,
     create_property_value,
     create_tag,
+    switch_tools,
 )
 
 _JANUARY = datetime(2026, 1, 15, 12, 0, tzinfo=UTC)
@@ -27,10 +29,7 @@ _MARCH = datetime(2026, 3, 5, 12, 0, tzinfo=UTC)
 
 
 async def _posts_enabled(session: AsyncSession, initiative) -> None:
-    initiative.posts_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.post: True})
 
 
 async def _board(session: AsyncSession, actor):

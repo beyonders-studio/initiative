@@ -18,8 +18,9 @@ import type { WidgetBinding } from "@/hooks/useWidgetData";
 import type { DataMeta } from "@/lib/widgets/dataShapes";
 import { queryScope } from "@/lib/widgets/provenance";
 import { sourceDescriptor } from "@/lib/widgets/sources";
-import { localized, type WidgetMeta } from "@/lib/widgets/widgetMeta";
+import type { WidgetMeta } from "@/lib/widgets/widgetMeta";
 import { Button } from "@/ui/button";
+import { localized } from "@/ui/lib/localized";
 import { cn } from "@/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 

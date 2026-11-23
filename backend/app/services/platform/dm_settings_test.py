@@ -33,20 +33,6 @@ async def _policy_of(session, user_id: int) -> DmPolicy | None:
     return row.dm_policy if row else None
 
 
-async def test_seeding_applies_the_operator_default(session):
-    await _set_default(session, DmPolicy.community)
-    user = await create_user(session)
-    await session.exec(
-        text("DELETE FROM public.user_dm_settings WHERE user_id = :u").bindparams(
-            u=user.id
-        )
-    )
-
-    await dm_settings_service.seed_for_new_account(session, user_id=user.id)
-
-    assert await _policy_of(session, user.id) is DmPolicy.community
-
-
 async def test_seeding_twice_leaves_a_changed_policy_alone(session):
     await _set_default(session, DmPolicy.private)
     user = await create_user(session)

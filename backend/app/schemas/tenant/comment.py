@@ -7,9 +7,7 @@ from pydantic import (
     ConfigDict,
     Field,
     computed_field,
-    create_model,
     field_validator,
-    model_validator,
 )
 
 from app.core.identity_boundary import PersonId
@@ -71,47 +69,23 @@ class CommentBase(SanitizedBaseModel):
         return normalized
 
 
-# Every comment parent, in one place: one field per tool plus the content-level
-# extras. The comments table carries a matching FK per entry, and the
-# create/list surfaces take exactly one of them.
-# Derived from the registry: a new parent's field joins by existing.
-COMMENT_TARGET_FIELDS: tuple[str, ...] = tuple(
-    f"{target}_id" for target in COMMENT_TARGETS
-)
-
-_CommentCreateTargets = create_model(
-    "_CommentCreateTargets",
-    __base__=CommentBase,
-    **{
-        field: (int | None, Field(default=None, gt=0))
-        for field in COMMENT_TARGET_FIELDS
-    },
-)
-_CommentReadParents = create_model(
-    "_CommentReadParents",
-    __base__=CommentBase,
-    **{field: (int | None, None) for field in COMMENT_TARGET_FIELDS},
+#: What a comment can be said on: every tool, and the kinds inside one that
+#: hold a conversation of their own. Derived from the registry: a new subject
+#: joins by existing.
+CommentSubject = Enum(
+    "CommentSubject", [(target, target) for target in COMMENT_TARGETS], type=str
 )
 
 
-class CommentCreate(_CommentCreateTargets):
+class CommentCreate(CommentBase):
+    """A comment, and what it is said on."""
+
+    subject_type: str
+    subject_id: int = Field(gt=0)
     parent_comment_id: int | None = Field(default=None, gt=0)
     #: Who it is said to. ``filer`` only on an operations case somebody filed,
     #: where it is the reply they are shown; ``members`` everywhere else.
     audience: CommentAudience = CommentAudience.members
-
-    @model_validator(mode="after")
-    def validate_target(self) -> CommentCreate:
-        provided = [
-            field for field in COMMENT_TARGET_FIELDS if getattr(self, field) is not None
-        ]
-        if len(provided) != 1:
-            raise ValueError("Provide exactly one comment target")
-        return self
-
-    def target_ids(self) -> dict[str, int | None]:
-        """The target fields as service kwargs."""
-        return {field: getattr(self, field) for field in COMMENT_TARGET_FIELDS}
 
 
 class ToolCommentSettings(SanitizedBaseModel):
@@ -148,15 +122,16 @@ class CommentRemoval(SanitizedBaseModel):
     reason: RemovalReason | None = None
 
 
-class CommentRead(_CommentReadParents, CreatedByRead):
-    """One comment. ``project_id`` is its own for a comment on a project and
-    the task's for a task comment (filled by the service's serializer)."""
+class CommentRead(CommentBase, CreatedByRead):
+    """One comment, and what it is said on."""
 
     model_config = ConfigDict(
         from_attributes=True, json_schema_serialization_defaults_required=True
     )
 
     id: int
+    subject_type: str
+    subject_id: int
     parent_comment_id: int | None = None
     created_at: datetime
     updated_at: datetime | None = None

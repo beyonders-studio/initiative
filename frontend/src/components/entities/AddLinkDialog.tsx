@@ -2,11 +2,7 @@ import { X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import {
-  EndpointKind,
-  type EndpointRef,
-  type FileRead,
-} from "@/api/generated/initiativeAPI.schemas";
+import type { EndpointRef, FileRead } from "@/api/generated/initiativeAPI.schemas";
 import { DEFAULT_GRANTS } from "@/components/access/grants";
 import { EntityPicker, type LinkableSuggestion } from "@/components/entities/EntityPicker";
 import { SearchCategoryTabs } from "@/components/search/SearchCategoryTabs";
@@ -17,6 +13,7 @@ import { toast } from "@/lib/mascotToast";
 import {
   canAssert,
   defaultGroupFor,
+  EndpointKind,
   edgeFor,
   groupOrderFor,
   RELATION_GROUPS,
@@ -112,7 +109,7 @@ export const AddLinkDialog = ({
   /** The far end's kind: who or what was picked, or the file an upload will become. */
   const farType = person
     ? EndpointKind.user
-    : (picked?.entity_type ?? (file ? EndpointKind.file : null));
+    : ((picked?.entity_type as EndpointKind | undefined) ?? (file ? EndpointKind.file : null));
   /**
    * A file somebody uploads is theirs, so every link to it is theirs to make.
    * A link to a person is the thing's to make, whichever way it runs, and this
@@ -133,10 +130,12 @@ export const AddLinkDialog = ({
    * Ordered for the pair once something is picked: the list is the same list,
    * but what two things of one kind usually say to each other comes first.
    */
+  // What this dialog is opened on: a built-in kind's page.
+  const anchor = entity.type as EndpointKind;
   const offered = useMemo(() => {
     const allowed = assertable.filter((group) => canAssert(group, farWritable));
-    return farType ? groupOrderFor(entity.type, farType, allowed) : allowed;
-  }, [assertable, farWritable, farType, entity.type]);
+    return farType ? groupOrderFor(anchor, farType, allowed) : allowed;
+  }, [assertable, farWritable, farType, anchor]);
 
   /**
    * What the sentence currently says.
@@ -146,7 +145,7 @@ export const AddLinkDialog = ({
    * picked, because there is no pair to propose for and the question has not
    * been asked yet.
    */
-  const proposed = farType ? defaultGroupFor(entity.type, farType) : null;
+  const proposed = farType ? defaultGroupFor(anchor, farType) : null;
   const chosenGroup =
     (groupKey && offered.some((group) => group.key === groupKey) ? groupKey : null) ??
     (proposed && offered.some((group) => group.key === proposed) ? proposed : null) ??

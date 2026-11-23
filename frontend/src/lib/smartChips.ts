@@ -16,6 +16,7 @@ import {
   type SmartChipState,
   SmartChipTone,
 } from "@/api/generated/initiativeAPI.schemas";
+import { isToolPluginKind } from "@/lib/toolPlugins";
 import { CHIP_TONE_CLASSES } from "@/ui/editor/editor-ui/chip-tones";
 
 /** How the parts of a reference are joined — mirrors `REF_SEPARATOR`. */
@@ -42,20 +43,23 @@ export const CHIP_ENTITY_TYPES: SearchEntityType[] = [
 
 /** The facts offered about one kind of thing — what a picker asks after the
  *  thing itself has been chosen. */
-export const chipKindsFor = (entityType: SearchEntityType): SmartChipKind[] =>
+export const chipKindsFor = (entityType: string): SmartChipKind[] =>
   SMART_CHIP_KINDS.filter((kind) => chipEntityType(kind) === entityType);
 
 /** What a document stores for one chip: `task:12:status`. */
 export const chipRef = (kind: SmartChipKind, entityId: number): string =>
   `${chipEntityType(kind)}${SEPARATOR}${entityId}${SEPARATOR}${chipAspect(kind)}`;
 
-/** What a link stores: `task:12`, which resolves to what it is called now. */
-export const referenceRef = (entityType: SearchEntityType, entityId: number): string =>
+/** What a link stores: `task:12`, or for a tool plug-in's row
+ *  `counter.tsjvtcm0s7gv2x:12`, which resolves to what it is called now. */
+export const referenceRef = (entityType: string, entityId: number): string =>
   `${entityType}${SEPARATOR}${entityId}`;
 
-/** The kind a stored reference names, or `null` if it names none. */
-export const storedEntityType = (value: string): SearchEntityType | null =>
-  Object.hasOwn(SearchEntityType, value) ? (value as SearchEntityType) : null;
+/** The kind a stored reference names, a built-in one or a tool plug-in's, or
+ *  `null` if it could name none. Whether the community has a plug-in's kind
+ *  is the server's to answer when the reference is read. */
+export const storedEntityType = (value: string): string | null =>
+  Object.hasOwn(SearchEntityType, value) || isToolPluginKind(value) ? value : null;
 
 /**
  * What a chip shows, given what came back for it.

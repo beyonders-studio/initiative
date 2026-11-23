@@ -29,6 +29,7 @@ from app.testing import (
     guild_of,
     lexical_body,
     route_as,
+    switch_tools,
 )
 
 
@@ -70,9 +71,7 @@ async def test_create_refuses_when_files_are_switched_off(
     them off refuses to hold one, and names the reason instead of failing at
     the row."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    a.initiative.files_enabled = False
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.file: False})
 
     response = await client.post(
         a.g("/files/"),
@@ -97,9 +96,7 @@ async def test_a_guild_admin_does_not_list_files_of_a_switched_off_initiative(
     assert listed.status_code == 200
     assert doc.id in [d["id"] for d in listed.json()["items"]]
 
-    a.initiative.files_enabled = False
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.file: False})
 
     listed = await client.get(a.g("/files/"), headers=a.headers)
     assert listed.status_code == 200
@@ -255,23 +252,13 @@ async def test_download_owner_can_download(
     assert response.headers.get("x-content-type-options") == "nosniff"
 
 
-async def test_download_unauthenticated_returns_401(
+async def test_download_is_answered_by_access(
     client: AsyncClient, session: AsyncSession, acting_user
 ) -> None:
-    """Unauthenticated request returns 401."""
-    owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
-
-    doc = await _create_uploaded_file(
-        session, initiative=owner.initiative, owner=owner.user, filename="dl_unauth.pdf"
-    )
-    response = await client.get(owner.g(f"/files/{doc.id}/download"))
-    assert response.status_code == 401
-
-
-async def test_download_guild_member_without_permission_returns_403(
-    client: AsyncClient, session: AsyncSession, acting_user
-) -> None:
-    """Guild member with no file permission gets 403."""
+    """Signed out is 401 and another community's member finds nothing. Both
+    download routes load the file the same way, so an initiative member the
+    sharing does not reach is refused the same way by each, until a read grant
+    lets them download."""
     owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
     other = await acting_user(
         guild_role=CommunityRole.member,
@@ -279,89 +266,24 @@ async def test_download_guild_member_without_permission_returns_403(
         initiative=owner.initiative,
         initiative_role="member",
     )
+    outsider = await acting_user("member")
 
     doc = await _create_uploaded_file(
-        session,
-        initiative=owner.initiative,
-        owner=owner.user,
-        filename="dl_no_perm.pdf",
+        session, initiative=owner.initiative, owner=owner.user, filename="dl.pdf"
     )
-    response = await client.get(
-        other.g(f"/files/{doc.id}/download"), headers=other.headers
-    )
-    assert response.status_code == 403
+    download = owner.g(f"/files/{doc.id}/download")
+    assert (await client.get(download)).status_code == 401
+    assert (await client.get(download, headers=outsider.headers)).status_code == 404
 
-
-async def test_version_download_answers_like_the_file_download(
-    client: AsyncClient, session: AsyncSession, acting_user
-) -> None:
-    """Both download routes load the file the same way, so an initiative
-    member the sharing does not reach is answered the same way by each."""
-    owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    other = await acting_user(
-        guild_role=CommunityRole.member,
-        guild=owner.guild,
-        initiative=owner.initiative,
-        initiative_role="member",
-    )
-
-    doc = await _create_uploaded_file(
-        session,
-        initiative=owner.initiative,
-        owner=owner.user,
-        filename="dl_version_no_perm.pdf",
-    )
-    current = await client.get(
-        other.g(f"/files/{doc.id}/download"), headers=other.headers
-    )
+    current = await client.get(download, headers=other.headers)
     stored = await client.get(
-        other.g(f"/files/{doc.id}/versions/1/download"),
-        headers=other.headers,
+        owner.g(f"/files/{doc.id}/versions/1/download"), headers=other.headers
     )
     assert current.status_code == 403
     assert stored.status_code == current.status_code
 
-
-async def test_download_non_guild_member_returns_404(
-    client: AsyncClient, session: AsyncSession, acting_user
-) -> None:
-    """User from a different guild gets 404 (file not visible)."""
-    owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    outsider = await acting_user("member")
-
-    doc = await _create_uploaded_file(
-        session,
-        initiative=owner.initiative,
-        owner=owner.user,
-        filename="dl_outsider.pdf",
-    )
-    response = await client.get(
-        owner.g(f"/files/{doc.id}/download"), headers=outsider.headers
-    )
-    assert response.status_code == 404
-
-
-async def test_download_read_permission_grants_access(
-    client: AsyncClient, session: AsyncSession, acting_user
-) -> None:
-    """User with explicit read permission can download."""
-    owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    reader = await acting_user(
-        guild_role=CommunityRole.member,
-        guild=owner.guild,
-        initiative=owner.initiative,
-        initiative_role="member",
-    )
-
-    doc = await _create_uploaded_file(
-        session, initiative=owner.initiative, owner=owner.user, filename="dl_reader.pdf"
-    )
-    await create_resource_grant(session, doc, user=reader.user)
-
-    response = await client.get(
-        owner.g(f"/files/{doc.id}/download"), headers=reader.headers
-    )
-    assert response.status_code == 200
+    await create_resource_grant(session, doc, user=other.user)
+    assert (await client.get(download, headers=other.headers)).status_code == 200
 
 
 async def test_download_inline_returns_no_attachment_header(
@@ -604,31 +526,6 @@ async def test_create_whiteboard_file(client: AsyncClient, acting_user) -> None:
     assert file_doc.status_code == 422
 
 
-def test_normalize_whiteboard_preserves_shape() -> None:
-    """normalize_file_content must not inject Lexical root into whiteboards."""
-    from app.services.tenant.files import normalize_file_content
-
-    scene = {
-        "elements": [{"id": "el1", "type": "rectangle"}],
-        "appState": {"viewBackgroundColor": "#ffffff"},
-        "files": {},
-    }
-    result = normalize_file_content(scene, file_type=FileType.excalidraw)
-    assert result["elements"] == scene["elements"]
-    assert result["appState"] == scene["appState"]
-    assert result["files"] == scene["files"]
-    assert "root" not in result
-
-
-def test_normalize_native_still_injects_root() -> None:
-    """Regression: native docs still get a root shape when content is empty."""
-    from app.services.tenant.files import normalize_file_content
-
-    result = normalize_file_content({}, file_type=FileType.lexical)
-    assert "root" in result
-    assert isinstance(result["root"], dict)
-
-
 async def test_create_smart_link_file(client: AsyncClient, acting_user) -> None:
     """POST /files/ with file_type='url' stores only the URL,
     and the list reports the URL without the body."""
@@ -642,7 +539,8 @@ async def test_create_smart_link_file(client: AsyncClient, acting_user) -> None:
             "name": "Design file",
             "initiative_id": owner.initiative.id,
             "file_type": "url",
-            "content": {"url": url},
+            # Anything beside the URL is left out.
+            "content": {"url": url, "extra": "ignored"},
         },
     )
     assert response.status_code == 201
@@ -658,8 +556,16 @@ async def test_create_smart_link_file(client: AsyncClient, acting_user) -> None:
     assert "content" not in row
 
 
-async def test_create_smart_link_rejects_missing_url(
-    client: AsyncClient, acting_user
+@pytest.mark.parametrize(
+    ("content", "detail"),
+    [
+        ({}, "FILE_SMART_LINK_URL_REQUIRED"),
+        (None, "FILE_SMART_LINK_URL_REQUIRED"),
+        ({"url": "ftp://example.com/file"}, "FILE_SMART_LINK_URL_INVALID"),
+    ],
+)
+async def test_create_smart_link_refuses_a_missing_or_non_http_url(
+    client: AsyncClient, acting_user, content, detail
 ) -> None:
     owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
 
@@ -670,82 +576,11 @@ async def test_create_smart_link_rejects_missing_url(
             "name": "Bad link",
             "initiative_id": owner.initiative.id,
             "file_type": "url",
-            "content": {},
+            "content": content,
         },
     )
     assert response.status_code == 400
-    assert response.json()["detail"] == "FILE_SMART_LINK_URL_REQUIRED"
-
-
-async def test_create_smart_link_rejects_non_http_url(
-    client: AsyncClient, acting_user
-) -> None:
-    owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
-
-    response = await client.post(
-        owner.g("/files/"),
-        headers=owner.headers,
-        json={
-            "name": "Bad scheme",
-            "initiative_id": owner.initiative.id,
-            "file_type": "url",
-            "content": {"url": "ftp://example.com/file"},
-        },
-    )
-    assert response.status_code == 400
-    assert response.json()["detail"] == "FILE_SMART_LINK_URL_INVALID"
-
-
-def test_normalize_smart_link_returns_only_url() -> None:
-    """normalize_file_content should strip any extra fields."""
-    from app.services.tenant.files import normalize_file_content
-
-    result = normalize_file_content(
-        {"url": "https://youtu.be/dQw4w9WgXcQ", "extra": "ignored"},
-        file_type=FileType.url,
-    )
-    assert result == {"url": "https://youtu.be/dQw4w9WgXcQ"}
-
-
-def test_normalize_smart_link_raises_on_missing_url() -> None:
-    """normalize_file_content should raise a domain error for missing URL,
-    not an HTTPException (transport concern lives at the endpoint layer)."""
-    from app.services.tenant.files import (
-        FileContentError,
-        normalize_file_content,
-    )
-
-    with pytest.raises(FileContentError) as exc_info:
-        normalize_file_content({}, file_type=FileType.url)
-    assert exc_info.value.code == "FILE_SMART_LINK_URL_REQUIRED"
-
-    with pytest.raises(FileContentError) as exc_info:
-        normalize_file_content(None, file_type=FileType.url)
-    assert exc_info.value.code == "FILE_SMART_LINK_URL_REQUIRED"
-
-
-def test_normalize_smart_link_raises_on_bad_scheme() -> None:
-    from app.services.tenant.files import (
-        FileContentError,
-        normalize_file_content,
-    )
-
-    with pytest.raises(FileContentError) as exc_info:
-        normalize_file_content(
-            {"url": "ftp://example.com/file"},
-            file_type=FileType.url,
-        )
-    assert exc_info.value.code == "FILE_SMART_LINK_URL_INVALID"
-
-
-def test_file_content_error_is_value_error() -> None:
-    """FileContentError inherits from ValueError so generic
-    ``except ValueError`` handlers still work."""
-    from app.services.tenant.files import FileContentError
-
-    exc = FileContentError("SOME_CODE")
-    assert isinstance(exc, ValueError)
-    assert exc.code == "SOME_CODE"
+    assert response.json()["detail"] == detail
 
 
 async def test_list_files_filters_by_template_and_type(

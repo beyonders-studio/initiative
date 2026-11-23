@@ -31,7 +31,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import Select, and_, exists, false, func, or_, true, tuple_
+from sqlalchemy import Select, Table, and_, exists, false, func, or_, true, tuple_
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import select as sa_select
 from sqlalchemy import update as sa_update
@@ -41,13 +41,15 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import CommonMessages
-from app.core.tools import DEFAULT_ENABLED_TOOLS, Tool
+from app.core.tool_set import ToolRecord
+from app.core.tools import Tool
 from app.db import cohorts
 from app.db.request_context import SystemGuild
 from app.db.session import (
     guild_context,
     install_context,
     routed_guild_id,
+    session_tools,
     set_rls_context,
 )
 from app.models.platform.guild import GUILD_LADDER, CommunityRole, GuildMembership
@@ -78,13 +80,13 @@ class Governing:
     one of its files: ``resource_id`` is None and ``resource_ids`` selects
     those files."""
 
-    tool: Tool
+    tool: Tool | ToolRecord
     resource_id: int | None
     initiative_id: int | None
     resource_ids: Any = None
 
     @classmethod
-    def of(cls, tool: Tool, row: Any) -> Governing:
+    def of(cls, tool: Tool | ToolRecord, row: Any) -> Governing:
         return cls(tool, row.id, row.initiative_id)
 
     @classmethod
@@ -111,23 +113,25 @@ class Governing:
 
 async def governing_of(
     session: AsyncSession, ref: tuple[str, int]
-) -> tuple[Tool, Any] | None:
-    """The tool, and its row, that governs ``ref`` (a task's project, a page's
-    wiki, a tool itself), read on ``session``, or ``None`` where the session
-    cannot reach it. The hops come from ``governing_path``, so no caller names
-    a tool."""
+) -> tuple[Tool | ToolRecord, Any] | None:
+    """The tool, and its row's ``id`` and ``initiative_id``, that governs
+    ``ref`` (a task's project, a page's wiki, a tool itself, a tool plug-in's
+    item's tool), read on ``session``, or ``None`` where the session cannot
+    reach it or the tool's row is in the trash. The hops come from the community's tool set, so no caller names
+    a tool. A built-in tool is named by its ``Tool``, an installed one by its
+    record."""
     from sqlalchemy import column as sa_column
     from sqlalchemy import table as sa_table
 
-    from app.db.initiative_rls import entity_tables, governing_path
-    from app.models.tenant._mixins import tool_models
+    from app.db.initiative_rls import entity_tables, governing_walk, paths_for
 
+    tools = await session_tools(session)
     kind, entity_id = ref
-    table = entity_tables()[kind]
-    walk = governing_path(table)
+    table = entity_tables(tools)[kind]
+    walk = governing_walk(table, paths_for(tools))
     if walk is None:
         raise ValueError(f"no tool governs {kind!r}")
-    tool, hops = walk
+    record, hops = walk
     row_id: int | None = entity_id
     for column, parent in hops:
         step = sa_table(table, sa_column("id"), sa_column(column))
@@ -137,11 +141,17 @@ async def governing_of(
         if row_id is None:
             return None
         table = parent
-    model = tool_models()[tool.plural]
+    own = record.table
     row = (
-        await session.exec(select(model).where(model.id == row_id))  # type: ignore[attr-defined]
+        await session.exec(
+            sa_select(own.c.id, own.c.initiative_id).where(
+                own.c.id == row_id, own.c.deleted_at.is_(None)
+            )
+        )
     ).one_or_none()
-    return None if row is None else (tool, row)
+    if row is None:
+        return None
+    return (record if record.installed else Tool(record.kind)), row
 
 
 def _grant_reaches(
@@ -192,7 +202,7 @@ def readers_of(governing: Governing, guild_id: int) -> Select:
     else:
         im = aliased(InitiativeMember)
         role = aliased(InitiativeRoleModel)
-        default = true() if tool in DEFAULT_ENABLED_TOOLS else false()
+        default = true() if tool.spec.on_by_default else false()
 
         def role_says(enabled: bool) -> ColumnElement[bool]:
             return (
@@ -345,7 +355,7 @@ class PersonRef:
 #: Every person column, by the tool whose sharing decides who it may name —
 #: beside a person-valued property, which :func:`person_refs` adds for every
 #: tool from the properties seam.
-PERSON_REFS: dict[Tool, tuple[PersonRef, ...]] = {
+PERSON_REFS: dict[str, tuple[PersonRef, ...]] = {
     Tool.project: (
         PersonRef(
             TaskAssignee.user_id,
@@ -374,14 +384,61 @@ _NAMING = MetadataValue.property_id.not_in(
 )
 
 
-def _property_ref(tool: Tool) -> PersonRef | None:
+def _inside(tool: ToolRecord, table: Table) -> Callable[[int], Select]:
+    """The ids of ``table``'s rows inside one row of the installed ``tool``:
+    its own table's row, or the items reaching it along their keys."""
+    from app.core.tool_set import ToolSet
+    from app.db.initiative_rls import item_path
+    from app.db.tool_rows import joined_up
+
+    hops = () if table is tool.table else item_path(tool, table).dac.via
+    joined, here = joined_up(table, hops, ToolSet((tool,)))
+    return lambda gid: sa_select(table.c.id).select_from(joined).where(here.c.id == gid)
+
+
+def _installed_refs(tool: ToolRecord) -> tuple[PersonRef, ...]:
+    """Every person an installed ``tool``'s rows name: its declared person
+    fields, and a person-valued property on its own row or an item."""
+    tables = {table.name: table for table in (tool.table, *tool.items)}
+    inside = {name: _inside(tool, table) for name, table in tables.items()}
+    kinds = ((tool.kind, tool.table.name), *((k.value, k.table) for k in tool.children))
+
+    def property_within(gid: int) -> ColumnElement[bool]:
+        return _NAMING & or_(
+            *(
+                and_(
+                    MetadataValue.entity_type == kind,
+                    MetadataValue.entity_id.in_(inside[name](gid)),
+                )
+                for kind, name in kinds
+            )
+        )
+
+    return (
+        *(
+            PersonRef(
+                column,
+                lambda gid, table=table: table.c.id.in_(inside[table.name](gid)),
+                clears=True,
+            )
+            for table in tables.values()
+            for column in table.c
+            if column.info.get("field") == "user_reference"
+        ),
+        PersonRef(MetadataValue.value_user_id, property_within, clears=True),
+    )
+
+
+def _property_ref(tool: Tool | ToolRecord) -> PersonRef | None:
     """A person-valued property on anything ``tool`` governs: the tool row
     itself and every sub-tool row inside it, read from the properties seam. A
     collection is governed by no one row, so it is not among them."""
     from app.services.tenant.metadata import PROPERTY_LINKS
 
     specs = [
-        spec for spec in PROPERTY_LINKS.values() if spec.tool is tool and spec.shared
+        spec
+        for spec in PROPERTY_LINKS.values()
+        if spec.tool == tool.value and spec.shared
     ]
     if not specs:
         return None
@@ -406,10 +463,12 @@ def _property_ref(tool: Tool) -> PersonRef | None:
     return PersonRef(MetadataValue.value_user_id, within, clears=True)
 
 
-def person_refs(tool: Tool) -> tuple[PersonRef, ...]:
+def person_refs(tool: Tool | ToolRecord) -> tuple[PersonRef, ...]:
     """Every person column on content inside ``tool``'s rows."""
+    if isinstance(tool, ToolRecord) and tool.installed:
+        return _installed_refs(tool)
     prop = _property_ref(tool)
-    return (*PERSON_REFS.get(tool, ()), *((prop,) if prop is not None else ()))
+    return (*PERSON_REFS.get(tool.value, ()), *((prop,) if prop is not None else ()))
 
 
 async def named_on(session: AsyncSession, governing: Governing) -> set[int]:
@@ -483,7 +542,7 @@ async def sweep(session: AsyncSession, governing: Governing) -> set[int]:
     if not gone:
         return gone
     for ref in person_refs(governing.tool):
-        table = ref.column.class_
+        table = getattr(ref.column, "class_", ref.column.table)
         where = (ref.within(governing.resource_id), ref.column.in_(gone))
         await session.exec(
             sa_update(table).where(*where).values({ref.column.key: None})

@@ -17,14 +17,14 @@ def _report(formats: dict[str, Any]) -> dict[str, Any]:
     "formats",
     [
         {"project": "pdf"},
-        {"counter_group": "xlsx"},
+        {"project": "xlsx"},
         {"calendar": "json"},
         {"contact": "csv"},
         {"file": {"lexical": "docx", "sheet": "csv"}},
     ],
 )
 def test_report_formats_a_section_offers_are_accepted(formats):
-    _validate_params(_report(formats), scope_kind="initiative")
+    _validate_params(_report(formats), _SECTIONS)
 
 
 @pytest.mark.parametrize(
@@ -43,18 +43,17 @@ def test_report_formats_a_section_offers_are_accepted(formats):
         {"file": {"lexical": "csv"}},
         {"not_a_tool": "pdf"},
         # A format that is not a string is refused rather than looked up.
-        {"counter_group": {"md": True}},
+        {"contact": {"md": True}},
     ],
 )
 def test_report_formats_a_section_does_not_offer_are_refused(formats):
     with pytest.raises(ExportError) as exc:
-        _validate_params(_report(formats), scope_kind="initiative")
+        _validate_params(_report(formats), _SECTIONS)
     assert exc.value.code == ExportMessages.EXPORT_INVALID_FORMAT
 
 
 def test_report_formats_are_formats_the_tools_adapter_renders():
     for section in _SECTIONS:
-        offered = set(section.report_formats).union(
-            *section.type_report_formats.values()
-        )
+        spec = section.tool.spec
+        offered = set(spec.report_formats).union(*spec.type_report_formats.values())
         assert offered <= set(section.adapter.formats), section.key

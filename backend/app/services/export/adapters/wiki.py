@@ -45,11 +45,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.errors import CodedError
 from app.core.file_types import FileType, is_stored
-from app.core.tools import Tool, tool_envelope_type
+from app.core.tools import Tool
 from app.models.platform.user import User
 from app.models.tenant.file import File
 from app.models.tenant.wiki import Wiki, WikiPage
-from app.schemas.tenant.tag import annotated_tags
+from app.schemas.tenant.import_envelopes import WikiFiledUpload, WikiPageEnvelope
 from app.services.export.adapters._common import (
     BuildContext,
     ToolExportAdapter,
@@ -59,7 +59,7 @@ from app.services.export.adapters._common import (
 )
 from app.services.export.adapters.file import FileAdapter
 from app.services.export.contract import RenderItem
-from app.services.export.property_values import exported_properties
+from app.services.export.envelope import envelope, record
 from app.services.permissions import EXPORT_ACCESS
 
 #: What one wiki contributes to a batch: its row, its pages, and the files
@@ -73,7 +73,6 @@ FILES_DIR = "files/"
 class WikiAdapter(ToolExportAdapter):
     tool = Tool.wiki
     template_id = "document"  # the Lexical PDF template files use
-    formats = ("json", "pdf", "md", "docx")
     #: Always a zip: the wiki and the files filed in it are one download.
     force_zip = True
 
@@ -311,8 +310,6 @@ def build_wiki_item(
     *,
     files: list[dict[str, Any]] | None = None,
 ) -> RenderItem:
-    # The envelope is importable machine data — stays canonical, never
-    # localized (translating field keys breaks import).
     data = _envelope(wiki, pages)
     if files:
         data["files"] = files
@@ -340,7 +337,7 @@ def filed_file_records(
     uploads: list[RenderItem] = []
     for file in files:
         parent = file_parent(wiki, file.id)
-        record: dict[str, Any] = {
+        filed: dict[str, Any] = {
             "page": slugs.get(parent) if parent is not None else None,
             "position": file_position(wiki, file.id),
             "external_ref": f"file:{file.id}",
@@ -351,67 +348,40 @@ def filed_file_records(
             asset = asset_item(storage, version)
             if version is None or asset is None:
                 continue
-            record["upload"] = {
-                "name": file.name,
-                "storage_key": asset.key,
-                "original_filename": version.original_filename,
-                "content_type": version.file_content_type,
-                "tags": sorted(tag.name for tag in annotated_tags(file)),
-                "properties": exported_properties(file),
-            }
+            filed["upload"] = record(
+                WikiFiledUpload,
+                file,
+                storage_key=asset.key,
+                original_filename=version.original_filename,
+                content_type=version.file_content_type,
+            )
             uploads.append(asset)
         else:
-            record["envelope"] = build_file_item(
+            filed["envelope"] = build_file_item(
                 file, "json", guild_id=ctx.guild_id, date=ctx.date, loc=loc
             ).data
-        records.append(record)
+        records.append(filed)
     return records, uploads
 
 
 def _envelope(wiki: Wiki, pages: list[WikiPage]) -> dict[str, Any]:
+    """The wiki's envelope: the tree, and its home and template pages, by slug."""
     by_id = {page.id: page for page in pages}
-    home = by_id.get(wiki.home_page_id) if wiki.home_page_id else None
-    template = by_id.get(wiki.template_page_id) if wiki.template_page_id else None
-    return {
-        "type": tool_envelope_type(Tool.wiki),
-        "schema_version": 1,
-        "name": wiki.name,
-        "description": wiki.description,
-        "home_page": home.slug if home is not None else None,
-        "template_page": template.slug if template is not None else None,
-        "page_order": wiki.page_order,
-        "contents_depth": wiki.contents_depth,
-        "show_connections": wiki.show_connections,
-        "show_updated_at": wiki.show_updated_at,
-        "reading_width": wiki.reading_width,
-        "accent_color": wiki.accent_color,
-        "tags": sorted(tag.name for tag in annotated_tags(wiki)),
-        "properties": exported_properties(wiki),
-        "pages": [_page_envelope(page, by_id) for page in pages],
-    }
 
+    def slug(page_id: int | None) -> str | None:
+        page = by_id.get(page_id) if page_id else None
+        return page.slug if page is not None else None
 
-def _page_envelope(page: WikiPage, by_id: dict[int, WikiPage]) -> dict[str, Any]:
-    parent = by_id.get(page.parent_page_id) if page.parent_page_id else None
-    return {
-        "title": page.title,
-        "slug": page.slug,
-        # What this page is filed under, named the way its siblings name it.
-        # None means it sits at the top of the wiki.
-        "parent": parent.slug if parent is not None else None,
-        "position": page.position,
-        # A draft restores as a draft: it is a page somebody has not shown
-        # anyone yet, and a restore is not the moment to publish it for them.
-        "is_draft": page.is_draft,
-        "content": page.content or {},
-        "tags": sorted(tag.name for tag in annotated_tags(page)),
-        "properties": exported_properties(page),
-        # When it was written, and when it was last edited. A restore that
-        # dated every page to the day it was restored lost the one thing a
-        # wiki's reading order is usually checked against.
-        "created_at": page.created_at.isoformat() if page.created_at else None,
-        "updated_at": page.updated_at.isoformat() if page.updated_at else None,
-        # The name this page answers to across one import, so a reference to
-        # it elsewhere in the same restore points at the page it became.
-        "external_ref": f"wiki_page:{page.id}",
-    }
+    return envelope(
+        Tool.wiki,
+        wiki,
+        home_page=slug(wiki.home_page_id),
+        template_page=slug(wiki.template_page_id),
+        # Each page with what it is filed under, named the way its siblings
+        # name it; none means it sits at the top of the wiki. A draft restores
+        # as a draft, and a page keeps when it was written and last edited.
+        pages=[
+            record(WikiPageEnvelope, page, parent=slug(page.parent_page_id))
+            for page in pages
+        ],
+    )

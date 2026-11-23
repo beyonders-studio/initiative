@@ -118,6 +118,7 @@ export function buildUserSummary(overrides: Partial<UserSummary> = {}): UserSumm
       trophies: [],
       grad_year: null,
     },
+    custom_status: { emoji: null, text: null, clear_at: null },
     community_role: null,
     ...overrides,
   };
@@ -185,7 +186,7 @@ export function buildUser(overrides: Partial<UserRead> = {}): UserRead {
     initiative_roles: [],
     created_at: "2026-01-15T00:00:00.000Z",
     updated_at: "2026-01-15T00:00:00.000Z",
-    custom_status: { emoji: null, text: null },
+    custom_status: { emoji: null, text: null, clear_at: null },
     profile_decorations: {
       banner: null,
       frame: null,
@@ -244,7 +245,7 @@ export function buildUserProfile(overrides: Partial<UserProfile> = {}): UserProf
     discriminator: 1000 + counter,
     avatar_url: null,
     status: "active",
-    custom_status: { emoji: null, text: null },
+    custom_status: { emoji: null, text: null, clear_at: null },
     profile_decorations: {
       banner: null,
       frame: null,

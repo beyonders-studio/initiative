@@ -8,7 +8,7 @@ comes from its listing.
 """
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -18,6 +18,7 @@ from app.models.platform.plugin_service_registration import (
     PluginAvailability,
 )
 from app.schemas.base import RawTextStr, SanitizedBaseModel
+from app.schemas.query import PageMeta
 
 __all__ = [
     "PluginBetaCommunityRead",
@@ -56,6 +57,31 @@ class PluginBetaCommunityRead(SanitizedBaseModel):
     name: str
 
 
+class PluginPlatformConnectionRead(SanitizedBaseModel):
+    """A community connection the platform can connect once for every
+    community, and what it connected."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    connection_id: str
+    #: The connection's label, by locale, as its manifest declares it.
+    label: dict[str, str] = {}
+    connected: bool = False
+    #: The account it is connected to, as the plug-in named it.
+    account_label: str | None = None
+    connected_at: datetime | None = None
+    #: The vendor reported the account's installation removed.
+    removed: bool = False
+
+
+class PluginPlatformConnectStart(SanitizedBaseModel):
+    """Where to send the operator to connect it."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    connect_url: str
+
+
 class PluginServiceRegistrationRead(SanitizedBaseModel):
     """A registration as the owner's settings see it."""
 
@@ -65,6 +91,14 @@ class PluginServiceRegistrationRead(SanitizedBaseModel):
     public_id: str
     #: The catalog listing its plug-in facts come from. Null until it arrives.
     listing_uid: str | None = None
+    #: What its listing calls it, its art, and the version it is on. Null
+    #: until the listing arrives.
+    name: str | None = None
+    avatar_url: str | None = None
+    version: str | None = None
+    #: This project publishes it: shipped in this build, or from the registry
+    #: under this project's own publisher.
+    first_party: bool = False
     #: ``container``, or ``declarative`` for a plug-in whose calls Initiative
     #: makes itself: it has no address, origins or keys.
     kind: str = "container"
@@ -96,8 +130,9 @@ class PluginServiceRegistrationRead(SanitizedBaseModel):
     availability: PluginAvailability = PluginAvailability.none
     #: The communities the owner picked, while it is beta.
     beta_communities: list[PluginBetaCommunityRead] = []
-    #: One vendor installation may connect to several communities.
-    shared_routes: bool = False
+    #: The community connections the platform can connect once for every
+    #: community, each with what is connected.
+    platform_connections: list[PluginPlatformConnectionRead] = []
     #: When the owner suspended it everywhere; null while it is not.
     suspended_at: datetime | None = None
     #: ``registry`` when its plug-in facts come from a listing the registry signed,
@@ -123,6 +158,10 @@ class PluginServiceRegistrationRead(SanitizedBaseModel):
     #: The flow at the vendor that can create its client and fill in the
     #: vendor values (``github_app_manifest``), when the listing declares one.
     vendor_setup: str | None = None
+    #: What the listing's vendor check said about the values this save set:
+    #: ``passed``, or ``not_run`` when the vendor could not be asked and the
+    #: values were saved unchecked. Absent when no check ran.
+    vendor_check: Literal["passed", "not_run"] | None = None
     #: The two addresses to register with the vendor's client: where it
     #: returns a person with a code, and where its install page returns them.
     connection_callback_url: str
@@ -134,6 +173,12 @@ class PluginServiceRegistrationRead(SanitizedBaseModel):
     live: bool
     created_at: datetime
     updated_at: datetime
+
+
+class PluginServiceRegistrationListResponse(PageMeta):
+    """One page of the plug-in services this deployment has wired up."""
+
+    items: list[PluginServiceRegistrationRead]
 
 
 class _DeploymentFacts(SanitizedBaseModel):
@@ -188,9 +233,6 @@ class PluginServiceRegistrationUpdate(_DeploymentFacts):
     jwks: dict[str, Any] | None = None
     jwks_uri: str | None = Field(default=None, max_length=1000)
     mandatory: bool | None = None
-    #: Let one vendor installation connect to several communities. Turning it
-    #: off is refused while one is connected to more than one.
-    shared_routes: bool | None = None
     #: Suspend it everywhere, or lift the suspension.
     suspended: bool | None = None
     #: Replace a beta plug-in's list of communities.

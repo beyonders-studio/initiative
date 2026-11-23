@@ -13,12 +13,7 @@ import { TOOLS, toolCamelPlural } from "@/lib/tools";
 import intake from "../../../public/locales/en/intake.json";
 import landing from "../../../public/locales/en/landing.json";
 import { DownloadPage } from "./DownloadPage";
-import {
-  EMBED_CTA,
-  EMBED_HEIGHT,
-  FRAME_TIMEOUT_MS,
-  SELF_HOST_GUIDE,
-} from "./pricing/PricingGridFrame";
+import { EMBED_CTA, EMBED_HEIGHT, FRAME_TIMEOUT_MS } from "./pricing/PricingGridFrame";
 import { PricingPage } from "./pricing/PricingPage";
 import { WhatsNewPage, WhatsNewPostPage } from "./WhatsNewPage";
 import { WelcomePage } from "./welcome/WelcomePage";
@@ -128,7 +123,7 @@ beforeEach(() => {
 describe("WelcomePage", () => {
   const renderHome = () => renderPage(WelcomePage, signedOut);
 
-  it("leads with signing up, and keeps signing in a link away", async () => {
+  it("leads with signing up, keeps signing in a link away, and draws the rest of the front page", async () => {
     renderHome();
 
     expect(
@@ -143,6 +138,68 @@ describe("WelcomePage", () => {
     expect(screen.getAllByRole("link", { name: landing.closer.start })[0]).toHaveAttribute(
       "href",
       "/start"
+    );
+
+    // One card per tool in the registry, each with its blurb.
+    await waitFor(() => {
+      expect(document.querySelectorAll("[data-tool]")).toHaveLength(TOOLS.length);
+    });
+    const blurbs = landing.tools as Record<string, string>;
+    for (const tool of TOOLS) {
+      const key = toolCamelPlural(tool);
+      expect(blurbs[key], `landing.json tools.${key}`).toBeTypeOf("string");
+      expect(document.querySelector(`[data-tool="${tool}"]`)).toHaveTextContent(blurbs[key]);
+    }
+
+    // People working on the same page at once: Maya typing, Dev selecting,
+    // Priya commenting.
+    expect(
+      await screen.findByRole("heading", {
+        level: 2,
+        name: `${landing.together.titleStart} ${landing.together.titleHighlight}`,
+      })
+    ).toBeInTheDocument();
+    const drawing = screen.getByRole("img", { name: landing.together.drawingAria });
+    expect(within(drawing).getByText(landing.together.people.maya)).toBeInTheDocument();
+    expect(within(drawing).getByText(landing.together.people.dev)).toBeInTheDocument();
+    expect(within(drawing).getByText(landing.together.comments.text)).toBeInTheDocument();
+
+    // Accounts are free only where this deployment sells plans, and the
+    // community directory shows only where the server runs one.
+    expect(screen.queryByText(landing.hero.freeTitle)).not.toBeInTheDocument();
+    expect(screen.queryByText(landing.directory.title)).not.toBeInTheDocument();
+
+    // It names itself to the browser and search engines, and lets a keyboard
+    // skip straight to the content.
+    await waitFor(() => {
+      expect(document.title).toBe(landing.meta.homeTitle);
+    });
+    expect(screen.getByRole("link", { name: landing.nav.skip })).toHaveAttribute(
+      "href",
+      "#landing-main"
+    );
+
+    // The scrolling communities can be paused.
+    fireEvent.click(screen.getByRole("button", { name: landing.communities.pause }));
+    expect(screen.getByRole("button", { name: landing.communities.play })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+
+    // What's new stays in the app, GitHub under socials, and the docs are linked.
+    expect(screen.getByRole("link", { name: landing.footer.changelog })).toHaveAttribute(
+      "href",
+      "/whats-new"
+    );
+    expect(screen.getByRole("heading", { name: landing.footer.socials })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "GitHub" })).toHaveAttribute("href", REPO_URL);
+    expect(screen.getAllByRole("link", { name: landing.nav.docs })[0]).toHaveAttribute(
+      "href",
+      docsUrl()
+    );
+    expect(screen.getByRole("link", { name: landing.footer.faq })).toHaveAttribute(
+      "href",
+      docsUrl("faq/")
     );
   });
 
@@ -168,47 +225,11 @@ describe("WelcomePage", () => {
     });
   });
 
-  it("draws one card per tool in the registry", async () => {
-    renderHome();
-
-    await waitFor(() => {
-      expect(document.querySelectorAll("[data-tool]")).toHaveLength(TOOLS.length);
-    });
-  });
-
-  it("draws people working on the same page at once", async () => {
-    renderHome();
-
-    expect(
-      await screen.findByRole("heading", {
-        level: 2,
-        name: `${landing.together.titleStart} ${landing.together.titleHighlight}`,
-      })
-    ).toBeInTheDocument();
-    const drawing = screen.getByRole("img", { name: landing.together.drawingAria });
-    // Three people on it: Maya typing, Dev selecting, Priya commenting.
-    expect(within(drawing).getByText(landing.together.people.maya)).toBeInTheDocument();
-    expect(within(drawing).getByText(landing.together.people.dev)).toBeInTheDocument();
-    expect(within(drawing).getByText(landing.together.comments.text)).toBeInTheDocument();
-  });
-
-  it("says accounts are free only where this deployment sells plans", async () => {
-    renderHome();
-    await screen.findByRole("heading", { level: 1, name: landing.hero.titleAria });
-    expect(screen.queryByText(landing.hero.freeTitle)).not.toBeInTheDocument();
-  });
-
-  it("says accounts are free where a billing portal is set up", async () => {
+  it("says accounts are free, and offers Pricing in the header, where a billing portal has a price book", async () => {
     server.use(stubConfig({ url: PORTAL }), stubCatalog());
     renderHome();
 
     expect(await screen.findByText(landing.hero.freeTitle)).toBeInTheDocument();
-  });
-
-  it("offers Pricing in the header once there is a price book", async () => {
-    server.use(stubConfig({ url: PORTAL }), stubCatalog());
-    renderHome();
-
     const pricing = await screen.findAllByRole("link", { name: landing.nav.pricing });
     expect(pricing[0]).toHaveAttribute("href", "/pricing");
   });
@@ -245,12 +266,6 @@ describe("WelcomePage", () => {
     expect(screen.queryByRole("link", { name: landing.nav.suggestions })).not.toBeInTheDocument();
   });
 
-  it("shows the community directory only where the server runs one", async () => {
-    renderHome();
-    await screen.findByRole("heading", { level: 1, name: landing.hero.titleAria });
-    expect(screen.queryByText(landing.directory.title)).not.toBeInTheDocument();
-  });
-
   it("brings a category's community to the front of the deck", async () => {
     server.use(stubConfig(null, { community_directory_enabled: true }));
     renderHome();
@@ -267,69 +282,18 @@ describe("WelcomePage", () => {
       "/start"
     );
   });
-
-  it("names itself to the browser and search engines", async () => {
-    renderHome();
-    await waitFor(() => {
-      expect(document.title).toBe(landing.meta.homeTitle);
-    });
-  });
-
-  it("lets a keyboard skip straight to the content", async () => {
-    renderHome();
-    expect(await screen.findByRole("link", { name: landing.nav.skip })).toHaveAttribute(
-      "href",
-      "#landing-main"
-    );
-  });
-
-  it("can pause the scrolling communities", async () => {
-    renderHome();
-    const pause = await screen.findByRole("button", { name: landing.communities.pause });
-    fireEvent.click(pause);
-    expect(screen.getByRole("button", { name: landing.communities.play })).toHaveAttribute(
-      "aria-pressed",
-      "true"
-    );
-  });
-
-  it("keeps what's new in the app, and GitHub under socials", async () => {
-    renderHome();
-    expect(await screen.findByRole("link", { name: landing.footer.changelog })).toHaveAttribute(
-      "href",
-      "/whats-new"
-    );
-    expect(screen.getByRole("heading", { name: landing.footer.socials })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "GitHub" })).toHaveAttribute("href", REPO_URL);
-  });
-
-  it("links the docs", async () => {
-    renderHome();
-
-    expect((await screen.findAllByRole("link", { name: landing.nav.docs }))[0]).toHaveAttribute(
-      "href",
-      docsUrl()
-    );
-    expect(screen.getByRole("link", { name: landing.footer.faq })).toHaveAttribute(
-      "href",
-      docsUrl("faq/")
-    );
-  });
 });
 
 describe("DownloadPage", () => {
   const renderDownload = () => renderPage(DownloadPage, signedOut);
 
-  it("offers the Android app from the release this server's floor names", async () => {
+  it("leads with the visitor's own device, then every computer and phone", async () => {
     renderDownload();
 
+    // The Android app from the release this server's floor names.
     const apk = await screen.findByTestId("android-apk");
     expect(apk).toHaveAttribute("href", androidApkUrl(NATIVE_FLOOR));
     expect(apk).toHaveAttribute("download");
-  });
-
-  it("leads with the visitor's own device, then every computer and phone", async () => {
-    renderDownload();
 
     // jsdom is a Linux computer: the hero offers its installer.
     await screen.findAllByTestId("desktop-installer");
@@ -399,15 +363,6 @@ describe("PricingPage", () => {
     expect(new URL(asked[0]).searchParams.get("lang")).toBe("en");
   });
 
-  it("fits the frame to the grid", async () => {
-    server.use(stubConfig({ url: PORTAL }), stubCatalog());
-    renderPricing();
-
-    const frame = await frameOf();
-    fromFrame(frame, { type: EMBED_HEIGHT, height: 1834.4 });
-    await waitFor(() => expect(frame.style.height).toBe("1835px"));
-  });
-
   it("sends each plan's button where it belongs", async () => {
     server.use(stubConfig({ url: PORTAL }), stubCatalog());
     const tab = { opener: {} as unknown };
@@ -424,8 +379,7 @@ describe("PricingPage", () => {
     expect(tab.opener).toBeNull();
     expect(window.location.href).toBe(before);
     fromFrame(frame, { type: EMBED_CTA, tier: "self_hosted", kind: "external" });
-    expect(open).toHaveBeenLastCalledWith(SELF_HOST_GUIDE, "_blank");
-    expect(SELF_HOST_GUIDE).toBe(docsUrl("running-a-server/installation/"));
+    expect(open).toHaveBeenLastCalledWith(docsUrl("running-a-server/installation/"), "_blank");
     fromFrame(frame, { type: EMBED_CTA, tier: "pewter", kind: "signup" });
     await waitFor(() => expect(router.state.location.pathname).toBe("/start"));
     open.mockRestore();
@@ -453,14 +407,15 @@ describe("PricingPage", () => {
     }
   });
 
-  it("keeps the grid once it has arrived", async () => {
+  it("fits the frame to the grid, and keeps the grid once it has arrived", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       server.use(stubConfig({ url: PORTAL }), stubCatalog());
       renderPricing();
 
       const frame = await frameOf();
-      fromFrame(frame, { type: EMBED_HEIGHT, height: 1200 });
+      fromFrame(frame, { type: EMBED_HEIGHT, height: 1834.4 });
+      await waitFor(() => expect(frame.style.height).toBe("1835px"));
       act(() => {
         vi.advanceTimersByTime(FRAME_TIMEOUT_MS * 2);
       });
@@ -504,25 +459,19 @@ describe("PricingPage", () => {
     open.mockRestore();
   });
 
-  it("says so when the price book cannot be read", async () => {
-    server.use(stubConfig({ url: PORTAL }), stubCatalog({ detail: "down" }, 503));
-    renderPricing();
-
-    expect(await screen.findByText(landing.pricing.unavailableTitle)).toBeInTheDocument();
-  });
-
-  // The cards reach straight through to these, so a tier arriving without
-  // one would throw mid-render and take the page down with it.
+  // The cards reach straight through to a tier's price, cta, limits and name,
+  // so a tier arriving without one would throw mid-render and take the page
+  // down with it.
+  const broken = (field: Record<string, unknown>) =>
+    stubCatalog({ ...CATALOG, tiers: [CATALOG.tiers[1], { ...CATALOG.tiers[2], ...field }] });
   it.each([
-    ["price", { ...CATALOG.tiers[2], price: undefined }],
-    ["cta", { ...CATALOG.tiers[2], cta: undefined }],
-    ["limits", { ...CATALOG.tiers[2], limits: undefined }],
-    ["name", { ...CATALOG.tiers[2], name: 7 }],
-  ])("refuses a price book whose tier is missing %s", async (_field, broken) => {
-    server.use(
-      stubConfig({ url: PORTAL }),
-      stubCatalog({ ...CATALOG, tiers: [CATALOG.tiers[1], broken] })
-    );
+    ["is unreadable", stubCatalog({ detail: "down" }, 503)],
+    ["has a tier missing its price", broken({ price: undefined })],
+    ["has a tier missing its cta", broken({ cta: undefined })],
+    ["has a tier missing its limits", broken({ limits: undefined })],
+    ["has a tier missing its name", broken({ name: 7 })],
+  ])("says so when the price book %s", async (_case, catalog) => {
+    server.use(stubConfig({ url: PORTAL }), catalog);
     renderPricing();
 
     expect(await screen.findByText(landing.pricing.unavailableTitle)).toBeInTheDocument();
@@ -534,7 +483,7 @@ const RELEASES = [
     version: "0.73.2",
     date: "2026-09-29",
     changes:
-      "### Fixed\n\n- **Uploads resume after a dropped connection.** See [Installation](docs/en/running-a-server/installation.md#checking-an-image-is-ours).\n- **Calendars load faster.**",
+      "### Added\n\n- **Pause an upload.** Hold it for later.\n\n  ![The upload bar, paused](docs/images/releases/upload-pause.webp)\n\n### Fixed\n\n- **Uploads resume after a dropped connection.** See [Installation](docs/en/running-a-server/installation.md#checking-an-image-is-ours).\n- **Calendars load faster.**",
   },
   {
     version: "0.73.1",
@@ -552,16 +501,30 @@ const stubChangelog = () =>
   });
 
 describe("WhatsNewPage", () => {
-  it("lists each release as a post with its headlines", async () => {
+  it("features the latest release, its picture as the cover, over the earlier posts", async () => {
     server.use(stubChangelog());
     renderPage(WhatsNewPage, signedOut);
 
-    const post = await screen.findByRole("link", {
+    const latest = await screen.findByRole("heading", {
+      level: 2,
       name: landing.whatsNew.postTitle.replace("{{version}}", "0.73.2"),
     });
-    expect(post).toHaveAttribute("href", "/whats-new/0.73.2");
+    expect(within(latest).getByRole("link")).toHaveAttribute("href", "/whats-new/0.73.2");
+    expect(screen.getByText(landing.whatsNew.latest)).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "The upload bar, paused" })).toBeInTheDocument();
+    expect(screen.getByText("1 new")).toBeInTheDocument();
+    expect(screen.getByText("2 fixed")).toBeInTheDocument();
+    expect(screen.getByText("Hold it for later.")).toBeInTheDocument();
     expect(screen.getByText("Uploads resume after a dropped connection")).toBeInTheDocument();
-    expect(screen.getByText("Search finds archived wikis")).toBeInTheDocument();
+
+    const earlier = screen.getByRole("region", { name: landing.whatsNew.earlier });
+    expect(
+      within(earlier).getByRole("heading", {
+        level: 3,
+        name: landing.whatsNew.postTitle.replace("{{version}}", "0.73.1"),
+      })
+    ).toBeInTheDocument();
+    expect(within(earlier).getByText("Search finds archived wikis")).toBeInTheDocument();
   });
 
   it("says so when the changelog can't be read", async () => {
@@ -583,7 +546,12 @@ describe("WhatsNewPage", () => {
       "href",
       `${DOCS_URL}running-a-server/installation/#checking-an-image-is-ours`
     );
-    expect(screen.getByRole("heading", { level: 2, name: "Fixed" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 2, name: landing.whatsNew.sections.fixed })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 3, name: "Uploads resume after a dropped connection" })
+    ).toBeInTheDocument();
   });
 
   const renderPost = (origin?: string) =>
@@ -609,7 +577,10 @@ describe("WhatsNewPage", () => {
     renderPost(CLOUD_ORIGIN);
 
     expect(
-      await screen.findByRole("heading", { level: 2, name: intake.ideas.shippedTitle })
+      await screen.findByRole("heading", {
+        level: 2,
+        name: landing.whatsNew.shippedHeadline_one,
+      })
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Resumable uploads" })).toHaveAttribute(
       "href",
@@ -638,15 +609,5 @@ describe("WhatsNewPage", () => {
     await screen.findByRole("heading", { level: 2, name: "Fixed" });
     expect(screen.queryByText(intake.ideas.shippedTitle)).not.toBeInTheDocument();
     expect(asked).toBe(1);
-  });
-});
-
-describe("landing copy covers the tool registry", () => {
-  it("has a blurb for every tool, keyed by its camel plural", () => {
-    const blurbs = landing.tools as Record<string, string>;
-    for (const tool of TOOLS) {
-      const key = toolCamelPlural(tool);
-      expect(blurbs[key], `landing.json tools.${key}`).toBeTypeOf("string");
-    }
   });
 });

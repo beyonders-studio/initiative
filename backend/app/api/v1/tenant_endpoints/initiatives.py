@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -27,7 +28,6 @@ from app.core.messages import (
     InitiativeMessages,
     UserMessages,
 )
-from app.core.tools import Tool
 from app.db.query import (
     MAX_ID_FILTER_VALUES,
     build_paginated_response,
@@ -46,6 +46,7 @@ from app.models.tenant.initiative import (
     InitiativeMember,
     InitiativeRoleModel,
     JoinRequestStatus,
+    permission_defaults,
 )
 from app.schemas.platform.user import UserSummaryListResponse
 from app.schemas.tenant.initiative import (
@@ -81,6 +82,7 @@ from app.services.platform import presence
 from app.services.platform import users as users_service
 from app.services.tenant import guild_plugins as guild_plugins_service
 from app.services.tenant import initiatives as initiatives_service
+from app.services.tenant.initiative_tools import switches, write_switches
 from app.services.tenant.names import ensure_name_free
 
 #: A route that administers the community's initiatives.
@@ -145,6 +147,15 @@ def _role_permissions(role: InitiativeRoleModel) -> dict[str, bool]:
         p.key if p.install_id is None else f"{p.install_id}:{p.key}": p.enabled
         for p in role.permissions
     }
+
+
+def _require_known(keys: Iterable[str], known: Iterable[str]) -> None:
+    """Refuse a tool switch or a role key naming no tool of the community."""
+    if not set(keys) <= set(known):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=InitiativeMessages.TOOL_UNKNOWN,
+        )
 
 
 async def _get_initiative_or_404(
@@ -835,14 +846,15 @@ async def create_initiative(
         name=initiative_in.name,
         description=initiative_in.description,
         join_policy=initiative_in.join_policy.value,
-        # One master switch per toggleable tool, derived — a new Tool member
-        # flows through without touching this endpoint.
-        **{t.view_permission: getattr(initiative_in, t.view_permission) for t in Tool},
     )
     if initiative_in.color:
         initiative.color = initiative_in.color
+    _require_known(initiative_in.tools, guild_context.tools.by_kind)
     session.add(initiative)
     await session.flush()
+    await write_switches(
+        session, initiative.id, switches(initiative_in.tools, guild_context.tools)
+    )
 
     # Create built-in roles for this initiative
     roles = await initiatives_service.create_builtin_roles(
@@ -892,10 +904,12 @@ async def update_initiative(
     )
 
     update_data = initiative_in.model_dump(exclude_unset=True)
-    if any(tool.view_permission in update_data for tool in Tool):
+    tools = dict(update_data.pop("tools", None) or {})
+    _require_known(tools, guild_context.tools.by_kind)
+    if tools:
         defaults = await initiatives_service.community_defaults(session)
         if any(
-            update_data.get(tool.view_permission, enabled) != enabled
+            tools.get(tool, enabled) != enabled
             for tool, enabled in defaults.tools.items()
         ):
             raise HTTPException(
@@ -905,7 +919,7 @@ async def update_initiative(
         # The community's switch is shown back as the initiative's; the
         # initiative's own value under it is left as it was.
         for tool in defaults.tools:
-            update_data.pop(tool.view_permission, None)
+            tools.pop(tool, None)
     # Auto-join enrols every future guild member, so it shapes onboarding for
     # the whole guild rather than for one initiative — guild admins only, the
     # same shape as the archive toggle above. join_policy stays with whoever may
@@ -950,8 +964,11 @@ async def update_initiative(
     for field, value in update_data.items():
         setattr(initiative, field, value)
     session.add(initiative)
-    switched = any(field.endswith("_enabled") for field in update_data)
-    members = await _member_ids(session, initiative_id) if switched else []
+    by_kind = guild_context.tools.by_kind
+    await write_switches(
+        session, initiative_id, {by_kind[kind]: on for kind, on in tools.items()}
+    )
+    members = await _member_ids(session, initiative_id) if tools else []
     await session.commit()
     await content_sockets.refresh_users(guild_context.guild_id, members)
     return await _read_initiative(initiative_id, session, guild_context)
@@ -1030,6 +1047,7 @@ async def list_initiative_roles(
             member_count=counts.get(role.id, 0),
             defaults=defaults,
             plugins=plugins,
+            tools=guild_context.tools,
         )
         for role in roles
     ]
@@ -1059,6 +1077,7 @@ async def create_initiative_role(
             detail=InitiativeMessages.CUSTOM_ROLES_OFF,
         )
 
+    _require_known(role_in.permissions or {}, permission_defaults(guild_context.tools))
     # Check for duplicate name
     existing = await initiatives_service.get_role_by_name(
         session, initiative_id=initiative_id, role_name=role_in.name
@@ -1097,6 +1116,7 @@ async def create_initiative_role(
         member_count=0,
         defaults=defaults,
         plugins=await guild_plugins_service.placed_installs(session, initiative_id),
+        tools=guild_context.tools,
     )
 
 
@@ -1189,6 +1209,7 @@ async def update_initiative_role(
     plugin_rules = role_in.plugin_permissions
     if permissions is not None or plugin_rules is not None:
         permissions = permissions or {}
+        _require_known(permissions, permission_defaults(guild_context.tools))
         plugin_rules = plugin_rules or []
         if plugin_rules:
             declared = await guild_plugins_service.declared_permission_ids(
@@ -1279,6 +1300,7 @@ async def update_initiative_role(
         member_count=member_count,
         defaults=await initiatives_service.community_defaults(session),
         plugins=await guild_plugins_service.placed_installs(session, initiative_id),
+        tools=guild_context.tools,
     )
 
 

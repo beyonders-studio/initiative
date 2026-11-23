@@ -10,12 +10,14 @@ from datetime import UTC, datetime
 from httpx2 import AsyncClient
 from sqlalchemy import text
 
-from app.core.messages import RelationshipMessages
-from app.core.relationships import EndpointKind, RelationshipType
+from app.core.messages import KindMessages, RelationshipMessages
+from app.core.relationships import RelationshipType
 from app.models.platform.guild import CommunityRole
+from app.models.tenant.relationship import EntityRelationship
 from app.services.platform import app_settings as app_settings_service
 from app.services.platform import rules
 from app.testing import (
+    add_counter,
     create_calendar_event,
     create_file,
     create_guest,
@@ -29,6 +31,7 @@ from app.testing import (
     create_task,
     create_user,
     get_auth_headers,
+    install_tool_plugin,
 )
 from app.testing.routing import route_as
 from app.testing.schema_harness import route_session_to_guild
@@ -108,9 +111,14 @@ async def test_the_same_pair_is_refused_twice(
     assert (
         await client.post(_url(a), headers=a.headers, json=payload)
     ).status_code == 201
-    again = await client.post(_url(a), headers=a.headers, json=payload)
-    assert again.status_code == 409
-    assert again.json()["detail"] == RelationshipMessages.EXISTS
+    # ``attached`` is symmetric: the pair named the other way round is the
+    # same edge, not a second one.
+    reversed_payload = {**payload, "source": payload["target"]}
+    reversed_payload["target"] = payload["source"]
+    for body in (payload, reversed_payload):
+        again = await client.post(_url(a), headers=a.headers, json=body)
+        assert again.status_code == 409
+        assert again.json()["detail"] == RelationshipMessages.EXISTS
 
 
 async def test_a_thing_cannot_be_linked_to_itself(
@@ -217,16 +225,16 @@ async def test_a_link_you_made_is_yours_to_remove(
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
+    """Taking a link back is remembered — nothing else records that somebody
+    linked two things and then took it back — and the pair links again, since
+    the unique key covers live rows only."""
     doc = await create_file(session, a.initiative, a.user)
-    created = await client.post(
-        _url(a),
-        headers=a.headers,
-        json={
-            "source": {"type": "project", "id": a.project.id},
-            "relationship_type": "attached",
-            "target": {"type": "file", "id": doc.id},
-        },
-    )
+    payload = {
+        "source": {"type": "project", "id": a.project.id},
+        "relationship_type": "attached",
+        "target": {"type": "file", "id": doc.id},
+    }
+    created = await client.post(_url(a), headers=a.headers, json=payload)
     edge_id = created.json()["id"]
 
     removed = await client.delete(a.g(f"/relationships/{edge_id}"), headers=a.headers)
@@ -236,6 +244,13 @@ async def test_a_link_you_made_is_yours_to_remove(
         _url(a), headers=a.headers, params={"entity": f"project:{a.project.id}"}
     )
     assert listing.json() == []
+    await route_session_to_guild(session, a.guild.id)
+    kept = await session.get(EntityRelationship, edge_id)
+    assert kept is not None
+    assert (kept.removed_at is not None, kept.removed_by) == (True, a.user.id)
+    again = await client.post(_url(a), headers=a.headers, json=payload)
+    assert again.status_code == 201, again.text
+    assert again.json()["id"] != edge_id
 
 
 async def test_a_task_link_is_addressed_by_the_same_surface(
@@ -265,17 +280,23 @@ async def test_a_task_link_is_addressed_by_the_same_surface(
 async def test_a_kind_no_edge_may_name_is_refused(
     client: AsyncClient, acting_user, session
 ):
-    """Nor is a person what a list is asked about: nothing gathers everything
-    that links to somebody."""
+    """A kind the community has no edge to is not found, and a person is not
+    what a list is asked about: nothing gathers everything that links to
+    somebody."""
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    for entity in ("comment:1", f"user:{a.user.id}"):
+    for kind in ("comment", f"stranger.{'x' * 14}"):
         response = await client.get(
-            _url(a), headers=a.headers, params={"entity": entity}
+            _url(a), headers=a.headers, params={"entity": f"{kind}:1"}
         )
-        assert response.status_code == 400, entity
-        assert response.json()["detail"] == RelationshipMessages.BAD_ENDPOINT
+        assert response.status_code == 404, kind
+        assert response.json()["detail"] == KindMessages.NOT_FOUND
+    response = await client.get(
+        _url(a), headers=a.headers, params={"entity": f"user:{a.user.id}"}
+    )
+    assert response.status_code == 400, response.text
+    assert response.json()["detail"] == RelationshipMessages.BAD_ENDPOINT
 
 
 async def test_a_guild_calendars_event_holds_no_initiative_content(
@@ -383,8 +404,8 @@ async def test_a_replace_cannot_drop_a_link_a_delete_would_refuse(
 async def test_a_kind_no_edge_may_name_is_refused_as_a_filter(
     client: AsyncClient, acting_user, session
 ):
-    """``other_type`` takes only what an edge can name, so the rest is refused
-    as a bad parameter rather than reaching the node encoder."""
+    """``other_type`` takes only what an edge in the community can name, so
+    the rest is not found rather than reaching the node encoder."""
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
@@ -398,7 +419,7 @@ async def test_a_kind_no_edge_may_name_is_refused_as_a_filter(
         },
         json=[],
     )
-    assert response.status_code == 422, response.text
+    assert response.status_code == 404, response.text
 
 
 async def test_an_archived_project_takes_no_new_links(
@@ -890,8 +911,8 @@ async def test_a_link_to_a_person_shows_to_whoever_reads_the_item(
     await create_relationship(
         session,
         a.guild,
-        source=(EndpointKind.task, task.id),
-        target=(EndpointKind.user, jane.id),
+        source=("task", task.id),
+        target=("user", jane.id),
         relationship_type=RelationshipType.depends_on,
     )
     await app_settings_service.ensure_settings_row(session)
@@ -938,9 +959,9 @@ async def _seed(session, guild_id: int, *pairs) -> None:
     for (source_kind, source_id), rtype, (target_kind, target_id) in pairs:
         await relationships_service.create(
             session,
-            source=Endpoint(EndpointKind(source_kind), source_id),
+            source=Endpoint(source_kind, source_id),
             relationship_type=RelationshipType(rtype),
-            target=Endpoint(EndpointKind(target_kind), target_id),
+            target=Endpoint(target_kind, target_id),
         )
     await session.commit()
 
@@ -1251,3 +1272,86 @@ async def test_a_projects_task_edges_are_read_at_once(
     assert [
         (task["id"], task["project_name"], task["done"]) for task in body["others"]
     ] == [(elsewhere.id, "Other", False)]
+
+
+async def test_a_tool_plugins_rows_are_ends_like_any_other(
+    client: AsyncClient, acting_user, session
+):
+    """A tool plug-in's item and its tool's row are linked, listed, walked to
+    and set in a slice as a built-in tool's are, named by their kinds, and a
+    comment on the item records what it names against the item."""
+    seat = await acting_user(
+        guild_role=CommunityRole.superadmin, initiative=True, project=True
+    )
+    await install_tool_plugin(client, session, seat)
+    tools, group, counter = await add_counter(
+        session, seat.guild.id, seat.initiative.id, count=3, max=10
+    )
+    (tool,) = tools.installed
+    (item_kind,) = (child.value for child in tool.children)
+    task = await create_task(session, seat.project)
+
+    made = await client.post(
+        _url(seat),
+        headers=seat.headers,
+        json={
+            "source": {"type": "task", "id": task.id},
+            "relationship_type": "depends_on",
+            "target": {"type": item_kind, "id": counter},
+        },
+    )
+    assert made.status_code == 201, made.text
+    other = made.json()["other"]
+    assert (
+        other["type"],
+        other["id"],
+        other["tool"],
+        other["tool_id"],
+        other["tool_title"],
+        other["is_open"],
+    ) == (item_kind, counter, tool.kind, group, "Scores", True)
+
+    listed = await client.get(
+        _url(seat), headers=seat.headers, params={"entity": f"{item_kind}:{counter}"}
+    )
+    assert listed.status_code == 200, listed.text
+    assert [(e["direction"], e["other"]["type"]) for e in listed.json()] == [
+        ("inbound", "task")
+    ]
+    nodes, _ = await _neighbourhood(client, seat, f"task:{task.id}")
+    assert nodes == {(item_kind, counter): 1}
+
+    response = await client.put(
+        _url(seat),
+        headers=seat.headers,
+        params={
+            "entity": f"{tool.kind}:{group}",
+            "relationship_type": "related_to",
+            "other_type": "task",
+        },
+        json=[task.id],
+    )
+    assert response.status_code == 200, response.text
+    assert [e["other"]["id"] for e in response.json()] == [task.id]
+
+    response = await client.post(
+        seat.g("/comments/"),
+        headers=seat.headers,
+        json={
+            "subject_type": item_kind,
+            "subject_id": counter,
+            "content": f"see #task[Do it]({task.id})",
+        },
+    )
+    assert response.status_code == 201, response.text
+    named = await client.get(
+        _url(seat),
+        headers=seat.headers,
+        params={
+            "entity": f"{item_kind}:{counter}",
+            "relationship_type": "references",
+        },
+    )
+    assert [(e["direction"], e["other"]["id"]) for e in named.json()] == [
+        ("outbound", task.id)
+    ]

@@ -1,9 +1,11 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { X } from "lucide-react";
+import { memo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { TagSummary } from "@/api/generated/initiativeAPI.schemas";
-import { getContrastingTextColor } from "@/lib/counter-color";
+import type { FieldRendererProps } from "@/ui/layouts/fields";
+import { getContrastingTextColor } from "@/ui/lib/contrast";
 import { cn } from "@/ui/lib/utils";
 
 interface TagBadgeProps {
@@ -156,3 +158,23 @@ export function TagBadgeList({ tags, limit = 3, tagHref, nested, className }: Ta
     </div>
   );
 }
+
+/** An item's tags as a layout draws its `tags` field: each as a badge on a
+ *  card, the first few in a table's cell. Each opens the tag's own page. */
+export const TagsFieldBadges = memo(function TagsFieldBadges({
+  value,
+  item,
+  variant,
+  env,
+}: FieldRendererProps) {
+  const tags = value as TagSummary[];
+  const tagHref = (tag: TagSummary) => env.communityPath(`/tags/${tag.id}`, item);
+  if (variant === "cell") {
+    return tags.length > 0 ? (
+      <TagBadgeList tags={tags} tagHref={tagHref} />
+    ) : (
+      <span className="text-muted-foreground text-sm">&mdash;</span>
+    );
+  }
+  return tags.map((tag) => <TagBadge key={tag.id} tag={tag} size="sm" to={tagHref(tag)} />);
+});

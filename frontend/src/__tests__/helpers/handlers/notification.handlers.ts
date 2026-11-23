@@ -78,6 +78,7 @@ export const buildNotificationPreferences = (
     coming_up: { cadence: "daily", at: "07:00", weekday: 1 },
   },
   pause: null,
+  max_pause_days: 90,
   respect_presence: true,
   communities: [],
   ...overrides,

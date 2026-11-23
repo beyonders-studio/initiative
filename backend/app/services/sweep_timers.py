@@ -48,11 +48,12 @@ from datetime import UTC, datetime, timedelta
 from functools import cache, partial
 from typing import Any
 
-from sqlalchemy import case, delete, exists, func, literal, or_, text
+from sqlalchemy import Table, case, delete, exists, func, literal, or_, text
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import metrics
+from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.db import cohorts
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
@@ -118,18 +119,45 @@ class Sweep:
     calls_out: bool = False
     #: The writes that give the sweep work.
     sources: tuple[TimerSource, ...] = ()
+    #: A column whose value, on a row of any of the community's tables that
+    #: carries it, is when the sweep has work there: each such table is a
+    #: source, and its earliest value is a due time beside ``next_due``.
+    due_column: str | None = None
     #: ``(community, now)``: the sweep's next due time read outside the
     #: community's schema, for a sweep whose work is kept in ``public`` (where
     #: the community's role reads nothing). The reconcile asks this in place of
     #: ``next_due``, which such a sweep, answering its own, never has run.
     due_outside: Callable[[int, datetime], Awaitable[datetime | None]] | None = None
 
+    def due_tables(self, tools: ToolSet) -> list[Table]:
+        """The tables carrying :attr:`due_column` in a community with
+        ``tools``, by name."""
+        column = self.due_column
+        found = [t for t in tools.tables.values() if column and column in t.c]
+        return sorted(found, key=lambda t: t.name)
+
+    def sources_in(self, tools: ToolSet) -> tuple[TimerSource, ...]:
+        """The writes that give the sweep work in a community with ``tools``:
+        a row setting :attr:`due_column`, then :attr:`sources`."""
+        column = self.due_column
+        return (
+            *(
+                on_row(
+                    t.name,
+                    f"{{row}}.{column}",
+                    events=f"INSERT OR UPDATE OF {column}",
+                    when=f"NEW.{column} IS NOT NULL",
+                )
+                for t in self.due_tables(tools)
+            ),
+            *self.sources,
+        )
+
 
 @cache
 def sweeps() -> tuple[Sweep, ...]:
     """Every sweep that runs on timers, read once."""
     from app.core.intake import IntakeStream, meta
-    from app.db.soft_delete_filter import SOFT_DELETE_MODELS
     from app.models.tenant.batched_notice import BatchedNotice
     from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
     from app.models.tenant.content_hold import ContentHold
@@ -181,6 +209,7 @@ def sweeps() -> tuple[Sweep, ...]:
         return select(func.now()).where(condition)
 
     hour, minute = timedelta(hours=1), timedelta(minutes=1)
+
     dispatchers = (export_worker.jobs, import_worker.jobs)
 
     def job_is(direction: DataJobDirection, statuses: Iterable[DataJobStatus]) -> str:
@@ -407,30 +436,15 @@ def sweeps() -> tuple[Sweep, ...]:
             scope=Scope.ACTIVE,
             every=hour,
             visit=trash_purge.purge_guild,
-            next_due=lambda _now: least(
-                *(
-                    select(func.min(model.purge_at)).where(  # type: ignore[attr-defined]
-                        model.purge_at.is_not(None)  # type: ignore[attr-defined]
-                    )
-                    for model in SOFT_DELETE_MODELS
-                ),
-                select(
-                    func.min(Upload.created_at) + UNCLAIMED_PASTED_IMAGE_GRACE
-                ).where(
-                    col(Upload.filename).startswith(PASTED_IMAGE_PREFIX),
-                    col(Upload.claimed_at).is_(None),
-                ),
+            # A trashed row arms its purge.
+            due_column="purge_at",
+            next_due=lambda _now: select(
+                func.min(Upload.created_at) + UNCLAIMED_PASTED_IMAGE_GRACE
+            ).where(
+                col(Upload.filename).startswith(PASTED_IMAGE_PREFIX),
+                col(Upload.claimed_at).is_(None),
             ),
             sources=(
-                *(
-                    on_row(
-                        str(model.__tablename__),
-                        "{row}.purge_at",
-                        events="INSERT OR UPDATE OF purge_at",
-                        when="NEW.purge_at IS NOT NULL",
-                    )
-                    for model in SOFT_DELETE_MODELS
-                ),
                 on_row(
                     "uploads",
                     "{row}.created_at",
@@ -892,11 +906,46 @@ async def arm(session: AsyncSession, kind: str, due: datetime) -> None:
     )
 
 
+def _due(sweep: Sweep, now: datetime, tools: ToolSet) -> Any:
+    """The sweep's ``next_due`` in a community with ``tools``, and the
+    earliest :attr:`Sweep.due_column` of each table carrying it."""
+    statement = sweep.next_due(now)
+    column = sweep.due_column
+    tables = sweep.due_tables(tools)
+    if not tables:
+        return statement
+    return select(
+        func.least(
+            statement.scalar_subquery(),
+            *(
+                select(func.min(t.c[column]))
+                .where(t.c[column].is_not(None))
+                .scalar_subquery()
+                for t in tables
+            ),
+        )
+    )
+
+
+async def _tools(guild_id: int | None) -> ToolSet:
+    from app.db.plugin_tools import provisioned_tools
+
+    return BUILTIN_TOOLS if guild_id is None else await provisioned_tools(guild_id)
+
+
 async def _next_due(
     session: AsyncSession, sweep: Sweep, now: datetime
 ) -> datetime | None:
+    from app.db.session import routed_guild_id
+
+    tools = (
+        await _tools(routed_guild_id(session))
+        if sweep.due_column is not None
+        else BUILTIN_TOOLS
+    )
+    statement = _due(sweep, now, tools)
     return (
-        await session.exec(sweep.next_due(now).execution_options(include_deleted=True))
+        await session.exec(statement.execution_options(include_deleted=True))
     ).first()
 
 
@@ -1199,8 +1248,12 @@ async def reconcile(session: AsyncSession, guild_id: int) -> datetime:
         and sweep.due_outside is None
         and (operations or sweep.scope is not Scope.OPERATIONS)
     ]
+    tools = await _tools(guild_id)
     probe = select(
-        *(sweep.next_due(now).scalar_subquery().label(sweep.kind) for sweep in checked)
+        *(
+            _due(sweep, now, tools).scalar_subquery().label(sweep.kind)
+            for sweep in checked
+        )
     ).execution_options(include_deleted=True)
     row = list((await session.exec(probe)).one())
     # The sweeps whose work the community's own role cannot read.

@@ -118,7 +118,7 @@ describe("a member's profile", () => {
       buildUserProfile({
         username: "tinker",
         discriminator: 42,
-        custom_status: { emoji: "🎲", text: "rolling for initiative" },
+        custom_status: { emoji: "🎲", text: "rolling for initiative", clear_at: null },
       })
     );
     await renderProfile();

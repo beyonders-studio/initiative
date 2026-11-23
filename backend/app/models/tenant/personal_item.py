@@ -9,6 +9,7 @@ than a foreign key doing it. A row holds at least one of them: whatever clears
 the last one deletes the row (``app.services.tenant.personal_items``).
 """
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import Enum
 
@@ -16,7 +17,7 @@ from sqlalchemy import CheckConstraint, Column, DateTime, Float, Index, Text, te
 from sqlmodel import Field, SQLModel
 
 from app.core.tools import CONTENT_KINDS, Tool
-from app.db.registry_checks import FROM_REGISTRY
+from app.db.registry_checks import FROM_REGISTRY, listed
 
 
 class ViewSource(str, Enum):
@@ -33,8 +34,15 @@ class ViewSource(str, Enum):
 #: The kinds whose opens become tabs, and which can be bookmarked: every tool.
 TOOL_KINDS: tuple[str, ...] = tuple(t.value for t in Tool)
 
-_KINDS = ", ".join(f"'{kind}'" for kind in CONTENT_KINDS)
-_TOOLS = ", ".join(f"'{kind}'" for kind in TOOL_KINDS)
+
+def _kind_check(kinds: Iterable[str]) -> str:
+    return f"entity_type IN ({listed(kinds)})"
+
+
+def _bookmark_check(tools: Iterable[str]) -> str:
+    return f"bookmarked_at IS NULL OR entity_type IN ({listed(tools)})"
+
+
 _SOURCES = ", ".join(f"'{source.value}'" for source in ViewSource)
 
 
@@ -49,9 +57,9 @@ class PersonalItem(SQLModel, table=True):
     __tablename__ = "personal_items"
     __table_args__ = (
         CheckConstraint(
-            f"entity_type IN ({_KINDS})",
+            _kind_check(CONTENT_KINDS),
             name="ck_personal_items_entity_type",
-            info={FROM_REGISTRY: True},
+            info={FROM_REGISTRY: lambda tools: _kind_check(tools.content_kinds)},
         ),
         CheckConstraint(
             f"view_source IN ({_SOURCES})",
@@ -59,9 +67,9 @@ class PersonalItem(SQLModel, table=True):
             info={FROM_REGISTRY: True},
         ),
         CheckConstraint(
-            f"bookmarked_at IS NULL OR entity_type IN ({_TOOLS})",
+            _bookmark_check(TOOL_KINDS),
             name="ck_personal_items_bookmarked_tool",
-            info={FROM_REGISTRY: True},
+            info={FROM_REGISTRY: lambda tools: _bookmark_check(t.kind for t in tools)},
         ),
         CheckConstraint(
             f"sort_order IS NULL OR entity_type = '{Tool.project.value}'",

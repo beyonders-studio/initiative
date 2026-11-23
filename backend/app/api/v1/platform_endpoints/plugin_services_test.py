@@ -77,11 +77,10 @@ async def _seed(session: AsyncSession, **overrides) -> PluginServiceRegistration
 
 
 async def _listed(client: AsyncClient, headers: dict[str, str], row_id: int) -> dict:
-    """One registration as the operator's list shows it."""
-    response = await client.get(BASE, headers=headers)
+    """One registration as the operator reads it."""
+    response = await client.get(f"{BASE}{row_id}", headers=headers)
     assert response.status_code == 200, response.text
-    (entry,) = [entry for entry in response.json() if entry["id"] == row_id]
-    return entry
+    return response.json()
 
 
 # --- capability gating -------------------------------------------------------
@@ -91,15 +90,18 @@ async def _listed(client: AsyncClient, headers: dict[str, str], row_id: int) -> 
     "role", [UserRole.member, UserRole.support, UserRole.moderator, UserRole.operator]
 )
 async def test_non_owner_tiers_are_refused(
-    client: AsyncClient, session: AsyncSession, role: UserRole
+    client: AsyncClient, session: AsyncSession, role: UserRole, capfd
 ):
     """``plugins.manage`` is owner-only: wiring a plug-in service is deployment
-    configuration, so no lower tier reaches any verb."""
+    configuration, so no lower tier reaches any verb, and a refused request
+    records nothing."""
     user = await create_user(session, role=role)
     headers = get_auth_headers(user)
     row = await _seed(session)
+    capfd.readouterr()
 
     assert (await client.get(BASE, headers=headers)).status_code == 403
+    assert (await client.get(f"{BASE}{row.id}", headers=headers)).status_code == 403
     create = await client.post(BASE, headers=headers, json=NEW)
     assert create.status_code == 403
     assert create.json()["detail"] == AuthMessages.INSUFFICIENT_PRIVILEGES
@@ -139,6 +141,7 @@ async def test_non_owner_tiers_are_refused(
             f"{PUBLISHERS}{row.publisher_id}", headers=headers, json={"enabled": False}
         )
     ).status_code == 403
+    assert emitted(capfd, AuditEventType.PLUGIN_SERVICE_UPDATED) == []
 
 
 async def test_anonymous_is_refused(client: AsyncClient):
@@ -149,15 +152,22 @@ async def test_anonymous_is_refused(client: AsyncClient):
 
 
 async def test_owner_creates_a_registration_as_stated(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, acting_user, capfd
 ):
-    headers = await _owner_headers(session)
+    owner = await acting_user()
+    capfd.readouterr()
 
-    response = await client.post(BASE, headers=headers, json=NEW)
+    response = await client.post(
+        BASE,
+        headers=owner.headers,
+        json={**NEW, "page_origin": "https://plugin.example.com", "mandatory": True},
+    )
 
     assert response.status_code == 201, response.text
     body = response.json()
     assert body["public_id"] == "acme.widgets"
+    # Browser origins, so they come from the browser address.
+    assert body["allowed_origins"] == ["https://plugin.example.com"]
     # Its plug-in facts wait for its listing.
     assert (body["listing_uid"], body["scope_ceiling"]) == (None, [])
     assert body["publisher_prefix"] == "acme"
@@ -166,6 +176,29 @@ async def test_owner_creates_a_registration_as_stated(
     assert body["live"] is False
     for gone in ("status", "has_secret", "manifest_hash", "last_verified_at"):
         assert gone not in body
+
+    # Recorded with what it confers.
+    envelopes = emitted(capfd)
+    rows = [
+        e for e in envelopes if e["event_type"] == AuditEventType.PLUGIN_SERVICE_CREATED
+    ]
+    assert [(r["actor_user_id"], r["target"]) for r in rows] == [
+        (owner.user.id, {"type": "plugin_service_registration", "id": body["id"]})
+    ]
+    detail = rows[0]["detail"]
+    assert {"public_id", "publisher_id", "base_url", "mandatory"} <= set(
+        detail["changed"]
+    )
+    assert detail["values"]["mandatory"] == {"from": None, "to": True}
+    # The address is a string: named, never copied.
+    assert "base_url" not in detail["values"]
+    # The acme prefix was new here, so its publisher was added with it.
+    publishers = [
+        e
+        for e in envelopes
+        if e["event_type"] == AuditEventType.PLUGIN_PUBLISHER_CREATED
+    ]
+    assert [r["detail"]["via"] for r in publishers] == ["registration"]
 
 
 async def test_owner_lists_registrations_with_their_publisher(
@@ -178,8 +211,8 @@ async def test_owner_lists_registrations_with_their_publisher(
 
     assert response.status_code == 200, response.text
     body = response.json()
-    assert len(body) == 1
-    entry = body[0]
+    assert body["total_count"] == 1
+    (entry,) = body["items"]
     assert entry["public_id"] == "acme.widgets"
     assert "grants" not in entry
     assert entry["mandatory"] is True
@@ -270,6 +303,7 @@ async def test_connect_pins_the_key_set_the_operator_confirmed(
     assert shown.status_code == 200, shown.text
     (confirmed,) = shown.json()
     assert confirmed["kid"] == "acme.widgets-1"
+    assert confirmed["fingerprint"] == plugin_keys.jwk_thumbprint(served[0]["keys"][0])
     assert fetched == [f"{PLUGIN_URL}/.well-known/jwks.json"]
     assert (await _listed(client, owner.headers, row.id))["jwks"] is None
 
@@ -303,10 +337,19 @@ async def test_connect_pins_the_key_set_the_operator_confirmed(
 
 
 async def test_patch_sets_the_operator_only_fields(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, acting_user, capfd
 ):
-    headers = await _owner_headers(session)
+    owner = await acting_user()
+    headers = owner.headers
     row = await _seed(session)
+    unchanged = await client.patch(
+        f"{BASE}{row.id}",
+        headers=headers,
+        json={"suspended": False, "mandatory": False},
+    )
+    assert unchanged.status_code == 200, unchanged.text
+    # An edit that changes nothing records nothing.
+    assert emitted(capfd, AuditEventType.PLUGIN_SERVICE_UPDATED) == []
 
     response = await client.patch(
         f"{BASE}{row.id}",
@@ -320,6 +363,12 @@ async def test_patch_sets_the_operator_only_fields(
     assert (body["availability"], body["beta_communities"]) == ("none", [])
     assert body["suspended_at"] is not None
     assert body["live"] is False
+    rows = emitted(capfd, AuditEventType.PLUGIN_SERVICE_UPDATED)
+    assert [(r["actor_user_id"], r["target"]["id"]) for r in rows] == [
+        (owner.user.id, row.id)
+    ]
+    assert {"suspended_at", "mandatory"} <= set(rows[0]["detail"]["changed"])
+    assert rows[0]["detail"]["values"]["mandatory"] == {"from": False, "to": True}
 
     lifted = await client.patch(
         f"{BASE}{row.id}", headers=headers, json={"suspended": False}
@@ -384,12 +433,11 @@ async def test_patch_replaces_a_beta_plugins_communities(
     ]
 
 
-async def test_sharing_is_turned_off_once_each_installation_has_one_community(
+async def test_every_community_that_connects_an_installation_holds_its_route(
     client: AsyncClient, session: AsyncSession
 ):
-    """Two communities hold installation 42. While sharing is off the second
-    is indexed without it; turning sharing on gives it the route, turning it
-    off is refused while both hold it, and goes through once one does."""
+    """Two communities connected installation 42: each holds its route, and
+    the registration has no switch to say otherwise."""
     headers = await _owner_headers(session)
     row = await _seed(session)
     user = await create_user(session)
@@ -404,40 +452,17 @@ async def test_sharing_is_turned_off_once_each_installation_has_one_community(
             listing_uid=LISTING_UID,
             config={"workspace": {"owner": "acme", "installation_id": "42"}},
         )
-        installs.append((guild.id, plugin))
-    (first, _), (second, second_plugin) = installs
+        await plugin_installs.record(guild.id, plugin)
+        installs.append(guild.id)
 
-    async def indexed() -> dict[int, tuple]:
-        session.expunge_all()
-        rows = await session.exec(
-            select(PluginInstall).where(PluginInstall.listing_uid == LISTING_UID)
-        )
-        return {item.guild_id: (item.hook_route, item.exclusive) for item in rows}
-
-    async def share(on: bool) -> httpx2.Response:
-        return await client.patch(
-            f"{BASE}{row.id}", headers=headers, json={"shared_routes": on}
-        )
-
-    assert await indexed() == {first: ("42", True), second: (None, True)}
-
-    shared = await share(True)
-    assert shared.status_code == 200, shared.text
-    assert shared.json()["shared_routes"] is True
-    await plugin_installs.record(second, second_plugin)
-    assert await indexed() == {first: ("42", False), second: ("42", False)}
-
-    refused = await share(False)
-    assert refused.status_code == 409
-    assert refused.json()["detail"] == PluginServiceMessages.SHARED_ROUTES_IN_USE
-    assert (await _listed(client, headers, row.id))["shared_routes"] is True
-    assert await indexed() == {first: ("42", False), second: ("42", False)}
-
-    await plugin_installs.forget(second, second_plugin.id)
-    unshared = await share(False)
-    assert unshared.status_code == 200, unshared.text
-    assert unshared.json()["shared_routes"] is False
-    assert await indexed() == {first: ("42", True)}
+    session.expunge_all()
+    rows = await session.exec(
+        select(PluginInstall).where(PluginInstall.listing_uid == LISTING_UID)
+    )
+    assert {item.guild_id: item.hook_route for item in rows} == dict.fromkeys(
+        installs, "42"
+    )
+    assert "shared_routes" not in await _listed(client, headers, row.id)
 
 
 async def test_the_browser_address_round_trips_and_clears(
@@ -453,12 +478,15 @@ async def test_the_browser_address_round_trips_and_clears(
     )
     assert set_it.status_code == 200, set_it.text
     assert set_it.json()["page_origin"] == "https://plugin.example.com"
+    # The list was still the plug-in's own origin, so it follows the plug-in.
+    assert set_it.json()["allowed_origins"] == ["https://plugin.example.com"]
 
     cleared = await client.patch(
         f"{BASE}{row.id}", headers=headers, json={"page_origin": ""}
     )
     assert cleared.status_code == 200, cleared.text
     assert cleared.json()["page_origin"] is None
+    assert cleared.json()["allowed_origins"] == [PLUGIN_URL]
 
 
 @pytest.mark.parametrize(
@@ -513,15 +541,84 @@ async def test_create_fails_closed_without_a_signing_key(
     assert response.json()["detail"] == PluginServiceMessages.SIGNING_NOT_CONFIGURED
 
 
+async def test_the_list_is_searched_and_paged(
+    client: AsyncClient, session: AsyncSession
+):
+    headers = await _owner_headers(session)
+    for public_id in ("acme.alpha", "acme.beta", "acme.gamma"):
+        await _seed(session, public_id=public_id, listing_uid=None)
+
+    first = (await client.get(BASE, headers=headers, params={"page_size": 2})).json()
+    second = (
+        await client.get(BASE, headers=headers, params={"page_size": 2, "page": 2})
+    ).json()
+    found = (await client.get(BASE, headers=headers, params={"search": "BET"})).json()
+
+    assert [entry["public_id"] for entry in first["items"]] == [
+        "acme.alpha",
+        "acme.beta",
+    ]
+    assert first["total_count"] == 3
+    assert first["has_next"] is True
+    assert [entry["public_id"] for entry in second["items"]] == ["acme.gamma"]
+    assert [entry["public_id"] for entry in found["items"]] == ["acme.beta"]
+    assert found["total_count"] == 1
+
+
+async def test_a_plug_in_reads_its_listings_name_art_and_publisher(
+    client: AsyncClient, session: AsyncSession
+):
+    """Name, art and version come from the listing; only this project's own
+    publisher, under a registry signature, is built by Initiative."""
+    headers = await _owner_headers(session)
+    rows = {}
+    for uid, public_id in (
+        ("FRSTPARTY00001", "beyonders-studio.github"),
+        ("THRDPARTY00001", "acme.widgets"),
+    ):
+        listing = await create_marketplace_listing(
+            session,
+            uid=uid,
+            public_id=public_id,
+            version="2.1.0",
+            name=f"{public_id} board",
+            avatar_url=f"/marketplace/{uid}.svg",
+            commit=False,
+        )
+        listing.source = "registry"
+        session.add(listing)
+        await session.commit()
+        rows[public_id] = await _seed(session, public_id=public_id, listing_uid=uid)
+
+    ours = await _listed(client, headers, rows["beyonders-studio.github"].id)
+    theirs = await _listed(client, headers, rows["acme.widgets"].id)
+
+    assert ours["name"] == "beyonders-studio.github board"
+    assert ours["avatar_url"] == "/marketplace/FRSTPARTY00001.svg"
+    assert ours["version"] == "2.1.0"
+    assert ours["first_party"] is True
+    assert theirs["name"] == "acme.widgets board"
+    assert theirs["first_party"] is False
+
+
 # --- delete -------------------------------------------------------------------
 
 
-async def test_owner_deletes_a_registration(client: AsyncClient, session: AsyncSession):
-    headers = await _owner_headers(session)
+async def test_owner_deletes_a_registration(
+    client: AsyncClient, session: AsyncSession, acting_user, capfd
+):
+    owner = await acting_user()
+    headers = owner.headers
     row = await _seed(session)
+    capfd.readouterr()
 
     assert (await client.delete(f"{BASE}{row.id}", headers=headers)).status_code == 204
-    assert (await client.get(BASE, headers=headers)).json() == []
+    rows = emitted(capfd, AuditEventType.PLUGIN_SERVICE_DELETED)
+    assert [(r["actor_user_id"], r["target"]) for r in rows] == [
+        (owner.user.id, {"type": "plugin_service_registration", "id": row.id})
+    ]
+    assert (await client.get(BASE, headers=headers)).json()["items"] == []
+    assert (await client.get(f"{BASE}{row.id}", headers=headers)).status_code == 404
 
 
 async def test_missing_registration_is_a_404(
@@ -541,9 +638,11 @@ async def test_missing_registration_is_a_404(
 
 
 async def test_owner_adds_and_lists_a_publisher(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, acting_user, capfd
 ):
-    headers = await _owner_headers(session)
+    owner = await acting_user()
+    headers = owner.headers
+    capfd.readouterr()
 
     created = await client.post(
         PUBLISHERS,
@@ -557,6 +656,10 @@ async def test_owner_adds_and_lists_a_publisher(
     assert body["display_name"] == "Our own plug-ins"
     assert body["verified"] is False
     assert body["enabled"] is True
+    added = emitted(capfd, AuditEventType.PLUGIN_PUBLISHER_CREATED)
+    assert [(r["actor_user_id"], r["target"]) for r in added] == [
+        (owner.user.id, {"type": "plugin_publisher", "id": body["id"]})
+    ]
 
     listed = await client.get(PUBLISHERS, headers=headers)
     assert "private-plugins" in {entry["prefix"] for entry in listed.json()}
@@ -584,11 +687,12 @@ async def test_a_prefix_is_one_segment_of_a_plugin_id(
 
 
 async def test_switching_a_publisher_off_takes_its_plugins_out_of_service(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, capfd
 ):
     headers = await _owner_headers(session)
     row = await _seed(session)
     assert (await _listed(client, headers, row.id))["live"]
+    capfd.readouterr()
 
     off = await client.patch(
         f"{PUBLISHERS}{row.publisher_id}",
@@ -599,6 +703,10 @@ async def test_switching_a_publisher_off_takes_its_plugins_out_of_service(
     assert off.status_code == 200, off.text
     assert off.json()["enabled"] is False
     assert off.json()["display_name"] == "Acme, paused"
+    updated = emitted(capfd, AuditEventType.PLUGIN_PUBLISHER_UPDATED)
+    assert [r["detail"]["values"]["enabled"] for r in updated] == [
+        {"from": True, "to": False}
+    ]
     read = await _listed(client, headers, row.id)
     assert read["suspended_at"] is None
     assert read["publisher_enabled"] is False
@@ -1115,3 +1223,308 @@ async def test_a_conversion_github_refuses_writes_nothing(
     assert response.status_code == 502
     assert response.json()["detail"] == PluginServiceMessages.VENDOR_SETUP_FAILED
     assert await load_vendor_values("acme.widgets") == {}
+
+
+# --- the plug-in's vendor check ----------------------------------------------
+
+
+def _rsa_pem() -> tuple[str, Any]:
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    pem = key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    ).decode()
+    return pem, key.public_key()
+
+
+CHECKED_DEFINITION: dict[str, Any] = {
+    **VENDOR_DEFINITION,
+    "vendor": {
+        "fields": [
+            {"key": key, "type": kind, "required": True, "label": {"en": key}}
+            for key, kind in (
+                ("app_id", "string"),
+                ("app_name", "string"),
+                ("private_key", "secret"),
+                ("hook_secret", "secret"),
+            )
+        ],
+        "check": {
+            "sign": {"iss": "{vendor.app_id}", "key": "{vendor.private_key}"},
+            "request": {"method": "GET", "url": "'https://api.vendor.example/app'"},
+            "expect": [
+                {
+                    "status": "4xx",
+                    "holds": "false",
+                    "fields": ["app_id", "private_key"],
+                    "message": {"en": "No client by this id and key."},
+                },
+                {
+                    "holds": "response.body.name = vendor.app_name",
+                    "fields": ["app_name"],
+                    "message": {"en": "The id and key belong to another name."},
+                    "shows": "response.body.name",
+                },
+            ],
+        },
+    },
+}
+
+
+def _vendor_answers(
+    monkeypatch, *, status: int = 200, body: dict | None = None, fail: bool = False
+) -> list[httpx2.Request]:
+    """The vendor answering the check; the requests it was sent."""
+    from app.services.tenant import plugin_connection_flows
+
+    sent: list[httpx2.Request] = []
+
+    async def resolve(url: str, *, allow_private: bool = False) -> ValidatedTarget:
+        return ValidatedTarget(
+            hostname=httpx2.URL(url).host,
+            addresses=(ipaddress.ip_address("203.0.113.7"),),
+        )
+
+    def handle(request: httpx2.Request) -> httpx2.Response:
+        sent.append(request)
+        if fail:
+            raise httpx2.ConnectError("unreachable", request=request)
+        return httpx2.Response(status, json=body or {})
+
+    monkeypatch.setattr(safe_http, "resolve_validated_target_async", resolve)
+    monkeypatch.setattr(
+        plugin_connection_flows, "http_transport", httpx2.MockTransport(handle)
+    )
+    return sent
+
+
+async def _checked_registration(session: AsyncSession) -> PluginServiceRegistration:
+    await create_marketplace_listing(
+        session,
+        uid=LISTING_UID,
+        public_id="acme.widgets",
+        kind="plugin",
+        definition=CHECKED_DEFINITION,
+    )
+    return await _seed(session)
+
+
+async def test_values_the_vendor_does_not_know_together_are_not_saved(
+    client: AsyncClient, session: AsyncSession, monkeypatch
+):
+    pem, _public = _rsa_pem()
+    sent = _vendor_answers(monkeypatch, body={"id": 7, "name": "widgets-for-acme"})
+    headers = await _owner_headers(session)
+    row = await _checked_registration(session)
+
+    response = await client.patch(
+        f"{BASE}{row.id}",
+        headers=headers,
+        json={
+            "vendor_values": {
+                "app_id": "7",
+                "app_name": "widgets",
+                "private_key": pem,
+            }
+        },
+    )
+
+    assert response.status_code == 400, response.text
+    body = response.json()
+    assert body["detail"] == PluginServiceMessages.VENDOR_CHECK_REFUSED
+    assert body["params"]["fields"] == "app_name"
+    assert json.loads(body["params"]["message"]) == {
+        "en": "The id and key belong to another name."
+    }
+    assert body["params"]["shows"] == "widgets-for-acme"
+    assert len(sent) == 1
+    assert await load_vendor_values("acme.widgets") == {}
+
+
+async def test_values_the_vendor_knows_are_saved_and_say_so(
+    client: AsyncClient, session: AsyncSession, monkeypatch
+):
+    import jwt as pyjwt
+
+    pem, public = _rsa_pem()
+    sent = _vendor_answers(monkeypatch, body={"id": 7, "name": "widgets"})
+    headers = await _owner_headers(session)
+    row = await _checked_registration(session)
+
+    response = await client.patch(
+        f"{BASE}{row.id}",
+        headers=headers,
+        json={
+            "vendor_values": {"app_id": "7", "app_name": "widgets", "private_key": pem}
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["vendor_check"] == "passed"
+    (request,) = sent
+    assert (request.method, request.headers["host"], request.url.path) == (
+        "GET",
+        "api.vendor.example",
+        "/app",
+    )
+    scheme, token = request.headers["authorization"].split(" ", 1)
+    assert scheme == "Bearer"
+    assert pyjwt.decode(token, public, algorithms=["RS256"])["iss"] == "7"
+    assert (await load_vendor_values("acme.widgets"))["app_name"] == "widgets"
+
+    # A save that sets nothing the check reads does not ask the vendor.
+    again = await client.patch(
+        f"{BASE}{row.id}",
+        headers=headers,
+        json={"vendor_values": {"hook_secret": "s3cr3t"}},
+    )
+    assert again.status_code == 200, again.text
+    assert again.json()["vendor_check"] is None
+    assert len(sent) == 1
+
+
+async def test_a_vendor_refusing_the_signed_jwt_blames_the_id_and_key(
+    client: AsyncClient, session: AsyncSession, monkeypatch
+):
+    pem, _public = _rsa_pem()
+    _vendor_answers(monkeypatch, status=401, body={"message": "bad credentials"})
+    headers = await _owner_headers(session)
+    row = await _checked_registration(session)
+
+    response = await client.patch(
+        f"{BASE}{row.id}",
+        headers=headers,
+        json={"vendor_values": {"app_id": "8", "app_name": "x", "private_key": pem}},
+    )
+
+    assert response.status_code == 400, response.text
+    assert response.json()["params"]["fields"] == "app_id\nprivate_key"
+
+
+async def test_a_vendor_that_cannot_be_asked_does_not_stop_a_save(
+    client: AsyncClient, session: AsyncSession, monkeypatch
+):
+    pem, _public = _rsa_pem()
+    sent = _vendor_answers(monkeypatch, fail=True)
+    headers = await _owner_headers(session)
+    row = await _checked_registration(session)
+
+    response = await client.patch(
+        f"{BASE}{row.id}",
+        headers=headers,
+        json={"vendor_values": {"app_id": "7", "app_name": "x", "private_key": pem}},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["vendor_check"] == "not_run"
+    assert len(sent) == 1
+    assert (await load_vendor_values("acme.widgets"))["app_id"] == "7"
+
+
+async def test_a_signing_value_that_is_not_a_key_is_refused(
+    client: AsyncClient, session: AsyncSession, monkeypatch
+):
+    sent = _vendor_answers(monkeypatch, body={"name": "x"})
+    headers = await _owner_headers(session)
+    row = await _checked_registration(session)
+
+    response = await client.patch(
+        f"{BASE}{row.id}",
+        headers=headers,
+        json={
+            "vendor_values": {
+                "app_id": "7",
+                "app_name": "x",
+                "private_key": "not a key",
+            }
+        },
+    )
+
+    assert response.status_code == 400, response.text
+    assert response.json()["detail"] == PluginServiceMessages.VENDOR_KEY_UNUSABLE
+    assert response.json()["params"]["fields"] == "private_key"
+    assert sent == []
+
+
+async def test_values_that_change_while_the_vendor_is_asked_are_not_written(
+    client: AsyncClient, session: AsyncSession, monkeypatch
+):
+    from sqlmodel import update
+
+    from app.services.marketplace import declarative
+
+    pem, _public = _rsa_pem()
+    _vendor_answers(monkeypatch, body={"name": "widgets"})
+    headers = await _owner_headers(session)
+    row = await _checked_registration(session)
+    asked = declarative.vendor_check
+
+    async def while_another_save_lands(*args, **kwargs):
+        await session.exec(
+            update(PluginServiceRegistration)
+            .where(PluginServiceRegistration.id == row.id)
+            .values(vendor_values={"hook_secret": "written by another save"})
+        )
+        await session.commit()
+        return await asked(*args, **kwargs)
+
+    monkeypatch.setattr(declarative, "vendor_check", while_another_save_lands)
+
+    response = await client.patch(
+        f"{BASE}{row.id}",
+        headers=headers,
+        json={
+            "vendor_values": {"app_id": "7", "app_name": "widgets", "private_key": pem}
+        },
+    )
+
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"] == PluginServiceMessages.VENDOR_VALUES_CHANGED
+    await session.refresh(row)
+    assert row.vendor_values == {"hook_secret": "written by another save"}
+
+
+async def test_a_setup_the_vendor_could_not_check_says_so(
+    client: AsyncClient, session: AsyncSession, acting_user, monkeypatch
+):
+    from app.services.tenant import plugin_connection_flows
+
+    _github(monkeypatch)
+
+    def unreachable(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ConnectError("unreachable", request=request)
+
+    monkeypatch.setattr(
+        plugin_connection_flows, "http_transport", httpx2.MockTransport(unreachable)
+    )
+    definition = copy.deepcopy(GITHUB_DEFINITION)
+    definition["vendor"]["check"] = {
+        "request": {"method": "GET", "url": "'https://api.vendor.example/app'"},
+        "expect": [
+            {
+                "holds": "response.body.id = vendor.app_id",
+                "fields": ["app_id"],
+                "message": {"en": "Another app."},
+            }
+        ],
+    }
+    await create_marketplace_listing(
+        session,
+        uid=LISTING_UID,
+        public_id="acme.widgets",
+        kind="plugin",
+        definition=definition,
+    )
+    row = await _seed(session)
+    a = await acting_user()
+    started = await _start(client, a.headers, row.id)
+
+    response = await _complete(client, a.headers, row.id, started["state"])
+
+    assert response.status_code == 200, response.text
+    assert response.json()["vendor_check"] == "not_run"
+    assert (await load_vendor_values("acme.widgets"))["app_id"] == "4242"

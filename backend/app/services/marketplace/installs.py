@@ -95,6 +95,21 @@ async def resolve_listing_install(
             MarketplaceMessages.LISTING_VERSION_INCOMPATIBLE,
             params={"version": latest.version} if latest is not None else None,
         )
+    if listing.bundled_with_uid is not None:
+        # A plug-in's dashboard is published with the plug-in version whose
+        # widgets and tables it draws, so a guild still on an older version
+        # takes it once that update is applied.
+        installed = (
+            await session.exec(
+                select(GuildPlugin.listing_version).where(
+                    GuildPlugin.listing_uid == listing.bundled_with_uid
+                )
+            )
+        ).first()
+        if installed is None or catalog_service.version_tuple(
+            installed
+        ) < catalog_service.version_tuple(version.version):
+            raise ListingInstallError(MarketplaceMessages.LISTING_NEEDS_PLUGIN)
     if not plugin_api.serves_plugin_api(version.min_plugin_api):
         # Built against a plug-in API contract this deployment does not serve:
         # a newer minor than it has, or another major. The same refusal as a

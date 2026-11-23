@@ -141,7 +141,8 @@ async def test_a_mention_from_an_ignored_account_writes_no_notification(
     posted = await client.post(
         bram.g("/comments/"),
         json={
-            "task_id": task.id,
+            "subject_type": "task",
+            "subject_id": task.id,
             "content": f"hello @[{ada.user.username}]({ada.user.id})",
         },
         headers=bram.headers,
@@ -162,7 +163,8 @@ async def test_a_mention_from_an_ignored_account_writes_no_notification(
     again = await client.post(
         bram.g("/comments/"),
         json={
-            "task_id": task.id,
+            "subject_type": "task",
+            "subject_id": task.id,
             "content": f"still here @[{ada.user.username}]({ada.user.id})",
         },
         headers=bram.headers,

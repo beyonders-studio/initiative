@@ -5,13 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PLAY_STORE_URL } from "@/lib/links";
 import { getItem, removeItem } from "@/lib/storage";
 
-import {
-  askForStoreReview,
-  dueForReview,
-  noteDayOfUse,
-  resetStoreReview,
-  useStoreListing,
-} from "./storeReview";
+import { askForStoreReview, noteDayOfUse, resetStoreReview, useStoreListing } from "./storeReview";
 
 const environment = vi.hoisted(() => ({
   get: vi.fn(async (): Promise<{ installer?: string }> => ({})),
@@ -43,14 +37,6 @@ beforeEach(async () => {
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
-});
-
-describe("dueForReview", () => {
-  it("waits for three days of use, then asks once", () => {
-    expect(dueForReview({ days: 2, lastDay: "2026-11-08", asked: false })).toBe(false);
-    expect(dueForReview({ days: 3, lastDay: "2026-11-08", asked: false })).toBe(true);
-    expect(dueForReview({ days: 3, lastDay: "2026-11-08", asked: true })).toBe(false);
-  });
 });
 
 describe("noteDayOfUse", () => {

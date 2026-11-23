@@ -17,7 +17,7 @@ there.
 from __future__ import annotations
 
 import logging
-from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from functools import partial
@@ -40,7 +40,8 @@ from app.core.notification_categories import (
     category_of,
     sample_type,
 )
-from app.core.tools import COMMENT_TARGETS, KINDS, Tool
+from app.core.tool_set import ToolRecord
+from app.core.tools import KINDS, Tool
 from app.core.user_display import name_here
 from app.core.user_input_validators import resolve_zone
 from app.db import cohorts
@@ -53,6 +54,7 @@ from app.db.session import (
     install_context,
     require_guild_context,
     routed_guild_id,
+    session_tools,
     set_rls_context,
 )
 from app.models.platform.notice_outbox import NoticeOutboxItem
@@ -218,10 +220,10 @@ async def _channels(
 #: id — ``("task", 7)``, ``("calendar_event", 3)``, ``("wiki_page", 12)``.
 Ref = tuple[str, int]
 
-#: The kinds the client opens by their own address (``/go/{kind}/{id}``) —
-#: every commentable kind and a calendar event. Mirrors the client resolver in
+#: The kind the client opens by its own address (``/go/{kind}/{id}``) beside
+#: every kind that takes comments. Mirrors the client resolver in
 #: ``lib/entityResolver.ts``. Any other kind opens the tool that governs it.
-_ADDRESSABLE = frozenset((*COMMENT_TARGETS, "calendar_event"))
+_ADDRESSED = "calendar_event"
 
 #: ``recipients`` for news about a thing nobody asked for — it was shared with
 #: you: everybody its sharing reaches, taken from the thing itself.
@@ -236,7 +238,8 @@ class Subject:
 
     #: What the notice names, as it was asked about.
     about: Ref
-    tool: Tool
+    #: A built-in tool by its ``Tool``, an installed one by its record.
+    tool: Tool | ToolRecord
     initiative_id: int | None
     #: The row of ``tool`` that governs it: the project a task is in. None for
     #: a thing no sharing governs (a collection).
@@ -268,9 +271,10 @@ async def resolve_subject(
     """Resolve ``ref`` on the caller's routed session, or ``None`` when the
     session cannot reach it.
 
-    The governing tool and the hops to it come from ``governing_path`` — a task
-    reaches its project by ``project_id``, an event its calendar by
-    ``calendar_id`` — so no notifier names its tool. Who can open it is
+    The governing tool and the hops to it come from the community's tool set
+    (``named_people.governing_of``) — a task reaches its project by
+    ``project_id``, an event its calendar by ``calendar_id``, a tool plug-in's
+    item its tool's row — so no notifier names its tool. Who can open it is
     ``named_people.readers_of``, the rule naming somebody on it uses, and who
     it is shared with is ``permissions.audience``, the rule the post audience
     uses.
@@ -280,18 +284,22 @@ async def resolve_subject(
     rule is asked.
     """
     kind, entity_id = ref
-    if KINDS[kind].standalone:
+    tools = await session_tools(session)
+    if kind not in tools.content_kinds:
+        return None
+    spec = KINDS.get(kind)
+    if spec is not None and spec.standalone:
         # No sharing of its own: it is opened by whoever can open one of the
         # files in it.
         from app.db.base import MODELS_BY_TABLE
 
-        model = MODELS_BY_TABLE[KINDS[kind].table]
+        model = MODELS_BY_TABLE[spec.table]
         row = (
             await session.exec(select(model).where(model.id == entity_id))  # type: ignore[attr-defined]
         ).scalar_one_or_none()
         if row is None:
             return None
-        tool = KINDS[kind].tool
+        tool: Tool | ToolRecord = spec.tool
         resource_id = None
         governing = Governing.of_collection(row)
     else:
@@ -301,11 +309,14 @@ async def resolve_subject(
         tool, row = governed
         resource_id = row.id
         governing = Governing.of(tool, row)
-    target_path = (
-        reference_path(kind, entity_id)
-        if kind in _ADDRESSABLE
-        else reference_path(tool, row.id)
-    )
+    if kind not in KINDS:
+        # A tool plug-in's row opens on the page every tool plug-in's rows
+        # share, its tool's or an item's, in its initiative.
+        target_path = f"/i/{row.initiative_id}/t/{kind}/{entity_id}"
+    elif kind in tools.comment_targets or kind == _ADDRESSED:
+        target_path = reference_path(kind, entity_id)
+    else:
+        target_path = reference_path(tool, row.id)
     if only is not None:
         return Subject(
             about=ref,
@@ -353,6 +364,7 @@ async def notify(
     rollup_key: str | None = None,
     email: Callable[[User], email_service.EmailPieces] | None = None,
     email_names_line: bool = True,
+    present: Collection[int] = (),
 ) -> None:
     """Tell ``recipients`` one thing: a bell line each, then email and push.
 
@@ -377,7 +389,18 @@ async def notify(
     thread, naming ``actor``, and email and push go only when it opened a new
     one. ``email_names_line=False`` leaves the mail standing when the line is
     read — for a notice waiting on somebody's decision.
+
+    ``present`` is for a send alone (``item_sent``): recipients the sender
+    named who can't open ``about`` but are in its initiative, so may know it is
+    there and ask for it. They are told though they can't open it; the line
+    names the thing only to whoever can, when it is read.
     """
+    if present and (
+        notification_type is not NotificationType.item_sent
+        or recipients == SHARED_WITH
+        or about is None
+    ):
+        raise ValueError("only a send names people who can't open its subject")
     if recipients != SHARED_WITH:
         recipients = [
             user_id
@@ -425,7 +448,7 @@ async def notify(
         for user_id in dict.fromkeys(cast(Iterable[int | None], recipients))
         if user_id is not None
         and user_id != actor_id(actor)
-        and (about is None or user_id in allowed)
+        and (about is None or user_id in allowed or user_id in present)
     ]
     if not wanted:
         return
@@ -639,18 +662,19 @@ def _build_smart_link(*, target_path: str, guild_id: int | None) -> str | None:
 # an extra load at every call site, and a stored target_path would go stale the
 # moment an entity moved. So these emit an entity REFERENCE and let the client's
 # /go resolver turn it into the canonical address on the way in.
-def reference_path(kind: Tool | str, entity_id: int | None) -> str:
+def reference_path(kind: Tool | ToolRecord | str, entity_id: int | None) -> str:
     """One entity's reference path, the same for every notifier and for any
     other service that addresses the entity.
 
-    ``kind`` is a ``Tool``, or the name of a kind that lives inside one
-    (``task``, ``event``), spelled the way the client's resolver speaks it —
+    ``kind`` is a tool (a ``Tool``, or an installed tool's record), or the
+    name of a kind that lives inside one (``task``, ``event``, a tool
+    plug-in's item's), spelled the way the client's resolver speaks it —
     kebab singular. Without an id there is no entity to resolve, so the guild
     home is the landing spot.
     """
     if entity_id is None:
         return "/"
-    name = kind.value if isinstance(kind, Tool) else kind
+    name = kind.value if isinstance(kind, (Tool, ToolRecord)) else kind
     return f"/go/{name.replace('_', '-')}/{entity_id}"
 
 

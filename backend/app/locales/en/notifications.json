@@ -319,12 +319,38 @@
         "title": "You can edit it now",
         "body_one": "{{answerer}} let you edit {{title}}",
         "body_other": "{{answerer}} let you edit {{count}} files"
+      },
+      "read_note": {
+        "title": "You can view it now",
+        "body": "{{answerer}} let you view {{title}}: “{{note}}”"
+      },
+      "write_note": {
+        "title": "You can edit it now",
+        "body": "{{answerer}} let you edit {{title}}: “{{note}}”"
       }
     },
     "declined": {
       "title": "Request declined",
       "body_one": "{{answerer}} declined your request",
       "body_other": "{{answerer}} declined your request for {{count}} files"
+    }
+  },
+  "item": {
+    "sent": {
+      "title": "Sent to you",
+      "body": "{{sender}} sent you {{title}}"
+    },
+    "sent_note": {
+      "title": "{{sender}} sent you {{title}}",
+      "body": "{{note}}"
+    },
+    "sent_unnamed": {
+      "title": "Sent to you",
+      "body": "{{sender}} sent you something you can ask to open"
+    },
+    "sent_unnamed_note": {
+      "title": "{{sender}} sent you something",
+      "body": "{{note}}"
     }
   }
 }

@@ -12,10 +12,11 @@
     "disabled": "Turned off",
     "enable": "Turn on",
     "disable": "Turn off",
-    "rename": "Rename",
     "remove": "Remove",
     "removeTitle": "Remove {{name}}?",
     "removeBody": "What it created moves to the trash, where it can still be restored. Every credential it held — the community's and each member's — is deleted, and the plug-in is told to stop using them.",
+    "removeToolBody": "Its tool disappears from every initiative now. In 30 days everything in it is deleted for good: its items, and the comments, links, tags and sharing on them. Add the plug-in again before then to get it all back.",
+    "removeTool": "Remove and delete in 30 days",
     "removed": "{{name}} removed.",
     "removeAndErase": "Remove and erase",
     "erase": "Also erase its data",
@@ -23,7 +24,6 @@
     "saved": "Saved.",
     "needsConfig": "Needs setup",
     "configInvalid": "Setup problem",
-    "provided": "Comes with Initiative",
     "unavailable": "Not set up on this server",
     "readOnly": "Read-only",
     "configure": "Open settings",
@@ -43,6 +43,13 @@
   "updates": {
     "wants": "Version {{version}} wants to:",
     "newSurface": "Show “{{name}}” inside initiatives",
+    "newTable": "Add a new kind of item, “{{key}}”, to its tool",
+    "newField": "Add the field “{{key}}”",
+    "newOption": "Add the choice “{{key}}”",
+    "newAction": "Add the action “{{key}}”",
+    "dropsField": "Remove the field “{{key}}” and delete what it holds",
+    "dropsOption": "Stop offering the choice “{{key}}”, emptying it wherever it was picked",
+    "acceptDropping": "Accept, update and delete what it drops",
     "accept": "Accept and update",
     "decline": "Decline",
     "declined": "You declined version {{version}}. The plug-in stays on its current version.",
@@ -52,8 +59,9 @@
   },
   "install": {
     "title": "Add {{name}}",
-    "description": "This adds something for the whole community. You can rename it now or later.",
-    "name": "Name",
+    "description": "This adds something for the whole community.",
+    "connectTitle": "Connect {{name}}",
+    "connectDescription": "Connect what it works with now, or later from Integrations in community settings.",
     "action": "Add to community",
     "done": "{{name}} added.",
     "adminOnly": "Ask your community's superadmin to add this plug-in.",
@@ -62,6 +70,7 @@
     "whereTitle": "Where it works",
     "whereDescription": "It shows its page, and reads and changes things, only in the initiatives you choose.",
     "whereDescriptionNoPage": "It reads and changes things only in the initiatives you choose.",
+    "whereDescriptionTool": "Its tool is there only in the initiatives you choose. In each, the initiative turns it on or off, and its roles say who uses it.",
     "whoTitle": "Who can use it",
     "callersTitle": "Plug-ins that can use it",
     "callersDescription": "These plug-ins in your community ask to use {{name}}. Each one you leave ticked can.",
@@ -90,8 +99,6 @@
     "personalScope": "Your account",
     "set": "Set",
     "notSet": "Not set",
-    "accessHint": "Uses {{api}} — {{scopes}}",
-    "noScopes": "no permissions listed",
     "secretSet": "Already set — type to replace",
     "empty": "Not set",
     "choose": "Choose one",
@@ -100,6 +107,7 @@
     "cleared": "Credential cleared.",
     "memberSet": "A community admin has set this up.",
     "memberNotSet": "A community admin still has to set this up.",
+    "platformExplainer": "This server's operator connected this for every community, so it's ready to use here. Only they can change or disconnect it.",
     "communityFlowExplainer": "This one is granted at the vendor rather than typed. Connecting opens their install page, where you choose the account and what this plug-in may see.",
     "personalExplainer": "This one signs you in as yourself, so each member connects their own account. Nobody else sees yours.",
     "connect": "Connect",
@@ -188,8 +196,7 @@
   "settings": {
     "description": "Set up how this plug-in connects.",
     "open": "{{name}} settings",
-    "adminTitle": "Community settings",
-    "adminDescription": "What the community owns for this plug-in. Only the superadmin sees this."
+    "communitySettings": "Community settings for this plug-in"
   },
   "page": {
     "connecting": "Connecting…",
@@ -206,6 +213,7 @@
     "title": "Where this plug-in works",
     "description": "This plug-in shows its page, and reads and changes things, only in the initiatives you choose.",
     "descriptionNoPage": "This plug-in reads and changes things only in the initiatives you choose.",
+    "descriptionTool": "This plug-in's tool is there only in the initiatives you choose. In each, the initiative turns it on or off, and its roles say who uses it.",
     "all": "Every current initiative",
     "some": "Only the initiatives I choose",
     "none": "No initiatives chosen, so this plug-in reaches nothing inside initiatives.",
@@ -222,7 +230,7 @@
     },
     "refused": {
       "title": "Not connected",
-      "body": "The other service did not complete the sign-in. Nothing changed here — try again from the plug-in's settings."
+      "body": "The connection was refused: the other service didn't finish the sign-in, or the account isn't one you control (for an organization, you need to be one of its owners). Nothing changed here — try again from the plug-in's settings."
     },
     "expired": {
       "title": "That link has expired",
@@ -239,10 +247,6 @@
     "sign_in_required": {
       "title": "Sign in to finish",
       "body": "Finish connecting in the browser where you're signed in to Initiative, as the person who started it."
-    },
-    "taken": {
-      "title": "Already connected elsewhere",
-      "body": "This organization is already connected to another community on this server, so nothing changed here. To connect it here, disconnect it there first, or remove the app from the organization at the other service and connect again."
     },
     "closeTab": "You can close this tab."
   },
@@ -273,10 +277,6 @@
       "files": {
         "read": "Read files",
         "write": "Read and change files"
-      },
-      "counter_groups": {
-        "read": "Read counters",
-        "write": "Read and change counters"
       },
       "calendars": {
         "read": "Read calendars",
@@ -344,5 +344,58 @@
   "permissions": {
     "use": "Use",
     "named": "{{plugin}}: {{permission}}"
+  },
+  "tool": {
+    "namePlaceholder": "Give it a name",
+    "readOnly": "You can read this, but not change it.",
+    "byline": "Added {{added}} · changed {{changed}}",
+    "fields": {
+      "createdAt": "Added",
+      "createdBy": "Added by",
+      "updatedAt": "Last changed"
+    },
+    "create": "New {{name}}",
+    "loadError": "These couldn't be loaded.",
+    "installsLoadError": "This community's tools couldn't be loaded.",
+    "empty": "Nothing here yet.",
+    "emptyBody": "Add the first one to get started.",
+    "createFirst": "Add the first one",
+    "noMatches": "Nothing here matches your filters.",
+    "notFound": "This isn't here",
+    "notFoundBody": "It may have been removed, or the tool it belongs to isn't installed in this community.",
+    "backToTool": "Back to {{name}}",
+    "actions": "Actions",
+    "layout": {
+      "name": "{{name}} page",
+      "help": "How each one is shown when it's opened. What it leaves out is hidden.",
+      "shipped": "This is the layout its plug-in ships. Changing it makes it this place's own.",
+      "titleHelp": "Each one shows its name.",
+      "hiddenHelp": "Each one can show this. Taken off, it is hidden, and Add puts it back.",
+      "parts": {
+        "byline": "Dates",
+        "notice": "Read-only notice",
+        "actions": "Menu",
+        "relations": "Relations",
+        "comments": "Comments"
+      },
+      "partHelp": {
+        "byline": "When it was added and last changed.",
+        "notice": "Tells a reader who can't change it so.",
+        "actions": "What else can be done with it.",
+        "relations": "What it is linked to.",
+        "comments": "Its conversation."
+      },
+      "noItems": "Add one to see its layout here.",
+      "lists": {
+        "grid": "Each one as a card, in even rows.",
+        "masonry": "Each one as a card, each as tall as it is.",
+        "table": "Each one as a row, its fields in columns."
+      }
+    },
+    "accessSettings": "Access settings"
+  },
+  "filters": {
+    "searchLabel": "Name or text",
+    "search": "Search by name or text"
   }
 }

@@ -19,51 +19,39 @@ const grantEntry = (level: "read" | "read_write") =>
   ({ id: 1, role: "member", accessType: "grant", grantAccessLevel: level }) as CommunityEntry;
 
 describe("community create gates (cheap, switcher-only)", () => {
-  it("keeps a member for both authoring and writing", () => {
-    expect(communityMayAuthorTools(memberCommunity())).toBe(true);
-    expect(communityMayWriteContent(memberCommunity())).toBe(true);
-  });
-
-  it("drops a frozen community for both gates", () => {
-    const frozen = memberCommunity({ content_read_only: true });
-    expect(communityMayAuthorTools(frozen)).toBe(false);
-    expect(communityMayWriteContent(frozen)).toBe(false);
-  });
-
-  it("lets a read_write grant write but not author, whoever holds it", () => {
-    const granted = grantEntry("read_write");
-    expect(communityMayAuthorTools(granted)).toBe(false);
-    expect(communityMayWriteContent(granted)).toBe(true);
-  });
-
-  it("denies a read grant both gates", () => {
-    const read = grantEntry("read");
-    expect(communityMayAuthorTools(read)).toBe(false);
-    expect(communityMayWriteContent(read)).toBe(false);
+  it.each([
+    ["keeps a member for both", memberCommunity(), true, true],
+    [
+      "drops a frozen community for both",
+      memberCommunity({ content_read_only: true }),
+      false,
+      false,
+    ],
+    ["lets a read_write grant write but not author", grantEntry("read_write"), false, true],
+    ["denies a read grant both", grantEntry("read"), false, false],
+  ])("%s", (_case, community, author, write) => {
+    expect(communityMayAuthorTools(community)).toBe(author);
+    expect(communityMayWriteContent(community)).toBe(write);
   });
 });
 
 describe("useGlobalCreateAccess", () => {
-  it("is false for both when every community is frozen or read-only-granted", () => {
-    mockUseCommunities.mockReturnValue({
-      communities: [memberCommunity({ id: 1, content_read_only: true }), grantEntry("read")],
-    });
+  it.each([
+    [
+      "every community is frozen or read-only-granted",
+      [memberCommunity({ id: 1, content_read_only: true }), grantEntry("read")],
+      { tool: false, task: false },
+    ],
+    [
+      "a read_write grant writes without authoring",
+      [grantEntry("read_write")],
+      { tool: false, task: true },
+    ],
+    ["a member community is present", [memberCommunity()], { tool: true, task: true }],
+  ])("when %s", (_case, communities, expected) => {
+    mockUseCommunities.mockReturnValue({ communities });
 
     const { result } = renderHook(() => useGlobalCreateAccess());
-    expect(result.current).toEqual({ tool: false, task: false });
-  });
-
-  it("separates authoring from writing for a read_write grant", () => {
-    mockUseCommunities.mockReturnValue({ communities: [grantEntry("read_write")] });
-
-    const { result } = renderHook(() => useGlobalCreateAccess());
-    expect(result.current).toEqual({ tool: false, task: true });
-  });
-
-  it("is true for both when a member community is present", () => {
-    mockUseCommunities.mockReturnValue({ communities: [memberCommunity()] });
-
-    const { result } = renderHook(() => useGlobalCreateAccess());
-    expect(result.current).toEqual({ tool: true, task: true });
+    expect(result.current).toEqual(expected);
   });
 });

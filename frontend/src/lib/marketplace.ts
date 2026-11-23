@@ -1,4 +1,5 @@
-import { ListingKind } from "@/api/generated/initiativeAPI.schemas";
+import { ListingKind, ListingSource } from "@/api/generated/initiativeAPI.schemas";
+import { darkVariant } from "@/lib/releaseImages";
 
 /**
  * Which marketplace offers a listing.
@@ -15,30 +16,13 @@ import { ListingKind } from "@/api/generated/initiativeAPI.schemas";
  * already have this" — a community's install is shared, a person's is theirs.
  *
  * Mirrors ``KIND_AUDIENCE`` in ``backend/app/services/marketplace/
- * definitions.py``, which is the source of truth; a kind missing from both
- * lists here is offered by neither, which the test below refuses.
+ * definitions.py``, which is the source of truth.
  */
-export const USER_SHELVES = [ListingKind.home_layout, ListingKind.profile_pack] as const;
-
 export const COMMUNITY_SHELVES = [
   ListingKind.dashboard,
   ListingKind.project,
   ListingKind.plugin,
   ListingKind.auto,
-] as const;
-
-/**
- * Kinds the server publishes that no shelf shows yet: the tool marketplaces
- * other than dashboards and projects. Each one exists in the API — browse,
- * detail and install — and is surfaced by moving it into `COMMUNITY_SHELVES`.
- */
-export const UNSHELVED_KINDS = [
-  ListingKind.file,
-  ListingKind.counter_group,
-  ListingKind.calendar,
-  ListingKind.post,
-  ListingKind.wiki,
-  ListingKind.contact,
 ] as const;
 
 /** A shelf a community installs from — the values `?kind=` may name under
@@ -102,3 +86,9 @@ export const minimumAgeFor = (
   const age = (region ? ages[region] : undefined) ?? ages.default;
   return typeof age === "number" ? age : null;
 };
+
+/** A listing's picture in the theme the app is drawn in. A built-in listing's
+ *  pictures come in two, `name.webp` and `name.dark.webp`, as `pnpm
+ *  screenshots` takes them; any other catalog's are drawn as written. */
+export const listingImageUrl = (image: string, source: ListingSource, dark: boolean): string =>
+  dark && source === ListingSource.builtin ? darkVariant(image) : image;

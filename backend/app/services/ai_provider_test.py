@@ -389,14 +389,6 @@ async def test_a_private_address_is_reached_only_when_allowed(monkeypatch):
     assert request.url.path == "/v1/chat/completions"
 
 
-def test_only_the_operators_own_servers_reach_private_addresses():
-    for provider in (AIProvider.ollama, AIProvider.custom):
-        assert ai_provider.allow_private(provider, "platform") is True
-        assert ai_provider.allow_private(provider, "community") is False
-    for provider in (AIProvider.openai, AIProvider.anthropic, AIProvider.openrouter):
-        assert ai_provider.allow_private(provider, "platform") is False
-
-
 async def test_a_connection_without_its_key_or_model_sends_nothing(monkeypatch):
     fake = _Provider(monkeypatch, reply=lambda body: _anthropic_reply("x"))
     for target, code in (

@@ -1,12 +1,12 @@
-"""RLS / role-security test for the auth_sessions store.
+"""The system engine's own tables, as the request path meets them.
 
-Locks in the app_admin-only wall (migration 20260706_0132): the request path
-cannot touch sessions at all, so the refresh-token hash is never read there. Session
-validation is a pre-auth lookup by hash (user unknown) and so runs on the system
-engine — there is deliberately no own-row request-path access.
+Sessions, sign-in providers and their secrets, API keys and email tokens are
+resolved before an account is known, so they are read and written on the
+system engine alone: no request role holds a grant on them, and every one is
+refused at the grant layer, the row's own account included.
 
-Style mirrors ``platform_role_rls_test``: SET ROLE platform_<tier> drops to a
-non-superuser role so RLS + table GRANTs are enforced like the request path.
+``SET ROLE`` drops the superuser setup session to the role under test, so the
+table grants are enforced as they are on a real request.
 """
 
 import hashlib
@@ -17,35 +17,36 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
 from app.db.public_rls import platform_tier, role_name
+from app.models.platform.user import UserRole
 from app.testing import as_role, create_user
 
 
-async def _make_session_row(session, user_id: int, token: str) -> None:
-    await session.exec(
-        text(
-            "INSERT INTO auth_sessions "
-            "(user_id, refresh_token_hash, expires_at, created_at) "
-            "VALUES (:u, :h, now() + interval '1 day', now())"
-        ),
-        params={"u": user_id, "h": hashlib.sha256(token.encode()).digest()},
+@pytest.mark.parametrize(
+    ("table", "column"),
+    [
+        ("auth_sessions", "refresh_token_hash"),
+        ("auth_providers", "id"),
+        ("auth_provider_secrets", "client_secret_encrypted"),
+        ("user_api_keys", "token_hash"),
+        ("user_tokens", "token"),
+    ],
+)
+async def test_a_system_engine_table_is_refused_to_every_request_role(
+    session, table, column
+):
+    user = await create_user(session)
+    roles = (
+        "app_user",
+        "app_guild_base",
+        "app_guild_base_ro",
+        *(role_name(platform_tier(tier)) for tier in UserRole),
     )
-
-
-async def test_auth_sessions_unreadable_on_request_path(session):
-    """No request-path grant: even the highest platform tier is denied at the
-    grant layer, so the refresh-token hash can never be read off the request path.
-    The superuser setup session (like the system engine) still sees the row."""
-    u1 = await create_user(session)
-    await _make_session_row(session, u1.id, "refresh-token-1")
-
-    # Positive control: the privileged path sees the session it just wrote.
-    seen = (await session.exec(text("SELECT count(*) FROM auth_sessions"))).scalar_one()
-    assert seen >= 1
-
-    async with as_role(session, role_name(platform_tier("owner")), u1.id):
-        with pytest.raises(DBAPIError):
-            async with session.begin_nested():
-                await session.exec(text("SELECT id FROM auth_sessions"))
+    for role in roles:
+        for statement in (f"SELECT {column} FROM {table}", f"DELETE FROM {table}"):
+            async with as_role(session, role, user.id):
+                with pytest.raises(DBAPIError):
+                    async with session.begin_nested():
+                        await session.exec(text(statement))
 
 
 async def test_session_cannot_be_its_own_rotation_parent(session):

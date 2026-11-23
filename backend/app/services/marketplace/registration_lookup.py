@@ -9,7 +9,8 @@ system engine and kept as an immutable snapshot the request path reads.
 
 **Freshness is bounded, and a suspension is immediate.** The cache is
 short-lived *and* dropped in-process on any registration or publisher write. A
-suspension or an install's status, written by any process, is announced on
+suspension, a platform connection or an install's status, written by any
+process, is announced on
 :data:`CHANNEL` by the database, and every process drops its snapshot on
 hearing it (:func:`hint`). Anything else a replica that did not serve the write
 picks up within the TTL.
@@ -66,6 +67,7 @@ __all__ = [
     "declarative_registration",
     "enabled_service_ids",
     "frame_origins",
+    "held_connections",
     "hint",
     "install_state",
     "invalidate_registrations",
@@ -137,6 +139,10 @@ class RegistrationSnapshot:
     #: The state of each install of its listing that is not plain active, by
     #: community: its status, or ``suspended`` where staff suspended it.
     install_states: Mapping[int, PluginState] = MappingProxyType({})
+    #: The community connections the platform connected for every community,
+    #: by connection id: each as a community's own stored connection reads
+    #: (:mod:`~app.services.marketplace.platform_connections`).
+    platform_connections: Mapping[str, Mapping[str, Any]] = MappingProxyType({})
 
     @property
     def browser_base(self) -> str:
@@ -211,6 +217,20 @@ _loaded_at: float = 0.0
 #: The installs that are not plain active, by listing and community, loaded
 #: with the snapshot: an install keeps its state with no registration behind it.
 _install_states: Mapping[str, Mapping[int, PluginState]] = MappingProxyType({})
+
+
+def held_connections(
+    stored: Mapping[str, Any] | None,
+) -> Mapping[str, Mapping[str, Any]]:
+    """The values of each connection a registration's ``platform_connections``
+    holds, by connection id, read only."""
+    return MappingProxyType(
+        {
+            connection_id: MappingProxyType(dict(entry["values"]))
+            for connection_id, entry in (stored or {}).items()
+            if isinstance(entry, dict) and isinstance(entry.get("values"), dict)
+        }
+    )
 
 
 def invalidate_registrations() -> None:
@@ -341,6 +361,7 @@ async def load_registrations(*, force: bool = False) -> dict[str, RegistrationSn
             operations_guild_id=operations_guild_id,
             beta_communities=frozenset(beta.get(row.listing_uid or "", ())),
             install_states=MappingProxyType(states.get(row.listing_uid or "", {})),
+            platform_connections=held_connections(row.platform_connections),
         )
         for row, live, operations_guild_id, signed, source in rows
     }
@@ -480,9 +501,17 @@ async def install_state(
 
     A plug-in with no service behind it — a tool instance — is always
     available and never mandatory, and has no state: there is no registration
-    for it to depend on. A service with no registration here keeps the state
-    staff gave its install.
+    for it to depend on. A tool plug-in runs nowhere either, so it is always
+    available and never mandatory, but it has a state: its registration's
+    and its install's, as a service's has. A service with no registration
+    here keeps the state staff gave its install.
     """
+    if isinstance(definition, Mapping) and definition.get("plugin_kind") == "tool":
+        snapshot = await declarative_registration(listing_uid)
+        if snapshot is not None:
+            return InstallState(state=snapshot.state_in(guild_id))
+        held = _install_states.get(listing_uid or "", {}).get(guild_id or 0)
+        return InstallState(state=held or PluginState.active)
     if not _has_registration(definition):
         return InstallState()
     snapshot = await registration_for_definition(definition, listing_uid=listing_uid)

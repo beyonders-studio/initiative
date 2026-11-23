@@ -19,7 +19,6 @@ import {
   type RelationshipRead,
   RelationshipType,
   SearchEntityType,
-  type Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
   useGetRelationsNeighbourhood,
@@ -50,9 +49,10 @@ export const useRelationshipsFor = (entity: EndpointRef, options?: { enabled?: b
   return useListRelationships(communityId, params, { query: options });
 };
 
-/** A tool and which one of them — what a cache entry for the shims is keyed by. */
+/** A tool, by its kind (a built-in tool's or a tool plug-in's), and which one
+ *  of them — what a cache entry for the shims is keyed by. */
 export interface ToolRef {
-  tool: Tool;
+  tool: string;
   id: number;
 }
 
@@ -248,7 +248,7 @@ interface ItemLinks {
  * links is written as an empty set, so removing the last of a kind sticks.
  */
 export const useSetItemLinks = (
-  tool: Tool,
+  tool: string,
   toolId: number,
   options?: MutationOpts<void, ItemLinks>
 ) =>

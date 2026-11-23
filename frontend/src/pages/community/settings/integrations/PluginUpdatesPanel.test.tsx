@@ -52,6 +52,12 @@ const asks = (overrides: Partial<CommunityPluginUpgradeAsks>): CommunityPluginUp
   version: "1.2.0",
   added_scopes: ["files:read"],
   added_surfaces: [],
+  added_tables: [],
+  added_fields: [],
+  added_options: [],
+  added_actions: [],
+  dropped_fields: [],
+  dropped_options: [],
   declined: false,
   ...overrides,
 });
@@ -63,24 +69,15 @@ beforeEach(() => {
 });
 
 describe("PluginUpdatesPanel", () => {
-  it("shows an install as tracking, and turns that off when asked", async () => {
-    renderPage(() => <PluginUpdatesPanel plugin={plugin({})} />);
+  // An install that tracks is the common case, so the first click turns it off.
+  it.each([true, false])("shows tracking as %s, and flips it when asked", async (tracking) => {
+    renderPage(() => <PluginUpdatesPanel plugin={plugin({ auto_update: tracking })} />);
 
     const toggle = await screen.findByLabelText("Update automatically");
-    expect(toggle).toBeChecked();
+    expect(toggle).toHaveAttribute("aria-checked", String(tracking));
 
     toggle.click();
-    expect(patched).toEqual([{ auto_update: false }]);
-  });
-
-  it("turns tracking back on from the manual state", async () => {
-    renderPage(() => <PluginUpdatesPanel plugin={plugin({ auto_update: false })} />);
-
-    const toggle = await screen.findByLabelText("Update automatically");
-    expect(toggle).not.toBeChecked();
-
-    toggle.click();
-    expect(patched).toEqual([{ auto_update: true }]);
+    expect(patched).toEqual([{ auto_update: !tracking }]);
   });
 
   it("offers the version the server named, and applies it", async () => {
@@ -119,39 +116,65 @@ describe("PluginUpdatesPanel", () => {
 
   it("says what a version asking for more wants, and accepts it with its scopes", async () => {
     const wanted = asks({
-      added_scopes: ["files:write"],
+      added_scopes: ["files:write", "plugins:acme.github"],
       added_surfaces: [{ id: "planner", name: { en: "Planner" } }],
     });
     renderPage(() => (
       <>
         <PluginUpdatesPanel plugin={plugin({ update_version: "1.2.0", pending_update: wanted })} />
-        <PluginPendingUpdate pluginId={7} asks={wanted} />
+        <PluginPendingUpdate pluginId={7} asks={wanted} pluginNames={{ "acme.github": "GitHub" }} />
       </>
     ));
 
     expect(await screen.findByText("Version 1.2.0 wants to:")).toBeInTheDocument();
     expect(screen.getByText("Read and change files")).toBeInTheDocument();
     expect(screen.getByText("Show “Planner” inside initiatives")).toBeInTheDocument();
+    // Using another plug-in names that plug-in.
+    expect(screen.getByText("Use GitHub in this community")).toBeInTheDocument();
     // The plain Update button is not offered beside the question.
     expect(screen.queryByRole("button", { name: /Update to/ })).not.toBeInTheDocument();
 
     screen.getByRole("button", { name: "Accept and update" }).click();
     expect(upgraded).toHaveBeenCalledWith(
-      { version: "1.2.0", add_scopes: ["files:write"] },
+      {
+        version: "1.2.0",
+        add_scopes: ["files:write", "plugins:acme.github"],
+        drop_fields: [],
+        drop_options: [],
+      },
       expect.anything()
     );
   });
 
-  it("says a version asking to use another plug-in names that plug-in", async () => {
-    renderPage(() => (
-      <PluginPendingUpdate
-        pluginId={7}
-        asks={asks({ version: "1.3.0", added_scopes: ["plugins:acme.github"] })}
-        pluginNames={{ "acme.github": "GitHub" }}
-      />
-    ));
+  it("lists what a tool plug-in's version changes, and confirms what it drops", async () => {
+    const wanted = asks({
+      version: "2.0.0",
+      added_scopes: [],
+      added_fields: ["counter.unit"],
+      dropped_fields: ["counter.color"],
+      dropped_options: ["counter.view_mode.clock"],
+    });
+    renderPage(() => <PluginPendingUpdate pluginId={7} asks={wanted} />);
 
-    expect(await screen.findByText("Use GitHub in this community")).toBeInTheDocument();
+    expect(await screen.findByText("Add the field “counter.unit”")).toBeInTheDocument();
+    expect(
+      screen.getByText("Remove the field “counter.color” and delete what it holds")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Stop offering the choice “counter.view_mode.clock”, emptying it wherever it was picked"
+      )
+    ).toBeInTheDocument();
+    screen.getByRole("button", { name: "Accept, update and delete what it drops" }).click();
+    expect(upgraded).toHaveBeenCalledWith(
+      {
+        version: "2.0.0",
+        add_scopes: [],
+        drop_fields: ["counter.color"],
+        drop_options: ["counter.view_mode.clock"],
+      },
+      expect.anything()
+    );
   });
 
   it("declines the version it was shown", async () => {

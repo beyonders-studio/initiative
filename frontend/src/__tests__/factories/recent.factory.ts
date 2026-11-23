@@ -43,8 +43,6 @@ export function buildRecentFileItem(overrides: Partial<PersonalItemRead> = {}): 
   });
 }
 
-export function buildRecentCounterGroupItem(
-  overrides: Partial<PersonalItemRead> = {}
-): PersonalItemRead {
-  return buildRecentItem({ entity_type: "counter_group", ...overrides });
+export function buildRecentWikiItem(overrides: Partial<PersonalItemRead> = {}): PersonalItemRead {
+  return buildRecentItem({ entity_type: "wiki", ...overrides });
 }

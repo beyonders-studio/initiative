@@ -85,16 +85,6 @@ describe("ConnectionActionsMenu", () => {
     );
   });
 
-  it("offers the conversation itself where there is one", async () => {
-    mocks.permission.mockReturnValue({ data: { permission: "open" } });
-    await open();
-
-    expect(screen.getByRole("menuitem", { name: "Message" })).toHaveAttribute(
-      "href",
-      "/messages?with=ada1234"
-    );
-  });
-
   it("is the whole of what one account can do about another, by default", async () => {
     mocks.permission.mockReturnValue({ data: { permission: "open", may_connect: true } });
     await open();
@@ -102,6 +92,11 @@ describe("ConnectionActionsMenu", () => {
     for (const name of [/view profile/i, /^message$/i, /^connect$/i, /copy handle/i, /^ignore$/i]) {
       expect(screen.getByRole("menuitem", { name })).toBeInTheDocument();
     }
+    // The conversation itself, where there is one.
+    expect(screen.getByRole("menuitem", { name: "Message" })).toHaveAttribute(
+      "href",
+      "/messages?with=ada1234"
+    );
   });
 
   it("leaves out only what the surface around it already offers", async () => {
@@ -128,18 +123,14 @@ describe("ConnectionActionsMenu", () => {
     expect(writeText).toHaveBeenCalledWith("ada#1234");
   });
 
-  it("offers nothing to open where the channel is not", async () => {
+  it("offers nothing to open where the channel is not, and asks only where the server says", async () => {
     await open();
 
     expect(screen.queryByRole("menuitem", { name: "Message" })).toBeNull();
-  });
-
-  it("only offers to ask when the server says the reader may", async () => {
-    await open();
     expect(screen.queryByRole("menuitem", { name: "Ask to message" })).toBeNull();
   });
 
-  it("offers it when it does", async () => {
+  it("offers to ask when the server says the reader may", async () => {
     mocks.permission.mockReturnValue({ data: { permission: "may_request" } });
     await open();
 

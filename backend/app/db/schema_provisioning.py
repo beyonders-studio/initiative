@@ -25,15 +25,18 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
-from dataclasses import dataclass, field
+from collections import OrderedDict
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
+from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import func, literal, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings
+from app.core.tool_set import BUILTIN_TOOLS, KEPT_TOOL_SETS, ToolSet
 from app.db import bootstrap
 from app.db import session as db_session
 from app.db.advisory_locks import LockNamespace, advisory_lock
@@ -146,7 +149,6 @@ SYSTEM_GUILD_MAINTENANCE_GRANTS: dict[str, tuple[str, ...]] = {
     # record (``SELECT *``) before capture/search triggers resolve identifiers.
     # PostgreSQL therefore requires table-level SELECT for these dependencies.
     "projects": ("SELECT",),
-    "counter_groups": ("SELECT",),
     "calendars": ("SELECT",),
     "dashboards": ("SELECT",),
     "collections": ("SELECT",),
@@ -244,6 +246,73 @@ class ProvisioningBundle:
     timer_ddl: str
     operations: dict[str, str]
     digests: dict[str, str]
+    #: The tools the parts were rendered from: the built-in ones, or a
+    #: community's with its installed tool plug-ins (:meth:`for_tools`).
+    tools: ToolSet = BUILTIN_TOOLS
+    #: The operator class the search index is built on, or None.
+    search_opclass: str | None = None
+
+    def for_tools(self, tools: ToolSet) -> ProvisioningBundle:
+        """This bundle for a community with ``tools``: the parts a tool set
+        renders (its tables' structure, the registry CHECKs, the grants, the
+        row security and the capture, search and timer triggers) rendered from
+        it, the rest as they are. The bundle itself
+        for a community with no tool plug-in, so its render does not move.
+        Rendered once per process per set, from the built-in bundle."""
+        if tools is self.tools or not tools.installed:
+            return self
+        if self.tools.installed:
+            raise ValueError("a community's bundle is rendered from the built-in one")
+        key = (id(self), tools.digest)
+        found = _community_bundles.get(key)
+        if found is not None:
+            _community_bundles.move_to_end(key)
+            return found
+        from app.db.event_capture import render_guild_capture_ddl
+        from app.db.guild_ddl import render_guild_rls_ddl
+        from app.db.plugin_tools import structure_ddl
+        from app.db.registry_checks import render_guild_registry_check_ddl
+        from app.db.search_index import render_guild_search_ddl
+        from app.db.timers import render_guild_timer_ddl
+
+        schema_ddl = f"{self.schema_ddl}\n-- installed tools\n{structure_ddl(tools)}"
+        checks_ddl = _every_community(
+            render_guild_registry_check_ddl(tools), self.operations["checks"]
+        )
+        rls_ddl = _every_community(render_guild_rls_ddl(tools), self.operations["rls"])
+        capture_ddl = _every_community(
+            render_guild_capture_ddl(tools), self.operations["capture"]
+        )
+        search_ddl = _every_community(
+            render_guild_search_ddl(self.search_opclass, tools),
+            self.operations["search"],
+        )
+        timer_ddl = render_guild_timer_ddl(tools)
+        grants = _grant_statements("__stamp__", 0, tools)
+        found = replace(
+            self,
+            schema_ddl=schema_ddl,
+            checks_ddl=checks_ddl,
+            rls_ddl=rls_ddl,
+            capture_ddl=capture_ddl,
+            search_ddl=search_ddl,
+            timer_ddl=timer_ddl,
+            tools=tools,
+            digests={
+                **self.digests,
+                "schema": _digest(schema_ddl, self.operations["schema"]),
+                "checks": _digest(checks_ddl, self.operations["checks"]),
+                "grants": _digest(*grants),
+                "rls": _digest(rls_ddl, self.operations["rls"]),
+                "capture": _digest(capture_ddl, self.operations["capture"]),
+                "search": _digest(search_ddl, self.operations["search"]),
+                "timers": _digest(timer_ddl, self.operations["timers"]),
+            },
+        )
+        _community_bundles[key] = found
+        while len(_community_bundles) > KEPT_TOOL_SETS:
+            _community_bundles.popitem(last=False)
+        return found
 
     @property
     def stamp(self) -> str:
@@ -253,9 +322,12 @@ class ProvisioningBundle:
     def stamp_pending(self, *parts: str) -> str:
         """The stamp, with ``parts`` still to finish: a later boot applies
         them again."""
-        return _STAMP_PREFIX + ",".join(
+        stamp = _STAMP_PREFIX + ",".join(
             f"{p}={'pending' if p in parts else self.digests[p]}" for p in PARTS
         )
+        if self.tools.installed:
+            stamp += f",{TOOLS_ITEM}={self.tools.digest}"
+        return stamp
 
     def stale_parts(self, stamp: str | None) -> tuple[str, ...]:
         """The parts a schema commented ``stamp`` still needs, in apply order."""
@@ -265,11 +337,56 @@ class ProvisioningBundle:
             if "=" in item
         )
         stale = tuple(p for p in PARTS if applied.get(p) != self.digests[p])
+        if applied.get(TOOLS_ITEM) != self.tools.digest:
+            return PARTS
         return PARTS if "schema" in stale else stale
 
 
 _bundle: ProvisioningBundle | None = None
 _bundle_lock = asyncio.Lock()
+#: :meth:`ProvisioningBundle.for_tools`'s renders, by bundle and tool set,
+#: the least recently used first.
+_community_bundles: OrderedDict[tuple[int, str | None], ProvisioningBundle] = (
+    OrderedDict()
+)
+
+#: The stamp's item naming the installed tool plug-ins its community's parts
+#: were rendered with, on a community that has any.
+TOOLS_ITEM = "tools"
+
+
+def schema_stamp(guild_id: int) -> Any:
+    """``guild_id``'s schema stamp as a column, for a read that runs anyway:
+    a schema comment is a catalog row any role reads."""
+    return func.obj_description(
+        func.to_regnamespace(literal(guild_schema_name(guild_id))),
+        literal("pg_namespace"),
+    )
+
+
+def stamp_tools(stamp: str | None) -> str | None:
+    """The digest of the tool plug-ins a schema stamped ``stamp`` was rendered
+    with, or None where it names none."""
+    for item in (stamp or "").removeprefix(_STAMP_PREFIX).split(","):
+        name, _, value = item.partition("=")
+        if name == TOOLS_ITEM:
+            return value
+    return None
+
+
+def _every_community(ddl: str, operations: str) -> str:
+    """``ddl`` less the operations community's own share, ``operations``,
+    which a community's tool plug-ins leave as it is: what every community's
+    schema applies. Taken by the statements of the built-in share rather than
+    by what each statement names, since a plug-in's kinds are free text there.
+    """
+    from app.db.guild_migrations import split_sql_statements
+
+    theirs = set(split_sql_statements(operations))
+    statements = split_sql_statements(ddl)
+    if not theirs <= set(statements):
+        raise ValueError("installed tools changed the operations community's share")
+    return "".join(f"{s};\n" for s in statements if s not in theirs)
 
 
 def _digest(*renders: str) -> str:
@@ -301,16 +418,16 @@ async def get_provisioning_bundle() -> ProvisioningBundle:
         engine = db_session.provisioning_engine
         schema_ddl = await render_guild_schema_ddl(engine)
         checks_ddl, operations_checks = split_operations(
-            render_guild_registry_check_ddl()
+            render_guild_registry_check_ddl(BUILTIN_TOOLS)
         )
-        rls_ddl, operations_rls = split_operations(render_guild_rls_ddl())
+        rls_ddl, operations_rls = split_operations(render_guild_rls_ddl(BUILTIN_TOOLS))
         capture_ddl, operations_capture = split_operations(render_guild_capture_ddl())
         # Naming the operator class in the rendered text is what makes the
         # digest move when it is installed later, so the sweep rebuilds indexes
         # that were created without it.
         opclass = f"public.{SEARCH_OPCLASS}" if await search_operator_ready() else None
         search_ddl, operations_search = split_operations(
-            render_guild_search_ddl(opclass)
+            render_guild_search_ddl(opclass, BUILTIN_TOOLS)
         )
         timer_ddl = render_guild_timer_ddl()
         operations = {
@@ -321,7 +438,7 @@ async def get_provisioning_bundle() -> ProvisioningBundle:
             "search": operations_search,
             "timers": render_guild_timer_ddl(operations=True),
         }
-        grants = _grant_statements("__stamp__", 0)
+        grants = _grant_statements("__stamp__", 0, BUILTIN_TOOLS)
         _bundle = ProvisioningBundle(
             schema_ddl=schema_ddl,
             checks_ddl=checks_ddl,
@@ -331,6 +448,7 @@ async def get_provisioning_bundle() -> ProvisioningBundle:
             search_ddl=search_ddl,
             timer_ddl=timer_ddl,
             operations=operations,
+            search_opclass=opclass,
             digests={
                 "schema": _digest(schema_ddl, operations["schema"]),
                 "checks": _digest(checks_ddl, operations["checks"]),
@@ -348,9 +466,12 @@ def reset_provisioning_bundle() -> None:
     """Drop the cached render (tests; or after in-process template changes)."""
     global _bundle
     _bundle = None
+    _community_bundles.clear()
 
 
-async def apply_guild_schema(conn: AsyncConnection, schema: str) -> None:
+async def apply_guild_schema(
+    conn: AsyncConnection, schema: str, bundle: ProvisioningBundle | None = None
+) -> None:
     """Build/refresh ``schema``'s guild-scoped tables by RUNNING the canonical,
     Alembic-owned DDL with the search_path pointed at it.
 
@@ -360,7 +481,7 @@ async def apply_guild_schema(conn: AsyncConnection, schema: str) -> None:
     ``public``) and idempotent (``IF NOT EXISTS`` / guarded constraints), so a
     re-run back-fills anything a later migration added. No model, no clone.
     """
-    ddl = (await get_provisioning_bundle()).schema_ddl
+    ddl = (bundle or await get_provisioning_bundle()).schema_ddl
     raw = await conn.get_raw_connection()
     # search_path so unqualified CREATEs land in the schema and intra-schema FKs
     # resolve there; reset to public so it doesn't leak onto the pooled connection.
@@ -370,11 +491,16 @@ async def apply_guild_schema(conn: AsyncConnection, schema: str) -> None:
 
 
 async def apply_guild_checks(
-    conn: AsyncConnection, schema: str, *, replace: bool = True, validate: bool = True
+    conn: AsyncConnection,
+    schema: str,
+    *,
+    replace: bool = True,
+    validate: bool = True,
+    bundle: ProvisioningBundle | None = None,
 ) -> None:
     """Replace and/or validate the registry CHECKs on ``schema``'s tables
     (``app.db.registry_checks``), with the search_path pointed at it."""
-    bundle = await get_provisioning_bundle()
+    bundle = bundle or await get_provisioning_bundle()
     ddl = "\n".join(
         ([bundle.checks_ddl] if replace else [])
         + ([bundle.validate_ddl] if validate else [])
@@ -385,7 +511,9 @@ async def apply_guild_checks(
     )
 
 
-async def apply_guild_rls(conn: AsyncConnection, schema: str) -> None:
+async def apply_guild_rls(
+    conn: AsyncConnection, schema: str, bundle: ProvisioningBundle | None = None
+) -> None:
     """Apply the initiative-level RLS policies to ``schema``'s tables by RUNNING
     the registry-rendered RLS DDL with the search_path pointed at it.
 
@@ -396,7 +524,7 @@ async def apply_guild_rls(conn: AsyncConnection, schema: str) -> None:
     per-table EXISTS joins resolve against the guild-local tables. The
     ``public`` functions those copies call are applied at boot before this runs.
     """
-    ddl = (await get_provisioning_bundle()).rls_ddl
+    ddl = (bundle or await get_provisioning_bundle()).rls_ddl
     raw = await conn.get_raw_connection()
     await raw.driver_connection.execute(
         f'SET search_path TO "{schema}", public;\n{ddl}\nSET search_path TO public;'
@@ -434,7 +562,9 @@ async def apply_guild_trigger_functions(conn: AsyncConnection) -> None:
     )
 
 
-async def apply_guild_capture(conn: AsyncConnection, schema: str) -> None:
+async def apply_guild_capture(
+    conn: AsyncConnection, schema: str, bundle: ProvisioningBundle | None = None
+) -> None:
     """Install the change-capture triggers on ``schema``'s evented tables.
 
     Schema-relative + idempotent (``DROP TRIGGER IF EXISTS`` + ``CREATE
@@ -445,20 +575,22 @@ async def apply_guild_capture(conn: AsyncConnection, schema: str) -> None:
     tables through the caller's search_path, the same way the RLS policies'
     EXISTS joins do.
     """
-    ddl = (await get_provisioning_bundle()).capture_ddl
+    ddl = (bundle or await get_provisioning_bundle()).capture_ddl
     raw = await conn.get_raw_connection()
     await raw.driver_connection.execute(
         f'SET search_path TO "{schema}", public;\n{ddl}\nSET search_path TO public;'
     )
 
 
-async def apply_guild_search(conn: AsyncConnection, schema: str) -> None:
+async def apply_guild_search(
+    conn: AsyncConnection, schema: str, bundle: ProvisioningBundle | None = None
+) -> None:
     """Install the search-index refresh triggers on ``schema``'s indexed tables.
 
     Same shape as :func:`apply_guild_capture`: per-table triggers calling
     shared functions that :func:`apply_guild_trigger_functions` keeps current.
     """
-    ddl = (await get_provisioning_bundle()).search_ddl
+    ddl = (bundle or await get_provisioning_bundle()).search_ddl
     raw = await conn.get_raw_connection()
     await raw.driver_connection.execute(
         f'SET search_path TO "{schema}", public;\n{ddl}\nSET search_path TO public;'
@@ -473,13 +605,15 @@ async def _run_in_schema(conn: AsyncConnection, schema: str, ddl: str) -> None:
     )
 
 
-async def apply_guild_timers(conn: AsyncConnection, schema: str) -> None:
+async def apply_guild_timers(
+    conn: AsyncConnection, schema: str, bundle: ProvisioningBundle | None = None
+) -> None:
     """Install the sweep-timer triggers on ``schema``'s tables.
 
     Same shape as :func:`apply_guild_capture`: per-table triggers calling
     shared functions that :func:`apply_guild_trigger_functions` keeps current.
     """
-    ddl = (await get_provisioning_bundle()).timer_ddl
+    ddl = (bundle or await get_provisioning_bundle()).timer_ddl
     raw = await conn.get_raw_connection()
     await raw.driver_connection.execute(
         f'SET search_path TO "{schema}", public;\n{ddl}\nSET search_path TO public;'
@@ -608,8 +742,10 @@ PLUGIN_ROLE_MACHINERY_WRITES: dict[str, tuple[str, ...]] = {
 }
 
 
-def _plugin_role_grant_statements(schema: str, plugin_role: str) -> list[str]:
-    """The plug-in role's grants, rendered from ``PLUGIN_TABLE_ACCESS`` in table order.
+def _plugin_role_grant_statements(
+    schema: str, plugin_role: str, tools: ToolSet
+) -> list[str]:
+    """The plug-in role's grants, rendered from ``plugin_table_access`` in table order.
 
     A scoped table a plug-in writes, a side-effect table and the subscriptions
     table take DML (the row policies decide which rows); a scoped read-only
@@ -617,14 +753,15 @@ def _plugin_role_grant_statements(schema: str, plugin_role: str) -> list[str]:
     The role's table grants are cleared first, so a re-provision leaves it
     holding what the registry says now.
     """
-    from app.db.plugin_rls import PLUGIN_TABLE_ACCESS, PluginTableKind
+    from app.db.plugin_rls import PluginTableKind, plugin_table_access
 
     stmts = [
         f'REVOKE ALL ON ALL TABLES IN SCHEMA "{schema}" FROM "{plugin_role}"',
         f'GRANT USAGE ON SCHEMA "{schema}" TO "{plugin_role}"',
     ]
-    for table in sorted(PLUGIN_TABLE_ACCESS):
-        access = PLUGIN_TABLE_ACCESS[table]
+    access_by_table = plugin_table_access(tools)
+    for table in sorted(access_by_table):
+        access = access_by_table[table]
         if access.writable or access.kind is PluginTableKind.side_effect:
             verbs = "SELECT, INSERT, UPDATE, DELETE"
         else:
@@ -654,7 +791,7 @@ def _plugin_role_grant_statements(schema: str, plugin_role: str) -> list[str]:
     return stmts
 
 
-def _grant_statements(schema: str, guild_id: int) -> list[str]:
+def _grant_statements(schema: str, guild_id: int, tools: ToolSet) -> list[str]:
     """Fail-closed grants tying each of the guild's roles to its ``schema``.
 
     NOTE: the provisioning-bundle stamp hashes this function's RENDERED
@@ -697,6 +834,14 @@ def _grant_statements(schema: str, guild_id: int) -> list[str]:
             f"GRANT {', '.join(privileges)} ON TABLE "
             f'"{schema}"."{table}" TO "{SYSTEM_LOGIN_ROLE}"'
             for table, privileges in system_maintenance_grants().items()
+        ),
+        # A comment can hang off a tool plug-in's row or one of its items, as
+        # off a built-in tool's, so the guard reads them while the scrub
+        # rewrites that comment.
+        *(
+            f'GRANT SELECT ON TABLE "{schema}"."{table.name}" TO "{SYSTEM_LOGIN_ROLE}"'
+            for record in tools.installed
+            for table in (record.table, *record.items)
         ),
         *(
             f"GRANT {', '.join(privileges)} ON SEQUENCE "
@@ -787,7 +932,7 @@ def _grant_statements(schema: str, guild_id: int) -> list[str]:
         )
     # Plug-in role: table by table from the plug-in registry, with no default
     # privileges and no guild role composed in.
-    stmts.extend(_plugin_role_grant_statements(schema, plugin_role))
+    stmts.extend(_plugin_role_grant_statements(schema, plugin_role, tools))
     # Guest roles: table by table from the guest registry, likewise.
     from app.db.guest_access import guest_role_grant_statements
 
@@ -812,6 +957,7 @@ def _grant_statements(schema: str, guild_id: int) -> list[str]:
                 guest_role,
                 guest_ro_role,
             ),
+            tools,
         )
     )
     return stmts
@@ -858,8 +1004,13 @@ async def _apply_parts(
     *,
     validate_checks: bool = True,
     operations: bool | None = None,
+    tools: ToolSet | None = None,
 ) -> None:
     """Apply ``parts`` of the bundle to ``guild_<id>``, then stamp the schema.
+
+    The bundle is the community's (:meth:`ProvisioningBundle.for_tools`):
+    ``tools``, or its installed tool plug-ins as they stand, read before any
+    part takes a lock its readers wait on.
 
     Every part is idempotent (``IF NOT EXISTS``, ``CREATE OR REPLACE``, drop
     and re-create), so re-applying one that was current changes nothing.
@@ -878,9 +1029,12 @@ async def _apply_parts(
     """
     from app.db.guild_ddl import is_operations_statement
     from app.db.operations_schema import holds_operations
+    from app.db.plugin_tools import provisioned_tools
 
     schema = guild_schema_name(guild_id)
-    bundle = await get_provisioning_bundle()
+    if tools is None:
+        tools = await provisioned_tools(guild_id)
+    bundle = (await get_provisioning_bundle()).for_tools(tools)
     tables = (
         (
             await conn.execute(
@@ -911,10 +1065,10 @@ async def _apply_parts(
             await _run_in_schema(conn, schema, share[part])
 
     if "schema" in parts:
-        await apply_guild_schema(conn, schema)  # canonical Alembic-owned table DDL
+        await apply_guild_schema(conn, schema, bundle)  # template DDL, tools' tables
         await then_operations("schema")
     if "checks" in parts:  # CHECKs that follow a registry
-        await apply_guild_checks(conn, schema, validate=validate_checks)
+        await apply_guild_checks(conn, schema, validate=validate_checks, bundle=bundle)
         await then_operations("checks")
     if "grants" in parts:
         roles = _guild_roles(guild_id)
@@ -925,22 +1079,22 @@ async def _apply_parts(
                 *(f'CREATE ROLE "{r}" NOLOGIN' for r in roles if r not in existing),
                 *(
                     s
-                    for s in _grant_statements(schema, guild_id)
+                    for s in _grant_statements(schema, guild_id, bundle.tools)
                     if operations or not is_operations_statement(s)
                 ),
             ],
         )
     if "rls" in parts:
-        await apply_guild_rls(conn, schema)  # initiative-level RLS policies
+        await apply_guild_rls(conn, schema, bundle)  # initiative-level RLS policies
         await then_operations("rls")
     if "capture" in parts:
-        await apply_guild_capture(conn, schema)  # change-capture triggers
+        await apply_guild_capture(conn, schema, bundle)  # change-capture triggers
         await then_operations("capture")
     if "search" in parts:
-        await apply_guild_search(conn, schema)  # search-index refresh triggers
+        await apply_guild_search(conn, schema, bundle)  # search-index refresh triggers
         await then_operations("search")
     if "timers" in parts:
-        await apply_guild_timers(conn, schema)  # sweep-timer triggers
+        await apply_guild_timers(conn, schema, bundle)  # sweep-timer triggers
         await then_operations("timers")
     pending = "checks" in parts and not validate_checks
     await _write_stamp(
@@ -957,6 +1111,34 @@ async def provision_guild_schema(conn: AsyncConnection, guild_id: int) -> str:
     await advisory_lock(conn, LockNamespace.GUILD_PROVISION, guild_id)
     await _apply_parts(conn, guild_id, PARTS)
     return guild_schema_name(guild_id)
+
+
+async def provision_community_tools(
+    guild_id: int, *, drop: str = "", uninstalled: str | None = None
+) -> ToolSet:
+    """Give ``guild_id``'s schema what its tool plug-ins, as they are
+    installed now, need: their tables, as their versions declare them, and
+    every part rendered from the community's tool set, which it returns.
+    ``drop`` is DDL run first: the columns a new major version stops
+    declaring, which its admin confirmed. ``uninstalled`` is the listing of a
+    tool plug-in the deletion sweep removed, whose tables go unless it is
+    installed again by now. One transaction on the provisioning engine, under
+    the guild's provisioning lock, so a request routed into the community
+    sees all of it or none."""
+    from app.db.plugin_tools import drop_tool_tables, provisioned_tools
+
+    schema = guild_schema_name(guild_id)
+    async with db_session.provisioning_engine.begin() as conn:
+        await advisory_lock(conn, LockNamespace.GUILD_PROVISION, guild_id)
+        tools = await provisioned_tools(guild_id)
+        if drop:
+            await _run_in_schema(conn, schema, drop)
+        if uninstalled is not None and not any(
+            tool.listing_uid == uninstalled.upper() for tool in tools.installed
+        ):
+            await drop_tool_tables(conn, schema, uninstalled)
+        await _apply_parts(conn, guild_id, PARTS, tools=tools)
+    return tools
 
 
 async def drop_guild_schema(conn: AsyncConnection, guild_id: int) -> None:
@@ -1060,7 +1242,11 @@ async def _backfill_guild(guild_id: int, *, wait: bool) -> bool | None:
     Returns whether anything was applied, or None when ``wait`` is False and
     another process holds the lock.
     """
-    bundle = await get_provisioning_bundle()
+    from app.db import cohorts
+    from app.db.plugin_tools import provisioned_tools
+    from app.db.request_context import SystemGuild
+    from app.services.tenant.initiative_tools import write_installed_tools
+
     async with db_session.provisioning_engine.begin() as conn:
         if not await advisory_lock(
             conn, LockNamespace.GUILD_PROVISION, guild_id, wait=wait
@@ -1071,16 +1257,29 @@ async def _backfill_guild(guild_id: int, *, wait: bool) -> bool | None:
             text("SELECT obj_description(to_regnamespace(:s), 'pg_namespace')"),
             {"s": guild_schema_name(guild_id)},
         )
+        # Compared with the community's own render, from its installs as they
+        # stand: an install whose provisioning never finished leaves a stamp
+        # that names other tools, or none, and is provisioned here.
+        tools = await provisioned_tools(guild_id)
+        bundle = (await get_provisioning_bundle()).for_tools(tools)
         parts = PARTS if settings.FORCE_GUILD_BACKFILL else bundle.stale_parts(stamp)
         if parts:
-            await _apply_parts(conn, guild_id, parts, validate_checks=False)
+            await _apply_parts(
+                conn, guild_id, parts, validate_checks=False, tools=tools
+            )
+    if stamp_tools(stamp) != tools.digest:
+        # What such an install did not get: its tool on in every initiative.
+        async with cohorts.system_session(guild_id) as session:
+            await db_session.set_rls_context(session, SystemGuild(guild_id))
+            await write_installed_tools(session, tools)
+            await session.commit()
     if "checks" in parts:
         # After the replacement commits, so the scan holds no lock that stops
         # the guild's reads and writes. A failure leaves ``checks`` pending.
         async with db_session.provisioning_engine.begin() as conn:
             await advisory_lock(conn, LockNamespace.GUILD_PROVISION, guild_id)
             schema = guild_schema_name(guild_id)
-            await apply_guild_checks(conn, schema, replace=False)
+            await apply_guild_checks(conn, schema, replace=False, bundle=bundle)
             await _write_stamp(conn, schema, bundle.stamp)
     return bool(parts)
 
@@ -1126,24 +1325,44 @@ async def backfill_guild_schemas() -> BackfillSummary:
     # live in the RLS-forced public.guilds, and the provisioner is a pure DDL
     # actor — FORCE RLS filters its unrouted data reads to zero rows (by
     # design). Reading data is the system engine's job (BYPASSRLS).
+    # Each guild, its stamp, and whether it has a tool plug-in installed: an
+    # install of a listing whose kinds have codes.
     async with db_session.system_engine.connect() as conn:
         rows = (
             await conn.execute(
                 text(
-                    "SELECT g.id, obj_description(n.oid) "
+                    "SELECT g.id, obj_description(n.oid), EXISTS ("
+                    "SELECT 1 FROM public.plugin_installs pi"
+                    " JOIN public.plugin_kind_codes c"
+                    " ON split_part(c.kind, '.', 2) = lower(pi.listing_uid)"
+                    " WHERE pi.guild_id = g.id) "
                     "FROM public.guilds g "
                     "LEFT JOIN pg_namespace n ON n.nspname = 'guild_' || g.id "
                     "ORDER BY g.id"
                 )
             )
         ).all()
-    behind = [
-        gid
-        for gid, stamp in rows
-        if settings.FORCE_GUILD_BACKFILL or bundle.stale_parts(stamp)
-    ]
-
     limit = asyncio.Semaphore(_BACKFILL_CONCURRENCY)
+
+    async def is_behind(guild_id: int, stamp: str | None, has_tools: bool) -> bool:
+        from app.db.plugin_tools import provisioned_tools
+
+        if settings.FORCE_GUILD_BACKFILL or bundle.stale_parts(stamp):
+            return True
+        if not has_tools and stamp_tools(stamp) is None:
+            return False
+        # Current by the built-in render: behind only if its tool plug-ins
+        # are not the ones its stamp names, one read of its installs.
+        async with limit:
+            try:
+                return stamp_tools(stamp) != (await provisioned_tools(guild_id)).digest
+            except Exception:
+                logger.exception("reading the tool plug-ins of guild %s", guild_id)
+                return True
+
+    checked = await asyncio.gather(*(is_behind(*row) for row in rows))
+    behind = [gid for (gid, *_), late in zip(rows, checked, strict=True) if late]
+
     failed_guild_ids: list[int] = []
 
     async def backfill(guild_id: int, wait: bool) -> bool | None:
@@ -1283,10 +1502,12 @@ async def reindex_guild_search(
 
     Returns the number of entities rewritten; zero when already current.
     """
+    from app.db.plugin_tools import provisioned_tools
     from app.db.search_index import reindex_plan, search_generation
 
     schema = guild_schema_name(guild_id)
-    generation = search_generation()
+    tools = await provisioned_tools(guild_id)
+    generation = search_generation(tools)
     conn = await session.connection()
     current = await conn.scalar(
         text("SELECT obj_description(to_regclass(:t), 'pg_class')"),
@@ -1296,7 +1517,7 @@ async def reindex_guild_search(
         return 0
 
     written = 0
-    for _entity_type, statement in reindex_plan():
+    for _entity_type, statement in reindex_plan(tools):
         cursor = 0
         while True:
             conn = await session.connection()
@@ -1333,27 +1554,36 @@ async def backfill_guild_search() -> int:
     fills in progressively instead of holding one transaction open across the
     whole sweep. A guild that fails is logged and the others carry on.
     """
+    from app.db.plugin_tools import provisioned_tools
     from app.db.search_index import search_generation
     from app.services.guild_sweeps import Scope, each_guild
 
     async with db_session.provisioning_engine.connect() as conn:
-        stale = (
-            (
-                await conn.execute(
-                    text(
-                        "SELECT substr(n.nspname, 7)::int FROM pg_class c"
-                        " JOIN pg_namespace n ON n.oid = c.relnamespace"
-                        " WHERE c.relname = 'search_entries'"
-                        " AND n.nspname ~ '^guild_[0-9]+$'"
-                        " AND obj_description(c.oid, 'pg_class')"
-                        " IS DISTINCT FROM :generation"
-                    ),
-                    {"generation": search_generation()},
+        rows = (
+            await conn.execute(
+                text(
+                    "SELECT substr(n.nspname, 7)::int,"
+                    " obj_description(c.oid, 'pg_class'),"
+                    " obj_description(n.oid, 'pg_namespace')"
+                    " FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace"
+                    " WHERE c.relname = 'search_entries'"
+                    " AND n.nspname ~ '^guild_[0-9]+$'"
                 )
             )
-            .scalars()
-            .all()
+        ).all()
+    # A community with tool plug-ins, which its schema's stamp names, is
+    # current by the generation of its own sources.
+    builtin = search_generation()
+    stale = [
+        guild_id
+        for guild_id, marker, stamp in rows
+        if marker
+        != (
+            builtin
+            if stamp_tools(stamp) is None
+            else search_generation(await provisioned_tools(guild_id))
         )
+    ]
     if not stale:
         return 0
     total = 0

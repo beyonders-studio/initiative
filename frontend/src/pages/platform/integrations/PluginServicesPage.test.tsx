@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -13,6 +13,10 @@ const buildRegistration = (
   id: 1,
   public_id: "core.github",
   listing_uid: "gh7k2m9p4q1x8z",
+  name: null,
+  avatar_url: null,
+  version: "1.0.0",
+  first_party: false,
   kind: "container",
   publisher_id: 1,
   publisher_prefix: "core",
@@ -27,7 +31,7 @@ const buildRegistration = (
   mandatory: false,
   availability: "none",
   beta_communities: [],
-  shared_routes: false,
+  platform_connections: [],
   suspended_at: null,
   source: "operator",
   image_digest: null,
@@ -38,6 +42,7 @@ const buildRegistration = (
   vendor_set: [],
   vendor_ready: true,
   vendor_setup: null,
+  vendor_check: null,
   connection_callback_url: "https://initiative.example.com/api/v1/plugin-connections/callback",
   connection_setup_url: "https://initiative.example.com/api/v1/plugin-connections/setup",
   webhook_url: "https://initiative.example.com/api/v1/plugin-hooks/core.github",
@@ -47,8 +52,10 @@ const buildRegistration = (
   ...overrides,
 });
 
-// Flipped per test before rendering; read lazily inside the mocked hook.
+// Flipped per test before rendering; read lazily inside the mocked hooks.
 let registrations: PluginServiceRegistrationRead[] = [];
+// What the list asked the server for, last.
+let listParams: Record<string, unknown> = {};
 
 const createMutate = vi.fn();
 const updateMutate = vi.fn();
@@ -57,13 +64,30 @@ const readKeysMutate = vi.fn();
 const connectMutate = vi.fn();
 const startSetupMutate = vi.fn();
 const completeSetupMutate = vi.fn();
+const connectEveryMutate = vi.fn();
+const disconnectEveryMutate = vi.fn();
 
 vi.mock("@/lib/mascotToast", () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
+  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }));
 
 vi.mock("@/hooks/usePluginServices", () => ({
-  usePluginServices: () => ({ data: registrations, isLoading: false, isError: false }),
+  usePluginServices: (params: Record<string, unknown>) => {
+    listParams = params;
+    return {
+      data: {
+        items: registrations,
+        total_count: registrations.length,
+        page: 1,
+        page_size: 20,
+        has_next: false,
+        has_prev: false,
+      },
+      isLoading: false,
+      isError: false,
+    };
+  },
+  usePluginService: () => ({ data: registrations[0], isLoading: false, isError: false }),
   useCreatePluginService: () => ({ mutate: createMutate, isPending: false }),
   useUpdatePluginService: () => ({ mutate: updateMutate, isPending: false }),
   useDeletePluginService: () => ({ mutate: deleteMutate, isPending: false }),
@@ -71,6 +95,8 @@ vi.mock("@/hooks/usePluginServices", () => ({
   useConnectPluginService: () => ({ mutate: connectMutate, isPending: false }),
   useStartVendorSetup: () => ({ mutate: startSetupMutate, isPending: false }),
   useCompleteVendorSetup: () => ({ mutate: completeSetupMutate, isPending: false }),
+  useConnectForEveryCommunity: () => ({ mutate: connectEveryMutate, isPending: false }),
+  useDisconnectForEveryCommunity: () => ({ mutate: disconnectEveryMutate, isPending: false }),
 }));
 
 // The beta's community picker searches every community on the server.
@@ -87,25 +113,49 @@ vi.mock(import("@/hooks/useSettings"), async (importOriginal) => ({
   })) as unknown as typeof import("@/hooks/useSettings").usePlatformCommunities,
 }));
 
+import { PluginServicePage } from "./PluginServicePage";
 import { PluginServicesPage } from "./PluginServicesPage";
 
-const renderAsOperator = () =>
-  renderWithProviders(<PluginServicesPage />, {
-    auth: { user: buildUser({ role: "owner", capabilities: ["plugins.manage"] }) },
+const operator = { user: buildUser({ role: "owner", capabilities: ["plugins.manage"] }) };
+
+/** The list, once it has rendered. */
+const renderAsOperator = async () => {
+  renderPage(PluginServicesPage, {
+    auth: operator,
+    initialRoute: "/settings/platform/integrations",
   });
+  await screen.findByRole("button", { name: "Add plug-in service" });
+};
+
+/** The first registration's own page, once it has rendered. */
+const renderPluginPage = async () => {
+  renderPage(PluginServicePage, {
+    auth: operator,
+    initialRoute: "/settings/platform/integrations/plugins/$registrationId",
+    routeParams: { registrationId: String(registrations[0].id) },
+  });
+  await screen.findByRole("heading", { name: registrations[0].public_id });
+};
+
+beforeEach(() => {
+  registrations = [];
+  listParams = {};
+  for (const mutate of [
+    createMutate,
+    updateMutate,
+    deleteMutate,
+    readKeysMutate,
+    connectMutate,
+    startSetupMutate,
+    completeSetupMutate,
+    connectEveryMutate,
+    disconnectEveryMutate,
+  ]) {
+    mutate.mockReset();
+  }
+});
 
 describe("PluginServicesPage", () => {
-  beforeEach(() => {
-    registrations = [];
-    createMutate.mockReset();
-    updateMutate.mockReset();
-    deleteMutate.mockReset();
-    readKeysMutate.mockReset();
-    connectMutate.mockReset();
-    startSetupMutate.mockReset();
-    completeSetupMutate.mockReset();
-  });
-
   describe("capability gate", () => {
     it("offers nothing to manage without plugins.manage", () => {
       registrations = [buildRegistration()];
@@ -123,169 +173,109 @@ describe("PluginServicesPage", () => {
     });
   });
 
-  describe("whether a plug-in is live", () => {
-    it("labels each registration live or not, with its publisher and listing", () => {
+  describe("the list", () => {
+    it("gives each plug-in one row: its publisher, its version and whether it is live", async () => {
       registrations = [
-        buildRegistration({
-          id: 1,
-          public_id: "core.github",
-          live: true,
-          scope_ceiling: ["projects:read", "projects:write"],
-        }),
+        buildRegistration({ id: 1, public_id: "core.github", version: "1.4.0", live: true }),
         // No key set, pasted or by address, so it cannot be live.
         buildRegistration({
           id: 2,
           public_id: "core.slack",
-          listing_uid: "sl4ck0000000aa",
+          listing_uid: null,
+          version: null,
           jwks: null,
-          jwks_uri: null,
           live: false,
+          publisher_enabled: false,
+          suspended_at: "2026-11-15T12:00:00Z",
         }),
       ];
-      renderAsOperator();
+      await renderAsOperator();
 
-      const [github, slack] = screen.getAllByRole("listitem");
+      const github = screen.getByRole("row", { name: /core\.github/ });
+      expect(within(github).getByRole("link", { name: "core.github" })).toBeInTheDocument();
+      expect(within(github).getByText("Core Plug-ins")).toBeInTheDocument();
+      expect(within(github).getByText("1.4.0")).toBeInTheDocument();
       expect(within(github).getByText("Live")).toBeInTheDocument();
-      expect(within(github).getByText(/Publisher: Core Plug-ins/)).toBeInTheDocument();
-      expect(within(github).getByText("gh7k2m9p4q1x8z")).toBeInTheDocument();
-      // The ceiling is the listing's, shown and not edited.
-      expect(
-        within(github).getByText("Scopes, from its listing: projects:read, projects:write")
-      ).toBeInTheDocument();
-      expect(within(github).queryByText(/Not live until it has signing keys/)).toBeNull();
+      // Added by this deployment itself: neither verified nor first-party.
+      expect(within(github).queryByText("Verified")).toBeNull();
+      expect(within(github).queryByText("Built by Initiative")).toBeNull();
 
+      const slack = screen.getByRole("row", { name: /core\.slack/ });
+      expect(within(slack).getByText("Waiting for its listing")).toBeInTheDocument();
       expect(within(slack).getByText("Not live")).toBeInTheDocument();
-      expect(within(slack).getByText("sl4ck0000000aa")).toBeInTheDocument();
-      expect(within(slack).getByText(/Not live until it has signing keys/)).toBeInTheDocument();
-    });
-
-    it("says when the publisher is switched off", () => {
-      registrations = [
-        buildRegistration({ publisher_name: "Acme", publisher_enabled: false, live: false }),
-      ];
-      renderAsOperator();
-
-      expect(screen.getByText("Not live")).toBeInTheDocument();
-      expect(screen.getByText("Publisher switched off")).toBeInTheDocument();
+      expect(within(slack).getByText("Publisher switched off")).toBeInTheDocument();
       expect(
-        screen.getByText(/Every plug-in from Acme is stopped because its publisher is switched off/)
+        within(slack).getByText(`Suspended since ${formatDate("2026-11-15T12:00:00Z")}`)
       ).toBeInTheDocument();
     });
 
-    it("offers no handshake to run", () => {
-      registrations = [buildRegistration()];
-      renderAsOperator();
-
-      expect(screen.queryByRole("button", { name: "Verify" })).toBeNull();
-    });
-  });
-
-  describe("reach", () => {
-    it("shows mandatory and operations-only on the registrations that carry them", () => {
-      registrations = [
-        buildRegistration({ id: 1, public_id: "core.automation", mandatory: true }),
-        buildRegistration({ id: 2, public_id: "acme.shopify" }),
-        buildRegistration({ id: 3, public_id: "acme.sales", availability: "operations" }),
-      ];
-      renderAsOperator();
-
-      // Scannable on the row...
-      expect(screen.getByText("In every community")).toBeInTheDocument();
-      // ...and spelled out, because a reviewer has to know what it means.
-      expect(
-        screen.getByText(
-          "Installed into every community automatically. Community admins cannot remove it or turn it off."
-        )
-      ).toBeInTheDocument();
-      expect(screen.getByText("Operations community only")).toBeInTheDocument();
-    });
-
-    it("says a mandatory operations-only plug-in is installed in the operations community alone", () => {
-      registrations = [buildRegistration({ mandatory: true, availability: "operations" })];
-      renderAsOperator();
-
-      expect(screen.getByText("In the operations community")).toBeInTheDocument();
-      expect(screen.queryByText("In every community")).toBeNull();
-      expect(screen.queryByText("Operations community only")).toBeNull();
-      expect(screen.queryByText(/Installed into every community/)).toBeNull();
-      expect(
-        screen.getByText(/added to the operations community only, and its admins cannot remove it/)
-      ).toBeInTheDocument();
-    });
-
-    it.each([
-      ["none", "Every community"],
-      ["operations", "The operations community"],
-    ] as const)(
-      "says a plug-in declaring %s reaches %s, with nothing to pick",
-      async (availability, reach) => {
-        const user = userEvent.setup();
-        registrations = [buildRegistration({ availability })];
-        renderAsOperator();
-
-        await user.click(screen.getByRole("button", { name: "Edit" }));
-        const dialog = await screen.findByRole("dialog");
-        expect(within(dialog).getByText(reach)).toBeInTheDocument();
-        expect(within(dialog).queryByText("Beta")).toBeNull();
-        expect(within(dialog).queryByRole("combobox")).toBeNull();
-        await user.click(within(dialog).getByRole("button", { name: "Save" }));
-
-        expect(updateMutate.mock.calls[0][0].data).not.toHaveProperty("beta_community_ids");
-      }
-    );
-
-    it("says nobody can use a beta plug-in until communities are picked", async () => {
-      const user = userEvent.setup();
-      registrations = [buildRegistration({ availability: "beta" })];
-      renderAsOperator();
-
-      expect(within(screen.getByRole("listitem")).getByText("Beta")).toBeInTheDocument();
-      await user.click(screen.getByRole("button", { name: "Edit" }));
-      const dialog = await screen.findByRole("dialog");
-      expect(within(dialog).getByText("Beta")).toBeInTheDocument();
-      expect(
-        within(dialog).getByText("Nobody can use this plug-in until you pick communities.")
-      ).toBeInTheDocument();
-    });
-
-    it("replaces a beta plug-in's communities with those picked", async () => {
-      const user = userEvent.setup();
+    it("leads a row with its listing's name and art, the identifier under it", async () => {
       registrations = [
         buildRegistration({
-          availability: "beta",
-          beta_communities: [{ id: 7, name: "Riverside" }],
+          name: "GitHub",
+          avatar_url: "/marketplace/github.svg",
+          source: "registry",
+          first_party: true,
         }),
       ];
-      renderAsOperator();
+      await renderAsOperator();
 
-      await user.click(screen.getByRole("button", { name: "Edit" }));
-      const dialog = await screen.findByRole("dialog");
-      expect(within(dialog).getByText("Riverside (#7)")).toBeInTheDocument();
-      await user.click(within(dialog).getByRole("combobox", { name: "Communities in the beta" }));
-      await user.click(await screen.findByRole("option", { name: /Hilltop/ }));
-      await user.keyboard("{Escape}");
-      await user.click(within(dialog).getByRole("button", { name: "Remove Riverside (#7)" }));
-      await user.click(within(dialog).getByRole("button", { name: "Save" }));
-
-      expect(updateMutate.mock.calls[0][0].data).toMatchObject({ beta_community_ids: [8] });
+      const row = screen.getByRole("row", { name: /GitHub/ });
+      expect(within(row).getByRole("link", { name: "GitHub" })).toBeInTheDocument();
+      expect(within(row).getByText(/core\.github/)).toBeInTheDocument();
+      expect(row.querySelector('img[src$="/marketplace/github.svg"]')).not.toBeNull();
+      // Signed by the registry, and published by this project.
+      expect(within(row).getByText("Verified")).toBeInTheDocument();
+      expect(within(row).getByText("Built by Initiative")).toBeInTheDocument();
     });
 
-    it("confers no powers beyond the scope ceiling", async () => {
+    it("asks the server for what was searched, rather than filtering one page", async () => {
       const user = userEvent.setup();
-      renderAsOperator();
+      registrations = [buildRegistration()];
+      await renderAsOperator();
 
-      await user.click(screen.getByRole("button", { name: "Add plug-in service" }));
-      await screen.findByLabelText("Plug-in identifier");
+      await user.type(screen.getByPlaceholderText("Search by identifier or publisher"), "github");
 
-      // One switch in the operator's box: whether every community gets it.
-      expect(within(screen.getByRole("dialog")).getAllByRole("switch")).toHaveLength(1);
+      await waitFor(() => expect(listParams).toMatchObject({ search: "github", page: 1 }));
+    });
+
+    it("tags beta and operations-only plug-ins, and mandatory ones", async () => {
+      registrations = [
+        buildRegistration({ id: 1, public_id: "core.automation", mandatory: true }),
+        buildRegistration({ id: 2, public_id: "acme.shopify", availability: "beta" }),
+        buildRegistration({ id: 3, public_id: "acme.sales", availability: "operations" }),
+        buildRegistration({
+          id: 4,
+          public_id: "acme.intake",
+          availability: "operations",
+          mandatory: true,
+        }),
+      ];
+      await renderAsOperator();
+
+      expect(
+        within(screen.getByRole("row", { name: /core\.automation/ })).getByText(
+          "In every community"
+        )
+      ).toBeInTheDocument();
+      expect(
+        within(screen.getByRole("row", { name: /acme\.shopify/ })).getByText("Beta")
+      ).toBeInTheDocument();
+      expect(
+        within(screen.getByRole("row", { name: /acme\.sales/ })).getByText(
+          "Operations community only"
+        )
+      ).toBeInTheDocument();
+      const intake = screen.getByRole("row", { name: /acme\.intake/ });
+      expect(within(intake).getByText("In the operations community")).toBeInTheDocument();
+      expect(within(intake).queryByText("In every community")).toBeNull();
     });
   });
 
   describe("registering", () => {
     const fillNewService = async () => {
       const user = userEvent.setup();
-      renderAsOperator();
+      await renderAsOperator();
 
       await user.click(screen.getByRole("button", { name: "Add plug-in service" }));
 
@@ -302,6 +292,13 @@ describe("PluginServicesPage", () => {
       const user = await fillNewService();
 
       expect(screen.queryByLabelText("Listing")).toBeNull();
+      // No shared secret, and no powers beyond the scope ceiling.
+      expect(screen.queryByText(/shared secret/i)).toBeNull();
+      expect(document.querySelector('input[type="password"]')).toBeNull();
+      // Connect reads from a saved base URL, so a new one has nothing to read.
+      expect(screen.queryByRole("button", { name: "Connect" })).toBeNull();
+      // One switch in the operator's box: whether every community gets it.
+      expect(within(screen.getByRole("dialog")).getAllByRole("switch")).toHaveLength(1);
       await user.click(screen.getByRole("button", { name: "Save" }));
 
       expect(createMutate).toHaveBeenCalledWith(
@@ -320,37 +317,125 @@ describe("PluginServicesPage", () => {
       );
     });
 
-    it("asks for no shared secret", async () => {
-      const user = userEvent.setup();
-      renderAsOperator();
-
-      await user.click(screen.getByRole("button", { name: "Add plug-in service" }));
-      await screen.findByLabelText("Plug-in identifier");
-
-      expect(screen.queryByText(/shared secret/i)).toBeNull();
-      expect(document.querySelector('input[type="password"]')).toBeNull();
-      // Connect reads from a saved base URL, so a new one has nothing to read.
-      expect(screen.queryByRole("button", { name: "Connect" })).toBeNull();
-    });
-
     it("sends the browser address when the plug-in is published somewhere else", async () => {
-      const user = userEvent.setup();
-      renderAsOperator();
+      const user = await fillNewService();
 
-      await user.click(screen.getByRole("button", { name: "Add plug-in service" }));
-
-      await user.type(await screen.findByLabelText("Plug-in identifier"), "acme.shopify");
-      await user.type(screen.getByLabelText("Base URL"), "http://shopify:8080");
       await user.type(screen.getByLabelText("Browser address"), "https://shop.example.com");
       await user.click(screen.getByRole("button", { name: "Save" }));
 
       expect(createMutate).toHaveBeenCalledWith(
         expect.objectContaining({
-          base_url: "http://shopify:8080",
+          base_url: "https://shopify.example.com",
           page_origin: "https://shop.example.com",
         }),
         expect.anything()
       );
+    });
+  });
+});
+
+describe("PluginServicePage", () => {
+  describe("what it is", () => {
+    it("shows its listing's facts, and what keeps it from being live", async () => {
+      registrations = [
+        buildRegistration({
+          version: "1.4.0",
+          jwks: null,
+          live: false,
+          scope_ceiling: ["projects:read", "projects:write"],
+        }),
+      ];
+      await renderPluginPage();
+
+      expect(screen.getByText("Core Plug-ins")).toBeInTheDocument();
+      expect(screen.getByText("1.4.0")).toBeInTheDocument();
+      expect(screen.getByText("gh7k2m9p4q1x8z")).toBeInTheDocument();
+      // The ceiling is the listing's, shown and not edited.
+      expect(screen.getByText("projects:read, projects:write")).toBeInTheDocument();
+      expect(screen.getByText(/Not live until it has signing keys/)).toBeInTheDocument();
+      // The identifier is the page's heading, not a box to edit.
+      expect(screen.queryByLabelText("Plug-in identifier")).toBeNull();
+      // There is no handshake to run.
+      expect(screen.queryByRole("button", { name: "Verify" })).toBeNull();
+    });
+
+    it.each([
+      [
+        { publisher_name: "Acme", publisher_enabled: false },
+        /Every plug-in from Acme is stopped because its publisher is switched off/,
+      ],
+      [{ vendor_ready: false }, /Not live until its vendor client is set/],
+    ])("says what stops it: %o", async (overrides, reason) => {
+      registrations = [buildRegistration({ ...overrides, live: false })];
+      await renderPluginPage();
+
+      expect(screen.getByText(reason)).toBeInTheDocument();
+    });
+  });
+
+  describe("reach", () => {
+    it.each([
+      [
+        "none",
+        "Installed into every community automatically. Community admins cannot remove it or turn it off.",
+      ],
+      ["operations", /added to the operations community only, and its admins cannot remove it/],
+    ] as const)(
+      "spells out what mandatory means for a plug-in declaring %s",
+      async (availability, said) => {
+        registrations = [buildRegistration({ mandatory: true, availability })];
+        await renderPluginPage();
+
+        expect(screen.getByText(said)).toBeInTheDocument();
+      }
+    );
+
+    it.each([
+      ["none", "Every community"],
+      ["operations", "The operations community"],
+    ] as const)(
+      "says a plug-in declaring %s reaches %s, with nothing to pick",
+      async (availability, reach) => {
+        const user = userEvent.setup();
+        registrations = [buildRegistration({ availability })];
+        await renderPluginPage();
+
+        expect(screen.getByText(reach)).toBeInTheDocument();
+        expect(screen.queryByRole("combobox")).toBeNull();
+        await user.click(screen.getByRole("button", { name: "Save" }));
+
+        expect(updateMutate.mock.calls[0][0].data).not.toHaveProperty("beta_community_ids");
+      }
+    );
+
+    it("says nobody can use a beta plug-in until communities are picked", async () => {
+      registrations = [buildRegistration({ availability: "beta" })];
+      await renderPluginPage();
+
+      expect(screen.getByText("Beta")).toBeInTheDocument();
+      expect(
+        screen.getByText("Nobody can use this plug-in until you pick communities.")
+      ).toBeInTheDocument();
+    });
+
+    it("replaces a beta plug-in's communities with those picked", async () => {
+      const user = userEvent.setup();
+      registrations = [
+        buildRegistration({
+          availability: "beta",
+          beta_communities: [{ id: 7, name: "Riverside" }],
+        }),
+      ];
+      await renderPluginPage();
+
+      expect(screen.getByText("Riverside (#7)")).toBeInTheDocument();
+      await user.click(screen.getByRole("combobox", { name: "Communities in the beta" }));
+      await user.click(await screen.findByRole("option", { name: /Hilltop/ }));
+      await user.keyboard("{Escape}");
+      await user.click(screen.getByRole("button", { name: "Remove Riverside (#7)" }));
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(updateMutate.mock.calls[0][0].data).toMatchObject({ beta_community_ids: [8] });
     });
   });
 
@@ -358,11 +443,10 @@ describe("PluginServicesPage", () => {
     it("sends the key set address and keeps the pasted set", async () => {
       const user = userEvent.setup();
       registrations = [buildRegistration({ jwks_uri: "https://gh.example.com/jwks.json" })];
-      renderAsOperator();
+      await renderPluginPage();
 
-      await user.click(screen.getByRole("button", { name: "Edit" }));
       // Emptying the address clears it rather than leaving it stored.
-      await user.clear(await screen.findByLabelText("Key set address"));
+      await user.clear(screen.getByLabelText("Key set address"));
       await user.click(screen.getByRole("button", { name: "Save" }));
 
       const data = updateMutate.mock.calls[0][0].data;
@@ -373,7 +457,7 @@ describe("PluginServicesPage", () => {
       expect(data).not.toHaveProperty("secret");
     });
 
-    it("asks for the vendor values and sharing, keeping a secret left alone", async () => {
+    it("lists the addresses to register, then asks for the vendor values, keeping a secret left alone", async () => {
       const user = userEvent.setup();
       registrations = [
         buildRegistration({
@@ -385,35 +469,31 @@ describe("PluginServicesPage", () => {
           vendor_set: ["client_id", "client_secret"],
         }),
       ];
-      renderAsOperator();
+      await renderPluginPage();
 
-      await user.click(screen.getByRole("button", { name: "Edit" }));
-      const clientId = await screen.findByLabelText(/Client id/);
+      // Where the vendor sends people back, to register with it, each to copy.
+      for (const address of [
+        "https://initiative.example.com/api/v1/plugin-connections/callback",
+        "https://initiative.example.com/api/v1/plugin-connections/setup",
+        "https://initiative.example.com/api/v1/plugin-hooks/core.github",
+      ]) {
+        expect(screen.getByText(address)).toBeInTheDocument();
+      }
+      expect(screen.getByRole("button", { name: "Copy the Callback address" })).toBeInTheDocument();
+      expect(screen.getByText("Set up")).toBeInTheDocument();
+
+      const clientId = screen.getByLabelText(/Client id/);
       expect(clientId).toHaveValue("gh-app");
       // A stored secret is never sent back, only that it is set.
       const secret = screen.getByLabelText(/Secret/);
       expect(secret).toHaveValue("");
       expect(secret).toHaveAttribute("placeholder", "Set. Type to replace it.");
-      // Where the vendor sends people back, to register with it.
-      expect(screen.getByLabelText("Callback address")).toHaveValue(
-        "https://initiative.example.com/api/v1/plugin-connections/callback"
-      );
-      expect(screen.getByLabelText("Setup address")).toHaveValue(
-        "https://initiative.example.com/api/v1/plugin-connections/setup"
-      );
-      expect(screen.getByLabelText("Webhook address")).toHaveValue(
-        "https://initiative.example.com/api/v1/plugin-hooks/core.github"
-      );
 
       await user.clear(clientId);
       await user.type(clientId, "gh-app-2");
-      await user.click(
-        screen.getByRole("switch", { name: "Share installations between communities" })
-      );
       await user.click(screen.getByRole("button", { name: "Save" }));
 
       expect(updateMutate.mock.calls[0][0].data).toMatchObject({
-        shared_routes: true,
         vendor_values: { client_id: "gh-app-2" },
       });
     });
@@ -430,25 +510,35 @@ describe("PluginServicesPage", () => {
           ],
         }),
       ];
-      renderAsOperator();
+      await renderPluginPage();
 
-      expect(screen.getByText(/makes this plug-in's calls itself/)).toBeInTheDocument();
-      expect(screen.queryByText(/give the address where you run it/)).toBeNull();
-      await user.click(screen.getByRole("button", { name: "Edit" }));
-      await user.type(await screen.findByLabelText(/Client id/), "gh-app");
+      expect(screen.queryByText(/Not live until it has an address/)).toBeNull();
+      expect(screen.queryByText(/Not live until it has signing keys/)).toBeNull();
+      await user.type(screen.getByLabelText(/Client id/), "gh-app");
       expect(screen.queryByLabelText("Base URL")).toBeNull();
       expect(screen.queryByLabelText("Pasted key set (JWKS)")).toBeNull();
       await user.click(screen.getByRole("button", { name: "Save" }));
 
       expect(updateMutate.mock.calls[0][0].data).toEqual({
         mandatory: false,
-        shared_routes: false,
         vendor_values: { client_id: "gh-app" },
       });
     });
 
-    it("shows the compose service to copy, and its address as the base URL", async () => {
+    it("holds a tool plug-in, which runs no code, to nothing about where it runs", async () => {
       const user = userEvent.setup();
+      registrations = [buildRegistration({ kind: "tool", base_url: null, jwks: null })];
+      await renderPluginPage();
+
+      expect(screen.queryByText(/Not live until it has an address/)).toBeNull();
+      expect(screen.queryByText(/Not live until it has signing keys/)).toBeNull();
+      expect(screen.queryByLabelText("Base URL")).toBeNull();
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(updateMutate.mock.calls[0][0].data).toEqual({ mandatory: false });
+    });
+
+    it("shows the compose service to copy, and its address as the base URL", async () => {
       const service = "github:\n  image: ghcr.io/beyonders-studio/github@sha256:abc\n";
       registrations = [
         buildRegistration({
@@ -457,23 +547,25 @@ describe("PluginServicesPage", () => {
           compose_base_url: "http://github:8080",
         }),
       ];
-      renderAsOperator();
+      await renderPluginPage();
 
-      await user.click(screen.getByRole("button", { name: "Edit" }));
-      const snippet = await screen.findByLabelText("Compose service");
+      const snippet = screen.getByLabelText("Compose service");
       expect(snippet).toHaveValue(service);
       expect(snippet).toHaveAttribute("readonly");
       expect(screen.getByRole("button", { name: "Copy" })).toBeInTheDocument();
       expect(screen.getByLabelText("Base URL")).toHaveValue("http://github:8080");
     });
 
-    it("creates the GitHub App at GitHub, posting its manifest there", async () => {
+    it("leads with creating the GitHub App, posting its manifest there", async () => {
       const user = userEvent.setup();
       const submit = vi.spyOn(HTMLFormElement.prototype, "submit").mockImplementation(() => {});
       registrations = [
         buildRegistration({
           vendor_setup: "github_app_manifest",
-          vendor_fields: [{ key: "client_id", type: "string", required: true, label: {} }],
+          vendor_fields: [
+            { key: "client_id", type: "string", required: true, label: { en: "Client id" } },
+          ],
+          vendor_ready: false,
         }),
       ];
       startSetupMutate.mockImplementation((_vars, { onSuccess }) =>
@@ -483,11 +575,19 @@ describe("PluginServicesPage", () => {
           state: "st/ate",
         })
       );
-      renderAsOperator();
+      await renderPluginPage();
 
-      await user.click(screen.getByRole("button", { name: "Edit" }));
-      await user.type(await screen.findByLabelText("GitHub organization"), "acme");
-      await user.click(screen.getByRole("button", { name: "Create the GitHub App" }));
+      expect(screen.getByText("Values missing")).toBeInTheDocument();
+      // Typing them in is the other way, folded away until asked for.
+      expect(screen.queryByLabelText(/Client id/)).toBeNull();
+      // The operator's own account owns it unless they pick an organization,
+      // whose name they then have to give.
+      expect(screen.queryByLabelText(/Organization name/)).toBeNull();
+      await user.click(screen.getByRole("radio", { name: "A GitHub organization" }));
+      const create = screen.getByRole("button", { name: "Create the GitHub App" });
+      expect(create).toBeDisabled();
+      await user.type(screen.getByLabelText(/Organization name/), "acme");
+      await user.click(create);
 
       expect(startSetupMutate).toHaveBeenCalledWith(
         { registrationId: 1, organization: "acme" },
@@ -501,27 +601,159 @@ describe("PluginServicesPage", () => {
       expect(posted.elements.namedItem("manifest")).toHaveValue('{"name":"GitHub"}');
       submit.mockRestore();
       posted.remove();
+
+      await user.click(screen.getByRole("button", { name: "Or enter the values yourself" }));
+      expect(screen.getByLabelText(/Client id/)).toBeInTheDocument();
+    });
+
+    it("connects an account for every community, and disconnects it after asking", async () => {
+      const user = userEvent.setup();
+      const workspace = {
+        connection_id: "workspace",
+        label: { en: "GitHub organization" },
+        connected: false,
+        account_label: null,
+        connected_at: null,
+        removed: false,
+      };
+      registrations = [
+        buildRegistration({
+          kind: "declarative",
+          vendor_ready: true,
+          platform_connections: [workspace],
+        }),
+      ];
+      await renderPluginPage();
+
+      expect(
+        screen.getByText("Not connected. Each community connects its own.")
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Connect for every community" }));
+      expect(connectEveryMutate).toHaveBeenCalledWith({
+        registrationId: 1,
+        connectionId: "workspace",
+      });
+
+      cleanup();
+      registrations = [
+        buildRegistration({
+          kind: "declarative",
+          vendor_ready: true,
+          platform_connections: [{ ...workspace, connected: true, account_label: "acme" }],
+        }),
+      ];
+      await renderPluginPage();
+
+      expect(screen.getByText("Connected to acme for every community")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Disconnect" }));
+      expect(disconnectEveryMutate).not.toHaveBeenCalled();
+      const dialog = await screen.findByRole("alertdialog");
+      await user.click(within(dialog).getByRole("button", { name: "Disconnect" }));
+      expect(disconnectEveryMutate).toHaveBeenCalledWith({
+        registrationId: 1,
+        connectionId: "workspace",
+      });
     });
 
     it("offers no GitHub App to a plug-in whose listing has no setup", async () => {
-      const user = userEvent.setup();
       registrations = [
         buildRegistration({
           vendor_fields: [{ key: "client_id", type: "string", required: true, label: {} }],
         }),
       ];
-      renderAsOperator();
+      await renderPluginPage();
 
-      await user.click(screen.getByRole("button", { name: "Edit" }));
-      await screen.findByLabelText(/client_id/);
+      expect(screen.getByLabelText(/client_id/)).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Create the GitHub App" })).toBeNull();
     });
 
-    it("says a registration waits on its vendor values", () => {
-      registrations = [buildRegistration({ vendor_ready: false, live: false })];
-      renderAsOperator();
+    it("leads with the values once they are set, folding a new app away", async () => {
+      const user = userEvent.setup();
+      registrations = [
+        buildRegistration({
+          vendor_setup: "github_app_manifest",
+          vendor_fields: [
+            { key: "client_id", type: "string", required: true, label: { en: "Client id" } },
+          ],
+          vendor_values: { client_id: "Iv1.abc" },
+          vendor_set: ["client_id"],
+          vendor_ready: true,
+        }),
+      ];
+      await renderPluginPage();
 
-      expect(screen.getByText(/Not live until its vendor client is set/)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Client id/)).toHaveValue("Iv1.abc");
+      expect(screen.queryByRole("button", { name: "Create the GitHub App" })).toBeNull();
+      await user.click(
+        screen.getByRole("button", { name: "Or replace them with a new app from the vendor" })
+      );
+      expect(screen.getByRole("button", { name: "Create the GitHub App" })).toBeInTheDocument();
+    });
+
+    it("marks the fields a vendor check blames, with what the vendor has", async () => {
+      const user = userEvent.setup();
+      const { toast } = await import("@/lib/mascotToast");
+      registrations = [
+        buildRegistration({
+          vendor_fields: [
+            { key: "app_slug", type: "string", required: true, label: { en: "App name" } },
+            { key: "app_id", type: "string", required: true, label: { en: "App id" } },
+          ],
+          vendor_values: { app_slug: "widgets", app_id: "7" },
+          vendor_set: ["app_slug", "app_id"],
+        }),
+      ];
+      updateMutate.mockImplementation((_vars, { onError }) =>
+        onError({
+          isAxiosError: true,
+          response: {
+            status: 400,
+            data: {
+              detail: "PLUGIN_SERVICE_VENDOR_CHECK_REFUSED",
+              params: {
+                fields: "app_slug",
+                message: JSON.stringify({ en: "The id and key belong to another name." }),
+                shows: "widgets-for-acme",
+              },
+            },
+          },
+        })
+      );
+      await renderPluginPage();
+
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      const alert = await screen.findByRole("alert");
+      expect(alert).toHaveTextContent("The id and key belong to another name.");
+      expect(alert).toHaveTextContent("widgets-for-acme");
+      expect(screen.getByLabelText(/App name/)).toHaveAttribute("aria-invalid", "true");
+      expect(screen.getByLabelText(/App id/)).not.toHaveAttribute("aria-invalid");
+      expect(toast.error).toHaveBeenCalledWith("The id and key belong to another name.");
+    });
+
+    it("says when the vendor could not be asked about the values", async () => {
+      const user = userEvent.setup();
+      const { toast } = await import("@/lib/mascotToast");
+      registrations = [
+        buildRegistration({
+          vendor_fields: [
+            { key: "app_id", type: "string", required: true, label: { en: "App id" } },
+          ],
+        }),
+      ];
+      updateMutate.mockImplementation((_vars, { onSuccess }) =>
+        onSuccess({ ...registrations[0], vendor_check: "not_run" })
+      );
+      await renderPluginPage();
+
+      await user.type(screen.getByLabelText(/App id/), "4735814");
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      await waitFor(() => expect(toast.warning).toHaveBeenCalled());
+      // Kept, so saving again sends it again and the vendor is asked again.
+      expect(screen.getByLabelText(/App id/)).toHaveValue("4735814");
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      expect(updateMutate.mock.calls[1][0].data.vendor_values).toEqual({ app_id: "4735814" });
     });
 
     it("connects: shows the fingerprints the plug-in serves and pins them once confirmed", async () => {
@@ -536,10 +768,9 @@ describe("PluginServicesPage", () => {
       connectMutate.mockImplementation((_vars, { onSuccess }) =>
         onSuccess(buildRegistration({ jwks: pinned }))
       );
-      renderAsOperator();
+      await renderPluginPage();
 
-      await user.click(screen.getByRole("button", { name: "Edit" }));
-      await user.click(await screen.findByRole("button", { name: "Connect" }));
+      await user.click(screen.getByRole("button", { name: "Connect" }));
 
       expect(readKeysMutate).toHaveBeenCalledWith(1, expect.anything());
       const shown = screen.getByRole("region", { name: "Keys the plug-in serves" });
@@ -572,10 +803,9 @@ describe("PluginServicesPage", () => {
     it("waits to connect until a new base URL is saved", async () => {
       const user = userEvent.setup();
       registrations = [buildRegistration()];
-      renderAsOperator();
+      await renderPluginPage();
 
-      await user.click(screen.getByRole("button", { name: "Edit" }));
-      const baseUrl = await screen.findByLabelText("Base URL");
+      const baseUrl = screen.getByLabelText("Base URL");
       await user.clear(baseUrl);
       await user.type(baseUrl, "http://initiative-github-2:8080");
 
@@ -601,10 +831,9 @@ describe("PluginServicesPage", () => {
         connectMutate.mockImplementation((_vars, { onSuccess }) =>
           onSuccess(buildRegistration({ jwks: pinned }))
         );
-        renderAsOperator();
+        await renderPluginPage();
 
-        await user.click(screen.getByRole("button", { name: "Edit" }));
-        await user.click(await screen.findByRole("button", { name: "Connect" }));
+        await user.click(screen.getByRole("button", { name: "Connect" }));
         await user.click(screen.getByRole("button", { name: "Pin these keys" }));
         const baseUrl = screen.getByLabelText("Base URL");
         await user.clear(baseUrl);
@@ -648,10 +877,9 @@ describe("PluginServicesPage", () => {
           response: { data: { detail: "PLUGIN_SERVICE_KEYS_CHANGED" } },
         })
       );
-      renderAsOperator();
+      await renderPluginPage();
 
-      await user.click(screen.getByRole("button", { name: "Edit" }));
-      await user.click(await screen.findByRole("button", { name: "Connect" }));
+      await user.click(screen.getByRole("button", { name: "Connect" }));
       await user.click(screen.getByRole("button", { name: "Pin these keys" }));
 
       expect(
@@ -663,10 +891,9 @@ describe("PluginServicesPage", () => {
     it("clears the pasted key set when the box is emptied", async () => {
       const user = userEvent.setup();
       registrations = [buildRegistration()];
-      renderAsOperator();
+      await renderPluginPage();
 
-      await user.click(screen.getByRole("button", { name: "Edit" }));
-      await user.clear(await screen.findByLabelText("Pasted key set (JWKS)"));
+      await user.clear(screen.getByLabelText("Pasted key set (JWKS)"));
       await user.click(screen.getByRole("button", { name: "Save" }));
 
       expect(updateMutate.mock.calls[0][0].data.jwks).toEqual({});
@@ -677,7 +904,7 @@ describe("PluginServicesPage", () => {
     it("confirms before suspending a plug-in, and says what suspending means", async () => {
       const user = userEvent.setup();
       registrations = [buildRegistration()];
-      renderAsOperator();
+      await renderPluginPage();
 
       await user.click(screen.getByRole("button", { name: "Suspend everywhere" }));
 
@@ -699,14 +926,12 @@ describe("PluginServicesPage", () => {
       );
     });
 
-    it("says since when it is suspended, and lifts it without a confirmation", async () => {
+    it("lifts a suspension without a confirmation", async () => {
       const user = userEvent.setup();
       registrations = [buildRegistration({ suspended_at: "2026-11-15T12:00:00Z" })];
-      renderAsOperator();
+      await renderPluginPage();
 
-      expect(
-        screen.getByText(`Suspended since ${formatDate("2026-11-15T12:00:00Z")}`)
-      ).toBeInTheDocument();
+      expect(screen.getByText(/cut off in every community/)).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Suspend everywhere" })).toBeNull();
       await user.click(screen.getByRole("button", { name: "Lift suspension" }));
 
@@ -722,7 +947,7 @@ describe("PluginServicesPage", () => {
     it("names what is lost and holds out for the plug-in identifier", async () => {
       const user = userEvent.setup();
       registrations = [buildRegistration()];
-      renderAsOperator();
+      await renderPluginPage();
 
       await user.click(screen.getByRole("button", { name: "Delete" }));
 
@@ -746,15 +971,16 @@ describe("PluginServicesPage", () => {
 describe("IndexPage", () => {
   it("does not land an plugins-only operator on settings they cannot manage", async () => {
     const { IndexPage } = await import("@/pages/platform/IndexPage");
-    renderPage(IndexPage, {
-      auth: { user: buildUser({ role: "owner", capabilities: ["plugins.manage"] }) },
+    const { router } = renderPage(IndexPage, {
+      auth: operator,
       initialRoute: "/settings/platform",
     });
-    // Authentication settings belong to config.manage. Rendering them here
-    // would contradict the tab this operator's own capability selects.
+    // Authentication settings belong to config.manage: this operator is sent
+    // to the tab their own capability selects.
     await waitFor(() =>
-      expect(screen.queryByRole("heading", { name: /authentication/i })).toBeNull()
+      expect(router.state.location.pathname).toBe("/settings/platform/integrations")
     );
+    expect(screen.queryByRole("heading", { name: /authentication/i })).toBeNull();
   });
 });
 
@@ -762,7 +988,7 @@ describe("VendorSetupPage", () => {
   it("hands GitHub's code and the setup's state to the server once", async () => {
     const { VendorSetupPage } = await import("./VendorSetupPage");
     renderPage(VendorSetupPage, {
-      auth: { user: buildUser({ role: "owner", capabilities: ["plugins.manage"] }) },
+      auth: operator,
       initialRoute: "/settings/platform/integrations/vendor-setup/$registrationId",
       routeParams: { registrationId: "7" },
       routerSearch: { code: "abc123", state: "st" },
@@ -780,7 +1006,7 @@ describe("VendorSetupPage", () => {
   it("says the setup failed when GitHub sent no code", async () => {
     const { VendorSetupPage } = await import("./VendorSetupPage");
     renderPage(VendorSetupPage, {
-      auth: { user: buildUser({ role: "owner", capabilities: ["plugins.manage"] }) },
+      auth: operator,
       initialRoute: "/settings/platform/integrations/vendor-setup/$registrationId",
       routeParams: { registrationId: "7" },
     });

@@ -10,35 +10,22 @@ from app.testing.factories import create_user
 
 
 async def test_a_subject_is_a_reference_and_resolves_back(session: AsyncSession):
+    """Minting is on first use, so a renewal names the account as the sign-in
+    did rather than handing out a second live reference; two accounts get
+    unrelated names."""
     user = await create_user(session)
+    other = await create_user(session)
 
     subject = await subject_for_user(session, user_id=user.id)
+    again = await subject_for_user(session, user_id=user.id)
+    others = await subject_for_user(session, user_id=other.id)
     await session.commit()
 
     assert subject.startswith("ucli_")
     assert subject != str(user.id)
+    assert again == subject
+    assert others != subject
     assert await user_for_subject(session, subject=subject) == user
-
-
-async def test_asking_twice_gives_the_same_name(session: AsyncSession):
-    """Minting is on first use, so a renewal names the account as the sign-in
-    did rather than handing out a second live reference."""
-    user = await create_user(session)
-
-    first = await subject_for_user(session, user_id=user.id)
-    second = await subject_for_user(session, user_id=user.id)
-    await session.commit()
-
-    assert first == second
-
-
-async def test_two_accounts_get_unrelated_names(session: AsyncSession):
-    one = await create_user(session)
-    other = await create_user(session)
-
-    assert await subject_for_user(session, user_id=one.id) != await subject_for_user(
-        session, user_id=other.id
-    )
 
 
 @pytest.mark.parametrize(

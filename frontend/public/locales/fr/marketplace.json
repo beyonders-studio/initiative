@@ -9,6 +9,10 @@
     "installed": "Installé",
     "version": "v{{version}}",
     "beta": "Bêta",
+    "paid": "Payant",
+    "subscription": "Abonnement",
+    "oneTime": "Achat unique",
+    "included": "Inclus avec Initiative",
     "needsUpdate": "Nécessite une app plus récente",
     "unavailable": "Pas encore disponible",
     "request": "À demander"
@@ -26,6 +30,8 @@
     "description": "Rien dans le catalogue ne correspond à « {{query}} »."
   },
   "detail": {
+    "screenshots": "Captures d'écran",
+    "screenshot": "{{name}}, capture {{number}}",
     "installs_one": "{{count}} installation",
     "installs_other": "{{count}} installations",
     "minimumAge": "Dès {{age}} ans",
@@ -71,5 +77,32 @@
   },
   "installedUnknown": "Impossible de vérifier lesquels vous possédez déjà : rien ci-dessous n'est donc marqué comme installé.",
   "subtitlePlugins": "Les plug-ins ajoutent quelque chose que toute la communauté partage. Seul le superadmin de la communauté peut les ajouter.",
-  "subtitleAuto": "Les automatisations s'exécutent en arrière-plan pour toute la communauté."
+  "subtitleAuto": "Les automatisations s'exécutent en arrière-plan pour toute la communauté.",
+  "tag": {
+    "tool": "Nouvel outil",
+    "community_tool": "Toute la communauté",
+    "page": "Page à part",
+    "connection": "Connecte un compte",
+    "add_on": "Complète vos outils"
+  },
+  "contents": {
+    "title": "Ce qu'il ajoute",
+    "tool": "Outil",
+    "toolInitiatives": "{{name}}, dans les initiatives",
+    "toolCommunity": "{{name}}, pour toute la communauté",
+    "pages": "Pages",
+    "pagesCommunity": "pour toute la communauté",
+    "pagesInitiatives": "dans les initiatives",
+    "pagesBoth": "pour toute la communauté et dans les initiatives",
+    "dashboards": "Tableaux de bord",
+    "widgets": "Widgets",
+    "widgetsNote": "pour n'importe quel tableau de bord",
+    "fields": "Champs",
+    "parts": "Sections",
+    "actions": "Actions",
+    "on": "sur les {{kinds}}",
+    "connections": "Connexions",
+    "connectionCommunity": "un administrateur la connecte une fois",
+    "connectionMember": "chaque membre connecte le sien"
+  }
 }

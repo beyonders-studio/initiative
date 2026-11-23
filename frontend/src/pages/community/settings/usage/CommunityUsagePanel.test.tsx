@@ -3,11 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildCommunity, communityCan } from "@/__tests__/factories";
 import { renderWithProviders } from "@/__tests__/helpers/render";
+import type { CommunityEntry } from "@/hooks/useCommunities";
 
 // Mutable state the mocked hooks read, so each test can vary billing config,
 // the active community, and the storage-usage response.
 const state = vi.hoisted(() => ({
-  community: null as ReturnType<typeof Object> | null,
+  community: null as unknown as CommunityEntry,
   billing: null as { url: string } | null,
   guestsEnabled: true,
   usage: { usage_bytes: 0 } as { usage_bytes: number } | undefined,
@@ -15,12 +16,6 @@ const state = vi.hoisted(() => ({
   usageEnabled: [] as boolean[],
 }));
 
-vi.mock("@/hooks/useCommunities", async () => {
-  const actual =
-    await vi.importActual<typeof import("@/hooks/useCommunities")>("@/hooks/useCommunities");
-  // Keep CommunityContext (the render helper's provider imports it); override the hook.
-  return { ...actual, useCommunities: () => ({ activeCommunity: state.community }) };
-});
 vi.mock("@/hooks/useAppConfig", () => ({
   useAppConfig: () => ({ billing: state.billing, guestsEnabled: state.guestsEnabled }),
 }));
@@ -32,6 +27,11 @@ vi.mock("@/api/generated/storage/storage", () => ({
 }));
 
 import { CommunityUsagePanel } from "./CommunityUsagePanel";
+
+const render = () =>
+  renderWithProviders(<CommunityUsagePanel />, {
+    communities: { activeCommunity: state.community },
+  });
 
 // The panel is a community-admin surface: it lives on the admin-gated settings
 // page and renders fields the API sends to admins only, so every fixture here
@@ -54,7 +54,7 @@ describe("CommunityUsagePanel", () => {
   });
 
   it("renders storage and member usage against caps (FOSS, billing absent)", () => {
-    renderWithProviders(<CommunityUsagePanel />);
+    render();
     expect(screen.getByText("Storage")).toBeInTheDocument();
     expect(screen.getByText("Members")).toBeInTheDocument();
     // Members: 4 of 10 — the usage number renders from the community's own row.
@@ -66,7 +66,7 @@ describe("CommunityUsagePanel", () => {
     [3, "Up to 3 at a time"],
   ])("states a guest cap of %s as its effect", (maxGuests, said) => {
     state.community = { ...state.community, max_guests: maxGuests };
-    renderWithProviders(<CommunityUsagePanel />);
+    render();
     expect(screen.getByText("Guests").parentElement).toHaveTextContent(said);
   });
 
@@ -76,7 +76,7 @@ describe("CommunityUsagePanel", () => {
   ])("says nothing about guests to %s", (_who, maxGuests, enabled) => {
     state.community = { ...state.community, max_guests: maxGuests };
     state.guestsEnabled = enabled;
-    renderWithProviders(<CommunityUsagePanel />);
+    render();
     expect(screen.queryByText("Guests")).toBeNull();
   });
 
@@ -90,7 +90,7 @@ describe("CommunityUsagePanel", () => {
       member_count: 4,
       tier_name: "gold",
     });
-    renderWithProviders(<CommunityUsagePanel />);
+    render();
     expect(screen.getByText("Storage")).toBeInTheDocument();
     expect(screen.queryByText("Upgrade")).not.toBeInTheDocument();
     expect(screen.queryByText("Manage billing")).not.toBeInTheDocument();
@@ -105,7 +105,7 @@ describe("CommunityUsagePanel", () => {
       max_users: null,
       member_count: 3,
     });
-    renderWithProviders(<CommunityUsagePanel />);
+    render();
     expect(screen.getAllByText(/Unlimited/).length).toBeGreaterThan(0);
   });
 
@@ -113,7 +113,7 @@ describe("CommunityUsagePanel", () => {
     // A refused or failed read is not zero bytes.
     state.usage = undefined;
     state.usageError = true;
-    renderWithProviders(<CommunityUsagePanel />);
+    render();
     expect(screen.getByText("Unavailable right now")).toBeInTheDocument();
     expect(screen.queryByText(/^0 B/)).not.toBeInTheDocument();
     // The member figure needs no request and still shows.
@@ -122,7 +122,7 @@ describe("CommunityUsagePanel", () => {
 
   it("shows no storage figure while it is still loading", () => {
     state.usage = undefined;
-    renderWithProviders(<CommunityUsagePanel />);
+    render();
     expect(screen.queryByText(/of 1000 B|0 B/)).not.toBeInTheDocument();
     expect(screen.queryByText("Unavailable right now")).not.toBeInTheDocument();
   });
@@ -138,7 +138,7 @@ describe("CommunityUsagePanel", () => {
       accessType: "grant",
       grantSettingsLevel: "superadmin",
     };
-    renderWithProviders(<CommunityUsagePanel />);
+    render();
     expect(state.usageEnabled.every(Boolean)).toBe(true);
     expect(screen.getByText(/500 B/)).toBeInTheDocument();
   });

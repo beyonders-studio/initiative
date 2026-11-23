@@ -2,21 +2,18 @@
  * "Run dashboard as": Initiative is only offered to someone allowed to choose
  * it, and anyone who can edit may go back to Individual.
  */
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { HttpResponse } from "msw";
+import { describe, expect, it } from "vitest";
 
 import { writerCan } from "@/__tests__/factories/can";
+import { communityHttp } from "@/__tests__/helpers/communityHttp";
+import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import type { DashboardRead } from "@/api/generated/initiativeAPI.schemas";
 
 import { DashboardViewModeField } from "./DashboardViewModeField";
-
-const mutate = vi.fn();
-
-vi.mock("@/hooks/useDashboards", () => ({
-  useSetDashboardViewMode: () => ({ mutate, isPending: false }),
-}));
 
 const dashboard = (overrides: Partial<DashboardRead> = {}) =>
   ({
@@ -28,15 +25,20 @@ const dashboard = (overrides: Partial<DashboardRead> = {}) =>
     ...overrides,
   }) as DashboardRead;
 
-beforeEach(() => mutate.mockReset());
-
 describe("DashboardViewModeField", () => {
   it("switches to Initiative for someone allowed to", async () => {
+    let sent: unknown = null;
+    server.use(
+      communityHttp.put("/dashboards/:id/view-mode", async ({ request }) => {
+        sent = await request.json();
+        return HttpResponse.json(dashboard({ view_mode: "initiative" }));
+      })
+    );
     renderWithProviders(<DashboardViewModeField dashboard={dashboard()} />);
     const user = userEvent.setup();
     await user.click(screen.getByRole("combobox", { name: /run dashboard as/i }));
     await user.click(await screen.findByRole("option", { name: /^initiative$/i }));
-    expect(mutate).toHaveBeenCalledWith("initiative");
+    await waitFor(() => expect(sent).toEqual({ mode: "initiative" }));
   });
 
   it("does not offer Initiative to someone who may not choose it", async () => {

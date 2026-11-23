@@ -153,17 +153,6 @@ async def test_an_account_that_met_no_form_is_asked(
     assert me.json()["legal_acceptance_required"] is True
 
 
-async def test_nobody_is_asked_on_a_deployment_with_no_terms(
-    client: AsyncClient, acting_user, monkeypatch
-):
-    monkeypatch.setattr(settings, "BILLING_URL", None)
-    actor = await acting_user()
-
-    me = await client.get("/api/v1/me", headers=actor.headers)
-
-    assert me.json()["legal_acceptance_required"] is False
-
-
 async def test_accepting_settles_it(
     client: AsyncClient, session: AsyncSession, acting_user, hosted
 ):
@@ -182,17 +171,9 @@ async def test_accepting_settles_it(
     me = await client.get("/api/v1/me", headers=actor.headers)
     assert me.json()["legal_acceptance_required"] is False
 
-
-async def test_accepting_twice_does_not_write_it_twice(
-    client: AsyncClient, session: AsyncSession, acting_user, hosted
-):
-    """The screen only shows while something is outstanding, so a second POST
-    is a double-submit rather than consent to a new revision."""
-    actor = await acting_user()
-
+    # The screen only shows while something is outstanding, so a second POST
+    # is a double-submit rather than consent to a new revision.
     await client.post("/api/v1/me/legal-acceptance", headers=actor.headers)
-    await client.post("/api/v1/me/legal-acceptance", headers=actor.headers)
-
     rows = await _rows(session, actor.user.id)
     assert [r.document for r in rows] == ["terms", "privacy"]
 
@@ -202,6 +183,9 @@ async def test_there_is_nothing_to_accept_on_a_self_hosted_deployment(
 ):
     monkeypatch.setattr(settings, "BILLING_URL", None)
     actor = await acting_user()
+
+    me = await client.get("/api/v1/me", headers=actor.headers)
+    assert me.json()["legal_acceptance_required"] is False
 
     response = await client.post("/api/v1/me/legal-acceptance", headers=actor.headers)
 

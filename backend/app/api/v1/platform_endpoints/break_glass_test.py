@@ -84,26 +84,6 @@ async def _live_pair(client: AsyncClient, actor: Actor) -> set[tuple[str, str]]:
     }
 
 
-async def test_break_glass_self_issues_live_grant(client: AsyncClient, outsider):
-    """An operator issues a grant in one step: created AND approved, live
-    immediately, with requester == approver as the record of who took it."""
-    a, guild = await outsider()
-
-    resp = await _break_glass(client, a, guild)
-
-    assert resp.status_code == 201, resp.text
-    grant = resp.json()
-    assert grant["status"] == "approved"
-    assert grant["is_live"] is True
-    # Breaking glass is not a dial: write access to the content, and a
-    # settings grant alongside it.
-    assert grant["access_level"] == "read_write"
-    assert grant["expires_at"] is not None
-    assert grant["user_id"] == a.user.id
-    assert grant["requested_by_id"] == a.user.id
-    assert grant["approved_by_id"] == a.user.id  # self-approved = the record
-
-
 async def test_break_glass_requires_data_bypass(client: AsyncClient, outsider):
     """Support and moderator hold ``access.request`` rather than
     ``data.bypass``, so the request->approve flow is their way in."""
@@ -119,7 +99,9 @@ async def test_admin_reaches_guild_only_after_clicking_through(
 ):
     """THE Phase 3 smoke test: reach into a community comes from the grant, so
     the same request answers 403 before clicking through and 200 after, scoped
-    to that one community."""
+    to that one community. The grant is issued in one step: created AND
+    approved, live immediately, with requester == approver as the record of
+    who took it."""
     a, guild = await outsider()
     host = await acting_user(
         guild_role=CommunityRole.admin, guild=guild, initiative=True
@@ -130,7 +112,14 @@ async def test_admin_reaches_guild_only_after_clicking_through(
 
     issued = await _break_glass(client, a, guild, reason="investigate")
     assert issued.status_code == 201, issued.text
-    assert issued.json()["is_live"] is True
+    grant = issued.json()
+    assert grant["status"] == "approved"
+    assert grant["is_live"] is True
+    assert grant["access_level"] == "read_write"
+    assert grant["expires_at"] is not None
+    assert grant["user_id"] == a.user.id
+    assert grant["requested_by_id"] == a.user.id
+    assert grant["approved_by_id"] == a.user.id
 
     after = await client.get(f"/api/v1/c/{guild.id}/initiatives/", headers=a.headers)
     assert after.status_code == 200, after.text

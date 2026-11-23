@@ -14,8 +14,8 @@ import { useTranslation } from "react-i18next";
 
 import type {
   ResourceAccessLevel,
+  ShareRequestAnswerScope,
   ShareRequestRead,
-  ShareRequestScope,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { SettingsSection } from "@/components/settings/SettingsSection";
@@ -50,7 +50,7 @@ type GiveLevel = Exclude<ResourceAccessLevel, "owner">;
 /** What an answer gives: the level, to whom, and whether a no is told. */
 interface Answer {
   level: GiveLevel;
-  scope: ShareRequestScope;
+  scope: ShareRequestAnswerScope;
   tell: boolean;
 }
 
@@ -150,7 +150,7 @@ const AnswerFields = ({
         </Label>
         <Select
           value={value.scope}
-          onValueChange={(scope) => onChange({ ...value, scope: scope as ShareRequestScope })}
+          onValueChange={(scope) => onChange({ ...value, scope: scope as ShareRequestAnswerScope })}
           disabled={disabled}
         >
           <SelectTrigger id={`${id}-scope`} className="h-8 w-56 max-w-full">

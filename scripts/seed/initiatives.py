@@ -7,6 +7,7 @@ from sqlalchemy import update
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tool_set import BUILTIN_TOOLS
 from app.core.tools import Tool
 from app.models.platform.user import User
 from app.models.tenant.initiative import (
@@ -16,6 +17,7 @@ from app.models.tenant.initiative import (
     InitiativeRoleModel,
     InitiativeRule,
 )
+from app.services.tenant.initiative_tools import switches, write_switches
 from app.services.tenant.initiatives import create_builtin_roles, creator_role
 from seed.common import Community
 
@@ -24,7 +26,7 @@ from seed.common import Community
 SEED_INITIATIVE_NAME = "Default Initiative"
 SEED_INITIATIVE_COLOR = "#2563eb"
 
-_SMALL_KIT = (Tool.counter_group, Tool.calendar, Tool.wiki)
+_SMALL_KIT = (Tool.calendar, Tool.wiki)
 
 #: Who makes each community's default initiative, and who else is in it on
 #: which built-in role.
@@ -115,7 +117,7 @@ INITIATIVES: dict[str, dict[str, dict]] = {
             ],
             "join_policy": InitiativeJoinPolicy.request,
             "tools": _SMALL_KIT,
-            "member_tools": (Tool.counter_group, Tool.calendar, Tool.wiki),
+            "member_tools": (Tool.calendar, Tool.wiki),
         },
     },
     "tides": {
@@ -150,7 +152,7 @@ INITIATIVES: dict[str, dict[str, dict]] = {
             ],
             "join_policy": InitiativeJoinPolicy.private,
             "tools": _SMALL_KIT,
-            "member_tools": (Tool.counter_group, Tool.calendar, Tool.wiki),
+            "member_tools": (Tool.calendar, Tool.wiki),
         },
     },
 }
@@ -212,6 +214,8 @@ async def seed_initiative(
     )
     session.add(initiative)
     await session.flush()
+    # Each tool's own switch, as a new initiative's: its record's default.
+    await write_switches(session, initiative.id, switches({}, BUILTIN_TOOLS))
 
     roles = await create_builtin_roles(session, initiative_id=initiative.id)
     role = await creator_role(
@@ -236,7 +240,8 @@ async def create_initiative(c: Community, key: str, d: dict) -> Initiative:
     gets one: ``private`` is invite-only, ``request`` puts them in the
     manager's queue, ``open`` is one click. ``auto_join`` enrols every new
     arrival and the check constraint only allows it on an ``open`` one. Tools
-    not named keep the model's own default.
+    not named keep their own default, written as the initiative's switch
+    rows the way creating one in the app writes them.
     """
     tools = d.get("tools", ())
     initiative = Initiative(
@@ -245,10 +250,14 @@ async def create_initiative(c: Community, key: str, d: dict) -> Initiative:
         color=d["color"],
         join_policy=d.get("join_policy", InitiativeJoinPolicy.private).value,
         auto_join=d.get("auto_join", False),
-        **{tool.view_permission: True for tool in tools},
     )
     c.session.add(initiative)
     await c.session.flush()
+    await write_switches(
+        c.session,
+        initiative.id,
+        switches({tool: True for tool in tools}, BUILTIN_TOOLS),
+    )
     c.ids["initiatives"].append(initiative.id)
 
     roles = await create_builtin_roles(c.session, initiative_id=initiative.id)

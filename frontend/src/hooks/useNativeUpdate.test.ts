@@ -58,118 +58,93 @@ const bundle = (over: Partial<BundleInfo>): BundleInfo => ({
  * "not up to date", while refusing bundles that need a newer native shell.
  */
 describe("buildBundleDownloadUrl", () => {
-  it("joins the manifest path to the origin, ignoring the /api/v1 suffix on serverUrl", () => {
-    expect(
-      buildBundleDownloadUrl("https://app.example.com/api/v1", "/api/v1/native/bundle/download")
-    ).toBe("https://app.example.com/api/v1/native/bundle/download");
-  });
-
-  it("preserves a non-standard port and http scheme (LAN self-hosting)", () => {
-    expect(
-      buildBundleDownloadUrl("http://192.168.1.10:8173/api/v1", "/api/v1/native/bundle/download")
-    ).toBe("http://192.168.1.10:8173/api/v1/native/bundle/download");
-  });
-
-  it("does not double up the /api/v1 segment", () => {
-    const url = buildBundleDownloadUrl("https://host/api/v1", "/api/v1/native/bundle/download");
-    expect(url.match(/\/api\/v1/g)).toHaveLength(1);
+  it.each([
+    ["https://app.example.com/api/v1", "https://app.example.com/api/v1/native/bundle/download"],
+    // A non-standard port and http scheme (LAN self-hosting).
+    ["http://192.168.1.10:8173/api/v1", "http://192.168.1.10:8173/api/v1/native/bundle/download"],
+  ])("joins the manifest path to the origin of %s, not doubling /api/v1", (serverUrl, url) => {
+    expect(buildBundleDownloadUrl(serverUrl, "/api/v1/native/bundle/download")).toBe(url);
   });
 });
 
 describe("floorFor", () => {
-  const statement = {
-    v: 1,
-    version: "0.75.0",
-    sha256: "",
-    minNativeVersion: "0.73.0",
-    minDesktopVersion: "0.75.0",
-  } as const;
-
-  it("holds the phone app to the phone floor", () => {
+  it("holds the phone app to the phone floor, and the desktop app to its own", () => {
+    const statement = {
+      v: 1,
+      version: "0.75.0",
+      sha256: "",
+      minNativeVersion: "0.73.0",
+      minDesktopVersion: "0.75.0",
+    } as const;
     expect(floorFor(statement, "android")).toBe("0.73.0");
-  });
-
-  it("holds the desktop app to its own floor", () => {
     expect(floorFor(statement, "electron")).toBe("0.75.0");
   });
 });
 
 describe("decideNativeUpdate", () => {
   const base = { currentVersion: "0.48.0", nativeVersion: "0.48.0", minNativeVersion: "0.48.0" };
+  const ios = { ...base, platform: "ios" };
 
-  it("is up-to-date only when the server's version is exactly the running bundle's", () => {
-    expect(decideNativeUpdate({ ...base, manifestVersion: "0.48.0" })).toBe("up-to-date");
+  it.each([
+    // Up to date only when the server's version is exactly the running bundle's.
+    ["the same version", { ...base, manifestVersion: "0.48.0" }, "up-to-date"],
     // A suffix is part of the version, and the patch number is read past it.
-    expect(decideNativeUpdate({ ...base, manifestVersion: "0.48.0-dev-abc" })).toBe("download");
-    expect(decideNativeUpdate({ ...base, manifestVersion: "0.48.3-dev-abc" })).toBe("download");
-  });
-
-  it("downloads when the server is newer", () => {
-    expect(decideNativeUpdate({ ...base, manifestVersion: "0.49.0" })).toBe("download");
-  });
-
-  it("goes back to an older bundle that is still no older than the app shipped with", () => {
-    expect(
-      decideNativeUpdate({ ...base, currentVersion: "0.49.0", manifestVersion: "0.48.1" })
-    ).toBe("download");
-  });
-
-  it("never installs a bundle older than the one the app shipped with", () => {
-    expect(decideNativeUpdate({ ...base, manifestVersion: "0.47.9" })).toBe("older-than-app");
-    expect(
-      decideNativeUpdate({ ...base, currentVersion: "0.49.0", manifestVersion: "0.47.0" })
-    ).toBe("older-than-app");
-  });
-
-  it("still installs a suffixed build of the version the app shipped with", () => {
-    expect(
-      decideNativeUpdate({ ...base, currentVersion: "0.48.1", manifestVersion: "0.48.0-dev-abc" })
-    ).toBe("download");
-  });
-
-  it("takes only patch releases over the air on iOS", () => {
-    const ios = { ...base, platform: "ios" };
-    expect(decideNativeUpdate({ ...ios, manifestVersion: "0.48.3" })).toBe("download");
-    expect(decideNativeUpdate({ ...ios, manifestVersion: "0.48.3-dev-abc" })).toBe("download");
-    expect(decideNativeUpdate({ ...ios, manifestVersion: "0.49.0" })).toBe("native-required");
-    expect(decideNativeUpdate({ ...ios, manifestVersion: "1.48.0" })).toBe("native-required");
-    // Other platforms keep taking feature releases.
-    expect(decideNativeUpdate({ ...base, platform: "android", manifestVersion: "0.49.0" })).toBe(
-      "download"
-    );
-  });
-
-  it("requires a native update when the bundle needs a newer shell than installed", () => {
-    expect(
-      decideNativeUpdate({
+    ["a suffixed build", { ...base, manifestVersion: "0.48.0-dev-abc" }, "download"],
+    ["a suffixed patch", { ...base, manifestVersion: "0.48.3-dev-abc" }, "download"],
+    ["a newer server", { ...base, manifestVersion: "0.49.0" }, "download"],
+    [
+      "an older bundle no older than the app shipped with",
+      { ...base, currentVersion: "0.49.0", manifestVersion: "0.48.1" },
+      "download",
+    ],
+    ["a bundle older than the app", { ...base, manifestVersion: "0.47.9" }, "older-than-app"],
+    [
+      "a downgrade below the app",
+      { ...base, currentVersion: "0.49.0", manifestVersion: "0.47.0" },
+      "older-than-app",
+    ],
+    [
+      "a suffixed build of the version the app shipped with",
+      { ...base, currentVersion: "0.48.1", manifestVersion: "0.48.0-dev-abc" },
+      "download",
+    ],
+    // Only patch releases go over the air on iOS; other platforms take features.
+    ["an iOS patch", { ...ios, manifestVersion: "0.48.3" }, "download"],
+    ["a suffixed iOS patch", { ...ios, manifestVersion: "0.48.3-dev-abc" }, "download"],
+    ["an iOS feature release", { ...ios, manifestVersion: "0.49.0" }, "native-required"],
+    ["an iOS major release", { ...ios, manifestVersion: "1.48.0" }, "native-required"],
+    [
+      "an Android feature release",
+      { ...base, platform: "android", manifestVersion: "0.49.0" },
+      "download",
+    ],
+    [
+      "a bundle needing a newer shell than installed",
+      {
         manifestVersion: "0.50.0",
         currentVersion: "0.48.0",
-        nativeVersion: "0.48.0", // installed APK predates the native change
+        nativeVersion: "0.48.0",
         minNativeVersion: "0.50.0",
-      })
-    ).toBe("native-required");
-  });
-
-  it("downloads when the installed shell is new enough for the bundle", () => {
-    expect(
-      decideNativeUpdate({
+      },
+      "native-required",
+    ],
+    [
+      "a bundle the installed shell is new enough for",
+      {
         manifestVersion: "0.50.0",
         currentVersion: "0.48.0",
         nativeVersion: "0.50.0",
         minNativeVersion: "0.49.0",
-      })
-    ).toBe("download");
-  });
-
-  it("prefers up-to-date over native-required when already running the served version", () => {
-    expect(
-      decideNativeUpdate({
-        manifestVersion: "0.48.0",
-        currentVersion: "0.48.0",
-        nativeVersion: "0.48.0",
-        minNativeVersion: "0.99.0",
-      })
-    ).toBe("up-to-date");
+      },
+      "download",
+    ],
+    [
+      "the served version, already running, whatever shell it asks for",
+      { ...base, manifestVersion: "0.48.0", minNativeVersion: "0.99.0" },
+      "up-to-date",
+    ],
+  ])("for %s, decides %s", (_case, input, decision) => {
+    expect(decideNativeUpdate(input)).toBe(decision);
   });
 });
 
@@ -181,34 +156,21 @@ describe("decideNativeUpdate", () => {
  * bundle — handing either to `set()` throws or boots a bundle that rolls back and re-prompts.
  */
 describe("findReadyBundle", () => {
-  it("returns the downloaded (pending) bundle for the requested version", () => {
-    const ready = bundle({ id: "9", version: "0.49.0", status: "pending" });
-    expect(findReadyBundle([bundle({ version: "0.48.0" }), ready], "0.49.0")).toBe(ready);
-  });
+  it.each(["pending", "success"] as const)(
+    "returns a %s bundle for the requested version",
+    (status) => {
+      const ready = bundle({ id: "9", version: "0.49.0", status });
+      expect(findReadyBundle([bundle({ version: "0.48.0" }), ready], "0.49.0")).toBe(ready);
+    }
+  );
 
-  it("also accepts an already-confirmed (success) bundle for the version (reuse/downgrade)", () => {
-    const ready = bundle({ id: "9", version: "0.49.0", status: "success" });
-    expect(findReadyBundle([ready], "0.49.0")).toBe(ready);
-  });
-
-  it("ignores a bundle that is still downloading (set() would throw)", () => {
-    expect(
-      findReadyBundle([bundle({ version: "0.49.0", status: "downloading" })], "0.49.0")
-    ).toBeNull();
-  });
-
-  it("ignores an errored bundle for the version (would roll back and re-prompt)", () => {
-    expect(findReadyBundle([bundle({ version: "0.49.0", status: "error" })], "0.49.0")).toBeNull();
-  });
-
-  it("ignores a pending bundle for a different version", () => {
-    expect(
-      findReadyBundle([bundle({ version: "0.48.0", status: "pending" })], "0.49.0")
-    ).toBeNull();
-  });
-
-  it("returns null when no bundles are present", () => {
-    expect(findReadyBundle([], "0.49.0")).toBeNull();
+  it.each([
+    ["one still downloading", [bundle({ version: "0.49.0", status: "downloading" })]],
+    ["an errored one", [bundle({ version: "0.49.0", status: "error" })]],
+    ["a pending one for another version", [bundle({ version: "0.48.0", status: "pending" })]],
+    ["none at all", []],
+  ])("finds nothing ready among %s", (_case, bundles) => {
+    expect(findReadyBundle(bundles, "0.49.0")).toBeNull();
   });
 });
 

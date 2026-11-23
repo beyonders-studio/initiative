@@ -21,7 +21,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import column_property
 from sqlmodel import Field, Relationship, SQLModel
 
-from app.core.tools import DEFAULT_ENABLED_TOOLS, Tool
+from app.core.tools import Tool
 from app.db.registry_checks import FROM_REGISTRY
 from app.models.platform.user import ABSENT_STATUSES
 from app.models.platform.user_profile_view import MemberProfile
@@ -34,8 +34,8 @@ from app.models.tenant._mixins import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
+    from app.core.tool_set import ToolSet
     from app.models.tenant.calendar import Calendar
-    from app.models.tenant.counter import CounterGroup
     from app.models.tenant.file import File
     from app.models.tenant.project import Project
 
@@ -104,10 +104,23 @@ PermissionKey = Enum(
 # master switch: the switch says whether a tool exists here at all, and this
 # says what an ordinary member may do with one that does.
 DEFAULT_PERMISSION_VALUES: dict["PermissionKey", bool] = {
-    **{PermissionKey(t.view_permission): t in DEFAULT_ENABLED_TOOLS for t in Tool},
+    **{PermissionKey(t.view_permission): t.spec.on_by_default for t in Tool},
     **{PermissionKey(t.create_permission): False for t in Tool},
     **{PermissionKey(name): False for name in EXTRA_PERMISSION_KEYS},
 }
+
+
+def permission_defaults(tools: "ToolSet | None") -> dict[str, bool]:
+    """Every role key in a community with ``tools``, with the answer a role
+    that has no row for it gets: :data:`PermissionKey`'s, then each installed
+    tool's pair, as a built-in tool's: viewing as its record says, creating
+    off."""
+    installed = () if tools is None else tools.installed
+    return {
+        **{key.value: DEFAULT_PERMISSION_VALUES[key] for key in PermissionKey},
+        **{tool.view_permission: tool.spec.on_by_default for tool in installed},
+        **{tool.create_permission: False for tool in installed},
+    }
 
 
 class BuiltinRole(NamedTuple):
@@ -125,6 +138,13 @@ class BuiltinRole(NamedTuple):
     is_manager: bool
     override_share_restrictions: bool
     permissions: dict["PermissionKey", bool]
+
+    def holds(self, tools: "ToolSet | None") -> dict[str, bool]:
+        """What the role holds of every key in a community with ``tools``:
+        every key where it holds every built-in one, the defaults
+        otherwise."""
+        every = all(self.permissions.values())
+        return {key: every or on for key, on in permission_defaults(tools).items()}
 
 
 #: The built-in role an ordinary member holds, whose permissions a community
@@ -231,6 +251,34 @@ def _quoted(keys) -> str:
     return ", ".join(f"'{key}'" for key in keys)
 
 
+def _rule_keys(tools: "ToolSet | None") -> str:
+    """Which keys a rule row may hold, in a community with ``tools``: a role
+    key of one of its tools, or one of the community's own, with no install;
+    and anything an install's row names, by role or for the whole
+    community."""
+    keys = permission_defaults(tools)
+    community = dict.fromkeys(
+        (
+            *COMMUNITY_DEFAULT_KEYS,
+            *(
+                f"{INITIATIVE_TOOL_PREFIX}{tool.kind}"
+                for tool in (() if tools is None else tools.installed)
+            ),
+            *(f"{INITIATIVE_MEMBER_PREFIX}{key}" for key in keys),
+        )
+    )
+    return (
+        "(install_id IS NULL AND ((initiative_id IS NOT NULL AND key IN ("
+        + _quoted(keys)
+        + ")) OR (initiative_id IS NULL AND initiative_role_id IS NULL"
+        + " AND key IN ("
+        + _quoted(community)
+        + "))))"
+        + " OR (install_id IS NOT NULL"
+        + " AND (initiative_id IS NULL) = (initiative_role_id IS NULL))"
+    )
+
+
 class InitiativeRule(SQLModel, table=True):
     """One of an initiative's rules: what one of its roles may do with a tool
     (``PermissionKey``). Kept in the community's own schema beside the
@@ -245,16 +293,9 @@ class InitiativeRule(SQLModel, table=True):
     __tablename__ = "initiative_rules"
     __table_args__ = (
         CheckConstraint(
-            "(install_id IS NULL AND ((initiative_id IS NOT NULL AND key IN ("
-            + _quoted(key.value for key in PermissionKey)
-            + ")) OR (initiative_id IS NULL AND initiative_role_id IS NULL"
-            + " AND key IN ("
-            + _quoted(COMMUNITY_DEFAULT_KEYS)
-            + "))))"
-            + " OR (install_id IS NOT NULL"
-            + " AND (initiative_id IS NULL) = (initiative_role_id IS NULL))",
+            _rule_keys(None),
             name="ck_initiative_rules_key",
-            info={FROM_REGISTRY: True},
+            info={FROM_REGISTRY: _rule_keys},
         ),
         ForeignKeyConstraint(
             ["initiative_role_id", "initiative_id"],
@@ -416,35 +457,7 @@ class InitiativeJoinRequest(SQLModel, table=True):
     )
 
 
-# One `{tool.plural}_enabled` master-switch column per Tool — derived from the
-# enum, so a new tool grows its column here automatically. The actual DDL still
-# ships as a guild migration (and the provisioning drift tests catch a
-# model/schema mismatch).
-#
-# Only the default varies: the tools in DEFAULT_ENABLED_TOOLS start on, so an
-# initiative created without an opinion is the one people already had.
-_InitiativeToolSwitchColumns = type(
-    "_InitiativeToolSwitchColumns",
-    (SQLModel,),
-    {
-        "__module__": __name__,
-        "__annotations__": {t.view_permission: bool for t in Tool},
-        **{
-            t.view_permission: Field(
-                default=t in DEFAULT_ENABLED_TOOLS,
-                nullable=False,
-                sa_column_kwargs={
-                    "server_default": str(t in DEFAULT_ENABLED_TOOLS).lower()
-                },
-            )
-            for t in Tool
-        },
-    },
-)
-
-
 class Initiative(
-    _InitiativeToolSwitchColumns,
     CreatedByMixin,
     ArchiveMixin,
     SoftDeleteMixin,
@@ -521,10 +534,6 @@ class Initiative(
         back_populates="initiative",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
-    counter_groups: list["CounterGroup"] = Relationship(
-        back_populates="initiative",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
-    )
 
 
 attach_initiative_actions(Initiative)
@@ -560,5 +569,30 @@ Initiative.__mapper__.add_property(  # type: ignore[attr-defined]
         .correlate_except(InitiativeMember, InitiativeRoleModel)
         .scalar_subquery(),
         deferred=True,
+    ),
+)
+
+#: Each initiative's own switch for each tool is an ``initiative_rules`` row
+#: with no role and no install, keyed by the tool's view key; a tool with no
+#: row is off. A new initiative is written a row per tool from the tool's
+#: record (``app.services.tenant.initiative_tools.write_switches``).
+_switch = InitiativeRule.__table__.alias("switch")  # type: ignore[attr-defined]
+Initiative.__mapper__.add_property(  # type: ignore[attr-defined]
+    "switched_on",
+    column_property(
+        select(
+            func.coalesce(
+                func.array_agg(_switch.c.key),
+                text("ARRAY[]::varchar[]"),
+            )
+        )
+        .where(
+            _switch.c.initiative_id == Initiative.id,
+            _switch.c.initiative_role_id.is_(None),
+            _switch.c.install_id.is_(None),
+            _switch.c.enabled.is_(True),
+        )
+        .correlate_except(_switch)
+        .scalar_subquery(),
     ),
 )

@@ -163,7 +163,8 @@ export type EditableLists<D extends PropertyDefinition = PropertyDefinitionRead>
   /** Its fields, by id: the built-ins, the properties of `definitions`, and
    *  the plug-ins'. */
   fields(definitions: D[], plugins: FieldDef[]): Map<string, FieldDef>;
-  shape: ListShape;
+  /** What its lists draw as shipped: one shape for all, or each list's own. */
+  shape: ListShape | ((kind: ListLayoutReadKind) => ListShape);
   /** The open list, its parts marked, drawn in `frame`; its scales as its
    *  `displays` say. */
   preview: (preview: ListPreview) => ReactNode;
@@ -354,7 +355,8 @@ export const LayoutEditor = <D extends PropertyDefinition>({
   plugins?: LayoutPlugins;
   /** The initiative's properties, which its fields may show, and how a new
    *  one is made. */
-  propertyEnv: Pick<PropertyEnv<D>, "definitions" | "createProperty">;
+  propertyEnv: Pick<PropertyEnv<D>, "definitions"> &
+    Partial<Pick<PropertyEnv<D>, "createProperty">>;
   /** The target's layouts, read by someone who may change them. */
   layouts: LayoutSet;
   /** Stores `changes`, in order, answering with the layouts as stored. One
@@ -389,13 +391,16 @@ export const LayoutEditor = <D extends PropertyDefinition>({
   const [selected, setSelected] = useState<Selection>(LAYOUT_SELECTED);
   const openDetail = details.find((detail) => detailKey(detail) === active);
   const onDetail = openDetail !== undefined;
-  const shape = lists?.shape ?? NO_SHAPE;
+  const shapeOf = (kind: ListLayoutReadKind): ListShape => {
+    const shape = lists?.shape ?? NO_SHAPE;
+    return typeof shape === "function" ? shape(kind) : shape;
+  };
   const current: ListLayout | null = onDetail
     ? null
     : {
         kind: active as ListLayoutReadKind,
         definition: draft.lists[active as ListLayoutReadKind] ?? {},
-        shape,
+        shape: shapeOf(active as ListLayoutReadKind),
       };
   const stored = openDetail ? (draft.details[detailKey(openDetail)] ?? null) : null;
   const detail = useMemo(
@@ -456,9 +461,9 @@ export const LayoutEditor = <D extends PropertyDefinition>({
     const field = propertyFieldId(propertyId);
     const onLists = shownKinds.filter((kind) => {
       const definition = draft.lists[kind] ?? {};
-      if (kind === "table") return columnsOf(definition, NO_FIELDS, shape).includes(field);
+      if (kind === "table") return columnsOf(definition, NO_FIELDS, shapeOf(kind)).includes(field);
       if (!CARD_LISTS.has(kind)) return false;
-      const card = cardOf(definition, NO_FIELDS, shape);
+      const card = cardOf(definition, NO_FIELDS, shapeOf(kind));
       return namedFields(card).has(field) || holdsPart(card, "properties");
     });
     const onPages = details.filter((each) => {
@@ -592,11 +597,13 @@ export const LayoutEditor = <D extends PropertyDefinition>({
       ? detailChoices(detail, openDetail, fields, plugins, t, propertiesPart)
       : { fields: [], plugins: [], parts: [] };
   // Wherever a field can be placed, a new one can be made, placed where Add
-  // was opened: the owner's metadata, or a property of the initiative's.
+  // was opened: the owner's metadata, or a property of the initiative's. What
+  // holds no properties (a tool plug-in's rows) makes none.
+  const create = propertyEnv.createProperty;
   const choices =
-    current?.kind === "calendar" || current?.kind === "gantt" || (!current && !detail)
+    !create || current?.kind === "calendar" || current?.kind === "gantt" || (!current && !detail)
       ? listed
-      : { ...listed, newField: { initiativeId, owner, create: propertyEnv.createProperty } };
+      : { ...listed, newField: { initiativeId, owner, create } };
   const addersAt = (place?: Place): Adders =>
     current?.kind === "table"
       ? { onField: (id) => edits.addColumn(id, place?.index), onPart: noop, onNode: noop }

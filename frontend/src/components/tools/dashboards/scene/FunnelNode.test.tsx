@@ -30,7 +30,7 @@ describe("a funnel that does not narrow", () => {
     const drawn = widths(container);
     expect(drawn[2]).toBe("100%");
     // And everything else is a share of it rather than of the first stage.
-    expect(drawn[0]).toBe(`${(257 / 273) * 100}%`);
+    expect(Number.parseFloat(drawn[0])).toBeCloseTo((257 / 273) * 100, 3);
   });
 
   it("draws no bar past the end of the panel", () => {

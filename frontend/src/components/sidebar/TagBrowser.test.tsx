@@ -50,23 +50,17 @@ describe("TagBrowser", () => {
     expect(screen.queryByRole("button", { name: "Edit Alpha" })).toBeNull();
   });
 
-  it("reveals selection and per-row edit affordances in edit mode", async () => {
-    renderBrowser(buildTags(), { editMode: true });
-
-    await screen.findByText("Alpha");
-    // 3 row checkboxes + the select-all checkbox in the bulk-action row.
-    expect(screen.getAllByRole("checkbox")).toHaveLength(4);
-    expect(screen.getByRole("checkbox", { name: "Select all tags" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Edit Alpha" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Delete Beta" })).toBeInTheDocument();
-  });
-
   it("select-all checks every row, expands groups, and toggles back off", async () => {
     const onExpandAll = vi.fn();
     const user = userEvent.setup();
     renderBrowser(buildTags(), { editMode: true, onExpandAll });
 
     await screen.findByText("Alpha");
+    // Edit mode reveals selection and per-row edit affordances: 3 row checkboxes
+    // + the select-all checkbox in the bulk-action row.
+    expect(screen.getAllByRole("checkbox")).toHaveLength(4);
+    expect(screen.getByRole("button", { name: "Edit Alpha" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete Beta" })).toBeInTheDocument();
     const selectAll = screen.getByRole("checkbox", { name: "Select all tags" });
     await user.click(selectAll);
 

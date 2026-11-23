@@ -219,7 +219,7 @@ Two allowances count per email address typed in, whoever types it:
 
 ## The Initiative registry and plug-ins
 
-Nothing to set. Your server follows the Initiative registry from its first start, and plug-ins are set up under **Settings → Platform → Integrations**. **Follow the registry**, on the same tab, stops the updates. See [Running plug-ins](plugins.md).
+Nothing to set. Your server follows the Initiative registry from its first start, and plug-ins are set up under **Settings → Platform → Integrations**. **Get updates from the registry**, on the same tab, stops the updates. See [Running plug-ins](plugins.md).
 
 ??? techspec "Mirrors, other registries, signing keys, and plug-ins from a file"
     Leave all of these unset unless you have the particular reason each one is for.

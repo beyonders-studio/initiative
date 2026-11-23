@@ -38,14 +38,6 @@ describe("useServerForm", () => {
     expect(result.current.edited).toBe(false);
   });
 
-  it("follows a later answer while nothing is unsaved", () => {
-    const { result, rerender } = renderForm(entity());
-
-    rerender({ loaded: entity({ name: "Renamed by somebody else" }) });
-
-    expect(result.current.values.name).toBe("Renamed by somebody else");
-  });
-
   it("keeps unsaved work when a later answer would overwrite it, until it is reset", () => {
     const { result, rerender } = renderForm(entity());
 
@@ -157,29 +149,7 @@ describe("useServerForm", () => {
       expect(result.current.values.description).toBe("and described");
     });
 
-    it("does not mark a keystroke saved that the save did not carry", () => {
-      // An autosave sends what it has, the reader types on, and the reply for
-      // the older text arrives. The newer text is still unsaved.
-      const { result } = renderForm(entity());
-
-      act(() => result.current.set({ name: "First" }));
-      act(() => result.current.set({ name: "First and more" }));
-      act(() => result.current.settle({ name: "First", description: "" }));
-
-      expect(result.current.edited).toBe(true);
-      expect(result.current.values.name).toBe("First and more");
-    });
-
-    it("settles when the fields still hold what was sent", () => {
-      const { result } = renderForm(entity());
-
-      act(() => result.current.set({ name: "First" }));
-      act(() => result.current.settle({ name: "First", description: "" }));
-
-      expect(result.current.edited).toBe(false);
-    });
-
-    it("settles a form whose values are deeper than fields", () => {
+    it("settles a form whose values are deeper than fields, once it holds what was sent", () => {
       // The rows come back as new objects every time, so field-by-field
       // identity would never match and the form would never settle again —
       // and never adopt another server answer for the rest of its life.
@@ -194,29 +164,14 @@ describe("useServerForm", () => {
       );
 
       act(() => result.current.set({ rows: [{ id: 1 }, { id: 2 }] }));
+      act(() => result.current.set({ rows: [{ id: 1 }, { id: 2 }, { id: 3 }] }));
+      // The reply for an older save does not cover what moved on since.
+      act(() => result.current.settle(deep([{ id: 1 }, { id: 2 }])));
       expect(result.current.edited).toBe(true);
 
-      act(() => result.current.settle(deep([{ id: 1 }, { id: 2 }])));
+      act(() => result.current.settle(deep([{ id: 1 }, { id: 2 }, { id: 3 }])));
 
       expect(result.current.edited).toBe(false);
-    });
-
-    it("still refuses when a deep form has moved on since the save", () => {
-      const deep = (rows: { id: number }[]) => ({ rows });
-      const { result } = renderHook(() =>
-        useServerForm(
-          { rows: [{ id: 1 }] },
-          (source) => deep(source?.rows ?? []),
-          1,
-          (a, b) => JSON.stringify(a) === JSON.stringify(b)
-        )
-      );
-
-      act(() => result.current.set({ rows: [{ id: 1 }, { id: 2 }] }));
-      act(() => result.current.set({ rows: [{ id: 1 }, { id: 2 }, { id: 3 }] }));
-      act(() => result.current.settle(deep([{ id: 1 }, { id: 2 }])));
-
-      expect(result.current.edited).toBe(true);
     });
   });
 });

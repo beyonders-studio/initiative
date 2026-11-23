@@ -16,9 +16,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
+  type ContentKind,
   type InitiativeRead,
   type TaggedEntity,
-  TagTarget,
   type TaskListRead,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
@@ -55,19 +55,15 @@ import { TableSkeleton } from "@/ui/page-skeletons";
 import { RelativeTime } from "@/ui/relative-time";
 import { StatusMessage } from "@/ui/status-message";
 
-/** What a tool holds that can carry a tag, by tool: every child kind the
- *  bulk tag edit can address. Derived, so a newly taggable kind gets its
- *  table by being one. */
-type TaggedChild = ChildKind & `${TagTarget}`;
-const TAGGABLE: ReadonlySet<string> = new Set(Object.values(TagTarget));
+/** What a tool holds that can carry a tag, by tool: every built-in child
+ *  kind (the backend's `TAGGABLE_EXTRAS`), so a new child kind gets its table
+ *  by being one. */
 export const TAGGED_CHILDREN = Object.fromEntries(
   TOOLS.map((tool) => [
     tool,
-    (Object.keys(PARENT_TOOL) as ChildKind[]).filter(
-      (kind): kind is TaggedChild => PARENT_TOOL[kind] === tool && TAGGABLE.has(kind)
-    ),
+    (Object.keys(PARENT_TOOL) as ChildKind[]).filter((kind) => PARENT_TOOL[kind] === tool),
   ])
-) as Record<Tool, TaggedChild[]>;
+) as Record<Tool, ChildKind[]>;
 
 /** How many things of a tool's tab carry the tag: its own rows and its
  *  children's, from the tag's counts. */
@@ -326,7 +322,7 @@ const TagEntityTable = ({
   tagId,
   initiatives,
 }: {
-  kind: TaggedChild;
+  kind: ChildKind;
   tagId: number;
   initiatives: InitiativeRead[];
 }) => {
@@ -334,7 +330,7 @@ const TagEntityTable = ({
   const communityPath = useCommunityPath();
   const { params, tableProps } = useServerTableState(NO_SORT_FIELDS);
   const { data, isLoading, isError, refetch } = useTagEntities(tagId, {
-    kind: kind as TagTarget,
+    kind: kind as ContentKind,
     page: params.page,
     page_size: params.page_size,
   });
@@ -379,7 +375,7 @@ const TagEntityTable = ({
           return entity.tool && entity.tool_id != null ? (
             <Link
               to={communityPath(
-                toolDetailRoute(entity.tool, entity.initiative_id ?? null, entity.tool_id)
+                toolDetailRoute(entity.tool as Tool, entity.initiative_id ?? null, entity.tool_id)
               )}
               className="text-sm hover:underline"
             >

@@ -16,6 +16,7 @@ export interface MdastNode {
   identifier?: string;
   children?: MdastNode[];
   data?: Record<string, unknown>;
+  position?: { start: { offset?: number }; end: { offset?: number } };
 }
 
 /** Both spellings of an image and of a link — inline, and by reference. */
@@ -120,6 +121,107 @@ export function remarkLineBreaks() {
         });
 
         children.splice(i, 1, ...replacement);
+      }
+    });
+  };
+}
+
+/** Faces people type that start with `>`, which markdown would read as a quote. */
+const QUOTE_FACES = [
+  ">.>",
+  ">.<",
+  ">_>",
+  ">_<",
+  ">:(",
+  ">:)",
+  ">:D",
+  ">:P",
+  ">:O",
+  ">:3",
+  ">w<",
+  ">///<",
+];
+
+/** Faces markdown would read as emphasis, strikethrough or an escape: `*_*`
+ *  would be an italic `_`, and the shrug would lose an arm. */
+const INLINE_FACES = [
+  "¯\\_(ツ)_/¯",
+  "(*^_^*)",
+  "(*^▽^*)",
+  "*_*",
+  "*-*",
+  "*.*",
+  "*o*",
+  "~_~",
+  "~.~",
+  "~-~",
+];
+
+/** What markdown may have made of a face's characters. */
+const FORMATTING = new Set(["text", "emphasis", "strong", "delete"]);
+
+/**
+ * A face reads as it was typed. A quote that starts with one is the face, not
+ * a quote holding `.>`; where one sits in a line, the markdown it was read as
+ * goes back to the text typed. Code keeps what it holds.
+ */
+export function remarkFaces() {
+  return (tree: MdastNode, file: { value: unknown }) => {
+    const source = String(file.value);
+    visitParents(tree, (parent) => {
+      const children = parent.children ?? [];
+      for (let i = children.length - 1; i >= 0; i--) {
+        const quote = children[i];
+        const start = quote.position?.start.offset;
+        if (quote.type !== "blockquote" || start === undefined) continue;
+        if (!QUOTE_FACES.some((face) => source.startsWith(face, start))) continue;
+        const text = quote.children?.[0]?.children?.[0];
+        if (text?.type !== "text") continue;
+        text.value = `>${text.value}`;
+        // The face is the quote's first paragraph; what follows it is quoted.
+        const [faceLine, ...quoted] = quote.children ?? [];
+        const rest = quoted.length
+          ? [{ ...quote, children: quoted, position: quoted[0].position }]
+          : [];
+        children.splice(i, 1, faceLine, ...rest);
+      }
+
+      // A face sits among a line's words, so only a parent holding some looks.
+      const from = parent.position?.start.offset;
+      const to = parent.position?.end.offset;
+      if (from === undefined || to === undefined) return;
+      if (!children.some((child) => FORMATTING.has(child.type))) return;
+      const words = source.slice(from, to);
+      for (const face of INLINE_FACES) {
+        for (let found = words.indexOf(face); found !== -1; ) {
+          const at = from + found;
+          const end = at + face.length;
+          const hit = children.flatMap((child, index) => {
+            const a = child.position?.start.offset;
+            const b = child.position?.end.offset;
+            return a !== undefined && b !== undefined && a < end && b > at ? [index] : [];
+          });
+          const first = children[hit[0]];
+          const last = children[hit[hit.length - 1]];
+          // Formatting the face's characters made is undone. Bold that wraps a
+          // face, its markers outside it, keeps its bold and looks at its own
+          // children, as a link does. Code holds the face as typed, and so
+          // may plain text.
+          const wraps =
+            hit.length === 1 &&
+            (first.value?.includes(face) ||
+              (first.children !== undefined &&
+                (first.position?.start.offset ?? at) < at &&
+                (first.position?.end.offset ?? end) > end));
+          const formatted =
+            hit.length > 0 && hit.every((index) => FORMATTING.has(children[index].type)) && !wraps;
+          if (formatted && first.position && last.position) {
+            const position = { start: first.position.start, end: last.position.end };
+            const value = source.slice(position.start.offset, position.end.offset);
+            children.splice(hit[0], hit.length, { type: "text", value, position });
+          }
+          found = words.indexOf(face, found + face.length);
+        }
       }
     });
   };

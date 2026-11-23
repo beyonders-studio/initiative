@@ -2,7 +2,7 @@ import { Copy, Shield, Tags, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { FileType, TagSummary, Tool } from "@/api/generated/initiativeAPI.schemas";
+import type { ContentKind, FileType, TagSummary } from "@/api/generated/initiativeAPI.schemas";
 import {
   type BulkAccessItem,
   BulkEditAccessDialog,
@@ -34,8 +34,9 @@ type BulkItem = BulkAccessItem & {
 interface BulkAccessSectionProps<T extends BulkItem> {
   /** The grid selection driving this page's cards. Its state stays on the page. */
   selection: GridSelectionLike<T>;
-  /** The tool being listed — routes every bulk endpoint. */
-  tool: Tool;
+  /** The tool being listed, a built-in tool or a tool plug-in's kind —
+   *  routes every bulk endpoint. */
+  tool: string;
   /** Invalidate the tool's list caches after a successful change. */
   invalidate: () => void;
   /** The page's own actions, before the shared ones. */
@@ -153,7 +154,7 @@ export function BulkAccessSection<T extends BulkItem>({
         open={tagsOpen}
         onOpenChange={setTagsOpen}
         items={items}
-        targetType={tool}
+        targetType={tool as ContentKind}
         communityId={communityId}
         onInvalidate={invalidate}
         onSuccess={selection.exit}

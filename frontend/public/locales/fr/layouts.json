@@ -231,24 +231,6 @@
   "sectionHelp": "Avec un titre, elle s'ouvre et se ferme ; sans titre, c'est une boîte.",
   "tab": "Mises en page",
   "settingsDescription": "Comment il dispose ce qu'il contient : chaque mise en page, sa dernière modification et l'accès à l'éditeur. Tous ceux qui peuvent l'ouvrir les voient ; ce que chacun filtre et trie lui appartient.",
-  "counterDetail": {
-    "name": "Détail du compteur",
-    "help": "Comment chaque compteur de ce groupe s'affiche quand on l'ouvre pour le modifier. Ce qu'il laisse de côté est masqué.",
-    "shipped": "Voici la mise en page d'origine. La modifier en fait celle du groupe.",
-    "titleHelp": "Chaque compteur affiche son nom.",
-    "hiddenHelp": "Chaque compteur peut afficher ceci. Retiré, il est masqué, et Ajouter le remet.",
-    "parts": {
-      "actions": "Menu",
-      "relations": "Relations",
-      "count": "Valeur"
-    },
-    "partHelp": {
-      "actions": "Ce qu'on peut faire d'autre avec le compteur : le réinitialiser.",
-      "relations": "Ce à quoi le compteur est lié.",
-      "count": "Sa valeur, par pas ou fixée."
-    },
-    "noItems": "Ajoutez un compteur au groupe pour voir sa mise en page ici."
-  },
   "fileDetail": {
     "name": "Page du fichier",
     "help": "Comment un fichier ouvert depuis cette collection s'affiche, à côté de son image ou de la collection, une fois que la collection a ses propres propriétés. Ce qu'il laisse de côté est masqué.",

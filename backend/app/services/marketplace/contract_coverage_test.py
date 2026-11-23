@@ -23,9 +23,13 @@ never both, so there are two, and each object is measured across both. A field
 added to the contract and to nothing else fails here.
 """
 
+from typing import get_args
+
 import pytest
 
-from app.services.marketplace import contract, service_plugins
+from app.core.collection_shapes import FieldDisplay
+from app.schemas.tenant import tool_layout
+from app.services.marketplace import contract, service_plugins, tool_plugins
 from app.services.marketplace.definitions import normalize_listing_definition
 from app.services.tenant import metadata as metadata_service
 
@@ -98,6 +102,36 @@ def maximal_manifest() -> dict:
                     "default_events": ["issues"],
                 },
                 "values": {"client_id": "client_id", "private_key": "pem"},
+            },
+            "check": {
+                "sign": {
+                    "iss": "{vendor.client_id}",
+                    "key": "{vendor.private_key}",
+                    "alg": "ES256",
+                    "lifetime": 30,
+                },
+                "auth": {"header": "X-Acme-Token", "prefix": "Token"},
+                "request": {
+                    "method": "POST",
+                    "url": "'https://api.acme.test/client'",
+                    "query": {"client": "vendor.client_id"},
+                    "headers": {"Accept": "'application/json'"},
+                    "body": "{'id': vendor.client_id}",
+                },
+                "expect": [
+                    {
+                        "status": "4xx",
+                        "holds": "false",
+                        "fields": ["client_id", "private_key"],
+                        "message": {"en": "Acme knows no client by this id and key."},
+                    },
+                    {
+                        "holds": "response.body.id = vendor.client_id",
+                        "fields": ["client_id"],
+                        "message": {"en": "The key belongs to another client."},
+                        "shows": "response.body.id",
+                    },
+                ],
             },
         },
         "connections": [
@@ -279,7 +313,7 @@ def maximal_manifest() -> dict:
                 "name": {"en": "Demo"},
                 "kind": "badge",
                 "list": True,
-                "on": ["task", "counter"],
+                "on": ["task", "post"],
                 "description": {"en": "The item's demo"},
                 "tone": "accent",
                 "states": {
@@ -381,6 +415,260 @@ def maximal_manifest() -> dict:
             }
         ],
     }
+
+
+def maximal_tool_manifest() -> dict:
+    """One tool manifest carrying every tool term. A field takes a currency,
+    options or a counter by its kind, and an item one open condition, so those
+    are spread over several and measured together (:func:`_open_conditions`
+    gives the other conditions)."""
+    return {
+        "plugin_kind": "tool",
+        "features": ["dashboards", "tool"],
+        "dashboards": [
+            {
+                "uid": "8V57MMR212TEY5",
+                "public_id": "acme.tally-board",
+                "name": "Tally board",
+                "widgets": [
+                    {
+                        "id": "all",
+                        "type": "chart",
+                        "title": "Every tally",
+                        "grid": {"x": 0, "y": 0, "w": 12, "h": 4},
+                        "options": {"mark": "bar"},
+                        "binding": {"source": "query", "sql": "SELECT 1"},
+                    }
+                ],
+            }
+        ],
+        "default_name": "Tallies",
+        "minimum_age": {"default": 13},
+        "min_plugin_api": "4.2",
+        "availability": "beta",
+        "help": {"en": "Count things."},
+        "tool": {
+            "key": "tally_group",
+            "name": {"en": "Tallies"},
+            "instance_name": {"en": "Tally group"},
+            "icon": "gauge",
+            "fields": [
+                {
+                    "key": "price",
+                    "name": {"en": "Price"},
+                    "kind": "currency",
+                    "currency": "EUR",
+                    "default": 2.5,
+                    "required": True,
+                },
+                {"key": "budget", "name": {"en": "Budget"}, "kind": "number"},
+                {"key": "shade", "name": {"en": "Shade"}, "kind": "color"},
+                {
+                    "key": "look",
+                    "name": {"en": "Look"},
+                    "kind": "select",
+                    "options": [{"value": "plain", "label": {"en": "Plain"}}],
+                    "default": "plain",
+                },
+            ],
+            "checks": [{"field": "budget", "at_least": 0}],
+            "layouts": {
+                "lists": [
+                    {"kind": "table", "columns": ["name", "price"]},
+                    {
+                        "kind": "masonry",
+                        "card": {
+                            "type": "card",
+                            "props": {"tint": "shade"},
+                            "children": [
+                                {
+                                    "type": "items",
+                                    "props": {
+                                        "item": "tally",
+                                        "fields": ["count", "name"],
+                                        "limit": 3,
+                                        "tint": "hue",
+                                    },
+                                }
+                            ],
+                        },
+                    },
+                ],
+                "detail": {"main": [{"type": "field", "props": {"field": "look"}}]},
+            },
+            "items": [
+                {
+                    "key": "tally",
+                    "name": {"en": "Tally"},
+                    "fields": [
+                        {
+                            "key": "count",
+                            "name": {"en": "Count"},
+                            "kind": "counter",
+                            "counter": {
+                                "min": 0,
+                                "max": "ceiling",
+                                "step": 1,
+                                "initial": "start",
+                            },
+                        },
+                        {"key": "ceiling", "name": {"en": "Ceiling"}, "kind": "number"},
+                        {"key": "start", "name": {"en": "Start"}, "kind": "number"},
+                        {
+                            "key": "hue",
+                            "name": {"en": "Hue"},
+                            "kind": "color",
+                            "default": "random",
+                        },
+                        {
+                            "key": "mode",
+                            "name": {"en": "Mode"},
+                            "kind": "select",
+                            "options": [
+                                {"value": "bar", "label": {"en": "Bar"}},
+                                {"value": "clock", "label": {"en": "Clock"}},
+                            ],
+                        },
+                    ],
+                    "checks": [{"field": "start", "at_most": {"field": "ceiling"}}],
+                    "layouts": {
+                        "lists": [
+                            {
+                                "kind": "grid",
+                                "card": {
+                                    "type": "card",
+                                    "children": [
+                                        {
+                                            "type": "stack",
+                                            "props": {
+                                                "direction": "row",
+                                                "gap": "xs",
+                                                "wrap": True,
+                                                "align": "start",
+                                                "tone": "muted",
+                                            },
+                                            "children": [
+                                                {
+                                                    "type": "field",
+                                                    "props": {"field": "count"},
+                                                },
+                                                {"type": "properties"},
+                                            ],
+                                        }
+                                    ],
+                                },
+                                "displays": {"count": "clock"},
+                                "presets": [
+                                    {
+                                        "slug": "by-count",
+                                        "name": {"en": "By count"},
+                                        "sort": [
+                                            {"field": "count", "dir": "desc"},
+                                            {"field": "updated_at"},
+                                        ],
+                                    }
+                                ],
+                            },
+                            {
+                                "kind": "table",
+                                "columns": ["name", "count"],
+                                "displays": {"count": {"from": "mode"}},
+                            },
+                        ],
+                        "detail": {
+                            "header": [
+                                {
+                                    "type": "stack",
+                                    "props": {"direction": "row"},
+                                    "children": [{"type": "byline"}],
+                                }
+                            ],
+                            "main": [
+                                {
+                                    "type": "section",
+                                    "props": {"title": "Bounds", "collapsed": True},
+                                    "children": [
+                                        {
+                                            "type": "field",
+                                            "props": {
+                                                "field": "ceiling",
+                                                "required": True,
+                                            },
+                                        }
+                                    ],
+                                }
+                            ],
+                            "side": [{"type": "properties"}],
+                        },
+                    },
+                    "open_while": {"field": "count", "below": {"field": "ceiling"}},
+                },
+                {
+                    "key": "mark",
+                    "name": {"en": "Mark"},
+                    "parent": "tally",
+                    "fields": [
+                        {"key": "done", "name": {"en": "Done"}, "kind": "checkbox"}
+                    ],
+                    "layouts": {
+                        # Every row's fields alone, as its fields change below.
+                        "lists": [{"kind": "table", "columns": ["name"]}],
+                        "detail": {
+                            "main": [{"type": "field", "props": {"field": "name"}}]
+                        },
+                    },
+                },
+            ],
+            "actions": [
+                {
+                    "id": "reset",
+                    "name": {"en": "Reset"},
+                    "on": "tally",
+                    "params": ["start"],
+                    "write": '{"set": {"count": params.start}}',
+                    "confirm": {"en": "Reset it?"},
+                }
+            ],
+        },
+    }
+
+
+def _open_conditions() -> dict:
+    """Every open condition, each on the field kind it reads, as stored."""
+    conditions: dict = {}
+    for field, condition in (
+        ({"kind": "number"}, {"below": 1}),
+        ({"kind": "number"}, {"at_most": 1}),
+        ({"kind": "number"}, {"above": 1}),
+        ({"kind": "number"}, {"at_least": 1}),
+        ({"kind": "number"}, {"equals": 1}),
+        ({"kind": "number"}, {"not_equals": 1}),
+        ({"kind": "checkbox"}, {"is": True}),
+        (
+            {"kind": "select", "options": [{"value": "a", "label": {"en": "A"}}]},
+            {"in": ["a"]},
+        ),
+        ({"kind": "date"}, {"not_passed": True}),
+    ):
+        body = maximal_tool_manifest()
+        body["tool"]["items"][1]["fields"] = [
+            {"key": "state", "name": {"en": "State"}, **field}
+        ]
+        body["tool"]["items"][1]["open_while"] = {"field": "state", **condition}
+        stored = normalize_listing_definition("plugin", body)
+        conditions.update(stored["tool"]["items"][1]["open_while"])
+    return conditions
+
+
+def _checks() -> dict:
+    """Every comparison a check makes, as stored."""
+    checks: dict = {}
+    for term in tool_plugins.COMPARISONS:
+        body = maximal_tool_manifest()
+        body["tool"]["checks"] = [{"field": "budget", term: 1}]
+        stored = normalize_listing_definition("plugin", body)
+        checks.update(stored["tool"]["checks"][0])
+    return checks
 
 
 def maximal_declarative_manifest() -> dict:
@@ -687,13 +975,19 @@ def declarative() -> dict:
 
 
 @pytest.fixture(scope="module")
-def nodes(published, declarative) -> list[tuple[str, dict]]:
-    return _nodes(published, declarative)
+def tool() -> dict:
+    """The maximal tool manifest as this build would store it."""
+    return normalize_listing_definition("plugin", maximal_tool_manifest())
 
 
-def _nodes(published: dict, declarative: dict) -> list[tuple[str, dict]]:
+@pytest.fixture(scope="module")
+def nodes(published, declarative, tool) -> list[tuple[str, dict]]:
+    return _nodes(published, declarative, tool)
+
+
+def _nodes(published: dict, declarative: dict, tool: dict) -> list[tuple[str, dict]]:
     """Each contract object beside the published node that should carry it,
-    measured across both manifests where neither alone carries every field."""
+    measured across the manifests where no one alone carries every field."""
     connection, other = published["connections"]
     read, written, _emitted = published["endpoints"]
     widget = published["widgets"][0]
@@ -707,8 +1001,49 @@ def _nodes(published: dict, declarative: dict) -> list[tuple[str, dict]]:
     section = part["tree"]
     field_node, stack, button = section["children"]
     value_node, text = stack["children"]
+    declared = tool["tool"]
+    price, _budget, _shade, look = declared["fields"]
+    tally, mark = declared["items"]
+    count = tally["fields"][0]
+    (grid, table), page = tally["layouts"]["lists"], tally["layouts"]["detail"]
+    masonry = declared["layouts"]["lists"][1]
+    preview = masonry["card"]["children"][0]
+    preset = grid["presets"][0]
+    card_stack = grid["card"]["children"][0]
+    card_field, properties = card_stack["children"]
+    page_stack, section = page["header"][0], page["main"][0]
+    page_field = section["children"][0]
     return [
-        ("manifest", {**published, **declarative}),
+        ("manifest", {**published, **declarative, **tool}),
+        ("tool", declared),
+        ("toolField", {**price, **look, **count}),
+        ("toolCounter", count["counter"]),
+        ("toolItem", {**tally, **mark}),
+        ("toolOpenWhile", _open_conditions()),
+        ("toolCheck", _checks()),
+        ("toolAction", declared["actions"][0]),
+        ("toolLayouts", tally["layouts"]),
+        # A table lists by its columns, a grid by its card.
+        ("toolListLayout", {**table, **grid}),
+        ("toolDisplayFrom", table["displays"]["count"]),
+        ("layoutPreset", preset),
+        ("layoutPresetSort", preset["sort"][0]),
+        ("layoutCardProps", masonry["card"]["props"]),
+        ("layoutItems", preview),
+        ("layoutItemsProps", preview["props"]),
+        ("toolDetailLayout", page),
+        ("layoutCard", masonry["card"]),
+        ("layoutCardStack", card_stack),
+        ("layoutStackProps", card_stack["props"]),
+        ("layoutCardField", card_field),
+        ("layoutFieldProps", card_field["props"]),
+        ("layoutProperties", properties),
+        ("layoutDetailStack", page_stack),
+        ("layoutSection", section),
+        ("layoutSectionProps", section["props"]),
+        ("layoutDetailField", page_field),
+        ("layoutDetailFieldProps", page_field["props"]),
+        ("layoutOwnPart", page_stack["children"][0]),
         ("connection", {**connection, **other, **workspace}),
         ("connectionField", connection["fields"][0]),
         ("connectionFlow", connection["flow"]),
@@ -717,6 +1052,18 @@ def _nodes(published: dict, declarative: dict) -> list[tuple[str, dict]]:
         ("vendorField", published["vendor"]["fields"][0]),
         ("githubAppManifestSetup", published["vendor"]["setup"]),
         ("githubAppManifest", published["vendor"]["setup"]["app"]),
+        ("vendorCheck", published["vendor"]["check"]),
+        ("vendorCheckSigning", published["vendor"]["check"]["sign"]),
+        ("vendorCheckRequest", published["vendor"]["check"]["request"]),
+        # A row that names a status refuses outright, so the two rows are
+        # measured together for 'shows'.
+        (
+            "vendorCheckRule",
+            {
+                **published["vendor"]["check"]["expect"][0],
+                **published["vendor"]["check"]["expect"][1],
+            },
+        ),
         ("webhooks", {**published["webhooks"], **hooks}),
         ("webhookVerify", published["webhooks"]["verify"]),
         ("webhookRoute", {**published["webhooks"]["route"], **hooks["route"]}),
@@ -735,7 +1082,12 @@ def _nodes(published: dict, declarative: dict) -> list[tuple[str, dict]]:
         ("widget", widget),
         ("page", published["pages"][0]),
         ("bundledDashboard", dashboard),
-        ("bundledDashboardWidget", dashboard["widgets"][0]),
+        # A service plug-in's tile names an endpoint, a tool plug-in's is a
+        # built-in widget with options, drawing a query.
+        (
+            "bundledDashboardWidget",
+            {**dashboard["widgets"][0], **tool["dashboards"][0]["widgets"][0]},
+        ),
         # `requires` names one operator at a time, so the two are covered from
         # the two places that use them.
         ("requires", {**read["requires"], **widget["requires"]}),
@@ -849,11 +1201,53 @@ def test_the_maximal_manifests_really_are_maximal(nodes):
     contract defines with fields is one these manifests reach. A change, and
     a list's element, is what a ``write`` answers rather than a term a
     manifest stores, and the changes engine holds an answer to it
-    (``metadata.apply_changes``), an element's every term."""
+    (``metadata.apply_changes``), an element's every term. A tool action's
+    change is an answer too, read once tool actions run."""
     reached = {owner for owner, _ in nodes} - {"other"}
     with_fields = {name for name in contract.objects() if contract.fields(name)}
-    assert with_fields - reached == {"change", "targetedChange", "listElement"}
+    assert with_fields - reached == {
+        "change",
+        "targetedChange",
+        "listElement",
+        "toolChange",
+        "toolItemChange",
+    }
     assert set(metadata_service._ELEMENT_TERMS) == set(contract.fields("listElement"))
+
+
+def test_a_tool_s_layouts_are_the_kit_s_grammar():
+    """A tool plug-in declares its layouts in the grammar ``tool_layouts``
+    stores, so each layout object the contract mirrors has the kit model's
+    terms and values (``app.schemas.tenant.tool_layout``), and what a tool
+    plug-in may use of it is a part of what the kit draws."""
+    for name, model in (
+        ("layoutStackProps", tool_layout.StackProps),
+        ("layoutFieldProps", tool_layout.FieldProps),
+        ("layoutDetailFieldProps", tool_layout.DetailFieldProps),
+        ("layoutSectionProps", tool_layout.SectionProps),
+        ("toolDetailLayout", tool_layout.DetailLayoutDefinition),
+        ("layoutCardProps", tool_layout.CardProps),
+        ("layoutItemsProps", tool_layout.ItemsProps),
+        ("layoutPresetSort", tool_layout.PresetSort),
+        ("toolDisplayFrom", tool_layout.DisplayFrom),
+    ):
+        terms = {field.alias or key for key, field in model.model_fields.items()}
+        assert set(contract.fields(name)) == terms, name
+    # A tool's preset sorts; the filters beside it are a built-in tool's.
+    assert set(contract.fields("layoutPreset")) <= set(
+        tool_layout.LayoutPreset.model_fields
+    )
+    assert contract.enum("toolSortField") == tool_plugins.TOOL_SORT_FIELDS
+    stack = contract.objects()["layoutStackProps"]["properties"]
+    for prop, field in tool_layout.StackProps.model_fields.items():
+        if prop != "wrap":
+            assert set(stack[prop]["enum"]) == set(
+                get_args(get_args(field.annotation)[0])
+            )
+    assert set(contract.enum("fieldDisplay")) == set(get_args(FieldDisplay))
+    assert contract.enum("toolListKind") == set(tool_plugins.TOOL_LIST_LAYOUTS)
+    assert contract.enum("toolListKind") <= set(get_args(tool_layout.ListLayoutKind))
+    assert contract.enum("toolDetailPart") <= set(get_args(tool_layout.OwnPartType))
 
 
 def test_an_emitting_endpoint_keeps_what_describes_it(published):
@@ -917,24 +1311,14 @@ def test_the_metadata_columns_match_the_contract():
 
 
 def test_a_term_the_contract_does_not_name_is_reported():
-    """The whole point of the report: a newer plug-in's extra terms are named."""
+    """A newer plug-in's extra terms are named, at the top and inside the
+    objects written inline rather than as named definitions (`service`,
+    `layout`, `grid`, `binding`). This is walked from the contract's own
+    structure rather than from a list of where things nest: that list was a
+    second copy of the contract, and it missed all four of these."""
     served = maximal_manifest()
     served["rate_limit"] = 5
     served["endpoints"][0]["retries"] = 3
-    assert contract.discarded_terms(served) == ["endpoints.0.retries", "rate_limit"]
-
-
-def test_a_term_nested_in_an_inline_object_is_reported():
-    """Not every object a manifest carries is a named definition — `service`,
-    `layout`, `grid` and `binding` are written inline — and a term added inside
-    one is exactly as invisible as a term added at the top.
-
-    This is walked from the contract's own structure rather than from a list of
-    where things nest, because that list is the kind of second copy the contract
-    exists to remove: it was one, it missed all four of these, and nothing said
-    so.
-    """
-    served = maximal_manifest()
     served["service"]["region"] = "eu"
     served["dashboards"][0]["layout"]["gutter"] = 4
     served["dashboards"][0]["widgets"][0]["grid"]["z"] = 9
@@ -944,85 +1328,25 @@ def test_a_term_nested_in_an_inline_object_is_reported():
         "dashboards.0.layout.gutter",
         "dashboards.0.widgets.0.binding.timeout",
         "dashboards.0.widgets.0.grid.z",
+        "endpoints.0.retries",
+        "rate_limit",
         "service.region",
     ]
 
 
-def test_an_object_the_contract_leaves_open_reports_nothing():
-    """A widget's `meta` and `sample_data` are opaque to the contract, and a
-    binding's `params` are named by the author. Keys inside them are nobody's
-    to declare, so reporting them would be noise on every honest manifest."""
+def test_a_manifest_this_build_fully_understands_reports_nothing():
+    """A report on a plug-in written against this contract would be a false
+    alarm on every verification. A widget's `meta` and `sample_data` are
+    opaque to the contract, and a binding's `params` are named by the author,
+    so keys inside them are nobody's to declare."""
+    assert contract.discarded_terms(maximal_manifest()) == []
+    assert contract.discarded_terms(maximal_tool_manifest()) == []
+    assert contract.discarded_terms(maximal_declarative_manifest()) == []
     served = maximal_manifest()
     served["widgets"][0]["meta"]["whatever"] = 1
     served["widgets"][0]["sample_data"][READ_ENDPOINT] = {"anything": 2}
     served["dashboards"][0]["widgets"][0]["binding"]["params"]["choice"] = "b"
-
     assert contract.discarded_terms(served) == []
-
-
-def test_a_manifest_this_build_fully_understands_reports_nothing():
-    """The ordinary case. A report on a plug-in written against this contract
-    would be a false alarm on every verification."""
-    assert contract.discarded_terms(maximal_manifest()) == []
-
-
-# --- what only the plug-in can know --------------------------------------------
-
-
-def test_an_identity_must_name_single_returns_of_its_own_endpoint():
-    """Nothing downstream refuses a bad address — it resolves to nothing, and a
-    fire somebody was waiting on is dropped without a word. So it is refused
-    here, at the one moment somebody can still fix it."""
-    from app.services.marketplace.manifest_values import ListingDefinitionError
-
-    def publish(**endpoint):
-        body = maximal_manifest()
-        body["endpoints"][1].update(endpoint)
-        return normalize_listing_definition("plugin", body)
-
-    with pytest.raises(ListingDefinitionError):
-        publish(identity={"kind": "issue", "key": ["nothing_returned"]})
-
-    with pytest.raises(ListingDefinitionError):
-        publish(
-            returns=[{"key": "numbers", "type": "int", "list": True}],
-            identity={"kind": "issue", "key": ["numbers"]},
-        )
-
-
-def test_a_read_endpoint_has_no_identity():
-    """It touched nothing, so there is nothing for it to address."""
-    from app.services.marketplace.manifest_values import ListingDefinitionError
-
-    body = maximal_manifest()
-    body["endpoints"][0]["identity"] = {"kind": "issue", "key": ["count"]}
-    with pytest.raises(ListingDefinitionError):
-        normalize_listing_definition("plugin", body)
-
-
-# --- a vendor's own setup flow ---------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "values",
-    [
-        {"client_id": "pem"},
-        {"client_id": "client_id", "private_key": "client_id"},
-        {"nothing": "id"},
-        {"client_id": "token"},
-        {},
-    ],
-    ids=["secret-to-plain", "twice", "undeclared", "unknown", "empty"],
-)
-def test_a_setup_writes_each_answer_once_and_secrets_only_to_a_secret(values):
-    """What GitHub answers with is written to the fields the setup names, so a
-    secret one meeting a plain field would be shown on the settings form."""
-    from app.services.marketplace.manifest_values import ListingDefinitionError
-
-    body = maximal_manifest()
-    body["vendor"]["setup"]["values"] = values
-    with pytest.raises(ListingDefinitionError):
-        normalize_listing_definition("plugin", body)
 
 
 # --- container or declarative ----------------------------------------------
@@ -1220,6 +1544,43 @@ def _labelled_on(connection) -> dict:
                 b["actions"][0].update(params=["number"]),
             ),
         ),
+        # An identity is refused here, at the one moment somebody can still fix
+        # it: downstream, a bad address resolves to nothing and a fire somebody
+        # was waiting on is dropped without a word.
+        _with(
+            maximal_manifest,
+            lambda b: b["endpoints"][1].update(
+                identity={"kind": "issue", "key": ["nothing_returned"]}
+            ),
+        ),
+        _with(
+            maximal_manifest,
+            lambda b: b["endpoints"][1].update(
+                returns=[{"key": "numbers", "type": "int", "list": True}],
+                identity={"kind": "issue", "key": ["numbers"]},
+            ),
+        ),
+        _with(
+            maximal_manifest,
+            lambda b: b["endpoints"][0].update(
+                identity={"kind": "issue", "key": ["count"]}
+            ),
+        ),
+        # A vendor setup writes each answer once, and a secret only to a secret
+        # field, which the settings form would otherwise show.
+        *(
+            _with(
+                maximal_manifest,
+                lambda b, values=values: b["vendor"]["setup"].update(values=values),
+            )
+            for values in (
+                {"client_id": "pem"},
+                {"client_id": "client_id", "private_key": "client_id"},
+                {"nothing": "id"},
+                {"client_id": "token"},
+                {},
+            )
+        ),
     ],
     ids=[
         "container-hosts",
@@ -1268,6 +1629,14 @@ def _labelled_on(connection) -> dict:
         "element-action-not-declared",
         "element-action-not-where-the-field-is",
         "action-params-without-an-endpoint",
+        "identity-names-nothing-returned",
+        "identity-names-a-list",
+        "identity-on-a-read",
+        "setup-secret-to-plain",
+        "setup-twice",
+        "setup-undeclared",
+        "setup-unknown",
+        "setup-empty",
     ],
 )
 def test_one_plugin_is_one_kind_and_says_only_what_its_kind_says(body):
@@ -1311,4 +1680,3 @@ def test_a_declarative_manifest_is_named_by_its_listing():
         normalize_listing_definition(
             "plugin", maximal_declarative_manifest(), public_id="acme.other"
         )
-    assert contract.discarded_terms(maximal_declarative_manifest()) == []

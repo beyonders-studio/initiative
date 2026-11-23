@@ -20,49 +20,31 @@ const badgeFor = (name: string) => {
 };
 
 describe("TagBadge", () => {
-  it("renders a long name in full rather than cutting it at a character count", () => {
-    // The old behaviour cut every segment to 12 characters and appended "…",
-    // so a name with room to spare still came out truncated.
-    const name = "Documentation and research";
+  // The old behaviour cut every segment to 12 characters and appended "…", so a
+  // name with room to spare still came out truncated.
+  it.each(["bug", "Documentation and research", "engineering-backlog/infrastructure"])(
+    "renders %j in full rather than cutting it at a character count",
+    (name) => {
+      badgeFor(name);
 
-    badgeFor(name);
+      expect(screen.getByText(name)).toBeInTheDocument();
+    }
+  );
 
-    expect(screen.getByText(name)).toBeInTheDocument();
-  });
-
-  it("does not cut a segmented name segment by segment", () => {
-    const name = "engineering-backlog/infrastructure";
-
-    badgeFor(name);
-
-    expect(screen.getByText(name)).toBeInTheDocument();
-  });
-
-  it("leaves the cut to the browser, via the label's own overflow", () => {
-    // `truncate` is overflow-hidden + ellipsis + nowrap; `max-w-full` is what
-    // bounds the badge to its container. Together they are the truncation.
-    const badge = badgeFor("A name long enough to need cutting somewhere");
-
-    expect(badge.className).toContain("max-w-full");
-    expect(badge.querySelector(".truncate")).not.toBeNull();
-  });
-
-  it("carries the whole name on title, whatever is shown", () => {
+  it("leaves the cut to the browser, carrying the whole name on title", () => {
     const name = "A name long enough to need cutting somewhere";
-
     const badge = badgeFor(name);
 
-    expect(badge).toHaveAttribute("title", name);
-  });
-
-  it("can shrink when it is itself a flex item", () => {
+    // `truncate` is overflow-hidden + ellipsis + nowrap; `max-w-full` is what
+    // bounds the badge to its container. Together they are the truncation.
+    expect(badge.className).toContain("max-w-full");
+    expect(badge.querySelector(".truncate")).not.toBeNull();
     // The picker puts its badges inside a button, where each one is a flex
     // item. A flex item's default `min-width: auto` refuses to go below its
     // content, so without `min-w-0` a long tag pushed straight out of the box
     // instead of truncating inside it.
-    const badge = badgeFor("longer-tag-name/much-longer-tag-name-electric-boogaloo");
-
     expect(badge.className).toContain("min-w-0");
+    expect(badge).toHaveAttribute("title", name);
   });
 
   it("keeps the remove control at full size while the label gives way", () => {
@@ -72,12 +54,6 @@ describe("TagBadge", () => {
 
     const remove = container.querySelector("button");
     expect(remove?.className).toContain("shrink-0");
-  });
-
-  it("keeps a short name untouched", () => {
-    badgeFor("bug");
-
-    expect(screen.getByText("bug")).toBeInTheDocument();
   });
 });
 

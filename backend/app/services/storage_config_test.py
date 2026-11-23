@@ -1,18 +1,17 @@
 """Tests for the resolved storage-config cache.
 
-Covers the precedence rules that make the Storage settings tab safe: the env
-fallback before the DB is loaded, and DB values overriding env after a refresh.
+Covers the env fallback before the DB is loaded (DB values overriding env after
+a save are held by the Storage settings endpoint's own tests), the S3 client's
+checksum settings, and the connection test.
 """
 
 from __future__ import annotations
 
 import pytest
-from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings as app_config
 from app.core.messages import SettingsMessages
 from app.services import storage_config
-from app.services.platform import app_settings as app_settings_service
 
 
 @pytest.fixture(autouse=True)
@@ -35,39 +34,7 @@ def test_current_config_falls_back_to_env_before_load(
     assert cfg.bucket == "env-bucket"
 
 
-async def test_refresh_loads_db_over_env(
-    session: AsyncSession,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """After a refresh, the snapshot reflects the DB row — and its backend/bucket
-    win over whatever the env vars say."""
-    monkeypatch.setattr(app_config, "STORAGE_BACKEND", "local", raising=False)
-
-    await app_settings_service.update_storage_settings(
-        session,
-        system_session=session,
-        backend="s3",
-        s3_bucket="db-bucket",
-        s3_region="ap-south-1",
-        s3_endpoint_url="https://garage.example.com",
-        s3_access_key_id="AKIADB",
-        s3_secret_access_key="db-secret",
-        secret_provided=True,
-        s3_use_path_style=True,
-        s3_local_fallback=False,
-    )
-
-    # update_storage_settings already refreshed the snapshot; assert it loaded.
-    cfg = storage_config.current_storage_config()
-    assert cfg.backend == "s3"
-    assert cfg.bucket == "db-bucket"
-    assert cfg.region == "ap-south-1"
-    assert cfg.endpoint_url == "https://garage.example.com"
-    assert cfg.secret_access_key == "db-secret"  # decrypted
-    assert cfg.use_path_style is True
-
-
-async def test_test_connection_local_is_noop(session: AsyncSession) -> None:
+async def test_test_connection_local_is_noop() -> None:
     """A local backend has no remote to reach, so the connection test passes."""
     cfg = storage_config.ResolvedStorageConfig(
         backend="local",
@@ -104,7 +71,7 @@ def test_build_s3_client_disables_flexible_checksums() -> None:
     assert client.meta.config.response_checksum_validation == "when_required"
 
 
-async def test_test_connection_s3_requires_bucket(session: AsyncSession) -> None:
+async def test_test_connection_s3_requires_bucket() -> None:
     cfg = storage_config.ResolvedStorageConfig(
         backend="s3",
         bucket=None,

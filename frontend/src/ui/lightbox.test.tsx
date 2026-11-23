@@ -12,14 +12,6 @@ const items: LightboxItem[] = [
 ];
 
 describe("Lightbox", () => {
-  it("shows the picture at the index and where it is in the set", () => {
-    renderWithProviders(
-      <Lightbox open onOpenChange={() => {}} items={items} index={1} onIndexChange={() => {}} />
-    );
-    expect(screen.getByRole("img", { name: "Second" })).toBeInTheDocument();
-    expect(screen.getByText("2 / 3")).toBeInTheDocument();
-  });
-
   it("draws its panel beside the picture, and leaves keys typed there to it", () => {
     const onIndexChange = vi.fn();
     renderWithProviders(
@@ -37,7 +29,7 @@ describe("Lightbox", () => {
     expect(onIndexChange).not.toHaveBeenCalled();
   });
 
-  it("pages with the arrow keys and the chevrons", () => {
+  it("shows the picture at the index and where it is in the set, paging with the arrow keys and the chevrons", () => {
     const onIndexChange = vi.fn();
     renderWithProviders(
       <Lightbox
@@ -48,6 +40,8 @@ describe("Lightbox", () => {
         onIndexChange={onIndexChange}
       />
     );
+    expect(screen.getByRole("img", { name: "Second" })).toBeInTheDocument();
+    expect(screen.getByText("2 / 3")).toBeInTheDocument();
     fireEvent.keyDown(window, { key: "ArrowRight" });
     expect(onIndexChange).toHaveBeenLastCalledWith(2);
     fireEvent.keyDown(window, { key: "ArrowLeft" });

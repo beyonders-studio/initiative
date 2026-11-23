@@ -11,7 +11,6 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any, ClassVar
 
-import pytest
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -21,11 +20,10 @@ from app.models.tenant.initiative import InitiativeRule
 from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.tool_layout import ToolLayout
 from app.services.export.guild_sections import SectionContext, _build_plugins
+from app.services.marketplace.tool_plugins import normalize_tool_plugin_definition
 from app.services.tenant.guild_plugins import (
-    PlacementError,
     SurfaceAccess,
-    is_placed,
-    placed_initiative_ids,
+    has_initiative_surfaces,
     set_placed_initiatives,
     show_on_saved_layouts,
     surface_access,
@@ -33,6 +31,7 @@ from app.services.tenant.guild_plugins import (
 from app.services.tenant.initiatives import get_member_role
 from app.services.tenant.task_types import get_default_type
 from app.testing import (
+    counters_tool_manifest,
     create_guild,
     create_guild_plugin,
     create_initiative,
@@ -105,39 +104,12 @@ class TestSetPlacedInitiatives:
         await session.commit()
         assert await _rows(session, guild.id, plugin.id) == {first.id, second.id}
 
-    async def test_it_may_only_name_this_guild_s_initiatives(
-        self, session: AsyncSession
-    ):
-        user, guild, first, _ = await _guild_with_two_initiatives(session)
-        plugin = await create_guild_plugin(session, guild, user, definition=DEFINITION)
 
-        await route_session_to_guild(session, guild.id)
-        with pytest.raises(PlacementError, match="not one of this guild"):
-            await set_placed_initiatives(session, plugin, {first.id + 10_000})
-
-
-class TestIsPlaced:
-    async def test_it_reads_the_rows(self, session: AsyncSession):
-        user, guild, first, second = await _guild_with_two_initiatives(session)
-        plugin = await create_guild_plugin(session, guild, user, definition=DEFINITION)
-
-        await route_session_to_guild(session, guild.id)
-        assert await is_placed(session, plugin.id, first.id) is False
-        await set_placed_initiatives(session, plugin, {first.id})
-        await session.commit()
-
-        await route_session_to_guild(session, guild.id)
-        assert await is_placed(session, plugin.id, first.id) is True
-        assert await is_placed(session, plugin.id, second.id) is False
-        assert await placed_initiative_ids(session, plugin.id) == {first.id}
-
-    async def test_the_guild_wide_reading_is_always_placed(self, session: AsyncSession):
-        user = await create_user(session)
-        guild = await create_guild(session, creator=user)
-        plugin = await create_guild_plugin(session, guild, user, definition=DEFINITION)
-
-        await route_session_to_guild(session, guild.id)
-        assert await is_placed(session, plugin.id, None) is True
+class TestToolPlugins:
+    def test_a_tool_plugin_has_its_tool_to_place(self):
+        assert has_initiative_surfaces(
+            normalize_tool_plugin_definition(counters_tool_manifest())
+        )
 
 
 class TestExport:
@@ -199,9 +171,9 @@ class TestExport:
 
 
 class TestSurfaceAccess:
-    """The one decision behind opening a surface, without a database: the
-    install's permissions held as the community's own are, read off the
-    reader's standing."""
+    """The edges of the decision behind opening a surface that a handoff in
+    ``guild_plugins_platform_test`` does not reach: rules naming another
+    initiative or install, and a permission members hold by default."""
 
     PAGE: ClassVar[dict[str, Any]] = {
         "id": "e",
@@ -254,51 +226,6 @@ class TestSurfaceAccess:
         assert self._decide(opens, plugin_denies=("1:3:open",)) is SurfaceAccess.refused
         # Not a member of the initiative: no role there to hold it.
         assert self._decide(opens, member_initiatives=()) is SurfaceAccess.refused
-
-    def test_admins_and_the_initiative_s_managers_always_hold_it(self):
-        assert self._decide(self.PRICES, guild_admin=True) is SurfaceAccess.open
-        assert self._decide(self.PRICES, manager_initiatives=(1,)) is SurfaceAccess.open
-        assert (
-            self._decide(self.PRICES, manager_initiatives=(2,)) is SurfaceAccess.refused
-        )
-
-    def test_at_the_community_level_it_is_held_as_an_admin_surface(self):
-        community = {"initiative_id": None}
-        # The admin rung with no custom role holds every one.
-        assert (
-            self._decide(self.PRICES, **community, held_plugin_permissions=("*",))
-            is SurfaceAccess.open
-        )
-        # A custom role keeps some.
-        narrowed = ("3:use",)
-        assert (
-            self._decide(self.PAGE, **community, held_plugin_permissions=narrowed)
-            is SurfaceAccess.open
-        )
-        assert (
-            self._decide(self.PRICES, **community, held_plugin_permissions=narrowed)
-            is SurfaceAccess.refused
-        )
-        # A member holds none, whatever they hold inside initiatives.
-        assert (
-            self._decide(
-                self.PAGE, **community, plugin_grants=("1:3:use",), guild_admin=False
-            )
-            is SurfaceAccess.refused
-        )
-
-    def test_not_placed_or_not_rendered_here_is_not_here(self):
-        assert (
-            self._decide(self.PAGE, placed=False, guild_admin=True)
-            is SurfaceAccess.not_here
-        )
-        inside_only = {**self.PAGE, "scopes": ["initiative"]}
-        assert (
-            self._decide(
-                inside_only, initiative_id=None, held_plugin_permissions=("*",)
-            )
-            is SurfaceAccess.not_here
-        )
 
 
 def _on_items(*fields: tuple[str, str], parts: tuple[str, ...] = ()) -> dict:

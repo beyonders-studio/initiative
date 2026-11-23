@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import ConfigDict, Field
 
+from app.models.platform.marketplace import ACCESS_ENTITLED
 from app.models.platform.plugin_service_registration import PluginAvailability
 from app.schemas.base import RawTextStr, SanitizedBaseModel, TitleStr
 from app.schemas.query import PageMeta
@@ -23,6 +24,8 @@ from app.services.import_engine.contract import EnvelopeImportResult
 from app.services.marketplace.definitions import (
     LISTING_KINDS,
     LISTING_SOURCES,
+    PluginTag,
+    plugin_tag,
     published_by_us,
 )
 
@@ -174,6 +177,14 @@ class MarketplaceListingSummary(SanitizedBaseModel):
     #: Its latest version declares itself beta: the owner picks the
     #: communities that may use it.
     beta: bool = False
+    #: Its package terms sell it: a community installs it once it holds an
+    #: entitlement, which billing sells.
+    paid: bool = False
+    #: Its package terms make it part of every community, at no extra cost.
+    included: bool = False
+    #: For a plug-in: how it shows up, read off its latest version — the tag
+    #: on its card. Absent for every other kind.
+    plugin_tag: PluginTag | None = None
     updated_at: datetime
 
 
@@ -401,6 +412,11 @@ def serialize_listing_summary(
         beta=latest is not None
         and (latest.definition or {}).get("availability")
         == PluginAvailability.beta.value,
+        paid=listing.access == ACCESS_ENTITLED,
+        included=listing.mandatory,
+        plugin_tag=plugin_tag(latest.definition or {})
+        if listing.kind == "plugin" and latest is not None
+        else None,
         updated_at=listing.updated_at,
     )
 

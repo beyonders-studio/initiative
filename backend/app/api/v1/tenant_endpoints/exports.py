@@ -40,6 +40,7 @@ from app.models.platform.user import User
 from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.models.tenant.initiative import Initiative
+from app.schemas.kinds import require_kind
 from app.schemas.query import DateBucket
 from app.schemas.tenant.backup_export import BackupEstimate
 from app.schemas.tenant.data_job import file_expired, serialize_data_job
@@ -719,15 +720,16 @@ ToolExportFormat: Any = Literal[_ALL_FORMATS]  # ty: ignore[invalid-type-form]
 _FORMAT_DESCRIPTION = (
     "One of the tool's export formats ("
     + "; ".join(f"{t.value}: {', '.join(f)}" for t, f in _TOOL_FORMATS.items())
-    + "). ``json`` is the importable envelope. A file's formats depend on "
-    "its type, so it has no default; a calendar defaults to ``ics``, every "
-    "other tool to ``json``"
+    + "; an installed tool plug-in: json, and csv or xlsx when it has one "
+    "item table). ``json`` is the importable envelope. A file's formats "
+    "depend on its type, so it has no default; a calendar defaults to "
+    "``ics``, every other tool to ``json``"
 )
 
 
 @router.get("/{tool}", response_model=None)
 async def export_tool(
-    tool: Tool,
+    tool: str,
     session: RLSSessionDep,
     current_user: CurrentUserDep,
     guild_context: GuildContextDep,
@@ -754,11 +756,14 @@ async def export_tool(
         default=None, max_length=64, description="IANA timezone for report timestamps"
     ),
 ) -> Response:
-    """Export a selection of one tool's entities. Each takes the owner rung on
-    it. Small selections return the file inline; large ones return ``202`` with
-    a queued job to poll and download."""
+    """Export a selection of one tool's entities: a built-in tool's, or an
+    installed tool plug-in's, by its kind. Each takes the export action on
+    it. Small selections return the file inline; large ones return ``202``
+    with a queued job to poll and download."""
+    require_kind(guild_context.tools, tool, Tool, items=False)
+    builtin = Tool(tool) if tool in Tool else None
     params: dict[str, Any] = {
-        f"{tool.value}_ids": ids,
+        f"{tool}_ids": ids,
         "filters": _parse_json_param(filters),
         "tz": tz,
     }
@@ -768,8 +773,10 @@ async def export_tool(
         session,
         current_user,
         guild_context,
-        source=tool_export_source(tool),
-        format=format or _DEFAULT_FORMATS.get(tool, "json") or "",
+        source=tool if builtin is None else tool_export_source(builtin),
+        format=format
+        or (_DEFAULT_FORMATS.get(builtin, "json") if builtin is not None else "json")
+        or "",
         params=params,
     )
     return _export_response(result, guild_context)

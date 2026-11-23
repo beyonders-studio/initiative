@@ -13,7 +13,7 @@ import { ThemePicker } from "./ThemePicker";
 const tile = (name: string) => screen.getByRole("radio", { name });
 
 describe("ThemePicker", () => {
-  it("shows one tile per theme, the chosen one checked", async () => {
+  it("shows one tile per theme, the chosen one and its variant checked", async () => {
     renderWithProviders(<ThemePicker value="catppuccin.mocha" onChange={vi.fn()} />);
 
     expect(await screen.findByRole("radio", { name: "Catppuccin" })).toHaveAttribute(
@@ -22,15 +22,8 @@ describe("ThemePicker", () => {
     );
     expect(tile("Kobold")).toHaveAttribute("aria-checked", "false");
     expect(screen.getAllByRole("radio", { name: "Catppuccin" })).toHaveLength(1);
-  });
-
-  it("checks the stored variant's orb", async () => {
-    renderWithProviders(<ThemePicker value="catppuccin.mocha" onChange={vi.fn()} />);
-
-    expect(await screen.findByRole("radio", { name: "Use Mocha for dark mode" })).toHaveAttribute(
-      "aria-checked",
-      "true"
-    );
+    // The stored variant's orb is checked inside it.
+    expect(tile("Use Mocha for dark mode")).toHaveAttribute("aria-checked", "true");
     expect(tile("Use Macchiato for dark mode")).toHaveAttribute("aria-checked", "false");
   });
 

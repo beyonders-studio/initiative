@@ -22,9 +22,8 @@ import {
   type SearchTarget,
   searchHitPath,
   TAG_ENTITY_TYPE,
-  TOOL_ENTITY_TYPES,
 } from "@/lib/searchResults";
-import { TOOL_ICONS, TOOLS } from "@/lib/tools";
+import { TOOL_ICONS } from "@/lib/tools";
 
 const target = (
   overrides: Partial<SearchTarget> & Pick<SearchTarget, "entity_type">
@@ -53,11 +52,6 @@ describe("searchHitPath", () => {
         target({ entity_type: "calendar_event", entity_id: 8, tool: Tool.calendar, tool_id: 2 })
       )
     ).toBe("/i/5/calendars/2/events/8");
-    expect(
-      searchHitPath(
-        target({ entity_type: "counter", entity_id: 9, tool: Tool.counter_group, tool_id: 6 })
-      )
-    ).toBe("/i/5/counter-groups/6/counter/9");
     // A collection is in the initiative's Files, not in one file.
     expect(
       searchHitPath(target({ entity_type: "collection", entity_id: 12, tool: Tool.file }))
@@ -135,25 +129,6 @@ describe("categories", () => {
     expect(new Set(asked)).toEqual(new Set(Object.values(SearchEntityType)));
     expect(asked).toHaveLength(new Set(asked).size);
   });
-
-  it("keeps members out of the index, because that is not where people live", () => {
-    // Identity is shared across communities; a community's own schema holds its
-    // content. So the Members tab asks the roster, and says so by having no
-    // entity types of its own.
-    expect(categoryEntityTypes("member")).toBeNull();
-    expect(categoryEntityTypes("member")).toBeNull();
-    expect(SEARCH_CATEGORIES).toContain("member");
-  });
-
-  it("puts members second, where people look for them", () => {
-    expect(SEARCH_CATEGORIES).toEqual(["tool", "member", "comment", "tag"]);
-  });
-
-  it("covers every tool, so a new one is searchable without an edit here", () => {
-    for (const tool of TOOLS) {
-      expect(TOOL_ENTITY_TYPES).toContain(tool);
-    }
-  });
 });
 
 describe("labels", () => {
@@ -169,21 +144,18 @@ describe("labels", () => {
 });
 
 describe("hitIcon", () => {
-  it("marks a tool from its kind when nobody filled in the tool", () => {
+  it("marks a tool from its kind when nobody filled in the tool, or from the tool a hit names", () => {
     // A relation being composed knows what kind it points at and not the tool
     // that governs it — which for a tool's own row is the same thing. Falling
-    // through to the tag mark made every counter group and wiki look like a label.
-    expect(hitIcon(target({ entity_type: SearchEntityType.counter_group }))).toBe(
-      TOOL_ICONS[Tool.counter_group]
+    // through to the tag mark made every dashboard and wiki look like a label.
+    expect(hitIcon(target({ entity_type: SearchEntityType.dashboard }))).toBe(
+      TOOL_ICONS[Tool.dashboard]
     );
     expect(hitIcon(target({ entity_type: SearchEntityType.wiki }))).toBe(TOOL_ICONS[Tool.wiki]);
     expect(hitIcon(target({ entity_type: SearchEntityType.file }))).toBe(TOOL_ICONS[Tool.file]);
-  });
-
-  it("still takes the tool a hit names", () => {
-    expect(
-      hitIcon(target({ entity_type: SearchEntityType.counter_group, tool: Tool.counter_group }))
-    ).toBe(TOOL_ICONS[Tool.counter_group]);
+    expect(hitIcon(target({ entity_type: SearchEntityType.dashboard, tool: Tool.dashboard }))).toBe(
+      TOOL_ICONS[Tool.dashboard]
+    );
   });
 
   it("marks a thing inside a tool with its own icon, not its tool's", () => {

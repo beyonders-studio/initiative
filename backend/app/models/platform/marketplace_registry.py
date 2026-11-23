@@ -30,6 +30,7 @@ from sqlalchemy import (
     String,
     Text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
 #: A hex SHA-256 digest is always this long, and the columns holding one are
@@ -42,6 +43,9 @@ ROLE_NAME_LENGTH = 200
 
 #: The id of the one status row.
 STATUS_ROW_ID = 1
+
+#: How many skipped entries the status row keeps from one refresh.
+MAX_SKIPPED_KEPT = 50
 
 
 class MarketplaceTufMetadata(SQLModel, table=True):
@@ -114,6 +118,13 @@ class MarketplaceRegistryStatus(SQLModel, table=True):
     )
     # Message code of the last refusal, or NULL after a clean refresh.
     last_error: str | None = Field(default=None, sa_column=Column(String(64)))
+    # What the last refresh skipped, and why: a list of ``{"name" (the target
+    # path or role), "code", and "listing_name" or "publisher_name" when
+    # known}``, at most ``MAX_SKIPPED_KEPT`` of them. NULL when nothing was
+    # skipped. The operator is shown the display names, never the path.
+    last_skipped: list[dict[str, str]] | None = Field(
+        default=None, sa_column=Column(JSONB)
+    )
     # How many listings the last verified repository carried.
     listing_count: int = Field(
         default=0, sa_column=Column(Integer, nullable=False, server_default="0")

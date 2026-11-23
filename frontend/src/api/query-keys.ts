@@ -34,9 +34,9 @@
  * `matches()` below, the only code in the app that decides whether a cached key
  * belongs to the current community.
  */
-import { type PostRead, PropertyTarget, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { ContentKind, type PostRead, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { queryClient } from "@/lib/queryClient";
-import { PARENT_TOOL, TOOLS, toolApiPath, toolRouteSegment } from "@/lib/tools";
+import { isBuiltInTool, PARENT_TOOL, TOOLS, toolApiPath, toolRouteSegment } from "@/lib/tools";
 
 // The active community is per-tab React state in `CommunityProvider`, mirrored here (a
 // module var is per-JS-context, so it stays per-tab — unlike shared storage) so
@@ -389,8 +389,13 @@ const pluginServices = (): Spec => ({ personalPrefix: ["/api/v1/plugin-services"
 // them — the sidebar's list, the settings dialog's detail, the members view —
 // and because the bus names the install community-wide, with no parent to carry it.
 // Every one is keyed by its path, so one prefix reaches them all, and the
-// widget catalog, which is read under the same path, with them.
-const plugins = (): Spec => ({ communityPrefix: ["/api/v1/plugins"] });
+// widget catalog, which is read under the same path, with them. The field
+// catalogue and the query vocabulary go too: the datasets they list are the
+// installed tools', so a change to an install changes them.
+const plugins = (): Spec => ({
+  communityPrefix: ["/api/v1/plugins", "/api/v1/fields/"],
+  communityExact: ["/api/v1/query/vocabulary"],
+});
 
 // ── AI Settings (platform config is personal; community/resolved are community) ──
 
@@ -484,10 +489,6 @@ const collection = (id: number): Spec => ({
   communityPrefix: [`/api/v1/collections/${id}/`],
 });
 
-const counter = (counterId: number): Spec => ({
-  communityExact: [`/api/v1/counters/${counterId}`],
-});
-
 // ── Posts (community) ────────────────────────────────────────────────────────────
 
 /**
@@ -570,11 +571,9 @@ const toolLists = (which: Tool): Spec => {
     communityPrefix: [`/api/v1/tools/${which}/counts`],
   });
   if (which === Tool.calendar) return compose(lists, allCalendarEvents());
-  // An initiative's list of layouts names its projects and counter groups, by
-  // name. The entries carry projects by their dates and posts by their
-  // polls' closing.
+  // An initiative's list of layouts names its projects by name. The entries
+  // carry projects by their dates and posts by their polls' closing.
   if (which === Tool.project) return compose(lists, initiativeLayouts(), allCalendarEntries());
-  if (which === Tool.counter_group) return compose(lists, initiativeLayouts());
   if (which === Tool.post) return compose(lists, allCalendarEntries());
   return lists;
 };
@@ -599,8 +598,17 @@ const toolSubtree = (which: Tool, id: number): Spec => ({
   communityPrefix: [`${toolApiPath(which)}/${id}/`],
 });
 
-/** One entity and every list it sits in — what a generic per-tool write makes stale. */
-const tool = (which: Tool, id: number): Spec => compose(toolEntity(which, id), toolList(which));
+/** Every read of a tool plug-in's rows, or of one kind's: its lists and each
+ *  row. */
+const pluginToolRows = (kind = ""): Spec => ({
+  communityPrefix: [kind ? `/api/v1/plugin-tools/${kind}/` : "/api/v1/plugin-tools/"],
+});
+
+/** One entity and every list it sits in — what a generic per-tool write makes
+ *  stale. A tool plug-in's row, every plug-in row read: a row over it
+ *  previews it. */
+const tool = (which: string, id: number): Spec =>
+  isBuiltInTool(which) ? compose(toolEntity(which, id), toolList(which)) : pluginToolRows();
 
 // The same two, by name, for the call sites that already know their tool.
 const allProjects = (): Spec => toolList(Tool.project);
@@ -609,8 +617,6 @@ const project = (id: number): Spec => toolEntity(Tool.project, id);
 // so a change to one refreshes them too.
 const allFiles = (): Spec => compose(toolList(Tool.file), allCollections());
 const file = (id: number): Spec => compose(toolEntity(Tool.file, id), allCollections());
-const allCounterGroups = (): Spec => toolList(Tool.counter_group);
-const counterGroup = (id: number): Spec => toolEntity(Tool.counter_group, id);
 const allCalendars = (): Spec => toolList(Tool.calendar);
 const calendar = (id: number): Spec => toolEntity(Tool.calendar, id);
 const allDashboards = (): Spec => toolList(Tool.dashboard);
@@ -628,15 +634,14 @@ const allContacts = (): Spec => toolList(Tool.contact);
  * reads, and for a row a tool holds, the tool's, whose pages show its rows. A
  * task also shows in the calendar's entries, which `allTasks` names.
  */
-const propertyHolder = (target: PropertyTarget): Spec => {
-  const own = target === PropertyTarget.task ? allTasks() : resourceAndMe(toolRouteSegment(target));
-  const parent: Tool | undefined = (PARENT_TOOL as Partial<Record<PropertyTarget, Tool>>)[target];
+const propertyHolder = (target: ContentKind): Spec => {
+  const own = target === ContentKind.task ? allTasks() : resourceAndMe(toolRouteSegment(target));
+  const parent: Tool | undefined = (PARENT_TOOL as Partial<Record<ContentKind, Tool>>)[target];
   return parent ? compose(own, toolLists(parent)) : own;
 };
 
 /** Every row that can carry property values — what a definition's change reaches. */
-const allPropertyHolders = (): Spec =>
-  compose(...Object.values(PropertyTarget).map(propertyHolder));
+const allPropertyHolders = (): Spec => compose(...Object.values(ContentKind).map(propertyHolder));
 
 // ── Everything this community shows (cross-tool) ─────────────────────────────────
 // Two callers, one description. Gaining (or losing) a membership row changes
@@ -649,6 +654,7 @@ const communityContent = (): Spec =>
   compose(
     allInitiatives(),
     ...TOOLS.map(toolList),
+    pluginToolRows(),
     allCollections(),
     allTasks(),
     allComments(),
@@ -663,7 +669,6 @@ export const q = {
   allCalendars,
   allComments,
   allContacts,
-  allCounterGroups,
   allDashboards,
   allFiles,
   allCollections,
@@ -681,6 +686,7 @@ export const q = {
   announcements,
   appConfig,
   pluginServices,
+  pluginToolRows,
   plugins,
   references,
   authProviders,
@@ -689,7 +695,6 @@ export const q = {
   calendar,
   captchaSettings,
   calendarEvent,
-  counter,
   communitySettings,
   notificationSettings,
   platformAuthSettings,
@@ -699,7 +704,6 @@ export const q = {
   filedTickets,
   moderationReports,
   contactGrants,
-  counterGroup,
   customRoles,
   currentUser,
   dashboard,

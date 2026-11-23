@@ -20,11 +20,10 @@ import type {
   TaskUpdateScope,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
-  PropertyTarget,
+  ContentKind,
   SearchEntityType,
   SmartChipKind,
   SmartChipTone,
-  TagTarget,
   TaskStatusCategory,
 } from "@/api/generated/initiativeAPI.schemas";
 import { setProperties } from "@/api/generated/properties/properties";
@@ -266,8 +265,8 @@ export const TASK_SAVES: FieldSaveKind<TaskRead, TaskUpdate> = {
   name: "task",
   readKey: (communityId, id) => getReadTaskQueryKey(communityId, id),
   patch: (communityId, id, patch) => updateTask(communityId, id, withZone(patch)),
-  properties: PropertyTarget.task,
-  lists: (edit) => ("patch" in edit ? q.allTasks() : q.propertyHolder(PropertyTarget.task)),
+  properties: ContentKind.task,
+  lists: (edit) => ("patch" in edit ? q.allTasks() : q.propertyHolder(ContentKind.task)),
   itself: (id) => q.task(id),
 };
 
@@ -463,13 +462,13 @@ export const useMoveTaskToGroup = () =>
       if ("patch" in move) return updateTask(communityId, taskId, move.patch);
       if ("tags" in move) {
         return bulkEditTags(communityId, {
-          target_type: TagTarget.task,
+          target_type: ContentKind.task,
           target_ids: [taskId],
           add_tag_ids: move.tags.add,
           remove_tag_ids: move.tags.remove,
         });
       }
-      return setProperties(communityId, PropertyTarget.task, taskId, move.properties);
+      return setProperties(communityId, ContentKind.task, taskId, move.properties);
     },
     // A new parent is a link, which the Gantt and a task's links read.
     invalidate: (_data, { taskId, move }) =>

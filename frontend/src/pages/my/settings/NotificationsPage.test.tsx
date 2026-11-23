@@ -17,10 +17,6 @@ vi.mock("@/hooks/usePushNotifications", () => ({
     isSupported: false,
   }),
 }));
-vi.mock("@/hooks/useSettings", async () => {
-  const actual = await vi.importActual<typeof import("@/hooks/useSettings")>("@/hooks/useSettings");
-  return { ...actual, useFcmConfig: () => ({ data: { enabled: false } }) };
-});
 
 import { NotificationsPage } from "./NotificationsPage";
 
@@ -33,7 +29,7 @@ describe("NotificationsPage", () => {
       />
     ));
 
-  it("renders the grid from the registry the server sends", async () => {
+  it("renders the grid from the registry the server sends, on the bell and the desktop", async () => {
     renderPage();
     expect(await screen.findByText("In your communities")).toBeInTheDocument();
     expect(screen.getByText("Mentions and replies")).toBeInTheDocument();
@@ -42,52 +38,39 @@ describe("NotificationsPage", () => {
     expect(screen.getByText("Needs you")).toBeInTheDocument();
     // Nothing switches cases off, so there is no row to show.
     expect(screen.queryByText("Cases")).not.toBeInTheDocument();
-  });
 
-  it("offers the bell as a channel", async () => {
-    renderPage();
-    expect(await screen.findByLabelText("Mentions and replies on Bell")).toBeInTheDocument();
-  });
-
-  it("offers the desktop on a server with no phone push", async () => {
-    renderPage();
-    expect(await screen.findByLabelText("Mentions and replies on Desktop")).toBeInTheDocument();
+    expect(screen.getByLabelText("Mentions and replies on Bell")).toBeInTheDocument();
+    // A server with no phone push offers the desktop and no mobile column.
+    expect(screen.getByLabelText("Mentions and replies on Desktop")).toBeInTheDocument();
     expect(screen.queryByLabelText("Mentions and replies on Mobile")).not.toBeInTheDocument();
-  });
-
-  it("leaves the bell on and unswitchable for account notices", async () => {
-    renderPage();
-    await screen.findByText("Your account");
+    // The bell stays on and unswitchable for account notices.
     const bell = screen.getByLabelText("Your account on Bell");
     expect(bell).toBeDisabled();
     expect(bell).toBeChecked();
   });
 
-  it("shows the configured reminder lead time", async () => {
-    renderPage({ event_reminder_minutes_before: 30 });
+  it.each([
+    [30, "30 minutes before"],
+    [0, "At the time of the event"],
+  ])("shows a reminder lead time of %i as %s", async (minutes, label) => {
+    renderPage({ event_reminder_minutes_before: minutes });
     // The Radix Select trigger renders the selected option's label.
-    expect(await screen.findByText("30 minutes before")).toBeInTheDocument();
+    expect(await screen.findByText(label)).toBeInTheDocument();
   });
 
-  it("renders 'at the time of the event' when lead time is zero", async () => {
-    renderPage({ event_reminder_minutes_before: 0 });
-    expect(await screen.findByText("At the time of the event")).toBeInTheDocument();
-  });
+  const serve = (preferences = buildNotificationPreferences()) => {
+    const sent: NotificationPreferencesUpdate[] = [];
+    server.use(
+      http.get("/api/v1/me/notification-preferences", () => HttpResponse.json(preferences)),
+      http.put("/api/v1/me/notification-preferences", async ({ request }) => {
+        sent.push((await request.json()) as NotificationPreferencesUpdate);
+        return HttpResponse.json(preferences);
+      })
+    );
+    return sent;
+  };
 
   describe("digests", () => {
-    const serve = () => {
-      const sent: NotificationPreferencesUpdate[] = [];
-      const preferences = buildNotificationPreferences();
-      server.use(
-        http.get("/api/v1/me/notification-preferences", () => HttpResponse.json(preferences)),
-        http.put("/api/v1/me/notification-preferences", async ({ request }) => {
-          sent.push((await request.json()) as NotificationPreferencesUpdate);
-          return HttpResponse.json(preferences);
-        })
-      );
-      return sent;
-    };
-
     it("lists each digest apart from the grid, with no bell of its own", async () => {
       serve();
       renderPage();
@@ -96,6 +79,8 @@ describe("NotificationsPage", () => {
       // Asked for, never sent unbidden.
       expect(screen.getByLabelText("Coming up on Email")).not.toBeChecked();
       expect(screen.queryByLabelText("Overdue tasks on Bell")).not.toBeInTheDocument();
+      // An email time is asked for only where email is gathered.
+      expect(document.getElementById("email-time")).toBeNull();
     });
 
     it("keeps a time for each digest, and writes the one that moved", async () => {
@@ -115,40 +100,26 @@ describe("NotificationsPage", () => {
         ])
       );
     });
-
-    it("asks for an email time only where email is gathered", async () => {
-      serve();
-      renderPage();
-
-      await screen.findByLabelText("Overdue tasks on Email");
-      expect(document.getElementById("email-time")).toBeNull();
-    });
   });
 
   describe("per community", () => {
-    const serve = (muted: boolean) => {
-      const sent: NotificationPreferencesUpdate[] = [];
-      const preferences = buildNotificationPreferences({
-        communities: [{ community_id: 4, community_name: "Acme", muted, off: ["subscriptions"] }],
-      });
-      server.use(
-        http.get("/api/v1/me/notification-preferences", () => HttpResponse.json(preferences)),
-        http.put("/api/v1/me/notification-preferences", async ({ request }) => {
-          sent.push((await request.json()) as NotificationPreferencesUpdate);
-          return HttpResponse.json(preferences);
+    const serveCommunity = (muted: boolean) =>
+      serve(
+        buildNotificationPreferences({
+          communities: [{ community_id: 4, community_name: "Acme", muted, off: ["subscriptions"] }],
         })
       );
-      return sent;
-    };
 
-    it("switches one row off for one community, and mutes it", async () => {
+    it("says which rows a community has off, switches one off there, and mutes it", async () => {
       const user = userEvent.setup();
-      const sent = serve(false);
+      const sent = serveCommunity(false);
       renderPage();
 
       const mentions = await screen.findByLabelText("Mentions and replies in Acme");
       expect(mentions).toBeChecked();
       expect(screen.getByLabelText("Subscribed in Acme")).not.toBeChecked();
+      // Closed, it says which of its rows are off.
+      expect(screen.getByText("Off here: Subscribed")).toBeInTheDocument();
       // Only the rows about a community's content are per community.
       expect(screen.queryByLabelText("Waiting on you in Acme")).not.toBeInTheDocument();
 
@@ -164,15 +135,8 @@ describe("NotificationsPage", () => {
       );
     });
 
-    it("says, closed, which of a community's rows are off", async () => {
-      serve(false);
-      renderPage();
-
-      expect(await screen.findByText("Off here: Subscribed")).toBeInTheDocument();
-    });
-
     it("says a muted community says nothing, in place of its rows", async () => {
-      serve(true);
+      serveCommunity(true);
       renderPage();
 
       expect(await screen.findByLabelText("Mute Acme")).toBeChecked();

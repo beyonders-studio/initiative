@@ -14,8 +14,8 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import text
 
-from app.db.tool_layouts_migration_test import _load
 from app.testing import create_guild, create_initiative, create_project, create_user
+from app.testing.later_revisions import load_revision
 
 _PRESETS = {"presets": [{"slug": "mine", "filters": {"assignees": ["me"]}}]}
 _MY_TASKS = {"layout": "calendar", "mode": "month", "parts": {"list": {"grouping": []}}}
@@ -32,7 +32,7 @@ async def test_existing_projects_keep_their_layouts_and_come_back(session) -> No
         (await create_project(session, initiative, user, name=name)).id
         for name in ("Saved", "Opens", "Plain")
     ]
-    migration = _load("20261021_0534_a_project_draws_a_gantt")
+    migration = load_revision("20261021_0534_a_project_draws_a_gantt")
 
     async def sql(statement: str, **params):
         return await (await session.connection()).execute(text(statement), params)

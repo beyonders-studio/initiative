@@ -116,19 +116,6 @@ async def test_unread_places_carries_the_whole_tree(
     ]
 
 
-async def test_reading_everything_empties_the_places(
-    client: AsyncClient, session: AsyncSession
-):
-    user = await create_user(session)
-    await _seed_notification(session, user.id)
-    headers = get_auth_headers(user)
-
-    await client.post("/api/v1/notifications/read-all", headers=headers)
-
-    response = await client.get("/api/v1/notifications/unread", headers=headers)
-    assert response.json() == {"places": []}
-
-
 async def test_the_popover_can_take_every_unread_page(
     client: AsyncClient, session: AsyncSession
 ):
@@ -160,22 +147,6 @@ async def test_the_popover_can_take_every_unread_page(
     assert len(set(seen)) == 5
     # The total is the first page's; the pages after it do not count again.
     assert counts == [5, None, None]
-
-
-async def test_marking_unread_puts_a_line_back(
-    client: AsyncClient, session: AsyncSession
-):
-    user = await create_user(session)
-    notification_id = await _seed_notification(session, user.id)
-    headers = get_auth_headers(user)
-
-    await client.post(f"/api/v1/notifications/{notification_id}/read", headers=headers)
-    response = await client.post(
-        f"/api/v1/notifications/{notification_id}/unread", headers=headers
-    )
-
-    assert response.status_code == 200
-    assert response.json()["read_at"] is None
 
 
 async def test_dismissing_removes_the_line(client: AsyncClient, session: AsyncSession):
@@ -258,17 +229,26 @@ async def test_mark_notification_read(client: AsyncClient, session: AsyncSession
     listed = await client.get("/api/v1/notifications/", headers=headers)
     assert listed.json()["unread_count"] == 0
 
+    response = await client.post(
+        f"/api/v1/notifications/{notification_id}/unread", headers=headers
+    )
+    assert response.status_code == 200
+    assert response.json()["read_at"] is None
+
 
 async def test_mark_all_notifications_read(client: AsyncClient, session: AsyncSession):
     user = await create_user(session)
     await _seed_notification(session, user.id)
     await _seed_notification(session, user.id)
 
-    response = await client.post(
-        "/api/v1/notifications/read-all", headers=get_auth_headers(user)
-    )
+    headers = get_auth_headers(user)
+
+    response = await client.post("/api/v1/notifications/read-all", headers=headers)
     assert response.status_code == 200
     assert response.json() == {"unread_count": 0}
+
+    response = await client.get("/api/v1/notifications/unread", headers=headers)
+    assert response.json() == {"places": []}
 
 
 async def test_cannot_read_other_users_notification(

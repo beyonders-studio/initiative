@@ -36,9 +36,10 @@ export type ListLayout = {
 };
 
 /** The fields of the plug-ins placed on the items, which a list as shipped
- *  shows after its own: a plug-in shows as it arrives. */
+ *  shows after its own: a plug-in shows as it arrives. A tool plug-in's own
+ *  fields carry no install, and its shipped lists already place them. */
 const pluginFieldIds = (fields: ReadonlyMap<string, FieldDef>): string[] =>
-  [...fields.values()].filter((field) => field.source === "plugin").map((field) => field.id);
+  [...fields.values()].filter((field) => field.plugin).map((field) => field.id);
 
 /** A board's card: its own, or the shipped one with the plug-ins' fields. */
 export const cardOf = (

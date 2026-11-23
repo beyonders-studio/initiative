@@ -23,7 +23,7 @@ export const Route = createFileRoute(
     void Promise.all([
       queryClient.ensureQueryData(getReadTaskQueryOptions(communityId, taskId)),
       queryClient.ensureInfiniteQueryData({
-        ...commentThreadQueryOptions(communityId, { task_id: taskId }),
+        ...commentThreadQueryOptions(communityId, { subject_type: "task", subject_id: taskId }),
         staleTime: 30_000,
       }),
       queryClient.ensureQueryData(getReadProjectQueryOptions(communityId, projectId)),

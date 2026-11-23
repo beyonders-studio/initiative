@@ -3,11 +3,7 @@ import { $getNodeByKey, type LexicalEditor, type NodeKey } from "lexical";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type {
-  SearchEntityType,
-  SearchSuggestion,
-  SmartChipKind,
-} from "@/api/generated/initiativeAPI.schemas";
+import type { SearchSuggestion, SmartChipKind } from "@/api/generated/initiativeAPI.schemas";
 import { useEditorInitiative } from "@/components/editor/context/editor-initiative-context";
 import {
   $createReferenceEmbedNode,
@@ -21,6 +17,7 @@ import { TaskFilters } from "@/components/tasks/TaskFilters";
 import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
 import { useAllProjects, useProjectTaskStatuses } from "@/hooks/useProjects";
 import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
+import { useReferenceKinds } from "@/hooks/useReferenceKinds";
 import {
   CARD,
   type EmbedDisplay,
@@ -32,7 +29,6 @@ import {
 } from "@/lib/embeds";
 import { pluginFields, usePluginsOnItems } from "@/lib/layouts/plugins";
 import { TASK_COLUMNS, taskFields } from "@/lib/layouts/tasks";
-import { entityIcon } from "@/lib/searchResults";
 import { chipKindsFor } from "@/lib/smartChips";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
@@ -46,7 +42,8 @@ import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 type Source = "item" | "tasks";
 
 interface Item {
-  entityType: SearchEntityType;
+  /** A built-in kind, or a tool plug-in's. */
+  entityType: string;
   entityId: number;
   title: string;
 }
@@ -262,7 +259,7 @@ function ItemSettings({
 }) {
   const { t } = useTranslation("editor");
   const facts = chipKindsFor(item.entityType);
-  const Icon = entityIcon(item.entityType);
+  const Icon = useReferenceKinds().icon(item.entityType);
   // A kind with nothing to read about it has only its card to show.
   const modes = facts.length > 0 ? ITEM_MODES : ITEM_MODES.slice(0, 1);
   return (

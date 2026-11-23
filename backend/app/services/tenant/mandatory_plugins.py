@@ -61,6 +61,7 @@ from app.services.marketplace.installs import (
     ListingInstallError,
     resolve_listing_install,
 )
+from app.services.marketplace.tool_plugins import is_tool_plugin
 from app.services.tenant import guild_plugins as guild_plugins_service
 from app.services.tenant import plugin_schedules
 
@@ -204,7 +205,11 @@ async def install_mandatory_plugins(
             continue
 
         definition = dict(version.definition)
-        if definition.get("plugin_kind") not in GUILD_INSTALLABLE_PLUGIN_KINDS:
+        # A tool plug-in's tables are made by a community choosing it, not by
+        # this sweep.
+        if definition.get("plugin_kind") not in GUILD_INSTALLABLE_PLUGIN_KINDS or (
+            is_tool_plugin(definition)
+        ):
             logger.warning(
                 "mandatory plug-ins: %s is not a kind this build mounts",
                 registration.public_id,

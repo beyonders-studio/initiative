@@ -1,8 +1,9 @@
 """Every socket a page holds open, in one register.
 
 A guild page opens up to three kinds of socket: the events bus
-(``/c/{guild}/events/updates``), a change signal for one counter group
-(``/c/{guild}/{tool}/{id}/ws``) and a collaboration room for one file body.
+(``/c/{guild}/events/updates``), a change signal for one row of a tool
+plug-in's tool (``/c/{guild}/plugin-tools/{kind}/{id}/ws``) and a
+collaboration room for one file body.
 Every page also holds the account's own socket (``/notifications/stream``),
 which belongs to no guild: it is registered with ``guild_id=None`` in its
 account's room, and ``app.services.platform.user_stream`` sends to that room.
@@ -35,7 +36,7 @@ What they share is everything else, and that lives here once:
 
 A re-check groups sockets by the account, guild and sign-in that opened them,
 and runs one guild entry per group on one session — a person with a board, a
-counter group and a file open costs one entry, not three — with at most
+tool's row and a file open costs one entry, not three — with at most
 ``RECHECK_CONCURRENCY`` groups in flight.
 
 What this holds is one process's own sockets. Where the API runs as several
@@ -62,6 +63,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import GuildAccessError, establish_guild_access
 from app.core import auth_context
+from app.core.tool_set import ToolRecord
 from app.core.tools import Tool
 from app.db import post_commit
 from app.db import session as db_session
@@ -374,9 +376,14 @@ class ContentSockets:
                 self.enqueue(sub, payload)
 
     def signal(
-        self, guild_id: int | None, tool: Tool, resource_id: int, event: str
+        self,
+        guild_id: int | None,
+        tool: Tool | ToolRecord,
+        resource_id: int,
+        event: str,
     ) -> None:
-        """Tell a tool's room that it changed, and nothing else.
+        """Tell a tool's room that it changed, and nothing else: a built-in
+        tool's, or a tool plug-in's.
 
         The frame names the change and the resource, never its content: the
         client refetches through the REST path, which is where the reader's own

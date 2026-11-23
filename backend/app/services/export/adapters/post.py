@@ -1,4 +1,4 @@
-"""Post source adapter: the importable backup envelope (json).
+"""Post source adapter: the envelope (json) every tool writes.
 
 A post's body is a Lexical editor state, so the envelope carries it whole and
 an import rebuilds the notice exactly — the same thing the file envelope
@@ -27,22 +27,18 @@ caller's RLS session.
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 from sqlalchemy import ColumnElement
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.tools import Tool, tool_envelope_type
+from app.core.tool_set import ToolRecord
+from app.core.tools import Tool
 from app.models.platform.user import User
 from app.models.tenant.post import Post, is_published_clause
-from app.services.export.adapters._common import (
-    BuildContext,
-    ToolExportAdapter,
-    envelope_key,
-)
-from app.services.export.contract import RenderItem
-from app.services.export.property_values import exported_properties
+from app.schemas.tenant.import_envelopes import PostPollEnvelope
+from app.services.export.adapters._common import BuildContext, ToolExportAdapter
+from app.services.export.envelope import record
 from app.services.permissions import EXPORT_ACCESS
 
 
@@ -67,46 +63,20 @@ class PostAdapter(ToolExportAdapter):
         await metadata_service.annotate_properties(session, [post])
         return post
 
-    def in_initiative(self, initiative_id: int, /) -> list[ColumnElement[bool]]:
+    def in_initiative(
+        self, record: ToolRecord, initiative_id: int, /
+    ) -> list[ColumnElement[bool]]:
         """Only published posts: a draft is in no export."""
-        return [*super().in_initiative(initiative_id), is_published_clause()]
+        return [*super().in_initiative(record, initiative_id), is_published_clause()]
 
-    def item(self, post: Post, ctx: BuildContext, /) -> RenderItem:
-        return build_post_item(post, ctx.format, ctx.now)
-
-
-def build_post_item(post: Post, format: str, now: datetime) -> RenderItem:
-    # The envelope is importable machine data — stays canonical, never
-    # localized (translating field keys breaks import).
-    return RenderItem(
-        key=envelope_key(Tool.post, post.name, now.strftime("%Y-%m-%d")),
-        data=_envelope(post),
-    )
-
-
-def _envelope(post: Post) -> dict[str, Any]:
-    return {
-        "type": tool_envelope_type(Tool.post),
-        "schema_version": 1,
-        "name": post.name,
-        "body": post.body or {},
-        "tags": sorted(tag.name for tag in post.tags or []),
-        "properties": exported_properties(post),
-        "poll": _poll_envelope(post),
-    }
-
-
-def _poll_envelope(post: Post) -> dict[str, Any] | None:
-    poll = getattr(post, "poll", None)
-    if poll is None:
-        return None
-    return {
-        "question": poll.question,
-        "options": [
-            option.text
-            for option in sorted(poll.options or [], key=lambda o: (o.position, o.id))
-        ],
-        "allows_multiple": poll.allows_multiple,
-        "is_anonymous": poll.is_anonymous,
-        "hide_results": poll.hide_results,
-    }
+    def fields(self, post: Post, ctx: BuildContext, /) -> dict[str, Any]:
+        """The poll's choices, as their text in the order they are offered."""
+        poll = post.poll
+        if poll is None:
+            return {"poll": None}
+        options = sorted(poll.options or [], key=lambda o: (o.position, o.id))
+        return {
+            "poll": record(
+                PostPollEnvelope, poll, options=[option.text for option in options]
+            )
+        }

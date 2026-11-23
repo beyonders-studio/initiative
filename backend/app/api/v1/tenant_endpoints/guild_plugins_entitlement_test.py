@@ -173,10 +173,13 @@ async def _seat(acting_user):
 
 
 class TestGating:
-    async def test_an_entitled_listing_without_a_statement_does_not_install(
-        self, client: AsyncClient, acting_user, entitled, billing
+    @pytest.mark.parametrize("values", [None, {"active": False}])
+    async def test_without_an_active_statement_it_does_not_install(
+        self, client: AsyncClient, acting_user, entitled, billing, values
     ):
         a = await _seat(acting_user)
+        if values is not None:
+            await _hold(a.guild.id, values)
 
         response = await _install(client, a)
 
@@ -187,10 +190,11 @@ class TestGating:
         self, client: AsyncClient, acting_user, entitled, billing
     ):
         """Billing marks a community the deployment's term has no seat for:
-        the listing is still shown, with a request rather than a purchase, and
-        it still doesn't install."""
+        the listing is still shown, with a request rather than a purchase and
+        without asking billing for an offer, and it still doesn't install."""
         a = await _seat(acting_user)
         await _hold(a.guild.id, {"active": False, "reason": "term_full"})
+        billing.answer = _OFFER
 
         detail = await client.get(
             a.g(f"/marketplace/listings/by-uid/{SERVICE_UID}"), headers=a.headers
@@ -198,6 +202,8 @@ class TestGating:
         browse = await client.get(
             a.g("/marketplace/listings"), headers=a.headers, params={"kind": "plugin"}
         )
+        assert billing.sent == []
+        billing.answer = None
         install = await _install(client, a)
 
         assert detail.status_code == 200, detail.text
@@ -269,26 +275,19 @@ class TestGating:
     ):
         a = await _seat(acting_user)
         statement = await _hold(a.guild.id, {"active": True})
+        billing.answer = _OFFER
 
         detail = await client.get(
             a.g(f"/marketplace/listings/by-uid/{SERVICE_UID}"), headers=a.headers
         )
+        assert detail.json()["unavailable"] is None
+        assert billing.sent == []
+        billing.answer = None
         response = await _install(client, a)
 
-        assert detail.json()["unavailable"] is None
         assert response.status_code == 201, response.text
         # The statement already held is handed to the plug-in it was for.
         assert hooks == [("entitlement", {"statement": statement})]
-
-    async def test_a_statement_that_says_inactive_does_not(
-        self, client: AsyncClient, acting_user, entitled, billing
-    ):
-        a = await _seat(acting_user)
-        await _hold(a.guild.id, {"active": False})
-
-        response = await _install(client, a)
-
-        assert response.status_code == 409
 
     async def test_a_statement_saying_nothing_of_active_counts(
         self, client: AsyncClient, acting_user, entitled, billing, hooks
@@ -614,30 +613,6 @@ class TestOffer:
             "action_url": f"{PORTAL}/manage?app={SERVICE_UID}",
             "offer": None,
         }
-
-    async def test_a_full_term_asks_billing_nothing(
-        self, client: AsyncClient, acting_user, entitled, billing
-    ):
-        a = await _seat(acting_user)
-        await _hold(a.guild.id, {"active": False, "reason": "term_full"})
-        billing.answer = _OFFER
-
-        response = await self._page(client, a)
-
-        assert response.json()["unavailable"]["offer"] is None
-        assert billing.sent == []
-
-    async def test_an_installable_listing_asks_billing_nothing(
-        self, client: AsyncClient, acting_user, entitled, billing
-    ):
-        a = await _seat(acting_user)
-        await _hold(a.guild.id, {"active": True})
-        billing.answer = _OFFER
-
-        response = await self._page(client, a)
-
-        assert response.json()["unavailable"] is None
-        assert billing.sent == []
 
     async def test_the_shelf_asks_billing_nothing(
         self, client: AsyncClient, acting_user, entitled, billing

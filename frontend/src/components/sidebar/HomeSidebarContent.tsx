@@ -26,7 +26,7 @@ import { useHasFiledTickets } from "@/hooks/useTickets";
 import { Badge } from "@/ui/badge";
 
 export const HomeSidebarContent = () => {
-  const { t } = useTranslation("nav");
+  const { t } = useTranslation(["nav", "common"]);
   const pathname = useLocation({ select: (location) => location.pathname });
 
   // My Messages is a list of people and then one of them, so it drills rather
@@ -69,9 +69,9 @@ export const HomeSidebarContent = () => {
             to: "/messages",
             label: t("myMessages"),
             icon: MessageSquare,
-            // Encrypted messaging is new and moving: the badge is the one
-            // place somebody is told before they rely on it.
-            badge: t("alphaBadge"),
+            // Encrypted messaging still changes: the badge is the one place
+            // somebody is told before they rely on it.
+            badge: t("common:beta"),
             waiting: messagesWaiting,
             // Climbing out of the conversations leaves this list showing
             // while the thread is still open behind it, so picking My Messages

@@ -19,7 +19,6 @@
   "platformSettings": "Paramètres de la plateforme",
   "signOut": "Se déconnecter",
   "viewDocumentation": "Voir la documentation",
-  "alphaBadge": "ALPHA",
   "initiativeSettings": "Paramètres de l'initiative",
   "initiativeActions": "Actions de l'initiative",
   "createFile": "Créer un fichier",
@@ -64,9 +63,6 @@
     "finalizing": "Finalisation de la redirection…",
     "goHome": "Revenir à l'accueil"
   },
-  "counterGroups": "Compteurs",
-  "allCounterGroups": "Tous les compteurs",
-  "createCounterGroup": "Nouveau groupe de compteurs",
   "createExternally": "Créé dans {{name}}",
   "operatorDashboard": "Tableau de bord opérateur",
   "requestsWaiting_one": "{{count}} en attente",

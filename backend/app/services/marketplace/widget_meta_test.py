@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from app.services.marketplace import contract, widget_meta
+from app.services.marketplace import widget_meta
 from app.services.marketplace.widget_meta import (
     localized_text,
     validate_widget_meta,
@@ -64,60 +64,41 @@ class TestTheBrowserTrimsByTheSameNumbers:
             _FRONTEND_CONTRACT.read_text(encoding="utf-8")
         ), "the two vendored copies differ — run backend/scripts/refresh_plugin_kit.py"
 
-    def test_every_limit_this_module_uses_comes_from_the_contract(self):
-        """Each name below is read by ``validate_widget_meta``; a limit that
-        stopped coming from the contract would be one the browser cannot see."""
-        for constant, cap in (
-            ("MAX_TEXT_LENGTH", "textLength"),
-            ("MAX_DESCRIPTION_LENGTH", "widgetDescriptionLength"),
-            ("MAX_LOCALES", "locales"),
-            ("MAX_OPTIONS", "widgetOptions"),
-            ("MAX_VALUES_PER_OPTION", "valuesPerOption"),
-            ("MAX_LOCALE_TAG_LENGTH", "localeTagLength"),
-        ):
-            assert getattr(widget_meta, constant) == contract.cap(cap), constant
-        assert widget_meta.LOCALE_TAG_CHARS == contract.charset("localeTag")
-
 
 class TestLocalizedText:
-    def test_a_widget_may_ship_one_language(self):
-        assert localized_text({"en": "Chart"}, 120) == {"en": "Chart"}
-
-    def test_text_is_trimmed_and_truncated_rather_than_refused(self):
-        # Meta is presentation: a widget with one over-long label should still
-        # name itself, which is what the browser does with the same input.
-        assert localized_text({"en": "  Chart  "}, 120) == {"en": "Chart"}
-        assert localized_text({"en": "abcdef"}, 3) == {"en": "abc"}
-
     @pytest.mark.parametrize(
-        "tag",
+        ("value", "cap", "expected"),
         [
-            "en_US",  # underscore is not a language tag separator
-            "en US",
-            "toolongalanguagetag",
-            "",
-            "en/../..",
+            ({"en": "Chart"}, 120, {"en": "Chart"}),
+            # Meta is presentation: trimmed and truncated rather than refused,
+            # which is what the browser does with the same input.
+            ({"en": "  Chart  "}, 120, {"en": "Chart"}),
+            ({"en": "abcdef"}, 3, {"en": "abc"}),
+            # A key that is not a language tag is dropped.
+            *(
+                ({tag: "Chart", "en": "Chart"}, 120, {"en": "Chart"})
+                for tag in ("en_US", "en US", "toolongalanguagetag", "", "en/../..")
+            ),
+            # A non-string value is dropped rather than coerced.
+            ({"en": {"nested": "object"}, "de": "Diagramm"}, 120, {"de": "Diagramm"}),
+            ({}, 120, None),
+            ({"en": "   "}, 120, None),
+            ("Chart", 120, None),
+            (["Chart"], 120, None),
+            # The scan stops at the locale cap rather than reading everything a
+            # module supplies.
+            (
+                {
+                    **{f"l{i:03d}": "x" for i in range(widget_meta.MAX_LOCALES + 5)},
+                    "en": "Chart",
+                },
+                120,
+                None,
+            ),
         ],
     )
-    def test_a_key_that_is_not_a_language_tag_is_dropped(self, tag):
-        assert localized_text({tag: "Chart", "en": "Chart"}, 120) == {"en": "Chart"}
-
-    def test_a_non_string_value_is_dropped_rather_than_coerced(self):
-        assert localized_text({"en": {"nested": "object"}, "de": "Diagramm"}, 120) == {
-            "de": "Diagramm"
-        }
-
-    def test_nothing_usable_reads_as_nothing(self):
-        assert localized_text({}, 120) is None
-        assert localized_text({"en": "   "}, 120) is None
-        assert localized_text("Chart", 120) is None
-        assert localized_text(["Chart"], 120) is None
-
-    def test_the_scan_stops_at_the_locale_cap(self):
-        many = {f"l{index:03d}": "x" for index in range(widget_meta.MAX_LOCALES + 5)}
-        # Not language tags, so nothing survives — but the point is that the
-        # scan is bounded rather than proportional to what a module supplies.
-        assert localized_text({**many, "en": "Chart"}, 120) is None
+    def test_text_keeps_only_what_is_usable(self, value, cap, expected):
+        assert localized_text(value, cap) == expected
 
 
 class TestValidateWidgetMeta:

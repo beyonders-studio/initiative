@@ -7,23 +7,13 @@ rewrite itself: what each binding becomes, and what the downgrade puts back.
 from __future__ import annotations
 
 import copy
-import importlib.util
-from pathlib import Path
 from types import SimpleNamespace
 
 from app.services.query.build import Column, QuerySpec, build
 from app.services.query.resolve import SheetCall
+from app.testing.later_revisions import load_revision
 
-_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "alembic"
-    / "versions"
-    / "20261106_0587_sheet_ranges_become_queries.py"
-)
-_spec = importlib.util.spec_from_file_location(_PATH.stem, _PATH)
-assert _spec and _spec.loader
-revision = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(revision)
+revision = load_revision("20261106_0587_sheet_ranges_become_queries")
 
 _FILE = SimpleNamespace(
     id=7,

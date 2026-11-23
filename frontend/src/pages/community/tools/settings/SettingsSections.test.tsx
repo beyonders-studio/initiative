@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -70,7 +71,7 @@ const noopMutation = () => ({ mutate: vi.fn(), isPending: false });
 const renderSection = (
   Section: React.ComponentType,
   entity: ToolSettingsEntity,
-  tool: Tool = Tool.counter_group,
+  tool: Tool = Tool.contact,
   template?: ToolMutation<{ is_template: boolean }>
 ) =>
   renderPage(() => (
@@ -120,6 +121,64 @@ describe("DetailsPage tags", () => {
       expect(screen.getByTestId("selected-tags")).toHaveTextContent("Existing tag")
     );
     expect(screen.getByTestId("selected-tags")).not.toHaveTextContent("Added tag");
+  });
+});
+
+// These settings fill themselves in from the entity the frame loaded. A fresh
+// copy arrives for reasons that have nothing to do with the reader (a realtime
+// signal, a window brought back to the front, another query's mutation), and
+// handing the section a changed entity is exactly what those refetches do.
+describe("DetailsPage during a background refetch", () => {
+  /** The section as its route mounts it, a button standing in for the moment a
+   *  fresh copy of the entity arrives. */
+  const renderRefetching = () => {
+    const Harness = () => {
+      const [entity, setEntity] = useState(buildEntity());
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => setEntity(buildEntity({ name: "Renamed by somebody else" }))}
+          >
+            refetch
+          </button>
+          <ToolSettingsProvider
+            value={{
+              tool: Tool.wiki,
+              entity,
+              update: noopMutation(),
+              setGrants: noopMutation(),
+              remove: noopMutation(),
+            }}
+          >
+            <DetailsPage />
+          </ToolSettingsProvider>
+        </>
+      );
+    };
+    return renderPage(Harness);
+  };
+
+  it("keeps what has been typed when a fresh copy of the entity arrives", async () => {
+    renderRefetching();
+    const user = userEvent.setup();
+
+    await user.clear(await screen.findByLabelText(/name/i));
+    await user.type(screen.getByLabelText(/name/i), "Half-written name");
+    await user.click(screen.getByRole("button", { name: "refetch" }));
+
+    await waitFor(() => expect(screen.getByLabelText(/name/i)).toHaveValue("Half-written name"));
+  });
+
+  it("catches up with a rename while nobody is typing", async () => {
+    renderRefetching();
+    expect(await screen.findByLabelText(/name/i)).toHaveValue("Q3 Roadmap");
+
+    await userEvent.click(screen.getByRole("button", { name: "refetch" }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText(/name/i)).toHaveValue("Renamed by somebody else")
+    );
   });
 });
 
@@ -262,22 +321,19 @@ describe("DetailsPage template switch", () => {
 });
 
 describe("AdvancedPage", () => {
-  it("offers deletion to the owner", async () => {
-    resetFactories();
-    renderSection(AdvancedPage, buildEntity());
+  // Deletion is the owner's alone and this tool declares no extras, so the tab
+  // bar hides the link — but the address is still typeable, live or archived.
+  it.each([null, "2026-09-01T00:00:00Z"])(
+    "says so rather than rendering a blank page when it holds nothing for a reader (archived: %s)",
+    async (archived_at) => {
+      resetFactories();
+      renderSection(AdvancedPage, buildEntity({ can: readerCan(), archived_at }));
 
-    expect(await screen.findByRole("button", { name: "Delete" })).toBeInTheDocument();
-  });
-
-  it("says so rather than rendering a blank page when it holds nothing", async () => {
-    resetFactories();
-    // Deletion is the owner's alone and this tool declares no extras, so the
-    // tab bar hides the link — but the address is still typeable.
-    renderSection(AdvancedPage, buildEntity({ can: readerCan() }));
-
-    expect(await screen.findByText("Permission required")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
-  });
+      expect(await screen.findByText("Permission required")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Unarchive" })).not.toBeInTheDocument();
+    }
+  );
 
   it("offers the way back out of the archive, which nothing else on it offers", async () => {
     resetFactories();
@@ -294,31 +350,18 @@ describe("AdvancedPage", () => {
     expect(await screen.findByRole("button", { name: "Unarchive" })).toBeInTheDocument();
   });
 
-  it("offers no way back to someone who could not write it anyway", async () => {
-    resetFactories();
-    renderSection(
-      AdvancedPage,
-      buildEntity({
-        can: readerCan(),
-        archived_at: "2026-09-01T00:00:00Z",
-      })
-    );
-
-    expect(await screen.findByText("Permission required")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Unarchive" })).not.toBeInTheDocument();
-  });
-
-  it("offers archiving on a live tool to someone who may write it", async () => {
+  it("offers archiving but no export on a live tool to someone who may write it", async () => {
     resetFactories();
     renderSection(AdvancedPage, buildEntity({ can: writerCan() }));
 
     expect(await screen.findByRole("button", { name: "Archive" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Export" })).not.toBeInTheDocument();
   });
   it("offers the owner an export of the tool", async () => {
     resetFactories();
     let sent: { format: string | null; ids: string | null } | null = null;
     server.use(
-      communityHttp.get("/exports/counter_group", ({ request }) => {
+      communityHttp.get("/exports/contact", ({ request }) => {
         const url = new URL(request.url);
         sent = {
           format: url.searchParams.get("format"),
@@ -337,9 +380,26 @@ describe("AdvancedPage", () => {
     await waitFor(() => expect(sent).toEqual({ format: "csv", ids: "7" }));
   });
 
+  it.each([
+    // One format: nothing to choose, so the wizard opens on it.
+    [Tool.dashboard, ["Importable file (.json)"]],
+    // A wiki's every download is a zip.
+    [Tool.wiki, ["PDF (.zip)", "Markdown (.zip)", "Word (.zip)", "Importable file (.zip)"]],
+  ])("offers the owner of a %s its own export formats", async (tool, formats) => {
+    resetFactories();
+    renderSection(AdvancedPage, buildEntity(), tool);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Export" }));
+
+    for (const name of formats) expect(await screen.findByText(name)).toBeInTheDocument();
+    if (formats.length === 1) {
+      expect(screen.getByRole("button", { name: /start export/i })).toBeInTheDocument();
+    }
+  });
+
   it("copies it into the initiative chosen, the suggested name following the choice", async () => {
     resetFactories();
-    const can = initiativeCan({ create: [Tool.counter_group] });
+    const can = initiativeCan({ create: [Tool.contact] });
     let sent: unknown = null;
     server.use(
       communityHttp.get("/initiatives/", () =>
@@ -348,12 +408,12 @@ describe("AdvancedPage", () => {
           buildInitiative({ id: 4, name: "There", can }),
         ])
       ),
-      communityHttp.post("/counter-groups/:groupId/duplicate", async ({ request }) => {
+      communityHttp.post("/contacts/:contactId/duplicate", async ({ request }) => {
         sent = await request.json();
         return HttpResponse.json({ id: 8, initiative_id: 4 }, { status: 201 });
       })
     );
-    renderSection(AdvancedPage, buildEntity(), Tool.counter_group);
+    renderSection(AdvancedPage, buildEntity(), Tool.contact);
 
     await userEvent.click(await screen.findByRole("button", { name: "Duplicate" }));
     const dialog = await screen.findByRole("dialog");
@@ -368,7 +428,7 @@ describe("AdvancedPage", () => {
 
   it("copies an initiative that keeps its content in only beside itself", async () => {
     resetFactories();
-    const can = initiativeCan({ create: [Tool.counter_group] });
+    const can = initiativeCan({ create: [Tool.contact] });
     const here = buildInitiative({ id: 3, name: "Here", can, keep_content_in: true });
     server.use(
       communityHttp.get("/initiatives/", () =>
@@ -376,7 +436,7 @@ describe("AdvancedPage", () => {
       ),
       communityHttp.get("/initiatives/:id", () => HttpResponse.json(here))
     );
-    renderSection(AdvancedPage, buildEntity(), Tool.counter_group);
+    renderSection(AdvancedPage, buildEntity(), Tool.contact);
 
     await userEvent.click(await screen.findByRole("button", { name: "Duplicate" }));
     const dialog = await screen.findByRole("dialog");
@@ -385,20 +445,12 @@ describe("AdvancedPage", () => {
     expect(screen.queryByRole("option", { name: "There" })).not.toBeInTheDocument();
   });
 
-  it("offers no copy of a post, which is published rather than reused", async () => {
+  it("offers its owner deletion, but no copy of a post, which is published rather than reused", async () => {
     resetFactories();
     renderSection(AdvancedPage, buildEntity(), Tool.post);
 
     expect(await screen.findByRole("button", { name: "Delete" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Duplicate" })).not.toBeInTheDocument();
-  });
-
-  it("offers no export to someone who may edit it but not delete it", async () => {
-    resetFactories();
-    renderSection(AdvancedPage, buildEntity({ can: writerCan() }));
-
-    expect(await screen.findByRole("button", { name: "Archive" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Export" })).not.toBeInTheDocument();
   });
 });
 

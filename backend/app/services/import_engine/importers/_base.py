@@ -13,7 +13,9 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import ImportEngineMessages
+from app.core.tool_set import ToolRecord
 from app.core.tools import Tool
+from app.db.session import routed_tools
 from app.models.platform.user import User
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.metadata import MetadataDefinition, MetadataType, MetadataValue
@@ -60,18 +62,20 @@ class NamesPeopleInPassing:
     the name, or on nobody.
     """
 
-    def people(self, validated: BaseModel) -> list[ManifestPerson]:
-        from app.schemas.tenant.backup_export import ManifestPerson
-        from app.services.import_engine.common import handle_key
+    def handles(self, validated: BaseModel) -> list[str]:
+        """Every handle the envelope names in passing."""
         from app.services.import_engine.mentions import mention_handles_in
         from app.services.import_engine.people import user_reference_handles
 
         payload = validated.model_dump(mode="json")
+        return [*user_reference_handles(payload), *mention_handles_in(payload)]
+
+    def people(self, validated: BaseModel) -> list[ManifestPerson]:
+        from app.schemas.tenant.backup_export import ManifestPerson
+        from app.services.import_engine.common import handle_key
+
         handles: dict[str, str] = {}
-        for handle in (
-            *user_reference_handles(payload),
-            *mention_handles_in(payload),
-        ):
+        for handle in self.handles(validated):
             handles.setdefault(handle_key(handle), handle)
         return [
             ManifestPerson(handle=handle, name=None, comment_count=0)
@@ -94,7 +98,7 @@ def parse_envelope(model: type[BaseModel], envelope: dict[str, Any]) -> BaseMode
 async def grant_ownership(
     session: AsyncSession,
     *,
-    tool: Tool,
+    tool: Tool | ToolRecord,
     entity_id: int,
     target_initiative: Initiative,
     importer: User,
@@ -175,16 +179,23 @@ class TagRestore:
         self._ids[key] = resolved.id
         return resolved.id
 
-    async def attach(self, row: Any, tags: Iterable[str | ProjectExportTag]) -> None:
+    async def attach(
+        self,
+        row: Any,
+        tags: Iterable[str | ProjectExportTag],
+        *,
+        spec: tags_service.TagLinkSpec | None = None,
+    ) -> None:
         """Tag ``row``, a persisted taggable row, with each of ``tags`` — a
-        name, or a name with the colour it is made in."""
+        name, or a name with the colour it is made in. ``spec`` says what
+        ``row`` is where its model cannot: a tool plug-in's row's kind's."""
         tag_ids: dict[int, None] = {}
         for tag in tags:
             if isinstance(tag, str):
                 tag_ids[await self.resolve(tag)] = None
             else:
                 tag_ids[await self.resolve(tag.name, tag.color)] = None
-        spec = tags_service.spec_for(row)
+        spec = spec or tags_service.spec_for(row)
         self._session.add_all(
             tags_service.tag_edge(spec, row.id, tag_id) for tag_id in tag_ids
         )
@@ -338,11 +349,16 @@ class PropertyRestore:
                 )
                 # Amounts in one currency are not amounts in another.
                 and found.currency == currency
-                # Nor is a count kept to one step and bounds kept to others.
+                # Nor is a count kept to one step and bounds kept to others;
+                # how it is drawn is not what it counts.
                 and (
                     declared is None
                     or found.counter is None
-                    or CounterSettings.model_validate(found.counter) == counter
+                    or counter is None
+                    or CounterSettings.model_validate(found.counter).model_dump(
+                        exclude={"look"}
+                    )
+                    == counter.model_dump(exclude={"look"})
                 )
             ):
                 self.matched += 1
@@ -366,7 +382,7 @@ class PropertyRestore:
             ),
             color=declared.color if declared is not None else None,
             currency=currency,
-            counter=counter.model_dump() if counter is not None else None,
+            counter=counter.model_dump(mode="json") if counter is not None else None,
             options=(
                 declared.options
                 if declared is not None
@@ -417,7 +433,7 @@ class PropertyRestore:
             if column_kwargs.get("value_user_id") is not None and pv.value_handle:
                 self.named.setdefault(column_kwargs["value_user_id"], pv.value_handle)
             column_kwargs_by_id[property_id] = column_kwargs  # ty: ignore[invalid-assignment] — persisted row, id is set
-        target = link_for(row).target
+        target = link_for(row, routed_tools(self._session)).target
         self._session.add_all(
             MetadataValue(
                 entity_type=target,
@@ -439,7 +455,7 @@ class PropertyRestore:
         await self._session.flush()
         gone: set[int] = set()
         if self.named:
-            link = link_for(tool_row)
+            link = link_for(tool_row, routed_tools(self._session))
             if link.shared:
                 gone = await bring_in_named(
                     self._session,

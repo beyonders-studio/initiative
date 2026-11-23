@@ -6,7 +6,7 @@
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { PropertyDefinitionRead, PropertyTarget } from "@/api/generated/initiativeAPI.schemas";
+import type { ContentKind, PropertySummary } from "@/api/generated/initiativeAPI.schemas";
 import { useStepCounter } from "@/hooks/useProperties";
 import { useCommunityPath } from "@/lib/communityUrl";
 import type { TranslateFn } from "@/types/i18n";
@@ -29,13 +29,13 @@ export const LAYOUT_NAMESPACES = [
  *  its reader may change that counter on it from the list. `may` is kept
  *  between renders by its caller. */
 export const useCounterSteps = <I extends { id: number }>(
-  target: PropertyTarget,
-  may: (item: I, definition: PropertyDefinitionRead) => boolean
+  target: ContentKind,
+  may: (item: I, summary: PropertySummary) => boolean
 ): NonNullable<LayoutEnv<I>["stepCounter"]> => {
   const { mutateAsync } = useStepCounter(target);
   return useCallback(
-    (item, definition: PropertyDefinitionRead) =>
-      may(item, definition) ? (up) => mutateAsync({ itemId: item.id, definition, up }) : null,
+    (item, summary: PropertySummary) =>
+      may(item, summary) ? (up) => mutateAsync({ itemId: item.id, summary, up }) : null,
     [may, mutateAsync]
   );
 };

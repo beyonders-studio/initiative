@@ -47,7 +47,6 @@ function stubMyTools({
         counts: {
           project: 0,
           file: 0,
-          counter_group: 0,
           calendar: 0,
           dashboard: 0,
           ...counts,
@@ -56,7 +55,6 @@ function stubMyTools({
     ),
     http.get("/api/v1/me/projects", () => page(projects)),
     http.get("/api/v1/me/files", () => page(files)),
-    http.get("/api/v1/me/counter-groups", () => page([])),
     http.get("/api/v1/me/calendars", () => page([])),
     http.get("/api/v1/me/dashboards", () => page([])),
     communityHttp.get("/initiatives/", () => HttpResponse.json([]))
@@ -134,28 +132,14 @@ describe("ToolsPage", () => {
     expect(screen.getByRole("radio", { name: "Made by me" })).toHaveAttribute("data-state", "on");
   });
 
-  it("narrows the list to the chosen communities", async () => {
+  it("narrows the list to the chosen communities, naming each row's initiative wherever it lives", async () => {
     let lastCommunityIds: string[] = [];
     stubMyTools({ counts: { project: 1 } });
     server.use(
       http.get("/api/v1/me/projects", ({ request }) => {
         lastCommunityIds = new URL(request.url).searchParams.getAll("community_ids");
-        return page([buildProject({ name: "Apollo", community_id: AWAY.id })]);
-      })
-    );
-
-    render({ tool: "projects", communities: String(AWAY.id) }, [HOME, AWAY]);
-
-    await screen.findByRole("link", { name: "Apollo" });
-    await waitFor(() => expect(lastCommunityIds).toEqual([String(AWAY.id)]));
-  });
-
-  it("names each row's initiative, wherever it lives", async () => {
-    stubMyTools({
-      counts: { project: 1 },
-      projects: [buildProject({ name: "Apollo", community_id: AWAY.id, initiative_id: 9 })],
-    });
-    server.use(
+        return page([buildProject({ name: "Apollo", community_id: AWAY.id, initiative_id: 9 })]);
+      }),
       communityHttp.get("/initiatives/", ({ params }) =>
         HttpResponse.json(
           Number(params.communityId) === AWAY.id
@@ -165,8 +149,10 @@ describe("ToolsPage", () => {
       )
     );
 
-    render({ tool: "projects" }, [HOME, AWAY]);
+    render({ tool: "projects", communities: String(AWAY.id) }, [HOME, AWAY]);
 
+    await screen.findByRole("link", { name: "Apollo" });
+    await waitFor(() => expect(lastCommunityIds).toEqual([String(AWAY.id)]));
     expect(await screen.findByRole("link", { name: "Mists" })).toBeInTheDocument();
   });
 });

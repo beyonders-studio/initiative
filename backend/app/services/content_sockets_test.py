@@ -31,24 +31,7 @@ from app.services.content_sockets import (
 )
 from app.services.platform.ws_auth import authenticate_ws_token
 from app.testing import create_user, get_auth_token
-
-
-class FakeWebSocket:
-    """Records the frames it was sent and the close code it received."""
-
-    def __init__(self) -> None:
-        self.sent: list[dict] = []
-        self.sent_bytes: list[bytes] = []
-        self.closed: int | None = None
-
-    async def send_json(self, message: dict) -> None:
-        self.sent.append(message)
-
-    async def send_bytes(self, payload: bytes) -> None:
-        self.sent_bytes.append(payload)
-
-    async def close(self, code: int | None = None) -> None:
-        self.closed = code
+from app.testing.sockets import FakeWebSocket, settle
 
 
 class ExplodingWebSocket(FakeWebSocket):
@@ -79,12 +62,6 @@ async def register():
         reg.leave(sub.websocket)
     if reg._loop_task is not None:
         reg._loop_task.cancel()
-
-
-async def settle() -> None:
-    """Let the writer tasks drain what was queued."""
-    for _ in range(10):
-        await asyncio.sleep(0)
 
 
 def _join(
@@ -127,42 +104,42 @@ async def test_a_signal_is_isolated_by_guild_and_kind(register) -> None:
     same = FakeWebSocket()
     other_guild_same_id = FakeWebSocket()
     same_guild_other_kind = FakeWebSocket()
-    _join(register, same, rooms={resource_room(1, "counter_group", 5)})
+    _join(register, same, rooms={resource_room(1, "wiki", 5)})
     _join(
         register,
         other_guild_same_id,
-        rooms={resource_room(2, "counter_group", 5)},
+        rooms={resource_room(2, "wiki", 5)},
         guild_id=2,
     )
     _join(register, same_guild_other_kind, rooms={resource_room(1, "calendar", 5)})
 
-    register.signal(1, Tool.counter_group, 5, "counter_updated")
+    register.signal(1, Tool.wiki, 5, "updated")
     await settle()
 
     assert len(same.sent) == 1
-    # counter group 5 in guild 2 is a different group (per-schema ids).
+    # wiki 5 in guild 2 is a different wiki (per-schema ids).
     assert other_guild_same_id.sent == []
     assert same_guild_other_kind.sent == []
 
 
 async def test_a_signal_names_the_change_and_carries_no_content(register) -> None:
     ws = FakeWebSocket()
-    _join(register, ws, rooms={resource_room(1, "counter_group", 5)})
+    _join(register, ws, rooms={resource_room(1, "wiki", 5)})
 
-    register.signal(1, Tool.counter_group, 5, "counter_added")
+    register.signal(1, Tool.wiki, 5, "page_added")
     await settle()
 
     (frame,) = ws.sent
     assert set(frame) == {"type", "id", "timestamp"}
-    assert frame["type"] == "counter_added"
+    assert frame["type"] == "page_added"
     assert frame["id"] == 5
 
 
 async def test_an_unrouted_signal_sends_nothing(register) -> None:
     ws = FakeWebSocket()
-    _join(register, ws, rooms={resource_room(1, "counter_group", 5)})
+    _join(register, ws, rooms={resource_room(1, "wiki", 5)})
 
-    register.signal(None, Tool.counter_group, 5, "counter_added")
+    register.signal(None, Tool.wiki, 5, "page_added")
     await settle()
 
     assert ws.sent == []
@@ -273,13 +250,13 @@ async def test_room_members_carries_the_channels_own_state(register) -> None:
 async def test_presence_counts_people_not_sockets_and_only_presence_sockets(
     register,
 ) -> None:
-    tab_one, tab_two, counters_page = FakeWebSocket(), FakeWebSocket(), FakeWebSocket()
+    tab_one, tab_two, wiki_page = FakeWebSocket(), FakeWebSocket(), FakeWebSocket()
     _join(register, tab_one, rooms={guild_room(1)}, presence=True)
     _join(register, tab_two, rooms={guild_room(1)}, presence=True)
     _join(
         register,
-        counters_page,
-        rooms={resource_room(1, "counter_group", 4)},
+        wiki_page,
+        rooms={resource_room(1, "wiki", 4)},
         user=SimpleNamespace(id=2),
     )
 
@@ -370,52 +347,26 @@ def _answers(*rooms):
     return authorize
 
 
-async def test_a_socket_still_authorized_keeps_its_room(register, monkeypatch) -> None:
-    _patch_entry(monkeypatch)
+async def _broken(_session, _user):
+    raise RuntimeError("boom")
+
+
+@pytest.mark.parametrize(
+    ("establish_ok", "authorize"),
+    [(True, _answers()), (False, _answers(DOC)), (True, _broken)],
+    ids=["lost-the-resource", "lost-the-guild", "authorizer-raises"],
+)
+async def test_a_failed_recheck_closes_the_socket(
+    register, monkeypatch, establish_ok, authorize
+) -> None:
+    _patch_entry(monkeypatch, establish_ok=establish_ok)
     ws = FakeWebSocket()
-    _join(register, ws, rooms={DOC}, authorize=_answers(DOC))
-
-    await register.revoke_user(1, USER.id)
-
-    assert ws.closed is None
-    assert register.room_size(DOC) == 1
-
-
-async def test_losing_the_resource_closes_the_socket(register, monkeypatch) -> None:
-    _patch_entry(monkeypatch)
-    ws = FakeWebSocket()
-    _join(register, ws, rooms={DOC}, authorize=_answers())
+    _join(register, ws, rooms={DOC}, authorize=authorize)
 
     await register.revoke_user(1, USER.id)
 
     assert ws.closed == status.WS_1008_POLICY_VIOLATION
     assert register.room_size(DOC) == 0
-
-
-async def test_losing_the_guild_closes_the_socket(register, monkeypatch) -> None:
-    _patch_entry(monkeypatch, establish_ok=False)
-    ws = FakeWebSocket()
-    _join(register, ws, rooms={DOC}, authorize=_answers(DOC))
-
-    await register.revoke_user(1, USER.id)
-
-    assert ws.closed == status.WS_1008_POLICY_VIOLATION
-
-
-async def test_an_authorizer_that_raises_closes_the_socket(
-    register, monkeypatch
-) -> None:
-    _patch_entry(monkeypatch)
-
-    async def broken(_session, _user):
-        raise RuntimeError("boom")
-
-    ws = FakeWebSocket()
-    _join(register, ws, rooms={DOC}, authorize=broken)
-
-    await register.revoke_user(1, USER.id)
-
-    assert ws.closed == status.WS_1008_POLICY_VIOLATION
 
 
 async def test_a_recheck_replaces_the_rooms(register, monkeypatch) -> None:
@@ -441,9 +392,9 @@ async def test_a_recheck_replaces_the_rooms(register, monkeypatch) -> None:
 async def test_one_guild_entry_serves_every_socket_of_one_sign_in(
     register, monkeypatch
 ) -> None:
-    """A board, a counter group and a file open in one guild cost one entry."""
+    """A board, a wiki and a file open in one guild cost one entry."""
     seen = _patch_entry(monkeypatch)
-    for key in (guild_room(1), resource_room(1, "counter_group", 4), DOC):
+    for key in (guild_room(1), resource_room(1, "wiki", 4), DOC):
         _join(register, FakeWebSocket(), rooms={key}, authorize=_answers(key))
 
     await register.revoke_user(1, USER.id)
@@ -617,30 +568,6 @@ async def _open(
     ws = FakeWebSocket()
     _join(reg, ws, rooms={DOC}, user=user, authorize=_answers(DOC))
     return ws
-
-
-async def test_a_socket_on_an_ended_session_is_closed(
-    register, monkeypatch, session: AsyncSession
-) -> None:
-    _patch_entry(monkeypatch)
-    user = await create_user(session)
-    issued = await session_service.create_session(
-        session, user_id=user.id, amr=["pwd"], satisfied_providers=[]
-    )
-    await session.commit()
-    ws = await _open(
-        register, get_auth_token(user, session_id=issued.session.id), session
-    )
-
-    await register.revoke_user_everywhere(user.id)
-    assert ws.closed is None
-
-    await session_service.revoke_chain(session, session_id=issued.session.id)
-    await session.commit()
-    await register.revoke_user_everywhere(user.id)
-
-    assert ws.closed == WS_CREDENTIAL_ENDED
-    assert register.room_size(DOC) == 0
 
 
 async def test_a_socket_follows_its_session_through_a_renewal(

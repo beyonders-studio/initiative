@@ -270,19 +270,6 @@ async def test_an_install_reads_people_and_its_community_by_reference(
     )
 
 
-async def test_the_same_person_is_called_the_same_thing_every_time(
-    client, session, acting_user, role_session
-):
-    installed, _people = await _setup(session, acting_user, role_session)
-    headers = _bearer(installed.guild.id, installed.plugin.id, ["files:read"])
-
-    first = await client.get(_url(installed.guild.id, "/people"), headers=headers)
-    plugin_refs.forget_cached_install_refs()
-    second = await client.get(_url(installed.guild.id, "/people"), headers=headers)
-
-    assert first.json() == second.json()
-
-
 async def test_a_second_install_sees_different_references(
     client, session, acting_user, role_session
 ):

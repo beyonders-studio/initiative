@@ -5,7 +5,8 @@ A listing declares what a plug-in is, and gives its registration the plug-in fac
 which listing it is, its image, its scope ceiling and its Compose service. The
 operator gives the deployment facts here: its addresses, its public keys, its
 vendor values and whether it is ``mandatory``, and the owner suspends a plug-in
-everywhere and lifts it, and picks the communities a beta plug-in reaches. Vendor
+everywhere and lifts it, picks the communities a beta plug-in reaches, and may
+connect a community connection once for every community. Vendor
 values may also come from the vendor's own setup flow, run from here. A publisher is the prefix of
 a plug-in's ``public_id``, with a switch that stops every plug-in under it. The whole
 surface is gated on ``plugins.manage`` (owner tier).
@@ -18,23 +19,27 @@ delegate.
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import SystemSessionDep, require_capability
 from app.core.capabilities import Capability
 from app.core.messages import PluginServiceMessages
+from app.db.query import build_paginated_response
 from app.models.platform.plugin_service_registration import PluginAvailability
 from app.models.platform.publisher import Publisher
 from app.models.platform.user import User
 from app.schemas.platform.plugin_service import (
     PluginBetaCommunityRead,
+    PluginPlatformConnectionRead,
+    PluginPlatformConnectStart,
     PluginPublisherCreate,
     PluginPublisherRead,
     PluginPublisherUpdate,
     PluginServiceConnect,
     PluginServicePublishedKey,
     PluginServiceRegistrationCreate,
+    PluginServiceRegistrationListResponse,
     PluginServiceRegistrationRead,
     PluginServiceRegistrationUpdate,
     PluginServiceVendorSetup,
@@ -42,8 +47,12 @@ from app.schemas.platform.plugin_service import (
     PluginServiceVendorSetupStart,
     PluginVendorFieldRead,
 )
+from app.services.marketplace import (
+    platform_connections as platform_connections_service,
+)
 from app.services.marketplace import publishers as publishers_service
 from app.services.marketplace import registrations as registrations_service
+from app.services.marketplace import vendor_check as vendor_check_service
 from app.services.marketplace import vendor_setup as vendor_setup_service
 from app.services.marketplace import vendor_values as vendor_values_service
 from app.services.tenant import plugin_connection_flows as flows_service
@@ -69,6 +78,10 @@ def _to_read(
         id=row.id,
         public_id=row.public_id,
         listing_uid=row.listing_uid,
+        name=view.name,
+        avatar_url=view.avatar_url,
+        version=view.version,
+        first_party=view.first_party,
         kind=row.kind,
         publisher_id=view.publisher.id,
         publisher_prefix=view.publisher.prefix,
@@ -86,7 +99,10 @@ def _to_read(
             PluginBetaCommunityRead(id=community_id, name=name)
             for community_id, name in view.beta_communities
         ],
-        shared_routes=row.shared_routes,
+        platform_connections=[
+            PluginPlatformConnectionRead(**view)
+            for view in platform_connections_service.views(row, definition)
+        ],
         suspended_at=row.suspended_at,
         source=row.source,
         image_digest=row.image_digest,
@@ -128,15 +144,40 @@ async def _definitions(
     )
 
 
-@router.get("/", response_model=list[PluginServiceRegistrationRead])
+@router.get("/", response_model=PluginServiceRegistrationListResponse)
 async def list_plugin_services(
     session: SystemSessionDep,
     _owner: PluginsManageDep,
-) -> list[PluginServiceRegistrationRead]:
-    """Every plug-in service this deployment has wired up (``plugins.manage``)."""
-    views = await registrations_service.registration_views(session)
+    search: str | None = Query(
+        default=None, description="Matches the plug-in's id or its publisher's name."
+    ),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+) -> PluginServiceRegistrationListResponse:
+    """One page of the plug-in services this deployment has wired up
+    (``plugins.manage``), by id."""
+    views, total_count, actual_page = await registrations_service.registration_page(
+        session, search=search, page=page, page_size=page_size
+    )
     definitions = await _definitions(session, views)
-    return [_to_read(view, definitions) for view in views]
+    return PluginServiceRegistrationListResponse(
+        **build_paginated_response(
+            [_to_read(view, definitions) for view in views],
+            total_count,
+            actual_page,
+            page_size,
+        )
+    )
+
+
+@router.get("/{registration_id}", response_model=PluginServiceRegistrationRead)
+async def read_plugin_service(
+    registration_id: int,
+    session: SystemSessionDep,
+    _owner: PluginsManageDep,
+) -> PluginServiceRegistrationRead:
+    """One plug-in service (``plugins.manage``)."""
+    return await _read_one(session, registration_id)
 
 
 @router.post(
@@ -175,11 +216,31 @@ async def update_plugin_service(
     owner: PluginsManageDep,
 ) -> PluginServiceRegistrationRead:
     """Suspend everywhere or lift, repoint either address, replace the keys,
-    make it mandatory or not, let vendor installations be shared, set the
-    vendor values, or replace a beta plug-in's communities. Turning sharing
-    off while an installation is connected to more than one community is
-    refused (409), and so is a list of communities for a plug-in that is not
-    beta; one naming a community that does not exist is refused (400)."""
+    make it mandatory or not, set the vendor values, or replace a beta
+    plug-in's communities. A list of communities for a plug-in that is not
+    beta is refused (409); one naming a community that does not exist is
+    refused (400).
+
+    Vendor values the listing's vendor check reads are checked with the
+    vendor before anything is written (:mod:`~app.services.marketplace.vendor_check`):
+    a refusal is a 400 naming the fields, and a check the vendor could not
+    answer saves the values and says so in ``vendor_check``."""
+    checked = held = None
+    if payload.vendor_values:
+        current = await registrations_service.get_registration(session, registration_id)
+        # What the check runs against, as stored: the write is refused if it
+        # moves before the row is locked.
+        held = dict(current.vendor_values or {})
+        definition = (
+            await vendor_values_service.listing_definitions(
+                session, [current.listing_uid]
+            )
+        ).get(current.listing_uid or "")
+        checked = await vendor_check_service.run(
+            definition,
+            held=vendor_values_service.held_values(current),
+            submitted=payload.vendor_values,
+        )
     row = await registrations_service.update_registration(
         session,
         registration_id,
@@ -189,13 +250,14 @@ async def update_plugin_service(
         jwks=payload.jwks,
         jwks_uri=payload.jwks_uri,
         mandatory=payload.mandatory,
-        shared_routes=payload.shared_routes,
         suspended=payload.suspended,
         beta_community_ids=payload.beta_community_ids,
         vendor_values=payload.vendor_values,
+        vendor_values_checked=held if checked is not None else None,
         actor_user_id=owner.id,
     )
-    return await _read_one(session, row.id)
+    read = await _read_one(session, row.id)
+    return read.model_copy(update={"vendor_check": checked})
 
 
 @router.get(
@@ -270,12 +332,53 @@ async def complete_plugin_service_vendor_setup(
 ) -> PluginServiceRegistrationRead:
     """Finish the setup the vendor sent the operator back from, writing the
     new client's values into the registration's vendor values."""
-    row = await vendor_setup_service.complete(
+    row, checked = await vendor_setup_service.complete(
         session,
         registration_id,
         code=payload.code,
         state=payload.state,
         actor_user_id=owner.id,
+    )
+    read = await _read_one(session, row.id)
+    return read.model_copy(update={"vendor_check": checked})
+
+
+@router.post(
+    "/{registration_id}/connections/{connection_id}/connect",
+    response_model=PluginPlatformConnectStart,
+)
+async def connect_plugin_service_for_every_community(
+    registration_id: int,
+    connection_id: str,
+    session: SystemSessionDep,
+    owner: PluginsManageDep,
+) -> PluginPlatformConnectStart:
+    """Start connecting one of the plug-in's community connections for every
+    community: the vendor's address to send the operator to. Nothing is
+    stored until the vendor sends them back. Refused (409) for a connection
+    the platform cannot make (``for_platform``)."""
+    row = await registrations_service.get_registration(session, registration_id)
+    return PluginPlatformConnectStart(
+        connect_url=await flows_service.start_platform_url(
+            public_id=row.public_id, connection_id=connection_id, started_by=owner.id
+        )
+    )
+
+
+@router.delete(
+    "/{registration_id}/connections/{connection_id}",
+    response_model=PluginServiceRegistrationRead,
+)
+async def disconnect_plugin_service_for_every_community(
+    registration_id: int,
+    connection_id: str,
+    session: SystemSessionDep,
+    owner: PluginsManageDep,
+) -> PluginServiceRegistrationRead:
+    """End a connection the platform made for every community: each
+    community reads its own again."""
+    row = await platform_connections_service.disconnect(
+        session, registration_id, connection_id, actor_user_id=owner.id
     )
     return await _read_one(session, row.id)
 

@@ -4,10 +4,10 @@
   "kind": "plugin",
   "name": "Community calendar",
   "publisher": "Initiative",
-  "description": "Calendars your whole community shares — holidays, meetups, and one for each of you.",
-  "long_description": "Give your community calendars of its own — for game nights, holidays, a recurring meetup, or just for yourself, rather than for one initiative.\n\nIt arrives with one calendar, and any member can add more. Every member sees a new calendar the moment it lands. Want only officers posting to it? Adjust its sharing, same as any calendar.\n\nRemoving the app sends its calendars to the trash, so nothing is lost by accident.",
+  "description": "Calendars everyone in the community sees, whichever initiatives they're in.",
+  "long_description": "An initiative's calendar is for its own members. A community calendar is for the events everyone should know about: holidays, socials, all-hands meetings.\n\n- Every member sees it, whichever initiatives they're in; its sharing can narrow that\n- Opens from the sidebar, outside any initiative\n- Everything an initiative's calendar does, for the whole community: repeating events, RSVPs and reminders, and subscribing from Google Calendar or Outlook\n- Admins add calendars and choose who can add events to each",
   "avatar_url": "/marketplace/core-guild-calendar.svg",
-  "images": [],
+  "images": ["/marketplace/community-calendar.webp"],
   "version": "1.0.1",
   "release_notes": "Brings installs that had the first copy up to the calendar as it ships now.",
   "definition": {

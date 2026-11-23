@@ -2,12 +2,9 @@
 
 import pytest
 
-from app.core.tools import BULK_EXPORT_TOOLS, Tool
+from app.core.tools import Tool
 from app.services.import_engine import limits as import_limits
 from app.services.marketplace.definitions import (
-    KIND_AUDIENCE,
-    LISTING_KINDS,
-    TOOL_LISTING_KINDS,
     normalize_listing_definition,
     normalize_listing_example,
 )
@@ -29,50 +26,40 @@ CANVAS = {
 }
 
 
-def _counters(count: int = 1, **extra) -> dict:
+def _wiki(count: int = 1, **extra) -> dict:
     return {
-        "type": "initiative-counter-group",
-        "name": "Hit points",
-        "counters": [{"name": f"Counter {i}", "count": i} for i in range(count)],
+        "type": "initiative-wiki",
+        "name": "Handbook",
+        "pages": [
+            {"title": f"Page {i}", "slug": f"page-{i}", "position": i, "content": {}}
+            for i in range(count)
+        ],
         **extra,
     }
 
 
-class TestEveryToolHasAMarketplace:
-    def test_the_kinds_are_the_exportable_tools(self):
-        assert set(TOOL_LISTING_KINDS) == {tool.value for tool in BULK_EXPORT_TOOLS}
-        assert set(TOOL_LISTING_KINDS) <= LISTING_KINDS
-
-    def test_a_tools_marketplace_installs_to_a_community(self):
-        for kind in TOOL_LISTING_KINDS:
-            assert KIND_AUDIENCE[kind] == "guild"
-
+class TestTheEnvelopeIsStoredAsTheImporterReadsIt:
     @pytest.mark.parametrize("tool", list(Tool))
     def test_a_listing_is_refused_unless_it_is_that_tools_envelope(self, tool):
         with pytest.raises(ListingDefinitionError):
             normalize_tool_listing(tool, {"type": "initiative-something-else"})
 
-
-class TestTheEnvelopeIsStoredAsTheImporterReadsIt:
-    def test_unknown_keys_are_dropped(self):
+    def test_unknown_keys_and_where_it_was_exported_from_are_dropped(self):
         stored = normalize_tool_listing(
-            Tool.counter_group, _counters(stray="not part of the envelope")
+            Tool.wiki,
+            _wiki(
+                stray="not part of the envelope",
+                source_instance_url="https://elsewhere",
+                source_guild_id=4,
+            ),
         )
-        assert "stray" not in stored
-        assert stored["counters"][0]["name"] == "Counter 0"
-
-    def test_where_it_was_exported_from_is_not_kept(self):
-        stored = normalize_tool_listing(
-            Tool.counter_group,
-            _counters(source_instance_url="https://elsewhere", source_guild_id=4),
-        )
-        assert "source_instance_url" not in stored
-        assert "source_guild_id" not in stored
+        assert not {"stray", "source_instance_url", "source_guild_id"} & set(stored)
+        assert stored["pages"][0]["title"] == "Page 0"
 
     @pytest.mark.parametrize(
         ("tool", "body"),
         [
-            (Tool.counter_group, _counters()),
+            (Tool.wiki, _wiki()),
             (
                 Tool.dashboard,
                 {"type": "initiative-dashboard", "name": "Board", "definition": CANVAS},
@@ -87,9 +74,9 @@ class TestTheEnvelopeIsStoredAsTheImporterReadsIt:
         assert normalize_tool_listing(tool, once) == once
 
     def test_a_listing_is_bounded_by_the_inline_import_ceiling(self):
-        too_many = _counters(count=import_limits.IMPORT_INLINE_MAX_ROWS + 1)
+        too_many = _wiki(count=import_limits.IMPORT_INLINE_MAX_ROWS + 1)
         with pytest.raises(ListingDefinitionError, match="rows"):
-            normalize_tool_listing(Tool.counter_group, too_many)
+            normalize_tool_listing(Tool.wiki, too_many)
 
 
 class TestADashboardListing:
@@ -114,7 +101,7 @@ class TestADashboardListing:
                 "type": "initiative-dashboard",
                 "name": "Board",
                 "definition": CANVAS,
-                "config": {"widgets": {"w1": {"counter_id": 12}}},
+                "config": {"widgets": {"w1": {"project_id": 12}}},
             },
         )
         assert stored["config"] == {}
@@ -129,21 +116,17 @@ class TestADashboardListing:
 
 class TestExamples:
     def test_a_content_tool_takes_its_publishers_example(self):
-        assert not example_is_generated(Tool.counter_group)
-        example = normalize_listing_example(
-            "counter_group", _counters(count=3), _counters()
-        )
+        assert not example_is_generated(Tool.wiki)
+        example = normalize_listing_example("wiki", _wiki(count=3), _wiki())
         assert example is not None
-        assert len(example["counters"]) == 3
+        assert len(example["pages"]) == 3
 
     def test_the_example_is_held_to_the_same_rules(self):
         with pytest.raises(ListingDefinitionError):
-            normalize_listing_example(
-                "counter_group", {"type": "initiative-post"}, _counters()
-            )
+            normalize_listing_example("wiki", {"type": "initiative-post"}, _wiki())
 
     def test_none_is_no_example(self):
-        assert normalize_listing_example("counter_group", None, _counters()) is None
+        assert normalize_listing_example("wiki", None, _wiki()) is None
 
     def test_a_dashboards_example_is_sample_data_not_a_canvas(self):
         # A dashboard's example is its sample answers, by widget, never another
@@ -155,7 +138,7 @@ class TestExamples:
 
     def test_a_kind_that_is_no_tool_carries_none(self):
         with pytest.raises(ListingDefinitionError):
-            normalize_listing_example("profile_pack", _counters(), {})
+            normalize_listing_example("profile_pack", _wiki(), {})
 
 
 class TestGeneratedExamples:

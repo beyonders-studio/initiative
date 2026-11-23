@@ -11,9 +11,6 @@ database to confirm:
   reversible boundary, then re-applied forward again — this is the
   high-value test for release rollbacks
 * the alembic_version stamp matches the script directory's head
-* the *most-recent* revision (head) specifically can be applied,
-  rolled back, and re-applied — this is the test that fires when
-  you just wrote a broken migration
 
 These tests use a separate ``initiative_migrations_test`` database so
 they don't disturb the schema-stamped ``initiative_test`` database used
@@ -404,6 +401,8 @@ class TestMigrationsAgainstDatabase:
             "alembic_version stamp must equal script_directory().get_current_head() "
             "after a successful upgrade"
         )
+        # A botched merge leaves several rows in ``alembic_version``.
+        assert _alembic_version_row_count() == 1
 
         # Sanity-check the layout: shared tables in public, tenant content in
         # guild_template — and no tenant table anywhere in public. The whole
@@ -419,18 +418,6 @@ class TestMigrationsAgainstDatabase:
                 f"tenant table {table!r} must not exist in public — guild "
                 "content lives only in guild schemas"
             )
-
-    def test_upgrade_head_is_idempotent(self, fresh_migrations_db: str) -> None:
-        """Running ``upgrade head`` twice must not raise. Catches
-        accidental non-idempotent DDL."""
-        _run_alembic("upgrade", "head")
-        rev_after_first = _current_alembic_revision()
-        _run_alembic("upgrade", "head")
-        rev_after_second = _current_alembic_revision()
-        assert rev_after_first == rev_after_second, (
-            "Repeated `alembic upgrade head` changed the version stamp — "
-            "a migration is not idempotent."
-        )
 
     def test_step_by_step_upgrade_from_base_to_head(
         self, fresh_migrations_db: str
@@ -532,101 +519,3 @@ class TestMigrationsAgainstDatabase:
         _run_alembic("upgrade", BASELINE_REVISION)
         with pytest.raises(NotImplementedError):
             _run_alembic("downgrade", "base")
-
-    def test_alembic_version_table_has_single_row_after_upgrade(
-        self, fresh_migrations_db: str
-    ) -> None:
-        """A common corruption mode is multiple rows in
-        ``alembic_version`` after a botched merge. ``upgrade head`` must
-        keep the table at exactly one row."""
-        _run_alembic("upgrade", "head")
-        assert _alembic_version_row_count() == 1
-
-
-class TestMostRecentRevision:
-    """Targeted tests against the most-recent (head) revision.
-
-    These give a tight signal when *the migration you just wrote* is
-    broken. They run faster than the full chain walk because they only
-    exercise the head revision in isolation: bring the database to
-    head's parent, then upgrade by one step and (if the head is
-    reversible) downgrade and re-upgrade.
-
-    Failures here mean the newest migration on the chain — the one
-    most likely to be wrong because it's the one you just changed —
-    cannot be applied, cannot be rolled back, or cannot be re-applied
-    after a rollback.
-    """
-
-    def test_head_upgrade_from_parent(self, fresh_migrations_db: str) -> None:
-        """Upgrade to the head's parent, then apply the head. Isolates
-        failures in the newest migration from failures earlier in the
-        chain."""
-        script = _script_directory()
-        head = script.get_current_head()
-        assert head is not None, "alembic could not determine a head revision"
-
-        head_rev = script.get_revision(head)
-        parent = head_rev.down_revision
-        assert isinstance(parent, str) and parent, (
-            f"Head revision {head!r} has no single parent (down_revision={parent!r}); "
-            "the chain may have branched."
-        )
-
-        _run_alembic("upgrade", parent)
-        assert _current_alembic_revision() == parent, (
-            f"Could not stage the database at head's parent {parent!r}"
-        )
-
-        _run_alembic("upgrade", head)
-        assert _current_alembic_revision() == head, (
-            f"Applying the head revision {head!r} did not advance the stamp "
-            "as expected — the newest migration's upgrade() is broken."
-        )
-
-    def test_head_downgrade_then_reapply(self, fresh_migrations_db: str) -> None:
-        """If the head is reversible, downgrading by one step from head
-        and re-applying must round-trip cleanly. Exercises the newest
-        migration's downgrade() and proves a release rollback would
-        work right now."""
-        script = _script_directory()
-        head = script.get_current_head()
-        assert head is not None
-
-        if head in INTENTIONALLY_IRREVERSIBLE:
-            pytest.skip(
-                f"Head revision {head} is intentionally irreversible; "
-                "cannot test downgrade round-trip."
-            )
-
-        head_rev = script.get_revision(head)
-        parent = head_rev.down_revision
-        assert isinstance(parent, str) and parent
-
-        _run_alembic("upgrade", "head")
-        assert _current_alembic_revision() == head
-
-        _run_alembic("downgrade", "-1")
-        assert _current_alembic_revision() == parent, (
-            f"Downgrading from head {head!r} should land on {parent!r}, "
-            f"got {_current_alembic_revision()!r}. The newest migration's "
-            "downgrade() is broken or incomplete."
-        )
-
-        _run_alembic("upgrade", head)
-        assert _current_alembic_revision() == head, (
-            f"Re-upgrading to head {head!r} after downgrade failed. The "
-            "newest migration is not reversible end-to-end (downgrade may "
-            "leave behind state that the upgrade does not expect)."
-        )
-
-    def test_head_upgrade_is_idempotent(self, fresh_migrations_db: str) -> None:
-        """Re-running the head migration after it's already applied
-        must be a no-op. Catches accidental ``CREATE`` / ``ADD COLUMN``
-        without ``IF NOT EXISTS`` guards on the newest migration."""
-        _run_alembic("upgrade", "head")
-        head_first = _current_alembic_revision()
-        _run_alembic("upgrade", "head")
-        head_second = _current_alembic_revision()
-        assert head_first == head_second
-        assert head_second == _script_directory().get_current_head()

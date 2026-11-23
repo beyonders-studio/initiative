@@ -35,13 +35,14 @@ foothold in a guild is a legitimate install with nothing to render.
 
 from __future__ import annotations
 
+import math
 import re
 import string
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from app.core.currencies import CURRENCY_CODES
-from app.core.plugin_scopes import ALL_SCOPES, plugin_scope_target
+from app.core.plugin_scopes import ALL_SCOPES, is_known_scope
 from app.models.platform.plugin_service_registration import PluginAvailability
 from app.services.marketplace import contract, expressions, plugin_api
 from app.services.marketplace.manifest_values import (
@@ -89,7 +90,10 @@ __all__ = [
     "TONES",
     "USE_PERMISSION",
     "WIDGET_BINDABLE_DIRECTIONS",
+    "bundled_dashboards",
+    "bundled_query_tile",
     "declared_permissions",
+    "listing_terms",
     "members_hold",
     "normalize_service_plugin_definition",
     "plugin_widget_type",
@@ -376,6 +380,7 @@ BUTTON_VARIANTS: frozenset[str] = frozenset(
 MAX_CONNECTIONS = contract.cap("connections")
 MAX_FIELDS_PER_CONNECTION = contract.cap("fieldsPerConnection")
 MAX_VENDOR_FIELDS = contract.cap("vendorFields")
+MAX_VENDOR_CHECKS = contract.cap("vendorChecks")
 MAX_GITHUB_APP_PERMISSIONS = contract.cap("githubAppPermissions")
 MAX_GITHUB_APP_EVENTS = contract.cap("githubAppEvents")
 MAX_FLOW_SCOPES = contract.cap("flowScopes")
@@ -432,6 +437,10 @@ MAX_BUNDLED_DASHBOARDS = contract.cap("bundledDashboards")
 MAX_DASHBOARD_WIDGETS = contract.cap("dashboardWidgets")
 MAX_DASHBOARD_GRID_COLUMNS = contract.cap("dashboardGridColumns")
 MAX_DASHBOARD_BINDING_PARAMS = contract.cap("dashboardBindingParams")
+MAX_DASHBOARD_WIDGET_OPTIONS = contract.cap("dashboardWidgetOptions")
+MAX_DASHBOARD_QUERY_LENGTH = contract.cap("dashboardQueryLength")
+#: A tool plug-in's tile reads its data with a query.
+QUERY_SOURCE = "query"
 #: How many values one binding parameter may fix, where the endpoint declared
 #: it takes several.
 MAX_BINDING_PARAM_VALUES = 64
@@ -795,6 +804,8 @@ def _vendor(raw: Any) -> dict[str, Any] | None:
         cleaned["label"] = label
     if vendor.get("setup") is not None:
         cleaned["setup"] = _vendor_setup(vendor["setup"], fields=fields)
+    if vendor.get("check") is not None:
+        cleaned["check"] = _vendor_check(vendor["check"], fields=fields)
     return cleaned
 
 
@@ -873,6 +884,117 @@ def _vendor_setup(raw: Any, *, fields: list[dict[str, Any]]) -> dict[str, Any]:
         "default_events": events,
     }
     return {"kind": setup["kind"], "app": cleaned_app, "values": dict(values)}
+
+
+#: What a vendor check's request may carry: a request with no connection,
+#: no GraphQL and no paging.
+_CHECK_REQUEST_TERMS = frozenset({"method", "url", "query", "headers", "body"})
+
+
+def _vendor_check(raw: Any, *, fields: list[dict[str, Any]]) -> dict[str, Any]:
+    """The call made to the vendor when the vendor values are saved, and the
+    rows its answer is held to. Its JWT is signed with one secret vendor value
+    and issued by vendor values; its rows name declared vendor fields."""
+    what = "service plug-in: vendor.check"
+    check = require_mapping(raw, what)
+    vendor_keys = {field["key"] for field in fields}
+    secret_keys = {field["key"] for field in fields if field["type"] == "secret"}
+    cleaned: dict[str, Any] = {}
+
+    if check.get("sign") is not None:
+        sign = require_mapping(check["sign"], f"{what}.sign")
+        key = sign.get("key")
+        named = (
+            key[len("{vendor.") : -1]
+            if isinstance(key, str) and key.startswith("{vendor.") and key.endswith("}")
+            else None
+        )
+        if named is None or "{" in named or "}" in named:
+            fail(f"{what}.sign.key is one vendor value, '{{vendor.<key>}}'")
+        if named not in vendor_keys:
+            fail(
+                f"{what}.sign.key names {{vendor.{named}}}, which the vendor block does not declare"
+            )
+        if named not in secret_keys:
+            fail(f"{what}.sign.key: {named!r} signs, so it is a secret field")
+        alg = sign.get("alg", "RS256")
+        if alg not in JWT_ALGORITHMS:
+            fail(f"{what}.sign: unknown alg {alg!r}")
+        lifetime = sign.get("lifetime", 60)
+        if (
+            isinstance(lifetime, bool)
+            or not isinstance(lifetime, int)
+            or not 1 <= lifetime <= MAX_TOKEN_LIFETIME_SECONDS
+        ):
+            fail(
+                f"{what}.sign.lifetime must be 1..{MAX_TOKEN_LIFETIME_SECONDS} seconds"
+            )
+        cleaned["sign"] = {
+            "iss": _template(
+                sign.get("iss"),
+                what=f"{what}.sign.iss",
+                vendor_keys=vendor_keys,
+                field_keys=set(),
+            ),
+            "key": key,
+            "alg": alg,
+            "lifetime": lifetime,
+        }
+    if check.get("auth") is not None:
+        if "sign" not in cleaned:
+            fail(
+                f"{what}.auth puts the signed JWT on the request, and there is none without 'sign'"
+            )
+        cleaned["auth"] = _auth(check["auth"])
+    auth_header = (cleaned.get("auth") or {}).get("header", DEFAULT_AUTH_HEADER)
+
+    request = require_mapping(check.get("request"), f"{what}.request")
+    extra = sorted(set(request) - _CHECK_REQUEST_TERMS)
+    if extra:
+        fail(f"{what}.request carries no {', '.join(extra)}")
+    cleaned["request"] = _vendor_request(
+        request,
+        what=f"{what}.request",
+        # Without a signed JWT the request carries no credential, so no
+        # header is Initiative's to set.
+        auth_header=auth_header if "sign" in cleaned else "",
+        connection_ids=None,
+    )
+
+    rows = require_list(check.get("expect"), f"{what}.expect", MAX_VENDOR_CHECKS)
+    if not rows:
+        fail(f"{what}.expect names at least one row")
+    expect: list[dict[str, Any]] = []
+    for index, entry in enumerate(rows):
+        where = f"{what}.expect.{index}"
+        row = require_mapping(entry, where)
+        named_fields = require_list(
+            row.get("fields"), f"{where}.fields", MAX_VENDOR_FIELDS
+        )
+        if not named_fields:
+            fail(f"{where}.fields names at least one vendor field")
+        for field in named_fields:
+            if field not in vendor_keys:
+                fail(
+                    f"{where}.fields names {field!r}, which the vendor block does not declare"
+                )
+        if len(set(named_fields)) != len(named_fields):
+            fail(f"{where}.fields names a field twice")
+        message = localized_text(row.get("message"), MAX_TEXT_LENGTH)
+        if message is None:
+            fail(f"{where}.message is required")
+        cleaned_row: dict[str, Any] = {
+            "holds": _checked(row.get("holds"), what=f"{where}.holds"),
+            "fields": list(named_fields),
+            "message": message,
+        }
+        if row.get("status") is not None:
+            cleaned_row["status"] = _status_match(row["status"], what=f"{where}.status")
+        if row.get("shows") is not None:
+            cleaned_row["shows"] = _checked(row["shows"], what=f"{where}.shows")
+        expect.append(cleaned_row)
+    cleaned["expect"] = expect
+    return cleaned
 
 
 def _template(
@@ -2442,8 +2564,44 @@ def _widget(
     return cleaned
 
 
+def bundled_dashboards(
+    raw: Any,
+    tile: Callable[[Any, str], dict[str, Any]],
+    *,
+    plugin_public_id: str | None,
+    what: str,
+) -> list[dict[str, Any]]:
+    """The dashboards a plug-in ships with itself, each tile checked by
+    ``tile``: a service plug-in's name its widgets and endpoints, a tool
+    plug-in's are queries (:func:`bundled_query_tile`)."""
+    dashboards = [
+        _bundled_dashboard(entry, tile)
+        for entry in require_list(raw, f"{what}: dashboards", MAX_BUNDLED_DASHBOARDS)
+    ]
+    seen_uids: set[str] = set()
+    seen_public_ids: set[str] = set()
+    for dashboard in dashboards:
+        # Checked here as well as by the catalog: these become listing rows
+        # whose identities are unique, and a manifest that collides with
+        # itself would fail halfway through a publish.
+        if dashboard["uid"] in seen_uids:
+            fail(f"{what}: two dashboards share the uid {dashboard['uid']}")
+        if dashboard["public_id"] in seen_public_ids:
+            fail(
+                f"{what}: two dashboards share the public_id {dashboard['public_id']!r}"
+            )
+        if dashboard["public_id"] == plugin_public_id:
+            fail(
+                f"{what}: dashboard {dashboard['uid']} uses the plug-in's own "
+                "public_id; a bundled dashboard is its own listing"
+            )
+        seen_uids.add(dashboard["uid"])
+        seen_public_ids.add(dashboard["public_id"])
+    return dashboards
+
+
 def _bundled_dashboard(
-    raw: Any, *, widget_ids: set[str], readable_ids: set[str]
+    raw: Any, tile: Callable[[Any, str], dict[str, Any]]
 ) -> dict[str, Any]:
     """One dashboard a plug-in ships with itself.
 
@@ -2487,9 +2645,7 @@ def _bundled_dashboard(
     )
 
     widgets = [
-        _bundled_dashboard_widget(
-            widget, widget_ids=widget_ids, readable_ids=readable_ids, what=what
-        )
+        tile(widget, what)
         for widget in require_list(
             entry.get("widgets"), f"{what} widgets", MAX_DASHBOARD_WIDGETS
         )
@@ -2554,6 +2710,12 @@ def _bundled_dashboard_widget(
         "binding": bound,
     }
 
+    return {**cleaned, **_tile_placement(widget, what=what)}
+
+
+def _tile_placement(widget: Mapping[str, Any], *, what: str) -> dict[str, Any]:
+    """A tile's title and where it sits on the grid, as far as it says."""
+    placed: dict[str, Any] = {}
     title = clean_text(
         widget.get("title"),
         what=f"{what} widget title",
@@ -2561,11 +2723,11 @@ def _bundled_dashboard_widget(
         required=False,
     )
     if title is not None:
-        cleaned["title"] = title
+        placed["title"] = title
 
     grid = widget.get("grid")
     if isinstance(grid, dict):
-        placed = {
+        cells = {
             key: _grid_int(
                 grid.get(key),
                 low=0 if key in ("x", "y") else 1,
@@ -2574,9 +2736,66 @@ def _bundled_dashboard_widget(
             )
             for key in ("x", "y", "w", "h")
         }
-        kept = {key: value for key, value in placed.items() if value is not None}
+        kept = {key: value for key, value in cells.items() if value is not None}
         if kept:
-            cleaned["grid"] = kept
+            placed["grid"] = kept
+    return placed
+
+
+def bundled_query_tile(raw: Any, what: str) -> dict[str, Any]:
+    """One tile of a tool plug-in's dashboard: a built-in widget drawing a
+    query. Which widget and which tables the query reads are checked where
+    the plug-in's uid names its tables (``tool_plugins.check_dashboards``);
+    here, that it is a query and nothing else."""
+    widget = require_mapping(raw, f"{what} widget")
+    widget_type = check_identifier(widget.get("type"), what=f"{what} widget type")
+    binding = require_mapping(widget.get("binding"), f"{what} widget binding")
+    sql = binding.get("sql")
+    if set(binding) != {"source", "sql"} or binding.get("source") != QUERY_SOURCE:
+        fail(
+            f"{what}: a tool plug-in has no endpoints, so its tile's binding is "
+            "{'source': 'query', 'sql': ...}"
+        )
+    if not isinstance(sql, str) or not sql.strip():
+        fail(f"{what}: a tile's query is required")
+    if len(sql) > MAX_DASHBOARD_QUERY_LENGTH:
+        fail(
+            f"{what}: a tile's query is at most {MAX_DASHBOARD_QUERY_LENGTH} characters"
+        )
+
+    cleaned: dict[str, Any] = {
+        "id": check_identifier(
+            widget.get("id") or widget_type, what=f"{what} widget id"
+        ),
+        "type": widget_type,
+        **_tile_placement(widget, what=what),
+    }
+    options = widget.get("options")
+    if options is not None:
+        cleaned["options"] = _tile_options(options, what=what)
+    cleaned["binding"] = {"source": QUERY_SOURCE, "sql": sql}
+    return cleaned
+
+
+def _tile_options(raw: Any, *, what: str) -> dict[str, Any]:
+    """A built-in widget's options, each a string, number or boolean. The
+    widget's own check, which knows its options, runs when the dashboard is
+    published."""
+    options = require_mapping(raw, f"{what} widget options")
+    if len(options) > MAX_DASHBOARD_WIDGET_OPTIONS:
+        fail(f"{what}: a tile carries at most {MAX_DASHBOARD_WIDGET_OPTIONS} options")
+    cleaned: dict[str, Any] = {}
+    for key, value in options.items():
+        name = check_identifier(key, what=f"{what} widget option")
+        if isinstance(value, str):
+            value = clean_text(
+                value, what=f"{what} widget option {name}", limit=MAX_PARAM_VALUE_LENGTH
+            )
+        elif not isinstance(value, (bool, int, float)) or (
+            isinstance(value, float) and not math.isfinite(value)
+        ):
+            fail(f"{what}: option {name!r} must be a string, number or boolean")
+        cleaned[name] = value
     return cleaned
 
 
@@ -3280,8 +3499,9 @@ def _requested_scopes(raw: Any, *, where: str) -> list[str]:
     """The scopes a plug-in asks a community to grant, canonically: a
     container's ``service.scopes``, or a declarative plug-in's ``scopes``.
 
-    Absent means none. Each must be in the vocabulary, or a ``plugins:`` scope
-    naming another plug-in's public id, and named once; stored sorted, so
+    Absent means none. Each must be in the vocabulary, a ``plugins:`` scope
+    naming another plug-in's public id, or a tool plug-in's scope, and named
+    once; stored sorted, so
     re-publishing the same manifest produces the same document.
     """
     if raw is None:
@@ -3296,10 +3516,10 @@ def _requested_scopes(raw: Any, *, where: str) -> list[str]:
         # hashable value.
         if not isinstance(entry, str):
             fail(f"service plug-in: {entry!r} is not a scope a plug-in may request")
-        if plugin_scope_target(entry) is not None:
+        if entry not in ALL_SCOPES:
+            if not is_known_scope(entry):
+                fail(f"service plug-in: {entry!r} is not a scope a plug-in may request")
             plugin_scopes += 1
-        elif entry not in ALL_SCOPES:
-            fail(f"service plug-in: {entry!r} is not a scope a plug-in may request")
         if entry in scopes:
             fail(f"service plug-in: {where} names {entry!r} twice")
         scopes.add(entry)
@@ -3418,6 +3638,54 @@ def _check_option_sources(
                     )
 
 
+#: The terms :func:`listing_terms` reads.
+LISTING_TERMS = frozenset(
+    {"help", "default_name", "minimum_age", "availability", "min_plugin_api"}
+)
+
+
+def listing_terms(body: Mapping[str, Any]) -> dict[str, Any]:
+    """What every plug-in carries beside what it does, container, declarative
+    or tool: its help, its starting name, the ages it is for, which
+    communities it reaches, and the oldest plug-in API contract it calls. A
+    term left out, or at its default, is not stored."""
+    cleaned: dict[str, Any] = {}
+    if body.get("help") is not None:
+        cleaned["help"] = _help(body["help"])
+
+    default_name = clean_text(
+        body.get("default_name"),
+        what="service plug-in: default_name",
+        limit=MAX_NAME_LENGTH,
+        required=False,
+    )
+    if default_name is not None:
+        cleaned["default_name"] = default_name
+
+    minimum_age = _minimum_age(body.get("minimum_age"))
+    if minimum_age is not None:
+        cleaned["minimum_age"] = minimum_age
+
+    availability = body.get("availability", PluginAvailability.none.value)
+    if not isinstance(availability, str) or availability not in AVAILABILITIES:
+        fail(
+            "service plug-in: availability must be one of "
+            f"{', '.join(sorted(AVAILABILITIES))}"
+        )
+    if availability != PluginAvailability.none.value:
+        cleaned["availability"] = availability
+
+    # The catalog decides from it whether this deployment serves the version;
+    # kept here so the stored definition still says what its author asked for.
+    try:
+        min_plugin_api = plugin_api.check_min_plugin_api(body.get("min_plugin_api"))
+    except ValueError as exc:
+        fail(f"service plug-in: {exc}")
+    if min_plugin_api is not None:
+        cleaned["min_plugin_api"] = min_plugin_api
+    return cleaned
+
+
 def normalize_service_plugin_definition(
     definition: Any, *, public_id: str | None = None
 ) -> dict[str, Any]:
@@ -3429,6 +3697,8 @@ def normalize_service_plugin_definition(
     for read scopes, at the top of its manifest. One plug-in is never both.
     """
     body = require_mapping(definition, "service plug-in definition")
+    if body.get("tool") is not None:
+        fail("service plug-in: only a tool plug-in declares a tool")
 
     declarative = body.get("service") is None
     service: dict[str, Any] | None = None
@@ -3690,43 +3960,20 @@ def normalize_service_plugin_definition(
         cleaned["settings"] = settings
     if permissions:
         cleaned["permissions"] = permissions
-    if body.get("help") is not None:
-        cleaned["help"] = _help(body["help"])
+    cleaned.update(listing_terms(body))
 
     # After the widgets and endpoints it can name, because every tile is checked
     # against them — the whole point of bundling rather than publishing
     # separately is that this cross-check is possible at all.
-    dashboards = [
-        _bundled_dashboard(entry, widget_ids=widget_ids, readable_ids=readable_ids)
-        for entry in require_list(
-            body.get("dashboards"),
-            "service plug-in: dashboards",
-            MAX_BUNDLED_DASHBOARDS,
-        )
-    ]
+    dashboards = bundled_dashboards(
+        body.get("dashboards"),
+        lambda widget, what: _bundled_dashboard_widget(
+            widget, widget_ids=widget_ids, readable_ids=readable_ids, what=what
+        ),
+        plugin_public_id=plugin_public_id,
+        what="service plug-in",
+    )
     if dashboards:
-        seen_uids: set[str] = set()
-        seen_public_ids: set[str] = set()
-        for dashboard in dashboards:
-            # Checked here as well as by the catalog: these become listing rows
-            # whose identities are unique, and a manifest that collides with
-            # itself would fail halfway through a publish.
-            if dashboard["uid"] in seen_uids:
-                fail(
-                    f"service plug-in: two dashboards share the uid {dashboard['uid']}"
-                )
-            if dashboard["public_id"] in seen_public_ids:
-                fail(
-                    "service plug-in: two dashboards share the public_id "
-                    f"{dashboard['public_id']!r}"
-                )
-            if dashboard["public_id"] == plugin_public_id:
-                fail(
-                    f"service plug-in: dashboard {dashboard['uid']} uses the plug-in's own "
-                    "public_id; a bundled dashboard is its own listing"
-                )
-            seen_uids.add(dashboard["uid"])
-            seen_public_ids.add(dashboard["public_id"])
         cleaned["dashboards"] = dashboards
 
     # After the endpoints, because it names one of them. A summary is a read:
@@ -3745,38 +3992,6 @@ def normalize_service_plugin_definition(
                 "an endpoint this plug-in answers reads on"
             )
         cleaned["community_summary"] = summary_id
-
-    default_name = clean_text(
-        body.get("default_name"),
-        what="service plug-in: default_name",
-        limit=MAX_NAME_LENGTH,
-        required=False,
-    )
-    if default_name is not None:
-        cleaned["default_name"] = default_name
-
-    minimum_age = _minimum_age(body.get("minimum_age"))
-    if minimum_age is not None:
-        cleaned["minimum_age"] = minimum_age
-
-    availability = body.get("availability", PluginAvailability.none.value)
-    if not isinstance(availability, str) or availability not in AVAILABILITIES:
-        fail(
-            "service plug-in: availability must be one of "
-            f"{', '.join(sorted(AVAILABILITIES))}"
-        )
-    if availability != PluginAvailability.none.value:
-        cleaned["availability"] = availability
-
-    # The oldest plug-in API contract the plug-in calls. The catalog decides from
-    # it whether this deployment serves the version; kept here so the stored
-    # definition still says what its author asked for.
-    try:
-        min_plugin_api = plugin_api.check_min_plugin_api(body.get("min_plugin_api"))
-    except ValueError as exc:
-        fail(f"service plug-in: {exc}")
-    if min_plugin_api is not None:
-        cleaned["min_plugin_api"] = min_plugin_api
 
     _check_features(cleaned["features"], cleaned)
     check_json_size(

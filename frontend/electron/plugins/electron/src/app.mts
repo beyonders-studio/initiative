@@ -8,6 +8,7 @@ export {
   nativeImage,
   nativeTheme,
   net,
+  powerMonitor,
   session,
   Tray,
   WebContentsView,

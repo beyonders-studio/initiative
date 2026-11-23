@@ -17,50 +17,37 @@ describe("Markdown", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("wraps code fences instead of letting them widen the container", () => {
+  it("keeps code, tables, links and prose inside the container, beside the caller's classes", () => {
     const { container } = render(
-      <Markdown content={"```\nconst averyveryverylongidentifierwithnospaces = 1;\n```"} />
+      <Markdown
+        content={[
+          "```\nconst averyveryverylongidentifierwithnospaces = 1;\n```",
+          "`inline` and [link](https://example.com)",
+          "| a | b |\n| - | - |\n| 1 | 2 |",
+        ].join("\n\n")}
+        className="line-clamp-2"
+      />
     );
 
     const classes = root(container).className;
+    // Code fences wrap rather than widen the container.
     expect(classes).toContain("[&_pre]:whitespace-pre-wrap");
     expect(classes).toContain("[&_pre]:wrap-break-word");
     expect(classes).toContain("[&_pre]:max-w-full");
     expect(classes).toContain("[&_pre]:overflow-x-auto");
     expect(container.querySelector("pre")).not.toBeNull();
-  });
-
-  it("breaks long inline code, links and prose", () => {
-    const { container } = render(<Markdown content="`inline` and text" />);
-
-    const classes = root(container).className;
+    // Long inline code, links and prose break.
     expect(root(container)).toHaveClass("wrap-break-word", "[&_a:hover]:underline");
     expect(classes).toContain("[&_code]:wrap-break-word");
     expect(classes).toContain("[&_a]:break-all");
     expect(classes).toContain("[&_img]:max-w-full");
-  });
-
-  it("scrolls a wide table instead of widening the container", () => {
-    const { container } = render(<Markdown content={"| a | b |\n| - | - |\n| 1 | 2 |"} />);
-
-    const classes = root(container).className;
+    // A wide table scrolls.
     expect(classes).toContain("[&_table]:overflow-x-auto");
     expect(classes).toContain("[&_table]:max-w-full");
     expect(container.querySelector("table")).not.toBeNull();
-  });
-
-  it("keeps the caller's classes alongside the defaults", () => {
-    const { container } = render(<Markdown content="hello" className="line-clamp-2" />);
-
-    expect(root(container).className).toContain("line-clamp-2");
-    expect(screen.getByText("hello")).toBeInTheDocument();
-  });
-
-  it("does not leak the hast node onto rendered elements", () => {
-    const { container } = render(<Markdown content="[link](https://example.com)" />);
-
-    const anchor = container.querySelector("a");
-    expect(anchor?.getAttribute("node")).toBeNull();
+    expect(classes).toContain("line-clamp-2");
+    // The hast node does not leak onto rendered elements.
+    expect(container.querySelector("a")?.getAttribute("node")).toBeNull();
   });
 
   it("opens a picture full size, paging through the others in reading order", async () => {
@@ -202,6 +189,51 @@ describe("Markdown", () => {
     expect(onChange).toHaveBeenLastCalledWith(content.replace("1) [x]", "1) [ ]"));
     await userEvent.click(quoted);
     expect(onChange).toHaveBeenLastCalledWith(content.replace("> - [ ]", "> - [x]"));
+  });
+
+  it("reads a face that starts with `>` as the face, and a quote as a quote", () => {
+    const { container } = render(
+      <Markdown
+        surface="message"
+        content={">.> sorry\n\n>_<\n>\n> after a face\n\n>quoted\n\n> also quoted"}
+      />
+    );
+
+    const quotes = [...container.querySelectorAll("blockquote")].map((q) => q.textContent?.trim());
+    expect(quotes).toEqual(["after a face", "quoted", "also quoted"]);
+    expect(screen.getByText(">.> sorry")).toBeInTheDocument();
+    expect(screen.getByText(">_<")).toBeInTheDocument();
+  });
+
+  it("keeps a face that markdown would read as emphasis, a strike or an escape", () => {
+    const { container } = render(
+      <Markdown
+        surface="message"
+        content={[
+          "*bold* eh ¯\\_(ツ)_/¯",
+          "*_* and ~_~ and (*^_^*)",
+          "(╯°□°)╯︵ ┻━┻",
+          "[*_* link](https://example.com) `*_*`",
+          "**hello ~_~ [there](https://example.com)**",
+        ].join("\n\n")}
+      />
+    );
+
+    const paragraphs = [...container.querySelectorAll("p")].map((p) => p.textContent);
+    expect(paragraphs).toEqual([
+      "bold eh ¯\\_(ツ)_/¯",
+      "*_* and ~_~ and (*^_^*)",
+      "(╯°□°)╯︵ ┻━┻",
+      "*_* link *_*",
+      "hello ~_~ there",
+    ]);
+    expect(container.querySelector("em")).toHaveTextContent("bold");
+    expect(container.querySelectorAll("em, del")).toHaveLength(1);
+    // Bold around a face keeps its bold, and the link inside it.
+    expect(container.querySelector("strong")).toHaveTextContent("hello ~_~ there");
+    expect(screen.getByRole("link", { name: "there" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "*_* link" })).toBeInTheDocument();
+    expect(container.querySelector("code")).toHaveTextContent("*_*");
   });
 
   it("draws a checklist's boxes in place of its bullets, ticked only where it is edited", () => {

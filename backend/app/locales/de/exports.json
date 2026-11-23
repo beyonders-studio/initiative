@@ -4,16 +4,13 @@
   },
   "footer": {
     "tasks": "Aufgaben-Export",
-    "project": "{{name}} — Projektbericht",
-    "counters": "{{name}} — Zähler-Export"
+    "project": "{{name}} — Projektbericht"
   },
   "summary": {
     "tasks_one": "{{count}} Aufgabe",
     "tasks_other": "{{count}} Aufgaben",
     "items_one": "{{count}} Eintrag",
-    "items_other": "{{count}} Einträge",
-    "counters_one": "{{count}} Zähler",
-    "counters_other": "{{count}} Zähler"
+    "items_other": "{{count}} Einträge"
   },
   "round": "Runde {{round}}",
   "pageOf": "von",
@@ -68,12 +65,7 @@
     "user_id": "Mitglied",
     "notes": "Notizen",
     "order": "#",
-    "status": "Status",
-    "name": "Zähler",
-    "count": "Stand",
-    "min": "Min",
-    "max": "Max",
-    "step": "Schritt"
+    "status": "Status"
   },
   "groups": {
     "empty": {

@@ -40,8 +40,6 @@ from app.testing import (
     create_calendar,
     create_calendar_event,
     create_collection,
-    create_counter,
-    create_counter_group,
     create_file,
     create_guild,
     create_guild_membership,
@@ -57,6 +55,7 @@ from app.testing import (
     create_wiki_page,
     enable_all_tools,
     route_session_to_guild,
+    switch_tools,
 )
 
 # ---------------------------------------------------------------------------
@@ -137,10 +136,7 @@ def _event_filters(a, parent, property_id, value):
 
 
 async def _calendar_in(session, a, initiative):
-    initiative.calendars_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.calendar: True})
     return await create_calendar(session, initiative, a.user)
 
 
@@ -249,22 +245,14 @@ async def test_put_sets_values(
     assert values[text.id] == "alpha"
     assert float(values[number.id]) == 7.5
 
-
-@surfaces
-async def test_put_of_nothing_clears_what_was_there(
-    client: AsyncClient, session: AsyncSession, acting_user, surface: Surface
-):
-    a, parent = await _scene(surface, session, acting_user)
-    entity = await surface.make(session, a, parent, "E")
-    defn = await create_property_definition(
-        session, a.initiative, name="Tag", type=MetadataType.text
+    refused = await _write(
+        client, a, surface, entity, [{"property_id": number.id, "value": "nope"}]
     )
-    await _write(
-        client, a, surface, entity, [{"property_id": defn.id, "value": "seed"}]
-    )
+    assert refused.status_code == 400
+    assert refused.json()["detail"] == "PROPERTY_INVALID_VALUE_FOR_TYPE"
 
+    # A put of nothing clears what was there.
     response = await _write(client, a, surface, entity, [])
-
     assert response.status_code == 200
     assert response.json() == []
     assert await _stored(session, surface, entity) == []
@@ -446,24 +434,6 @@ async def test_an_option_change_is_held_to_its_definition(
 # ---------------------------------------------------------------------------
 # Values are held to their definition
 # ---------------------------------------------------------------------------
-
-
-@surfaces
-async def test_put_refuses_a_value_the_type_cannot_read(
-    client: AsyncClient, session: AsyncSession, acting_user, surface: Surface
-):
-    a, parent = await _scene(surface, session, acting_user)
-    entity = await surface.make(session, a, parent, "E")
-    defn = await create_property_definition(
-        session, a.initiative, name="Count", type=MetadataType.number
-    )
-
-    response = await _write(
-        client, a, surface, entity, [{"property_id": defn.id, "value": "not a number"}]
-    )
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == "PROPERTY_INVALID_VALUE_FOR_TYPE"
 
 
 @pytest.mark.parametrize(
@@ -826,8 +796,8 @@ async def test_list_filters_by_a_selected_option(
 async def test_every_tool_and_its_sub_tools_read_back_what_they_carry(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
-    """Every tool, a counter group's counters and a wiki's pages are written
-    like any other target, and each one's own read returns its values."""
+    """Every tool and a wiki's pages are written like any other target, and
+    each one's own read returns its values."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     await enable_all_tools(session, a.initiative)
     defn = await create_property_definition(session, a.initiative, name="Note")
@@ -850,16 +820,10 @@ async def test_every_tool_and_its_sub_tools_read_back_what_they_carry(
         assert read.status_code == 200, (tool, read.text)
         assert _values(read.json()["properties"]) == {defn.id: tool.value}, tool
 
-    group = await create_counter_group(session, a.initiative, a.user)
-    counter = await create_counter(session, group)
     page = await create_wiki_page(
         session, await create_wiki(session, a.initiative, a.user), a.user
     )
-    await write("counter", counter.id)
     await write("wiki_page", page.id)
-    group_read = await client.get(a.g(f"/counter-groups/{group.id}"), headers=a.headers)
-    [counter_read] = group_read.json()["counters"]
-    assert _values(counter_read["properties"]) == {defn.id: "counter"}
     page_read = await client.get(a.g(f"/wiki-pages/{page.id}"), headers=a.headers)
     assert page_read.status_code == 200, page_read.text
     assert _values(page_read.json()["properties"]) == {defn.id: "wiki_page"}
@@ -885,8 +849,8 @@ async def test_every_tool_and_its_sub_tools_read_back_what_they_carry(
 async def test_a_create_writes_its_values_with_the_row(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
-    """A create carries its values in its own transaction: a counter group and
-    a counter in it come back holding them, and a task naming a person who cannot open
+    """A create carries its values in its own transaction: a wiki and a page
+    in it come back holding them, and a task naming a person who cannot open
     its project is refused whole — no task is left without its values. A
     task's update does the same."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
@@ -896,27 +860,27 @@ async def test_a_create_writes_its_values_with_the_row(
         session, a.initiative, name="Owner", type=MetadataType.user_reference
     )
 
-    group = await client.post(
-        a.g("/counter-groups/"),
+    wiki = await client.post(
+        a.g("/wikis/"),
         headers=a.headers,
         json={
             "initiative_id": a.initiative.id,
-            "name": "Tally",
-            "properties": [{"property_id": note.id, "value": "group"}],
+            "name": "Handbook",
+            "properties": [{"property_id": note.id, "value": "wiki"}],
         },
     )
-    assert group.status_code == 201, group.text
-    assert _values(group.json()["properties"]) == {note.id: "group"}
-    counter = await client.post(
-        a.g(f"/counter-groups/{group.json()['id']}/counters"),
+    assert wiki.status_code == 201, wiki.text
+    assert _values(wiki.json()["properties"]) == {note.id: "wiki"}
+    page = await client.post(
+        a.g(f"/wikis/{wiki.json()['id']}/pages"),
         headers=a.headers,
         json={
-            "name": "First",
-            "properties": [{"property_id": note.id, "value": "counter"}],
+            "title": "First",
+            "properties": [{"property_id": note.id, "value": "page"}],
         },
     )
-    assert counter.status_code == 201, counter.text
-    assert _values(counter.json()["properties"]) == {note.id: "counter"}
+    assert page.status_code == 201, page.text
+    assert _values(page.json()["properties"]) == {note.id: "page"}
 
     outsider = await create_user(session)
     await create_guild_membership(
@@ -1279,8 +1243,8 @@ async def test_purging_an_initiative_takes_every_value_in_it_with_it(
         session, a.initiative, name="Topic", type=MetadataType.text
     )
     await _write(client, a, EVENTS, event, [{"property_id": defn.id, "value": "hold"}])
-    group = await create_counter_group(session, a.initiative, a.user)
-    for row in (group, await create_counter(session, group)):
+    wiki = await create_wiki(session, a.initiative, a.user)
+    for row in (wiki, await create_wiki_page(session, wiki, a.user)):
         await create_property_value(session, row, defn, value_text="hold")
 
     deleted = await client.delete(

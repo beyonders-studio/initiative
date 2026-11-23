@@ -128,6 +128,11 @@ describe("HomePage", () => {
     await user.click(await screen.findByRole("button", { name: "Customize" }));
     await user.click(screen.getByRole("button", { name: "New view" }));
     const picker = await screen.findByRole("dialog", { name: "New view" });
+    // More layouts are a trip to the marketplace away.
+    expect(within(picker).getByRole("link", { name: "Browse the marketplace" })).toHaveAttribute(
+      "href",
+      "/marketplace"
+    );
     await user.click(within(picker).getByRole("button", { name: /assigned work/i }));
 
     await waitFor(() => expect(keptViews(kept)?.views).toHaveLength(2));
@@ -475,7 +480,7 @@ describe("HomePage", () => {
     server.use(
       http.get("/api/v1/me/tools/counts", () =>
         HttpResponse.json({
-          counts: { project: 1, wiki: 1, file: 0, counter_group: 0, calendar: 0, dashboard: 0 },
+          counts: { project: 1, wiki: 1, file: 0, calendar: 0, dashboard: 0 },
         })
       ),
       http.get("/api/v1/me/projects", () => {
@@ -554,7 +559,7 @@ describe("HomePage", () => {
       ...over,
     });
     let bookmarks = [
-      bookmarked({ entity_type: "counter_group", entity_id: 7, name: "Raffle tickets" }),
+      bookmarked({ entity_type: "wiki", entity_id: 7, name: "Raffle tickets" }),
       bookmarked({ entity_type: "project", entity_id: 5, name: "Fete stalls", icon: "🎪" }),
     ];
     const removed: string[] = [];
@@ -578,12 +583,12 @@ describe("HomePage", () => {
     );
     expect(screen.getByRole("link", { name: /raffle tickets/i })).toHaveAttribute(
       "href",
-      "/c/3/i/2/counter-groups/7"
+      "/c/3/i/2/wikis/7"
     );
 
     const [first] = screen.getAllByRole("button", { name: "Remove bookmark" });
     await user.click(first);
-    await waitFor(() => expect(removed).toEqual(["3/counter_group/7"]));
+    await waitFor(() => expect(removed).toEqual(["3/wiki/7"]));
     await waitFor(() =>
       expect(screen.queryByRole("link", { name: /raffle tickets/i })).not.toBeInTheDocument()
     );
@@ -591,13 +596,11 @@ describe("HomePage", () => {
     await user.click(screen.getByRole("button", { name: "Customize" }));
     await user.click(screen.getByRole("button", { name: "Bookmarks settings" }));
     await user.click(await screen.findByRole("combobox", { name: "Tools" }));
-    await user.click(await screen.findByRole("option", { name: "Counters" }));
-    await waitFor(() =>
-      expect(keptLayout(kept).widgets[0].options).toEqual({ tools: ["counter_group"] })
-    );
+    await user.click(await screen.findByRole("option", { name: "Wikis" }));
+    await waitFor(() => expect(keptLayout(kept).widgets[0].options).toEqual({ tools: ["wiki"] }));
     await user.keyboard("{Escape}");
     await user.keyboard("{Escape}");
-    expect(await screen.findByRole("heading", { name: "Bookmarked Counters" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Bookmarked Wikis" })).toBeInTheDocument();
     expect(await screen.findByText(/nothing bookmarked yet/i)).toBeInTheDocument();
   });
 
@@ -605,7 +608,7 @@ describe("HomePage", () => {
     server.use(
       http.get("/api/v1/me/tools/counts", () =>
         HttpResponse.json({
-          counts: { project: 1, file: 0, counter_group: 0, calendar: 0, dashboard: 0 },
+          counts: { project: 1, file: 0, calendar: 0, dashboard: 0 },
         })
       ),
       http.get("/api/v1/me/projects", () => new HttpResponse(null, { status: 500 }))
@@ -685,20 +688,6 @@ describe("HomePage", () => {
         expect(box).toBeDisabled();
       }
     });
-  });
-
-  it("sends the reader to the marketplace for more layouts", async () => {
-    const user = userEvent.setup();
-    keepLayout(comingUpAndCommunities);
-    renderHome();
-
-    await user.click(await screen.findByRole("button", { name: "Customize" }));
-    await user.click(screen.getByRole("button", { name: "New view" }));
-    const picker = await screen.findByRole("dialog", { name: "New view" });
-    expect(within(picker).getByRole("link", { name: "Browse the marketplace" })).toHaveAttribute(
-      "href",
-      "/marketplace"
-    );
   });
 
   it("wears the banner a view was given, while the reader still has it", async () => {

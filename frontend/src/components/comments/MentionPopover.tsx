@@ -4,14 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { SearchSuggestion, UserSummary } from "@/api/generated/initiativeAPI.schemas";
+import { StatusLine } from "@/components/user/ProfileStatus";
 import { useInitiative } from "@/hooks/useInitiatives";
+import { type ReferenceKinds, useReferenceKinds } from "@/hooks/useReferenceKinds";
 import { useCommunityPickerSuggestions } from "@/hooks/useSearch";
 import { type MemberSearchScope, useMemberSearch } from "@/hooks/useUsers";
 import { getInitials } from "@/lib/initials";
 import type { ActiveMention } from "@/lib/mentions";
-import { MENTIONABLE_TYPES } from "@/lib/mentions";
 import { linkableToolTypes } from "@/lib/references";
-import { hitIcon } from "@/lib/searchResults";
 import { getAvatarSrc, getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
 import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
 import { cn } from "@/ui/lib/utils";
@@ -50,6 +50,8 @@ interface Row {
   subtitle: string | null;
   leading: React.ReactNode;
   choose: MentionChoice;
+  /** A person's status, beside their name. */
+  status?: UserSummary["custom_status"];
 }
 
 const memberRow = (member: UserSummary): Row => {
@@ -69,6 +71,7 @@ const memberRow = (member: UserSummary): Row => {
       </Avatar>
     ),
     choose: { user: true, id: member.id, label, member },
+    status: member.custom_status,
   };
 };
 
@@ -80,8 +83,8 @@ const createRow = (name: string, t: TFunction<["comments", "common"]>): Row => (
   choose: { user: false, create: name },
 });
 
-const suggestionRow = (suggestion: SearchSuggestion): Row => {
-  const Icon = hitIcon(suggestion);
+const suggestionRow = (suggestion: SearchSuggestion, kinds: ReferenceKinds): Row => {
+  const Icon = kinds.icon(suggestion.entity_type);
   return {
     key: `${suggestion.entity_type}-${suggestion.entity_id}`,
     label: suggestion.title,
@@ -126,9 +129,11 @@ export const MentionPopover = ({
   // Held across renders, so the rows below are rebuilt only when what they
   // come from changes, and moving through them doesn't start them over.
   const { data: initiative } = useInitiative(inInitiative ? initiativeId : null);
+  const kinds = useReferenceKinds();
   const types = useMemo(
-    () => (active.canCreate ? linkableToolTypes(initiative) : (active.types ?? MENTIONABLE_TYPES)),
-    [active.canCreate, active.types, initiative]
+    (): string[] =>
+      active.canCreate ? linkableToolTypes(initiative) : (active.types ?? kinds.mentionable),
+    [active.canCreate, active.types, initiative, kinds.mentionable]
   );
   // A bare trigger names nothing yet, so the list opens on what was most
   // recently worked on instead of on nothing at all.
@@ -151,14 +156,23 @@ export const MentionPopover = ({
     if (active.user) return (members.data?.items ?? []).map(memberRow);
     const found = suggestions.items
       .filter((suggestion) => !wanted || wanted.includes(suggestion.entity_type))
-      .map(suggestionRow);
+      .map((suggestion) => suggestionRow(suggestion, kinds));
     if (!active.canCreate || !active.query.trim()) return found;
     // `[[ ]]` is the trigger that can make what it cannot find. The option is
     // last, so it never sits where an existing thing was about to be picked.
     const named = active.query.trim().toLowerCase();
     if (found.some((row) => row.label.toLowerCase() === named)) return found;
     return [...found, createRow(active.query.trim(), t)];
-  }, [active.user, active.canCreate, active.query, wanted, members.data, suggestions.items, t]);
+  }, [
+    active.user,
+    active.canCreate,
+    active.query,
+    wanted,
+    members.data,
+    suggestions.items,
+    kinds,
+    t,
+  ]);
 
   const isLoading = active.user
     ? (memberScope !== undefined || inInitiative) && members.isLoading
@@ -260,7 +274,10 @@ export const MentionPopover = ({
           >
             {row.leading}
             <div className="min-w-0 flex-1">
-              <p className="truncate font-medium">{row.label}</p>
+              <div className="flex min-w-0 items-center gap-2">
+                <p className="truncate font-medium">{row.label}</p>
+                <StatusLine status={row.status} className="text-xs" />
+              </div>
               {row.subtitle && (
                 <p className="truncate text-muted-foreground text-xs">{row.subtitle}</p>
               )}

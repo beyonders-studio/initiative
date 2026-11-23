@@ -10,9 +10,9 @@ import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import {
+  ContentKind,
   MetadataType,
   type PropertySummary,
-  PropertyTarget,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { itemSaves } from "@/hooks/useFieldSave";
@@ -41,7 +41,7 @@ const Field = ({
   target,
   ...props
 }: Omit<ComponentProps<typeof PropertiesField<Row, never>>, "saves" | "env"> & {
-  target: PropertyTarget;
+  target: ContentKind;
 }) => {
   const env = usePropertyEnv({
     initiativeId: props.initiativeId ?? null,
@@ -70,7 +70,7 @@ const writes = (answer: PropertySummary[] = []) => {
 const panel = (saved: PropertySummary[], readOnly = false, queryClient?: QueryClient) =>
   renderWithProviders(
     <Field
-      target={PropertyTarget.file}
+      target={ContentKind.file}
       id={10}
       properties={saved}
       readOnly={readOnly}
@@ -152,7 +152,7 @@ describe("a row's properties, saved one at a time", () => {
     // The panel moves to another row: its Retry would add Size there.
     rerender(
       <Field
-        target={PropertyTarget.file}
+        target={ContentKind.file}
         id={11}
         properties={[{ ...status, value: "draft" }]}
         readOnly={false}
@@ -205,7 +205,7 @@ describe("a row's properties, saved one at a time", () => {
   it("names a task's panel for its project's metadata as well", () => {
     renderWithProviders(
       <Field
-        target={PropertyTarget.task}
+        target={ContentKind.task}
         id={10}
         properties={[]}
         readOnly

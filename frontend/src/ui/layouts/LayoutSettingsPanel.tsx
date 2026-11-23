@@ -23,6 +23,7 @@ import type { LayoutNode } from "@/ui/layouts/tree";
 import { listFormat } from "@/ui/lib/intl";
 import {
   COUNTER_DISPLAYS,
+  counterSettings,
   type FieldDisplay,
   type PropertyDefinition,
   SCALE_DISPLAYS,
@@ -97,6 +98,7 @@ export const ListLayoutSettings = ({
   const drawnType = selectedField !== null ? fields.get(selectedField)?.property?.type : undefined;
   const drawn =
     drawnType === MetadataType.scale || drawnType === MetadataType.counter ? drawnType : null;
+  const shownLook = selectedField !== null ? layout.definition.displays?.[selectedField] : null;
   return (
     // Disabled as one, so a save under way leaves every control as it was.
     <fieldset disabled={locked} className="min-w-0">
@@ -150,7 +152,13 @@ export const ListLayoutSettings = ({
       {selectedField !== null && drawn !== null ? (
         <DisplaySetting
           type={drawn}
-          value={layout.definition.displays?.[selectedField] ?? "number"}
+          value={
+            // A look each row reads off its own select field shows as the
+            // field's own, and choosing one draws every row in it.
+            typeof shownLook === "string"
+              ? shownLook
+              : counterSettings(fields.get(selectedField)?.property?.counter).look
+          }
           onChange={(display) => edits.changeDisplay(selectedField, display)}
         />
       ) : null}

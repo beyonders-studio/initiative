@@ -7,11 +7,15 @@ its tool draws: each way it lists what it holds, and its detail.
 Each is drawn as shipped until it is changed, and stored when it is, on its
 own; so is the list the target opens on. A project's lists also hold the
 presets they offer.
+
+A tool plug-in's table is laid out the same way: its lists and its rows' page
+are the ones its plug-in declares, drawn as shipped until they are changed,
+and each change is held to the table's declaration
+(``app.services.marketplace.tool_plugins``).
 """
 
 from __future__ import annotations
 
-import json
 from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -26,6 +30,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.errors import CodedError
 from app.core.messages import TaskTypeMessages, ToolLayoutMessages
+from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.core.tools import (
     DETAIL_LAYOUTS,
     LAYOUT_DEFAULT,
@@ -36,43 +41,52 @@ from app.core.tools import (
     Tool,
 )
 from app.db.advisory_locks import LockNamespace, advisory_lock
-from app.db.session import require_guild_context
+from app.db.session import require_guild_context, routed_tools
+from app.db.tool_rows import locate
 from app.models.tenant.metadata import MetadataDefinition, MetadataType
 from app.models.tenant.task import TaskType
 from app.models.tenant.tool_layout import ToolLayout
 from app.schemas.tenant.tool_layout import (
     ASSIGNEE_ME,
     ASSIGNEE_NONE,
-    MAX_DEFINITION_BYTES,
-    MAX_DEPTH,
-    MAX_NODES,
     MAX_PLUGIN_PARTS,
     PLUGIN_FIELD_PREFIX,
     PROPERTY_FIELD_PREFIX,
+    TOOL_FIELDS,
     CalendarFilterSpec,
     CardPart,
-    CounterDetailFieldId,
     DetailFieldPart,
     DetailLayoutDefinition,
     DetailLayoutRead,
     DetailLayoutWrite,
-    DetailStackPart,
+    DisplayFrom,
     EventDetailFieldId,
     FieldPart,
     FileFieldId,
+    ItemsPart,
     ListLayoutDefinition,
     ListLayoutRead,
     ListLayoutWrite,
     PluginPart,
     PostDetailFieldId,
-    SectionPart,
-    StackPart,
     TaskDetailFieldId,
     TaskFieldId,
     TaskFilterSpec,
     ToolLayoutDefaultWrite,
     ToolLayoutRead,
     ToolLayoutWrite,
+    ToolPluginDetailLayoutRead,
+    ToolPluginLayoutWrite,
+    parts_of,
+    too_large,
+)
+from app.services.marketplace.manifest_values import ListingDefinitionError
+from app.services.marketplace.tool_plugins import (
+    TOOL_LIST_LAYOUTS,
+    TableFields,
+    detail_layout,
+    list_layout,
+    table_fields,
 )
 
 #: The parts any detail lays out with.
@@ -94,7 +108,6 @@ DETAIL_PARTS: dict[str, frozenset[str]] = {
     },
     "calendar_event": _LAYOUT_PARTS
     | {"plugin", "dates", "rsvp", "actions", "relations"},
-    "counter": _LAYOUT_PARTS | {"plugin", "actions", "relations", "count"},
     "post": _LAYOUT_PARTS
     | {
         "plugin",
@@ -115,7 +128,6 @@ DETAIL_PARTS: dict[str, frozenset[str]] = {
 DETAIL_FIELDS: dict[str, frozenset[str]] = {
     "task": frozenset(field.value for field in TaskDetailFieldId),
     "calendar_event": frozenset(field.value for field in EventDetailFieldId),
-    "counter": frozenset(field.value for field in CounterDetailFieldId),
     "post": frozenset(field.value for field in PostDetailFieldId),
     "file": frozenset(field.value for field in FileFieldId),
 }
@@ -184,6 +196,37 @@ class Target:
         object.__setattr__(self, "tool", getattr(self.tool, "value", self.tool))
 
 
+@dataclass(frozen=True)
+class Drawn:
+    """What a target draws: the ways it lists what it holds, in order, those
+    hidden until it shows them, and its details. A tool plug-in's table names
+    its own fields (``table``)."""
+
+    lists: tuple[str, ...]
+    details: tuple[str, ...]
+    hidden_as_shipped: frozenset[str] = frozenset()
+    table: TableFields | None = None
+
+
+def drawn(tool: str, tools: ToolSet = BUILTIN_TOOLS) -> Drawn:
+    """What ``tool`` draws in a community with ``tools``: an Initiative tool's
+    record, or a tool plug-in's table's declaration (its lists, and its rows'
+    page by its kind)."""
+    located = locate(tools, tool)
+    if located is not None:
+        declared = located.declared
+        return Drawn(
+            lists=tuple(entry["kind"] for entry in declared["layouts"]["lists"]),
+            details=(tool,),
+            table=table_fields(located.tool.declaration, declared["key"]),
+        )
+    return Drawn(
+        LIST_LAYOUTS.get(tool, ()),
+        DETAIL_LAYOUTS.get(tool, ()),
+        LISTS_HIDDEN_AS_SHIPPED.get(tool, frozenset()),
+    )
+
+
 def _bad_request(detail: str) -> HTTPException:
     return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
 
@@ -249,15 +292,14 @@ async def item_types_by_instance(
     return found
 
 
-def shown_lists(tool: str, stored: Mapping[str, dict[str, Any]]) -> tuple[str, ...]:
+def shown_lists(target: Drawn, stored: Mapping[str, dict[str, Any]]) -> tuple[str, ...]:
     """The lists a target shows, in order, from the definitions it stores by
     kind: each that its own definition does not hide. As shipped, every list
     shows but those ``LISTS_HIDDEN_AS_SHIPPED`` names."""
-    hidden = LISTS_HIDDEN_AS_SHIPPED.get(tool, frozenset())
     return tuple(
         kind
-        for kind in LIST_LAYOUTS.get(tool, ())
-        if not stored.get(kind, {}).get("hidden", kind in hidden)
+        for kind in target.lists
+        if not stored.get(kind, {}).get("hidden", kind in target.hidden_as_shipped)
     )
 
 
@@ -266,32 +308,37 @@ def _stored_lists(rows: Iterable[ToolLayout]) -> dict[str, dict[str, Any]]:
 
 
 def _require_one_shown(
-    target: Target, rows: list[ToolLayout], kind: str, definition: dict | None
+    target: Drawn, rows: list[ToolLayout], kind: str, definition: dict | None
 ) -> None:
     """A 400 unless the target still shows a list with ``kind`` stored as
     ``definition`` (None: drawn as shipped)."""
-    if kind not in LIST_LAYOUTS.get(target.tool, ()):
+    if kind not in target.lists:
         return
     stored = _stored_lists(rows)
     stored.pop(kind, None)
     if definition is not None:
         stored[kind] = definition
-    if not shown_lists(target.tool, stored):
+    if not shown_lists(target, stored):
         raise _bad_request(ToolLayoutMessages.ONE_LIST_SHOWN)
 
 
 def read_set(
-    tool: str, rows: list[ToolLayout], types: Sequence[TaskType] = ()
+    tool: str,
+    rows: list[ToolLayout],
+    types: Sequence[TaskType] = (),
+    tools: ToolSet = BUILTIN_TOOLS,
 ) -> list[ToolLayoutRead]:
     """Every layout the tool draws, its lists then its details, each as stored
     or as shipped. The target opens on its default list, or on the first. A
     detail laid out per type (:data:`TYPED_DETAILS`) is one per type, in the
-    types' order."""
+    types' order. A tool plug-in's table's are read naming its fields."""
+    target = drawn(tool, tools)
+    names = {TOOL_FIELDS: target.table.names} if target.table is not None else None
     stored = {row.kind: row for row in rows if row.task_type_id is None}
     typed = {row.task_type_id: row for row in rows if row.task_type_id is not None}
-    lists = LIST_LAYOUTS.get(tool, ())
+    lists = target.lists
     # A target shows one list at least, whatever was stored.
-    shown = shown_lists(tool, _stored_lists(rows)) or lists[:1]
+    shown = shown_lists(target, _stored_lists(rows)) or lists[:1]
     chosen = stored.get(LAYOUT_DEFAULT)
     default = chosen.definition.get("kind") if chosen is not None else None
     if default not in shown:
@@ -310,17 +357,22 @@ def read_set(
             kind=kind,
             is_default=kind == default,
             hidden=kind not in shown,
-            definition=ListLayoutDefinition.model_validate(definition(kind)),
+            definition=ListLayoutDefinition.model_validate(
+                definition(kind), context=names
+            ),
             updated_at=when(kind),
         )
         for kind in lists
     ]
-    for kind in DETAIL_LAYOUTS.get(tool, ()):
+    for kind in target.details:
         if TYPED_DETAILS.get(tool) != kind:
+            read = ToolPluginDetailLayoutRead if names else DetailLayoutRead
             layouts.append(
-                DetailLayoutRead(
+                read(
                     kind=kind,
-                    definition=DetailLayoutDefinition.model_validate(definition(kind)),
+                    definition=DetailLayoutDefinition.model_validate(
+                        definition(kind), context=names
+                    ),
                     updated_at=when(kind),
                 )
             )
@@ -341,26 +393,16 @@ def read_set(
     return layouts
 
 
-def _parts(part: Any, depth: int) -> Iterable[tuple[Any, int]]:
-    """Every part in a tree, with its depth."""
-    yield part, depth
-    if isinstance(part, (CardPart, StackPart, DetailStackPart, SectionPart)):
-        for child in part.children:
-            yield from _parts(child, depth + 1)
-
-
 def _within_limits(stored: dict[str, Any], roots: list[Any], loose: int) -> None:
     """Refuse a layout past the node, depth, size or plug-in part limit.
     ``loose`` is the nodes outside any tree (columns)."""
-    parts = [found for root in roots for found in _parts(root, 1)]
-    if (
-        len(parts) + loose > MAX_NODES
-        or max((depth for _, depth in parts), default=0) > MAX_DEPTH
-        or len(json.dumps(stored).encode()) > MAX_DEFINITION_BYTES
-    ):
+    if too_large(stored, roots, loose):
         raise _bad_request(ToolLayoutMessages.TOO_LARGE)
     installs = Counter(
-        part.props.plugin for part, _ in parts if isinstance(part, PluginPart)
+        part.props.plugin
+        for root in roots
+        for part, _ in parts_of(root)
+        if isinstance(part, PluginPart)
     )
     if any(count > MAX_PLUGIN_PARTS for count in installs.values()):
         raise CodedError(
@@ -395,9 +437,42 @@ def _typed(target: Target, kind: str) -> bool:
     return TYPED_DETAILS.get(target.tool) == kind
 
 
-def check(target: Target, write: ToolLayoutWrite) -> dict[str, Any]:
+def _check_plugin(target: Drawn, write: ToolPluginLayoutWrite) -> dict[str, Any]:
+    """A tool plug-in's table's layout as stored, held to its declaration as
+    publishing it was: a list holds what its kind holds, its looks and its
+    presets, and may be hidden. What it leaves out is drawn as shipped."""
+    assert target.table is not None
+    # A null is what a read sends for what a layout leaves out.
+    raw = {key: value for key, value in write.definition.items() if value is not None}
+    try:
+        if write.kind in target.details:
+            return detail_layout(raw, table=target.table, what=write.kind)
+        _require(write.kind, target.lists)
+        held = {TOOL_LIST_LAYOUTS[write.kind], "displays", "presets", "hidden"}
+        if set(raw) - held:
+            raise _bad_request(ToolLayoutMessages.KIND_NOT_ALLOWED)
+        return list_layout(raw, table=target.table, what=write.kind)
+    except ListingDefinitionError:
+        raise _bad_request(ToolLayoutMessages.KIND_NOT_ALLOWED) from None
+
+
+def check(
+    target: Target,
+    write: ToolLayoutWrite | ToolPluginLayoutWrite,
+    tools: ToolSet = BUILTIN_TOOLS,
+) -> dict[str, Any]:
     """A layout's definition as stored, or a 400 naming what is wrong with it.
     What it leaves out is left out, so it is drawn as shipped."""
+    shape = drawn(target.tool, tools)
+    if shape.table is not None:
+        if not isinstance(write, ToolPluginLayoutWrite):
+            write = ToolPluginLayoutWrite(
+                kind=write.kind,
+                definition=write.definition.model_dump(mode="json", exclude_unset=True),
+            )
+        return _check_plugin(shape, write)
+    if isinstance(write, ToolPluginLayoutWrite):
+        raise _bad_request(ToolLayoutMessages.KIND_NOT_ALLOWED)
     definition = write.definition
     # A null is what a read sends for what a layout leaves out, so a layout
     # read and sent back leaves it out too.
@@ -407,7 +482,7 @@ def check(target: Target, write: ToolLayoutWrite) -> dict[str, Any]:
         if value is not None
     }
     if isinstance(write, DetailLayoutWrite):
-        _require(write.kind, DETAIL_LAYOUTS.get(target.tool, ()))
+        _require(write.kind, shape.details)
         if _typed(target, write.kind) != (write.task_type_id is not None):
             raise _bad_request(ToolLayoutMessages.KIND_NOT_ALLOWED)
         assert isinstance(definition, DetailLayoutDefinition)
@@ -418,11 +493,11 @@ def check(target: Target, write: ToolLayoutWrite) -> dict[str, Any]:
         ]
         _within_limits(stored, roots, 0)
         if not all(
-            _drawn_on(part, write.kind) for root in roots for part, _ in _parts(root, 1)
+            _drawn_on(part, write.kind) for root in roots for part, _ in parts_of(root)
         ) or not all(_requireable(write.kind, key) for key in required_keys(stored)):
             raise _bad_request(ToolLayoutMessages.KIND_NOT_ALLOWED)
     else:
-        _require(write.kind, LIST_LAYOUTS.get(target.tool, ()))
+        _require(write.kind, shape.lists)
         assert isinstance(definition, ListLayoutDefinition)
         _check_list_fields(target, write.kind, stored, definition)
         _check_presets(target.tool, write.kind, stored.get("presets") or [])
@@ -457,7 +532,16 @@ def _check_list_fields(
     list holds whether it is shown and what it shows of each file — its table
     its columns, its other lists a card — and how its scales are drawn."""
     cards = [definition.card] if definition.card is not None else []
-    parts = [part for root in cards for part, _ in _parts(root, 1)]
+    parts = [part for root in cards for part, _ in parts_of(root)]
+    # A tint, a preview of items and a look read from the row are a tool
+    # plug-in's, whose rows hold the fields they name.
+    if any(
+        isinstance(part, ItemsPart) or (isinstance(part, CardPart) and part.props)
+        for part in parts
+    ) or any(
+        isinstance(look, DisplayFrom) for look in (definition.displays or {}).values()
+    ):
+        raise _bad_request(ToolLayoutMessages.KIND_NOT_ALLOWED)
     shown = [
         getattr(field, "value", field)
         for field in (
@@ -626,7 +710,7 @@ async def start(
                 definition=stored,
             )
         )
-    _require(default, shown_lists(target.tool, lists))
+    _require(default, shown_lists(drawn(target.tool), lists))
     session.add(
         ToolLayout(
             initiative_id=target.initiative_id,
@@ -675,21 +759,27 @@ async def _require_requireable_properties(
         raise _bad_request(ToolLayoutMessages.KIND_NOT_ALLOWED)
 
 
-async def save(session: AsyncSession, target: Target, write: ToolLayoutWrite) -> None:
+async def save(
+    session: AsyncSession,
+    target: Target,
+    write: ToolLayoutWrite | ToolPluginLayoutWrite,
+) -> None:
     """Change one of the target's layouts, so long as it still shows a list."""
-    definition = check(target, write)
+    tools = routed_tools(session)
+    definition = check(target, write, tools)
     task_type_id = getattr(write, "task_type_id", None)
     await _require_type(session, target, task_type_id)
     await _require_requireable_properties(session, target, write.kind, definition)
     rows = await _locked_rows(session, target)
-    _require_one_shown(target, rows, write.kind, definition)
+    _require_one_shown(drawn(target.tool, tools), rows, write.kind, definition)
     await _keep(session, target, write.kind, definition, task_type_id, rows=rows)
 
 
 async def save_default(session: AsyncSession, target: Target, kind: str) -> None:
     """Open the target on its ``kind`` list, one it shows."""
     rows = await _locked_rows(session, target)
-    _require(kind, shown_lists(target.tool, _stored_lists(rows)))
+    shape = drawn(target.tool, routed_tools(session))
+    _require(kind, shown_lists(shape, _stored_lists(rows)))
     await _keep(session, target, LAYOUT_DEFAULT, {"kind": kind}, rows=rows)
 
 
@@ -701,14 +791,13 @@ async def reset(
 ) -> None:
     """Draw one of the target's layouts as shipped again: for one type of
     item, when it is laid out per type."""
-    _require(
-        kind, LIST_LAYOUTS.get(target.tool, ()) + DETAIL_LAYOUTS.get(target.tool, ())
-    )
+    shape = drawn(target.tool, routed_tools(session))
+    _require(kind, shape.lists + shape.details)
     if _typed(target, kind) != (task_type_id is not None):
         raise _bad_request(ToolLayoutMessages.KIND_NOT_ALLOWED)
     await _require_type(session, target, task_type_id)
     rows = await _locked_rows(session, target)
-    _require_one_shown(target, rows, kind, None)
+    _require_one_shown(shape, rows, kind, None)
     for row in rows:
         if row.kind == kind and row.task_type_id == task_type_id:
             await session.delete(row)
@@ -946,7 +1035,9 @@ async def restore_layouts(
     write of it would be. One that is not, that names a kind its tool does
     not draw, or that is one of a kind's per type without its type, is drawn
     as shipped."""
-    lists = LIST_LAYOUTS.get(target.tool, ())
+    tools = routed_tools(session)
+    shape = drawn(target.tool, tools)
+    lists = shape.lists
     # Two pages for one type (two of the file's types are one here) keep the
     # first.
     restored: set[tuple[str, int | None]] = set()
@@ -959,6 +1050,10 @@ async def restore_layouts(
             if kind == LAYOUT_DEFAULT:
                 stored = ToolLayoutDefaultWrite.model_validate(definition).model_dump()
                 _require(stored["kind"], lists)
+            elif shape.table is not None:
+                stored = _check_plugin(
+                    shape, ToolPluginLayoutWrite(kind=kind, definition=definition)
+                )
             else:
                 write = ListLayoutWrite if kind in lists else DetailLayoutWrite
                 stored = check(

@@ -37,4 +37,29 @@ describe("the calendar's list", () => {
     expect(screen.getByText(/^Okt/)).toBeInTheDocument();
     expect(screen.queryByText("Friday")).toBeNull();
   });
+
+  // An event running past midnight says when it stops rather than filling the
+  // day; one ending at midnight stays on the day it started; a day it runs to
+  // its midnight is "All day".
+  it.each([
+    ["2026-10-24T00:30:00", 2, true, false],
+    ["2026-10-24T00:00:00", 1, false, false],
+    ["2026-10-25T00:00:00", 2, false, true],
+  ])("lists an evening event ending %s", async (endAt, rows, until, allDay) => {
+    const evening: CalendarEntry = {
+      id: "event-2",
+      title: "Game night",
+      startAt: "2026-10-23T18:00:00",
+      endAt,
+      allDay: false,
+      meta: { type: "event", eventId: 2 },
+    };
+    renderWithProviders(
+      <ListView entries={[evening]} focusDate={new Date("2026-10-15T12:00:00")} />
+    );
+
+    expect(await screen.findAllByRole("button")).toHaveLength(rows);
+    expect(Boolean(screen.queryByText(/^Until /))).toBe(until);
+    expect(Boolean(screen.queryByText("All day"))).toBe(allDay);
+  });
 });

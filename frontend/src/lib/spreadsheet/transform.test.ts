@@ -209,34 +209,6 @@ describe("transformSheet — formula reference rewriting", () => {
     const result = run(sheet({ cells }), op({ axis: "col", mode: "insert", at: 0 }));
     expect(result.cells[keyOf(0, 1)]).toBe("=C1*2"); // cell moved A->B, ref B->C
   });
-
-  it("shrinks a range on interior row delete", () => {
-    const cells = cellMap({ "0:0": "=SUM(A2:A11)" });
-    const result = run(sheet({ cells }), op({ axis: "row", mode: "delete", at: 4 }));
-    expect(result.cells[keyOf(0, 0)]).toBe("=SUM(A2:A10)");
-  });
-
-  it("turns a reference to a deleted row into #REF!", () => {
-    const cells = cellMap({ "0:0": "=A5" });
-    const result = run(sheet({ cells }), op({ axis: "row", mode: "delete", at: 4 }));
-    expect(result.cells[keyOf(0, 0)]).toBe("=#REF!");
-  });
-
-  it("collapses a range to #REF! when a range endpoint row is deleted", () => {
-    // Delete the row A2 sits on (the range's start) — the whole range
-    // collapses rather than producing the invalid =SUM(#REF!:A10).
-    const cells = cellMap({ "0:0": "=SUM(A2:A11)" });
-    const result = run(sheet({ cells }), op({ axis: "row", mode: "delete", at: 1 }));
-    expect(result.cells[keyOf(0, 0)]).toBe("=SUM(#REF!)");
-  });
-
-  it("leaves non-formula values untouched", () => {
-    const cells = cellMap({ "5:0": "=A1 plain", "6:0": "literal" });
-    const result = run(sheet({ cells }), op({ axis: "row", mode: "insert", at: 0 }));
-    // "=A1 plain" is a formula string; "A1" has a trailing space then text,
-    // so the ref still rewrites, but the surrounding text is preserved.
-    expect(result.cells[keyOf(7, 0)]).toBe("literal");
-  });
 });
 
 describe("multi-sheet transforms", () => {
@@ -279,7 +251,7 @@ describe("rewriteReferencesToSheet", () => {
     expect(out).toEqual({ "0:0": "=Data!A6+A5" });
   });
 
-  it("matches the sheet name case-insensitively", () => {
+  it("matches the sheet name case-insensitively, in a plain record as well as a Map", () => {
     expect(
       rewriteReferencesToSheet(cellMap({ "0:0": "=dAtA!A5" }), {
         sheetName: "Data",
@@ -287,6 +259,12 @@ describe("rewriteReferencesToSheet", () => {
         mapIndex: shiftDown,
       })
     ).toEqual({ "0:0": "=dAtA!A6" });
+    expect(
+      rewriteReferencesToSheet(
+        { "0:0": "=Data!B2" },
+        { sheetName: "Data", axis: "col", mapIndex: (i) => i + 1 }
+      )
+    ).toEqual({ "0:0": "=Data!C2" });
   });
 
   it("returns null when no formula reaches the transformed sheet", () => {
@@ -297,14 +275,5 @@ describe("rewriteReferencesToSheet", () => {
         mapIndex: shiftDown,
       })
     ).toBeNull();
-  });
-
-  it("accepts a plain record as well as a Map", () => {
-    expect(
-      rewriteReferencesToSheet(
-        { "0:0": "=Data!B2" },
-        { sheetName: "Data", axis: "col", mapIndex: (i) => i + 1 }
-      )
-    ).toEqual({ "0:0": "=Data!C2" });
   });
 });

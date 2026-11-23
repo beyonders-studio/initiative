@@ -1,5 +1,12 @@
 """An initiative's tools and roles, once its community's defaults apply.
 
+Each initiative's own switch for a tool is one of its ``initiative_rules``
+rows: no role, no install, the tool's view key (``Initiative.switched_on``
+holds the keys whose row is on). A tool with no row is off. A tool plug-in's
+tool is one of the community's tools, and its rows are a built-in tool's;
+in an initiative its install is not placed in, it is as a tool switched off
+there, whatever its rows say.
+
 A community may set a tool's switch, and what the built-in member role may
 do, for every initiative in it (``COMMUNITY_DEFAULT_KEYS``, its
 ``initiative_rules`` rows with no initiative); its value stands over the
@@ -14,25 +21,34 @@ does not.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from typing import Any
 
-from sqlalchemy import and_, case, exists, func, not_, or_, select
+from sqlalchemy import and_, case, delete, func, not_, or_, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql.elements import ColumnElement
+from sqlmodel import col
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tool_set import ToolRecord, ToolSet
 from app.core.tools import Tool
 from app.db.guild_standing import ActorContext
 from app.db.session import actor_context
+from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.initiative import (
     BUILTIN_MEMBER_ROLE,
+    BUILTIN_ROLES,
     INITIATIVE_CUSTOM_ROLES,
     INITIATIVE_MEMBER_PREFIX,
-    INITIATIVE_TOOL_KEYS,
+    INITIATIVE_TOOL_PREFIX,
     Initiative,
     InitiativeRoleModel,
     InitiativeRule,
 )
+from app.models.tenant.plugin_placement import PluginPlacement
+from app.models.tenant.resource_grant import ResourceGrant
+from app.models.tenant.tool_layout import ToolLayout
 
 
 def _community(key: str):
@@ -46,7 +62,7 @@ def _community(key: str):
     )
 
 
-def community_switch(context: ActorContext, tool: Tool) -> bool | None:
+def community_switch(context: ActorContext, tool: Tool | ToolRecord) -> bool | None:
     """The switch the community set for ``tool`` in every initiative, or
     ``None`` where each initiative sets its own."""
     if f"{tool.value}=on" in context.community_tools:
@@ -56,36 +72,172 @@ def community_switch(context: ActorContext, tool: Tool) -> bool | None:
     return None
 
 
-def tool_on(context: ActorContext, initiative: Any, tool: Tool) -> bool:
-    """Whether ``tool`` is on in ``initiative``, by the request's standing."""
-    switch = community_switch(context, tool)
-    if switch is None:
-        return bool(getattr(initiative, tool.view_permission))
-    return switch
+def own_switch(initiative: Any, tool: Tool | ToolRecord) -> bool:
+    """Whether ``initiative``'s own switch has ``tool`` on, beneath anything
+    its community set."""
+    return tool.view_permission in (initiative.switched_on or ())
 
 
-async def tool_on_in(session: AsyncSession, initiative: Any, tool: Tool) -> bool:
-    """:func:`tool_on` for a caller holding only a session: by its standing
-    where it has one, and by the community's row where it does not (the
-    system's own reads)."""
-    context = actor_context(session)
-    if context is not None:
-        return tool_on(context, initiative, tool)
-    row, where = _community(INITIATIVE_TOOL_KEYS[tool])
-    switch = await session.scalar(select(row.enabled).where(where))
-    if switch is None:
-        return bool(getattr(initiative, tool.view_permission))
-    return switch
+def switch(context: ActorContext, initiative: Any, tool: Tool | ToolRecord) -> bool:
+    """The switch ``tool`` has in ``initiative``: the community's where it
+    set one, the initiative's own otherwise. A tool plug-in's is read whether
+    or not its install is placed there."""
+    community = community_switch(context, tool)
+    return own_switch(initiative, tool) if community is None else community
 
 
-def tool_on_sql(tool: Tool) -> ColumnElement[bool]:
-    """:func:`tool_on` over ``initiatives`` rows, for a query's filter. The
-    community's row is read once for the statement."""
-    row, where = _community(INITIATIVE_TOOL_KEYS[tool])
-    return func.coalesce(
-        select(row.enabled).where(where).scalar_subquery(),
-        getattr(Initiative, tool.view_permission),
+def switches(asked: Mapping[str, bool], tools: ToolSet) -> dict[ToolRecord, bool]:
+    """Every tool's switch for a new initiative in a community with
+    ``tools``: ``asked`` where it names one by kind, the tool's record
+    otherwise."""
+    return {tool: asked.get(tool.kind, tool.spec.on_by_default) for tool in tools}
+
+
+async def write_switches(
+    session: AsyncSession,
+    initiative_id: int,
+    tools: Mapping[Tool, bool] | Mapping[ToolRecord, bool],
+) -> None:
+    """Set ``initiative_id``'s own switch for each tool in ``tools``, leaving
+    the others as they are."""
+    if not tools:
+        return
+    statement = pg_insert(InitiativeRule).values(
+        [
+            {
+                "initiative_id": initiative_id,
+                "key": tool.view_permission,
+                "enabled": enabled,
+            }
+            for tool, enabled in tools.items()
+        ]
     )
+    await session.exec(
+        statement.on_conflict_do_update(  # type: ignore[call-overload]
+            constraint="uq_initiative_rules_subject",
+            set_={"enabled": statement.excluded.enabled},
+        )
+    )
+
+
+#: Rule rows per INSERT, well under the values a statement binds.
+_RULE_ROWS_PER_INSERT = 1000
+
+
+async def write_installed_tools(session: AsyncSession, tools: ToolSet) -> None:
+    """Give every initiative what it would hold of ``tools``' installed tools
+    had they been there when it was made: each one's switch, on, and each
+    role's keys for it, as ``BuiltinRole.holds`` says (a custom role's as the
+    member role's). Rows already there are kept, so a switch turned off stays
+    off. Every initiative has them, placed or not, so placing the install
+    somewhere later finds them there. Once the community's rules are
+    rendered with ``tools``."""
+    switches = [tool.view_permission for tool in tools.installed]
+    keys = {*switches, *(tool.create_permission for tool in tools.installed)}
+    holds = {role.name: role.holds(tools) for role in BUILTIN_ROLES}
+    member = holds[BUILTIN_MEMBER_ROLE]
+    role = InitiativeRoleModel
+    rows = [
+        (initiative_id, None, key, True)
+        for initiative_id in (await session.exec(select(Initiative.id))).scalars()
+        for key in switches
+    ] + [
+        (initiative_id, role_id, key, enabled)
+        for role_id, initiative_id, name, builtin in await session.exec(
+            select(role.id, role.initiative_id, role.name, role.is_builtin)
+        )
+        for key, enabled in (holds.get(name, member) if builtin else member).items()
+        if key in keys
+    ]
+    columns = ("initiative_id", "initiative_role_id", "key", "enabled")
+    for start in range(0, len(rows), _RULE_ROWS_PER_INSERT):
+        await session.exec(
+            pg_insert(InitiativeRule)
+            .values(
+                [
+                    dict(zip(columns, row))
+                    for row in rows[start : start + _RULE_ROWS_PER_INSERT]
+                ]
+            )
+            .on_conflict_do_nothing(constraint="uq_initiative_rules_subject")
+        )
+
+
+async def forget_tool(session: AsyncSession, kinds: Sequence[str]) -> None:
+    """Delete the rules, grants and layouts naming a tool plug-in's kinds (its
+    own first), whoever wrote them: what a later install's tables would
+    otherwise meet, and what the community's rules rendered without it
+    refuse."""
+    await session.exec(
+        delete(ResourceGrant).where(col(ResourceGrant.resource_type).in_(kinds))
+    )
+    await session.exec(delete(ToolLayout).where(col(ToolLayout.tool).in_(kinds)))
+    await session.exec(
+        delete(InitiativeRule).where(
+            col(InitiativeRule.install_id).is_(None),
+            col(InitiativeRule.key).contains(kinds[0], autoescape=True),
+        )
+    )
+
+
+async def tool_on_in(
+    session: AsyncSession, initiative: Any, tool: Tool | ToolRecord
+) -> bool:
+    """Whether ``tool`` is on in ``initiative``: its :func:`switch` by the
+    session's standing where it has one, and by the community's row where it
+    does not (the system's own reads). A tool plug-in's is also its tool
+    being there for the reader, and its install's placement, as
+    :func:`tool_on_sql` reads it."""
+    context = actor_context(session)
+    if isinstance(tool, ToolRecord) and tool.installed:
+        if context is not None and tool.kind not in context.open_tools:
+            return False
+        return bool(
+            await session.scalar(
+                select(tool_on_sql(tool)).where(Initiative.id == initiative.id)
+            )
+        )
+    if context is not None:
+        return switch(context, initiative, tool)
+    row, where = _community(f"{INITIATIVE_TOOL_PREFIX}{tool.value}")
+    community = await session.scalar(select(row.enabled).where(where))
+    if community is None:
+        return own_switch(initiative, tool)
+    return community
+
+
+def tool_on_sql(tool: Tool | ToolRecord) -> ColumnElement[bool]:
+    """:func:`tool_on_in` over ``initiatives`` rows, for a query's filter. The
+    community's row is read once for the statement. A tool plug-in's is on
+    only where its install is switched on and placed, as the standing's
+    pairs say; its install's state is asked by its rows' own policies."""
+    row, where = _community(f"{INITIATIVE_TOOL_PREFIX}{tool.value}")
+    own = aliased(InitiativeRule)
+    switch = func.coalesce(
+        select(row.enabled).where(where).scalar_subquery(),
+        select(own.key)
+        .where(
+            own.initiative_id == Initiative.id,
+            own.initiative_role_id.is_(None),  # type: ignore[union-attr]
+            own.install_id.is_(None),  # type: ignore[union-attr]
+            own.key == tool.view_permission,
+            own.enabled.is_(True),  # type: ignore[union-attr]
+        )
+        .exists(),
+    )
+    if not (isinstance(tool, ToolRecord) and tool.installed):
+        return switch
+    placed = (
+        select(PluginPlacement.initiative_id)
+        .join(GuildPlugin, col(GuildPlugin.id) == PluginPlacement.install_id)
+        .where(
+            PluginPlacement.initiative_id == Initiative.id,
+            GuildPlugin.listing_uid == tool.listing_uid,
+            col(GuildPlugin.enabled).is_(True),
+        )
+        .exists()
+    )
+    return and_(switch, placed)
 
 
 def member_permission_sql(
@@ -102,7 +254,7 @@ def member_permission_sql(
         and_(
             not_(role.is_builtin),
             not_(role.is_manager),
-            exists().where(custom_roles, off.enabled.is_(False)),  # type: ignore[union-attr]
+            select(off.key).where(custom_roles, off.enabled.is_(False)).exists(),  # type: ignore[union-attr]
         ),
     )
     return case(

@@ -11,9 +11,9 @@ import pytest
 from app.core.messages import MarketplaceMessages
 from app.models.platform.guild import CommunityRole
 from app.testing import (
-    create_counter,
-    create_counter_group,
     create_task,
+    create_wiki,
+    create_wiki_page,
 )
 
 PENDING_URL = "/api/v1/marketplace/local/pending"
@@ -21,21 +21,19 @@ SETTINGS_URL = "/api/v1/marketplace/local/settings"
 MINE_URL = "/api/v1/marketplace/local/mine"
 
 
-async def _counter_group(session, actor, *counts: float):
-    group = await create_counter_group(
-        session, actor.initiative, actor.user, name="Our tally"
-    )
-    for index, count in enumerate(counts):
-        await create_counter(session, group, name=f"Counter {index}", count=count)
-    return group
+async def _wiki(session, actor, pages: int):
+    wiki = await create_wiki(session, actor.initiative, actor.user, name="Our lore")
+    for index in range(pages):
+        await create_wiki_page(session, wiki, actor.user, title=f"Page {index}")
+    return wiki
 
 
 async def _share(client, actor, images=(), **body):
     """Share as the page does: the fields as a form, the pictures as files."""
     fields = {
-        "kind": "counter_group",
-        "name": "Party tally",
-        "description": "Keep score.",
+        "kind": "wiki",
+        "name": "Party lore",
+        "description": "Keep the rules.",
         **body,
     }
     return await client.post(
@@ -53,7 +51,7 @@ async def _share(client, actor, images=(), **body):
 async def _shelf(client, actor) -> list[str]:
     response = await client.get(
         actor.g("/marketplace/listings"),
-        params={"kind": "counter_group"},
+        params={"kind": "wiki"},
         headers=actor.headers,
     )
     assert response.status_code == 200, response.text
@@ -65,9 +63,9 @@ class TestSharing:
         self, client, acting_user, session
     ):
         member = await acting_user(guild_role=CommunityRole.member, initiative=True)
-        group = await _counter_group(session, member, 3, 5)
+        wiki = await _wiki(session, member, 2)
 
-        response = await _share(client, member, entity_id=group.id)
+        response = await _share(client, member, entity_id=wiki.id)
 
         assert response.status_code == 201, response.text
         body = response.json()
@@ -80,14 +78,14 @@ class TestSharing:
     ):
         member = await acting_user(guild_role=CommunityRole.member, initiative=True)
         owner = await acting_user("owner")
-        group = await _counter_group(session, member, 3, 5)
-        uid = (await _share(client, member, entity_id=group.id)).json()["uid"]
+        wiki = await _wiki(session, member, 2)
+        uid = (await _share(client, member, entity_id=wiki.id)).json()["uid"]
 
         pending = await client.get(PENDING_URL, headers=owner.headers)
         assert pending.status_code == 200, pending.text
         [waiting] = [item for item in pending.json() if item["uid"] == uid]
         assert waiting["is_new_listing"] is True
-        assert waiting["definition"]["type"] == "initiative-counter-group"
+        assert waiting["definition"]["type"] == "initiative-wiki"
 
         approved = await client.post(
             f"/api/v1/marketplace/local/{uid}/versions/1.0.0/approve",
@@ -106,8 +104,8 @@ class TestSharing:
     async def test_a_refused_share_is_gone(self, client, acting_user, session):
         member = await acting_user(guild_role=CommunityRole.member, initiative=True)
         owner = await acting_user("owner")
-        group = await _counter_group(session, member, 1)
-        uid = (await _share(client, member, entity_id=group.id)).json()["uid"]
+        wiki = await _wiki(session, member, 1)
+        uid = (await _share(client, member, entity_id=wiki.id)).json()["uid"]
 
         refused = await client.post(
             f"/api/v1/marketplace/local/{uid}/versions/1.0.0/refuse",
@@ -122,8 +120,8 @@ class TestSharing:
 
     async def test_reviewing_is_the_owners(self, client, acting_user, session):
         member = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-        group = await _counter_group(session, member, 1)
-        uid = (await _share(client, member, entity_id=group.id)).json()["uid"]
+        wiki = await _wiki(session, member, 1)
+        uid = (await _share(client, member, entity_id=wiki.id)).json()["uid"]
 
         # A guild admin runs a community, not the deployment's shelf.
         assert (
@@ -140,7 +138,7 @@ class TestSharing:
     ):
         member = await acting_user(guild_role=CommunityRole.member, initiative=True)
         owner = await acting_user("owner")
-        group = await _counter_group(session, member, 2)
+        wiki = await _wiki(session, member, 1)
         switched = await client.put(
             SETTINGS_URL,
             json={"members_publish_directly": True},
@@ -148,7 +146,7 @@ class TestSharing:
         )
         assert switched.status_code == 200, switched.text
 
-        response = await _share(client, member, entity_id=group.id)
+        response = await _share(client, member, entity_id=wiki.id)
 
         assert response.json()["awaiting_review"] is False
         assert response.json()["uid"] in await _shelf(client, member)
@@ -158,8 +156,8 @@ class TestSharing:
     ):
         member = await acting_user(guild_role=CommunityRole.member, initiative=True)
         owner = await acting_user("owner")
-        group = await _counter_group(session, member, 3, 5)
-        uid = (await _share(client, member, entity_id=group.id)).json()["uid"]
+        wiki = await _wiki(session, member, 2)
+        uid = (await _share(client, member, entity_id=wiki.id)).json()["uid"]
         await client.post(
             f"/api/v1/marketplace/local/{uid}/versions/1.0.0/approve",
             headers=owner.headers,
@@ -173,8 +171,8 @@ class TestSharing:
         )
 
         assert response.status_code == 201, response.text
-        assert response.json()["result"]["entity_title"] == "Party tally"
-        assert response.json()["result"]["created"].get("counters") == 2
+        assert response.json()["result"]["entity_title"] == "Party lore"
+        assert response.json()["result"]["created"].get("pages") == 2
 
 
 class TestVersions:
@@ -182,11 +180,11 @@ class TestVersions:
         self, client, acting_user, session
     ):
         member = await acting_user(guild_role=CommunityRole.member, initiative=True)
-        group = await _counter_group(session, member, 1)
-        uid = (await _share(client, member, entity_id=group.id)).json()["uid"]
+        wiki = await _wiki(session, member, 1)
+        uid = (await _share(client, member, entity_id=wiki.id)).json()["uid"]
 
         again = await _share(
-            client, member, entity_id=group.id, listing_uid=uid, name="Renamed"
+            client, member, entity_id=wiki.id, listing_uid=uid, name="Renamed"
         )
 
         assert again.status_code == 201, again.text
@@ -194,17 +192,17 @@ class TestVersions:
         mine = await client.get(MINE_URL, headers=member.headers)
         [listing] = [item for item in mine.json() if item["uid"] == uid]
         # The name is the listing's; a new version does not change it.
-        assert listing["name"] == "Party tally"
+        assert listing["name"] == "Party lore"
         assert listing["pending_versions"] == ["1.0.0", "2.0.0"]
 
     async def test_nobody_else_publishes_a_version_of_it(
         self, client, acting_user, session
     ):
         member = await acting_user(guild_role=CommunityRole.member, initiative=True)
-        group = await _counter_group(session, member, 1)
-        uid = (await _share(client, member, entity_id=group.id)).json()["uid"]
+        wiki = await _wiki(session, member, 1)
+        uid = (await _share(client, member, entity_id=wiki.id)).json()["uid"]
         other = await acting_user(guild_role=CommunityRole.member, initiative=True)
-        theirs = await _counter_group(session, other, 1)
+        theirs = await _wiki(session, other, 1)
 
         response = await _share(client, other, entity_id=theirs.id, listing_uid=uid)
 
@@ -237,10 +235,10 @@ class TestWhatIsShared:
         self, client, acting_user, session
     ):
         owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-        group = await _counter_group(session, owner, 1)
+        wiki = await _wiki(session, owner, 1)
         outsider = await acting_user(guild_role=CommunityRole.member, guild=owner.guild)
 
-        response = await _share(client, outsider, entity_id=group.id)
+        response = await _share(client, outsider, entity_id=wiki.id)
 
         assert response.status_code in (403, 404)
 
@@ -251,8 +249,8 @@ class TestTakingItDown:
     ):
         member = await acting_user(guild_role=CommunityRole.member, initiative=True)
         owner = await acting_user("owner")
-        group = await _counter_group(session, member, 1)
-        uid = (await _share(client, member, entity_id=group.id)).json()["uid"]
+        wiki = await _wiki(session, member, 1)
+        uid = (await _share(client, member, entity_id=wiki.id)).json()["uid"]
         await client.post(
             f"/api/v1/marketplace/local/{uid}/versions/1.0.0/approve",
             headers=owner.headers,
@@ -267,8 +265,8 @@ class TestTakingItDown:
 
     async def test_nobody_else_takes_it_down(self, client, acting_user, session):
         member = await acting_user(guild_role=CommunityRole.member, initiative=True)
-        group = await _counter_group(session, member, 1)
-        uid = (await _share(client, member, entity_id=group.id)).json()["uid"]
+        wiki = await _wiki(session, member, 1)
+        uid = (await _share(client, member, entity_id=wiki.id)).json()["uid"]
         other = await acting_user(guild_role=CommunityRole.member)
 
         response = await client.delete(
@@ -347,12 +345,12 @@ class TestPictures:
         from app.testing import png_bytes
 
         member = await acting_user(guild_role=CommunityRole.member, initiative=True)
-        group = await _counter_group(session, member, 1)
+        wiki = await _wiki(session, member, 1)
 
         shared = await _share(
             client,
             member,
-            entity_id=group.id,
+            entity_id=wiki.id,
             images=[png_bytes(2, 2), png_bytes(3, 3)],
         )
 
@@ -368,10 +366,10 @@ class TestPictures:
         self, client, acting_user, session
     ):
         member = await acting_user(guild_role=CommunityRole.member, initiative=True)
-        group = await _counter_group(session, member, 1)
+        wiki = await _wiki(session, member, 1)
 
         shared = await _share(
-            client, member, entity_id=group.id, images=[b"not a picture"]
+            client, member, entity_id=wiki.id, images=[b"not a picture"]
         )
 
         assert shared.status_code == 422

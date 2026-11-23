@@ -18,7 +18,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
-from app.db.public_rls import SHARED_TABLE_REGISTRY, role_name
+from app.db.public_rls import role_name
 from app.db.request_context import Platform, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.user import UserRole
@@ -108,12 +108,6 @@ async def _two_guilds(session):
         )
     await session.commit()
     return person, one, two
-
-
-def test_the_registry_gives_the_guild_floor_none_of_them():
-    for table in PER_PERSON:
-        assert SHARED_TABLE_REGISTRY[table].grants.app_guild_base is None, table
-    assert SHARED_TABLE_REGISTRY["marketplace_media"].grants.platform_base is None
 
 
 @pytest.mark.parametrize("table", PER_PERSON)

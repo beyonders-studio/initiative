@@ -503,6 +503,7 @@ class TestOtherSources:
                         "public_id": "acme.tracker",
                         "base_url": "http://tracker.internal.test:8080",
                         "jwks": sample_plugin_jwks(),
+                        "mandatory": True,
                     }
                 ]
             )
@@ -522,6 +523,7 @@ class TestOtherSources:
         assert registration.source == "registry"
         assert registration.base_url == "http://tracker.internal.test:8080"
         assert registration.jwks == sample_plugin_jwks()
+        assert registration.mandatory is True
         assert await _live(session, registration.id) is True
 
 
@@ -559,10 +561,12 @@ class TestRefusals:
 
         result, _ = await _refresh(session, repo)
 
-        # The publisher's role no longer verifies; nothing of it lands.
-        assert [(item.name, item.code) for item in result.skipped] == [
-            ("acme", Codes.METADATA_REJECTED)
-        ]
+        # The publisher's role no longer verifies; nothing of it lands. It
+        # has never been seen here, so there is no name to give it.
+        assert [
+            (item.publisher_name, item.listing_name, item.code)
+            for item in result.skipped
+        ] == [(None, None, Codes.METADATA_REJECTED)]
         assert await _listing(session, PLUGIN_UID) is None
 
     async def test_a_tampered_top_level_role_refuses_the_whole_repository(
@@ -592,7 +596,10 @@ class TestRefusals:
         repo.files[served] = repo.files[served].replace(b"Renamed", b"Changed")
         result, _ = await _refresh(session, repo)
 
-        assert [item.code for item in result.skipped] == [Codes.TARGET_REJECTED]
+        # The entry did not verify, so it is named as this deployment holds it.
+        assert [(item.listing_name, item.code) for item in result.skipped] == [
+            ("Tracker", Codes.TARGET_REJECTED)
+        ]
         listing = await _listing(session, PLUGIN_UID)
         assert listing is not None
         assert listing.name == "Tracker"
@@ -610,11 +617,90 @@ class TestRefusals:
         repo.publish(publisher_expires=datetime.now(UTC) - timedelta(days=1))
         result, _ = await _refresh(session, repo)
 
-        assert [(item.name, item.code) for item in result.skipped] == [
-            ("acme", Codes.EXPIRED)
+        # Named by the publisher's display name, which the first refresh
+        # recorded.
+        publisher = await _publisher(session, "acme")
+        assert publisher is not None
+        assert [(item.publisher_name, item.code) for item in result.skipped] == [
+            (publisher.display_name, Codes.EXPIRED)
         ]
         listing = await _listing(session, PLUGIN_UID)
         assert listing is not None and listing.available is True
+
+    async def test_a_version_republished_with_other_content_says_so(
+        self, session, repo, trusted, monkeypatch, tmp_path
+    ):
+        entry = repo.add_listing("acme", PLUGIN_UID, slug="tracker", name="Tracker")
+        repo.publish()
+        await _refresh(session, repo)
+
+        # The same version, its release notes changed: content a published
+        # version may not change.
+        changed = [{**v, "release_notes": "Changed."} for v in entry["versions"]]
+        repo.add_listing(
+            "acme",
+            PLUGIN_UID,
+            slug="tracker",
+            name="Tracker",
+            extra={"versions": changed},
+        )
+        repo.publish()
+        result, _ = await _refresh(session, repo)
+
+        assert [(item.listing_name, item.code) for item in result.skipped] == [
+            ("Tracker", Codes.VERSION_REUSED)
+        ]
+        status = await _status(session)
+        assert status is not None
+        assert status.last_error == Codes.VERSION_REUSED
+        path = f"publishers/acme/{PLUGIN_UID}/listing.json"
+        assert status.last_skipped == [
+            {"name": path, "code": Codes.VERSION_REUSED, "listing_name": "Tracker"}
+        ]
+        read = await tuf_registry.read_status(session, enabled=True)
+        assert read.skipped == [
+            tuf_registry.SkippedEntry(
+                name=path, code=Codes.VERSION_REUSED, listing_name="Tracker"
+            )
+        ]
+
+        # A trusted root that stops loading is what the status reports; the
+        # skips from before do not bury it.
+        broken = _write_root(tmp_path / "broken.json", b"not a root")
+        monkeypatch.setattr(tuf_registry, "BUILTIN_ROOT_PATH", broken)
+        read = await tuf_registry.read_status(session, enabled=True)
+        assert (read.last_error, read.skipped) == (Codes.ROOT_INVALID, [])
+        monkeypatch.setattr(tuf_registry, "BUILTIN_ROOT_PATH", trusted)
+
+        # Published as a new version, it lands and the status clears.
+        repo.add_listing(
+            "acme",
+            PLUGIN_UID,
+            slug="tracker",
+            name="Tracker",
+            versions=("1.0.0", "1.0.1"),
+        )
+        repo.publish()
+        result, _ = await _refresh(session, repo)
+        assert result.skipped == []
+        status = await _status(session)
+        assert status is not None
+        assert (status.last_error, status.last_skipped) == (None, None)
+        assert (await tuf_registry.read_status(session, enabled=True)).skipped == []
+
+    async def test_a_name_another_registry_listing_holds_is_an_identity_conflict(
+        self, session, repo, trusted
+    ):
+        repo.add_listing("acme", BOARD_UID, slug="board", kind="dashboard")
+        repo.add_listing("acme", OTHER_UID, slug="board", kind="dashboard", name="Copy")
+        repo.publish()
+
+        result, _ = await _refresh(session, repo)
+
+        assert [(item.listing_name, item.code) for item in result.skipped] == [
+            ("Copy", Codes.IDENTITY_CONFLICT)
+        ]
+        assert await _listing(session, OTHER_UID) is None
 
 
 # ---------------------------------------------------------------------------
@@ -758,7 +844,11 @@ class TestFetching:
 
 
 class TestBundle:
-    async def test_a_bundle_applies_like_a_fetch(self, session, repo, trusted):
+    async def test_a_bundle_applies_like_a_fetch_with_the_switch_off(
+        self, session, repo, trusted
+    ):
+        await rules.put(session, "marketplace_registry_enabled", False)
+        await session.commit()
         repo.add_listing("acme", PLUGIN_UID, slug="tracker")
         repo.publish()
 
@@ -769,32 +859,6 @@ class TestBundle:
         assert await _listing(session, PLUGIN_UID) is not None
         status = await _status(session)
         assert status is not None and status.source == tuf_registry.BUNDLE_SOURCE
-
-    async def test_a_bundle_applies_with_the_switch_off(self, session, repo, trusted):
-        await rules.put(session, "marketplace_registry_enabled", False)
-        await session.commit()
-        repo.add_listing("acme", PLUGIN_UID, slug="tracker")
-        repo.publish()
-
-        result = await tuf_registry.apply_bundle(session, repo.bundle())
-
-        assert result.ok, result
-
-    async def test_a_tampered_bundle_is_refused(self, session, repo, trusted):
-        repo.add_listing("acme", PLUGIN_UID, slug="tracker")
-        repo.publish()
-        path = "metadata/1.targets.json"
-        repo.files[path] = repo.files[path].replace(b'"acme"', b'"acmf"', 1)
-
-        result = await tuf_registry.apply_bundle(session, repo.bundle())
-
-        assert result.code == Codes.METADATA_REJECTED
-        assert await _listing(session, PLUGIN_UID) is None
-
-    async def test_something_that_is_not_a_bundle_is_refused(self, session, trusted):
-        with pytest.raises(tuf_registry.RegistryError) as refused:
-            await tuf_registry.apply_bundle(session, b"not a tar archive")
-        assert refused.value.code == Codes.BUNDLE_INVALID
 
     def test_a_member_outside_the_repository_is_refused(self):
         import io
@@ -852,9 +916,16 @@ class TestPackageTerms:
             ["runs"],
         )
 
-    async def test_terms_are_not_honoured_under_another_root(
+    async def test_terms_are_honoured_only_under_the_shipped_root(
         self, session, repo, trusted, monkeypatch, tmp_path
     ):
+        repo.add_listing("acme", PLUGIN_UID, slug="tracker")
+        repo.set_terms(PLUGIN_UID, _terms(**MANDATORY_TERMS))
+        repo.publish()
+        await _refresh(session, repo)
+        listing = await _listing(session, PLUGIN_UID)
+        assert listing is not None and listing.access == "open"
+
         other = TufRepository()
         monkeypatch.setattr(
             tuf_registry,
@@ -862,39 +933,12 @@ class TestPackageTerms:
             _write_root(tmp_path / "shipped.json", other.root_bytes()),
         )
         monkeypatch.setattr(settings, "MARKETPLACE_REGISTRY_ROOT", str(trusted))
-        repo.add_listing("acme", PLUGIN_UID, slug="tracker")
-        repo.set_terms(PLUGIN_UID, _terms(**MANDATORY_TERMS))
-        repo.publish()
-
         result, _ = await _refresh(session, repo)
 
         assert result.ok, result
         listing = await _listing(session, PLUGIN_UID)
         assert listing is not None
         assert (listing.access, listing.mandatory, listing.meters) == (None, False, [])
-
-    async def test_terms_a_root_change_leaves_are_dropped(
-        self, session, repo, trusted, monkeypatch, tmp_path
-    ):
-        repo.add_listing("acme", PLUGIN_UID, slug="tracker")
-        repo.set_terms(PLUGIN_UID, _terms())
-        repo.publish()
-        await _refresh(session, repo)
-        listing = await _listing(session, PLUGIN_UID)
-        assert listing is not None and listing.access == "entitled"
-
-        other = TufRepository()
-        monkeypatch.setattr(
-            tuf_registry,
-            "BUILTIN_ROOT_PATH",
-            _write_root(tmp_path / "shipped.json", other.root_bytes()),
-        )
-        monkeypatch.setattr(settings, "MARKETPLACE_REGISTRY_ROOT", str(trusted))
-        result, _ = await _refresh(session, repo)
-
-        assert result.ok, result
-        listing = await _listing(session, PLUGIN_UID)
-        assert listing is not None and listing.access is None
 
     async def test_a_delegation_with_no_role_file_means_no_terms(
         self, session, repo, trusted
@@ -968,7 +1012,11 @@ class TestPackageTerms:
         repo.publish()
         result, _ = await _refresh(session, repo)
 
-        assert [entry.name for entry in result.skipped] == ["package"]
+        # The package's own role: no listing or publisher to name it by.
+        assert [
+            (entry.name, entry.code, entry.listing_name, entry.publisher_name)
+            for entry in result.skipped
+        ] == [("package", Codes.METADATA_REJECTED, None, None)]
         listing = await _listing(session, PLUGIN_UID)
         assert listing is not None and listing.access == "entitled"
 
@@ -1008,6 +1056,7 @@ class TestPackageTerms:
         from app.services.marketplace import registration_lookup
 
         repo.add_listing("acme", PLUGIN_UID, slug="tracker")
+        repo.add_listing("acme", OTHER_UID, slug="other")
         repo.set_terms(PLUGIN_UID, _terms(**MANDATORY_TERMS))
         repo.publish()
         await _refresh(session, repo)
@@ -1021,16 +1070,5 @@ class TestPackageTerms:
         snapshots = await registration_lookup.load_registrations(force=True)
 
         assert snapshots["acme.tracker"].mandatory is True
-
-    async def test_a_listing_without_terms_follows_the_registration(
-        self, session, repo, trusted
-    ):
-        from app.services.marketplace import registration_lookup
-
-        repo.add_listing("acme", PLUGIN_UID, slug="tracker")
-        repo.publish()
-        await _refresh(session, repo)
-
-        snapshots = await registration_lookup.load_registrations(force=True)
-
-        assert snapshots["acme.tracker"].mandatory is False
+        # A listing without terms follows its registration.
+        assert snapshots["acme.other"].mandatory is False

@@ -9,12 +9,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import {
-  EntityType,
-  PermissionKey,
-  PropertyTarget,
-  Tool,
-} from "@/api/generated/initiativeAPI.schemas";
+import { ContentKind, Tool } from "@/api/generated/initiativeAPI.schemas";
+import records from "@/api/generated/tools.json";
 import { TOOL_SKETCHES } from "@/components/initiatives/ToolSkeletons";
 import { EXTRA_PERMISSION_KEYS } from "@/hooks/useInitiativeRoles";
 
@@ -27,14 +23,11 @@ import trash from "../../public/locales/en/trash.json";
 import { PALETTE_TOOLS, TOOL_PALETTE } from "./toolPalette";
 import { TOOL_HAS_DETAIL } from "./toolRows";
 import {
-  counterRoute,
   entityRefRoute,
   eventRoute,
-  INITIATIVES_ROUTE,
   initiativeRoute,
   NO_RELATIONS_PANEL,
-  NON_EXPORTABLE_TOOLS,
-  PARENT_TOOL,
+  SHARED_LAYOUT_TOOLS,
   SIDEBAR_TOOLS,
   singularOf,
   TOOL_ICONS,
@@ -107,22 +100,18 @@ describe("tool registry", () => {
     expect([...SIDEBAR_TOOLS].sort()).toEqual([...TOOLS].sort());
   });
 
-  it("derives the exact permission keys the API exposes", () => {
+  it("derives the exact permission keys the backend names", () => {
     const derived = [
       ...TOOLS.flatMap((tool) => [toolViewPermission(tool), toolCreatePermission(tool)]),
       ...EXTRA_PERMISSION_KEYS,
     ];
-    expect(derived.sort()).toEqual(Object.values(PermissionKey).sort());
+    expect(derived.sort()).toEqual([...records.permission_keys].sort());
   });
 
-  it("every tool is a trash entity type with a label", () => {
-    const trashTypes = Object.values(EntityType) as string[];
+  it("every tool has a trash label", () => {
     const labels = trash.entityType as Record<string, string>;
     for (const tool of TOOLS) {
-      expect(trashTypes, `missing EntityType for ${tool}`).toContain(tool);
-    }
-    for (const entityType of trashTypes) {
-      expect(labels[entityType], `missing trash.json entityType.${entityType}`).toBeTruthy();
+      expect(labels[tool], `missing trash.json entityType.${tool}`).toBeTruthy();
     }
   });
 });
@@ -272,25 +261,25 @@ describe("tool routes", () => {
   });
 
   it("pluralizes and singularizes by one rule, not by adding or chopping an s", () => {
-    expect(toolPlural(Tool.counter_group)).toBe("counter_groups");
-    expect(toolRouteSegment(Tool.counter_group)).toBe("counter-groups");
-    expect(toolCamelPlural(Tool.counter_group)).toBe("counterGroups");
-    expect(toolPascalPlural(Tool.counter_group)).toBe("CounterGroups");
+    // An underscore in a tool's name, as a child kind has one.
+    const twoWords = "calendar_event" as Tool;
+    expect(toolPlural(twoWords)).toBe("calendar_events");
+    expect(toolRouteSegment(twoWords)).toBe("calendar-events");
+    expect(toolCamelPlural(twoWords)).toBe("calendarEvents");
+    expect(toolPascalPlural(twoWords)).toBe("CalendarEvents");
     expect(toolPlural("calendar_entry" as Tool)).toBe("calendar_entries");
     expect(singularOf("calendar_entries")).toBe("calendar_entry");
-    expect(singularOf("counter_groups")).toBe("counter_group");
+    expect(singularOf("calendar_events")).toBe("calendar_event");
     expect(singularOf("tasks")).toBe("task");
-  });
-
-  it("derives the route param name from the enum", () => {
-    expect(toolCamelSingular(Tool.counter_group)).toBe("counterGroup");
+    expect(toolCamelSingular(Tool.calendar)).toBe("calendar");
+    expect(toolCamelSingular("calendar_event" as Tool)).toBe("calendarEvent");
   });
 });
 
 describe("tool route builders", () => {
   it("addresses a tool entity inside its initiative", () => {
-    expect(toolListRoute(Tool.counter_group, 12)).toBe("/i/12/counter-groups");
-    expect(toolDetailRoute(Tool.counter_group, 12, 3)).toBe("/i/12/counter-groups/3");
+    expect(toolListRoute(Tool.wiki, 12)).toBe("/i/12/wikis");
+    expect(toolDetailRoute(Tool.wiki, 12, 3)).toBe("/i/12/wikis/3");
     expect(toolSettingsRoute(Tool.project, 1, 7)).toBe("/i/1/projects/7/settings");
   });
 
@@ -321,15 +310,8 @@ describe("tool route builders", () => {
     expect(taskRoute(1, 2, 5)).toBe("/i/1/projects/2/tasks/5");
     expect(eventRoute(1, 2, 9)).toBe("/i/1/calendars/2/events/9");
     expect(eventRoute(null, 2, 9)).toBe("/calendars/2/events/9");
-    expect(counterRoute(1, 3, 7)).toBe("/i/1/counter-groups/3/counter/7");
-  });
-
-  it("names the initiative tree", () => {
-    expect(INITIATIVES_ROUTE).toBe("/i");
     expect(initiativeRoute(4)).toBe("/i/4");
-  });
-
-  it("routes a bare id through the resolver", () => {
+    // A bare id goes through the resolver.
     expect(entityRefRoute("file", 42)).toBe("/go/file/42");
   });
 });
@@ -359,26 +341,9 @@ describe("tool relations", () => {
     const wired = toolsWithRelationsPanel();
     const missing = TOOLS.filter((tool) => !NO_RELATIONS_PANEL.has(tool) && !wired.has(tool));
     expect(missing, `no ToolRelationsPanel wired for ${missing.join(", ")}`).toEqual([]);
-  });
-
-  it("does not wire a panel for a tool that opted out", () => {
-    const wired = toolsWithRelationsPanel();
     for (const tool of NO_RELATIONS_PANEL) {
       expect(wired.has(tool), `${tool} opted out of relations but renders a panel`).toBe(false);
     }
-  });
-
-  it("names a parent tool for every entity that is not one", () => {
-    // A link is cached against a tool, so a child entity has to say which one
-    // answers for it — otherwise a write leaves the container's copy stale.
-    expect(Object.values(PARENT_TOOL).every((tool) => TOOLS.includes(tool))).toBe(true);
-    expect(Object.keys(PARENT_TOOL).sort()).toEqual([
-      "calendar_event",
-      "collection",
-      "counter",
-      "task",
-      "wiki_page",
-    ]);
   });
 });
 
@@ -386,25 +351,25 @@ describe("tool properties", () => {
   it("every tool and sub-tool has somewhere its properties are set", () => {
     const set = new Set<string>();
     for (const source of Object.values(componentSources)) {
-      for (const [, target] of source.matchAll(/propertySaves\[PropertyTarget\.(\w+)\]/g)) {
+      for (const [, target] of source.matchAll(/propertySaves\[ContentKind\.(\w+)\]/g)) {
         set.add(target);
       }
     }
     // An item's page saves them with the item's own save kind.
     for (const source of Object.values(hookSources)) {
-      for (const [, target] of source.matchAll(/properties: PropertyTarget\.(\w+)/g)) {
+      for (const [, target] of source.matchAll(/properties: ContentKind\.(\w+)/g)) {
         set.add(target);
       }
     }
     // A tool's are on its settings page, which every tool shares.
     if (
       componentSources["../pages/community/tools/settings/DetailsPage.tsx"].includes(
-        "propertySaves[PropertyTarget[tool]]"
+        "propertySaves[ContentKind[tool]]"
       )
     ) {
       for (const tool of TOOLS) set.add(tool);
     }
-    const missing = Object.values(PropertyTarget).filter((target) => !set.has(target));
+    const missing = Object.values(ContentKind).filter((target) => !set.has(target));
     expect(missing, `nowhere sets the properties of ${missing.join(", ")}`).toEqual([]);
   });
 });
@@ -432,32 +397,23 @@ describe("tool surfaces are wired, not just typed", () => {
   });
 });
 
-describe("tool exports", () => {
-  it("every bulk-export tool has a format source, and only those", async () => {
-    const { fileTypeFormats, TOOL_EXPORT_FORMATS } = await import("@/components/exports/formats");
-    const { FileType } = await import("@/api/generated/initiativeAPI.schemas");
-    const { BULK_EXPORT_TOOLS } = await import("./tools");
+describe("tool layouts", () => {
+  // The records say which tools the whole initiative shares one page of; each
+  // needs its detail (and presets, where its list has them) drawn here.
+  it("every shared-layout tool has its layouts drawn", async () => {
+    const { SHARED_LAYOUTS } = await import("@/components/layouts/details");
+    expect(Object.keys(SHARED_LAYOUTS).sort()).toEqual([...SHARED_LAYOUT_TOOLS].sort());
+  });
+});
 
-    for (const tool of BULK_EXPORT_TOOLS) {
-      // Files are per-type (their format set depends on the selection);
-      // every file type must offer at least one engine format.
-      if (tool === Tool.file) continue;
-      expect(
-        TOOL_EXPORT_FORMATS[tool]?.length,
-        `missing TOOL_EXPORT_FORMATS[${tool}]`
-      ).toBeGreaterThan(0);
-    }
+describe("tool exports", () => {
+  // Files are per-type (their format set depends on the selection); every
+  // file type must offer at least one engine format.
+  it("every file type has a format", async () => {
+    const { fileTypeFormats } = await import("@/components/exports/formats");
+    const { FileType } = await import("@/api/generated/initiativeAPI.schemas");
     for (const type of Object.values(FileType)) {
       expect(fileTypeFormats(type).length, `missing formats for ${type}`).toBeGreaterThan(0);
-    }
-    // Exact coverage: a formats entry for a non-export tool is drift too.
-    for (const tool of TOOLS) {
-      if (NON_EXPORTABLE_TOOLS.has(tool) && tool !== Tool.file) {
-        expect(
-          TOOL_EXPORT_FORMATS[tool],
-          `${tool} declares formats but is in NON_EXPORTABLE_TOOLS`
-        ).toBeUndefined();
-      }
     }
   });
 });
@@ -523,12 +479,9 @@ describe("tool imports", () => {
 });
 
 describe("toolInPath", () => {
-  it("reads the tool and id a path is inside", () => {
-    expect(toolInPath("/c/1/i/2/counter-groups/3")).toEqual({ tool: Tool.counter_group, id: 3 });
+  it("reads the outermost tool and id a path is inside, so what it holds and its settings name it", () => {
+    expect(toolInPath("/c/1/i/2/wikis/3")).toEqual({ tool: Tool.wiki, id: 3 });
     expect(toolInPath("/c/1/calendars/5")).toEqual({ tool: Tool.calendar, id: 5 });
-  });
-
-  it("reads the outermost tool, so what it holds and its settings name it", () => {
     expect(toolInPath("/c/1/i/2/projects/3/tasks/5")).toEqual({ tool: Tool.project, id: 3 });
     expect(toolInPath("/c/1/i/2/wikis/4/files/8")).toEqual({ tool: Tool.wiki, id: 4 });
     expect(toolInPath("/c/1/i/2/dashboards/6/settings/access")).toEqual({

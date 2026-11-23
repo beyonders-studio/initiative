@@ -55,7 +55,7 @@ from app.api.v1.platform_endpoints.session_opening import (
 )
 from app.core import audit_context, auth_context, usernames
 from app.core.audit_events import AuditEventType
-from app.core.config import API_V1_STR, is_device, settings
+from app.core.config import API_V1_STR, install_id, is_device, settings
 from app.core.encryption import (
     SALT_EMAIL,
     SALT_OIDC_CLIENT_SECRET,
@@ -909,6 +909,7 @@ async def refresh_access_token(
         raw_refresh_token=raw,
         user_agent=audit_context.client_user_agent(),
         ip=audit_context.client_ip(),
+        install_id=install_id(request),
         idle=timedelta(seconds=(payload.idle_seconds or 0) if payload else 0),
     )
     if result.outcome is RefreshOutcome.REUSED and result.user_id is not None:
@@ -923,6 +924,9 @@ async def refresh_access_token(
             target_user_id=result.user_id,
             target_type="user",
             target_id=result.user_id,
+            # How the renewal it was spent on went, which the security rules
+            # grade it by.
+            detail=result.replay.as_detail() if result.replay is not None else None,
         )
     # The name the replacement token will carry, in the rotation's own
     # transaction. The raw refresh secret the rotation mints exists only in

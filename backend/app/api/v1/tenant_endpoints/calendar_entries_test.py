@@ -13,6 +13,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import recurrence
 from app.core.messages import CalendarEventMessages
+from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
 from app.testing import (
     create_calendar,
@@ -23,6 +24,7 @@ from app.testing import (
     create_project,
     create_task,
     get_auth_headers,
+    switch_tools,
 )
 from app.testing.factories import (
     create_guild,
@@ -38,10 +40,7 @@ WINDOW_END = (NOW + timedelta(days=30)).isoformat()
 
 async def _enable_events(session: AsyncSession, initiative, creator):
     """Enable the calendars tool and return a calendar to hang events off."""
-    initiative.calendars_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.calendar: True})
     return await create_calendar(session, initiative, creator)
 
 
@@ -212,9 +211,7 @@ async def test_guild_entries_include_flags_skip_legs(
     assert only_events.json()["projects"] == []
     assert only_events.json()["polls"] == []
 
-    a.initiative.posts_enabled = True
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.post: True})
     ending = await create_project(session, a.initiative, a.user, end_date=NOW.date())
     await create_project(
         session, a.initiative, a.user, start_date=(NOW + timedelta(days=60)).date()
@@ -419,8 +416,8 @@ async def test_guild_scope_returns_every_guild_calendar_s_events(
 async def test_me_entries_aggregate_across_guilds(
     client: AsyncClient, session: AsyncSession, monkeypatch
 ):
-    """Entries from every guild, narrowed by ``guild_ids``; the guilds share
-    one budget of repeating occurrences."""
+    """Entries from every guild in the window, narrowed by ``guild_ids``; the
+    guilds share one budget of repeating occurrences."""
     user = await create_user(session, email="cal-me@example.com")
     g1, _i1, p1, cal1 = await _guild_with_project(session, user, name="Alpha")
     g2, _i2, p2, cal2 = await _guild_with_project(session, user, name="Beta")
@@ -434,6 +431,11 @@ async def test_me_entries_aggregate_across_guilds(
     )
     task1 = await create_task(session, p1, due_date=NOW, assignees=[user])
     task2 = await create_task(session, p2, due_date=NOW, assignees=[user])
+    # The window travels as start_after/start_before, not as a filter the
+    # cross-guild task path would drop.
+    out_window = await create_task(
+        session, p1, due_date=NOW + timedelta(days=400), assignees=[user]
+    )
 
     headers = get_auth_headers(user)
     response = await client.get(
@@ -449,6 +451,21 @@ async def test_me_entries_aggregate_across_guilds(
     task_keys = {(t["community_id"], t["id"]) for t in body["tasks"]}
     assert {(g1.id, event1.id), (g2.id, event2.id)} <= event_keys
     assert {(g1.id, task1.id), (g2.id, task2.id)} <= task_keys
+    assert (g1.id, out_window.id) not in task_keys
+
+    # The window is required, and bounded.
+    missing = await client.get("/api/v1/me/calendar-entries", headers=headers)
+    assert missing.status_code == 422
+    too_wide = await client.get(
+        "/api/v1/me/calendar-entries",
+        headers=headers,
+        params={
+            "start_after": WINDOW_START,
+            "start_before": (NOW + timedelta(days=400)).isoformat(),
+        },
+    )
+    assert too_wide.status_code == 422
+    assert too_wide.json()["detail"] == CalendarEventMessages.WINDOW_INVALID
 
     # guild_ids narrows to a single guild.
     narrowed = await client.get(
@@ -480,46 +497,3 @@ async def test_me_entries_aggregate_across_guilds(
         else:
             assert bounded.status_code == 422, bounded.text
             assert bounded.json()["detail"] == CalendarEventMessages.WINDOW_TOO_FULL
-
-
-async def test_me_entries_windows_tasks_by_params(
-    client: AsyncClient, session: AsyncSession
-):
-    """The cross-guild task path applies only extracted scalar filters, so the
-    calendar window can only travel as start_after/start_before — assert it
-    excludes an out-of-window task rather than returning every assigned task."""
-    user = await create_user(session, email="cal-me-window@example.com")
-    _g, _i, project, _cal = await _guild_with_project(session, user, name="Gamma")
-
-    in_window = await create_task(session, project, due_date=NOW, assignees=[user])
-    out_window = await create_task(
-        session, project, due_date=NOW + timedelta(days=400), assignees=[user]
-    )
-
-    headers = get_auth_headers(user)
-    response = await client.get(
-        "/api/v1/me/calendar-entries",
-        headers=headers,
-        params={
-            "start_after": WINDOW_START,
-            "start_before": WINDOW_END,
-            "include_events": "false",
-        },
-    )
-    assert response.status_code == 200, response.text
-    task_ids = {t["id"] for t in response.json()["tasks"]}
-    assert in_window.id in task_ids
-    assert out_window.id not in task_ids
-
-    missing = await client.get("/api/v1/me/calendar-entries", headers=headers)
-    assert missing.status_code == 422
-    too_wide = await client.get(
-        "/api/v1/me/calendar-entries",
-        headers=headers,
-        params={
-            "start_after": WINDOW_START,
-            "start_before": (NOW + timedelta(days=400)).isoformat(),
-        },
-    )
-    assert too_wide.status_code == 422
-    assert too_wide.json()["detail"] == CalendarEventMessages.WINDOW_INVALID

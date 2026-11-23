@@ -274,12 +274,40 @@
     "empty": "Sag, was du gerade machst",
     "edit": "Dein Status",
     "set": "Status setzen",
-    "help": "Ein Emoji, eine Zeile oder beides. Alle, die dein Profil öffnen, sehen es.",
+    "help": "Ein Emoji, eine Zeile oder beides. Andere sehen es neben deinem Namen.",
     "placeholder": "Was machst du gerade?",
     "emojiPlaceholder": "Emoji",
-    "save": "Status setzen",
-    "clear": "Löschen",
-    "failed": "Dieser Status konnte nicht gespeichert werden."
+    "save": "Speichern",
+    "clear": "Status löschen",
+    "failed": "Dieser Status konnte nicht gespeichert werden.",
+    "erase": "Löschen",
+    "until": "Bis {{time}}",
+    "suggestions": "Vorschläge",
+    "suggestion": {
+      "meeting": "In einem Meeting",
+      "commuting": "Unterwegs",
+      "sick": "Krank",
+      "vacation": "Im Urlaub",
+      "remote": "Im Homeoffice"
+    },
+    "clearAfter": {
+      "label": "Löschen nach",
+      "never": "Nicht löschen",
+      "30m": "30 Minuten",
+      "1h": "1 Stunde",
+      "4h": "4 Stunden",
+      "today": "Heute",
+      "week": "Diese Woche",
+      "custom": "Datum und Uhrzeit wählen"
+    },
+    "pause": {
+      "label": "Benachrichtigungen pausieren",
+      "help": "Bis dein Status endet. Die Glocke sammelt weiter, und du bekommst am Ende eine Zusammenfassung.",
+      "running": "Pausiert bis {{time}}.",
+      "needsEnd": "Wähle, wann dein Status endet, um bis dahin zu pausieren.",
+      "failed": "Benachrichtigungen konnten nicht pausiert werden.",
+      "tooLong": "Eine Pause dauert höchstens {{count}} Tage. Wähle ein früheres Ende, um bis dahin zu pausieren."
+    }
   },
   "communities": {
     "title": "Communitys"

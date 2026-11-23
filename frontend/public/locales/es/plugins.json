@@ -12,10 +12,11 @@
     "disabled": "Desactivada",
     "enable": "Activar",
     "disable": "Desactivar",
-    "rename": "Cambiar el nombre",
     "remove": "Quitar",
     "removeTitle": "¿Quitar {{name}}?",
     "removeBody": "Lo que haya creado pasa a la papelera, desde donde aún puede restaurarse. Se borran todas las credenciales que tenía —las de la comunidad y las de cada miembro— y se le pide al complemento que deje de usarlas.",
+    "removeToolBody": "Su herramienta desaparece ahora de todas las iniciativas. En 30 días se borra para siempre todo lo que contiene: sus elementos y los comentarios, enlaces, etiquetas y permisos que tengan. Vuelve a añadir el complemento antes para recuperarlo todo.",
+    "removeTool": "Quitar y borrar en 30 días",
     "removed": "{{name}} quitada.",
     "removeAndErase": "Quitar y borrar",
     "erase": "Borrar también sus datos",
@@ -23,7 +24,6 @@
     "saved": "Guardado.",
     "needsConfig": "Falta configurarla",
     "configInvalid": "Problema de configuración",
-    "provided": "Viene con Initiative",
     "unavailable": "No está configurada en este servidor",
     "readOnly": "Solo lectura",
     "configure": "Abrir los ajustes",
@@ -43,6 +43,13 @@
   "updates": {
     "wants": "La versión {{version}} quiere:",
     "newSurface": "Mostrar «{{name}}» dentro de las iniciativas",
+    "newTable": "Añadir a su herramienta un nuevo tipo de elemento, «{{key}}»",
+    "newField": "Añadir el campo «{{key}}»",
+    "newOption": "Añadir la opción «{{key}}»",
+    "newAction": "Añadir la acción «{{key}}»",
+    "dropsField": "Quitar el campo «{{key}}» y borrar lo que contiene",
+    "dropsOption": "Dejar de ofrecer la opción «{{key}}» y vaciarla allí donde se eligió",
+    "acceptDropping": "Aceptar, actualizar y borrar lo que se quita",
     "accept": "Aceptar y actualizar",
     "decline": "Rechazar",
     "declined": "Rechazaste la versión {{version}}. El complemento se queda en su versión actual.",
@@ -52,8 +59,9 @@
   },
   "install": {
     "title": "Añadir {{name}}",
-    "description": "Esto añade algo para todo la comunidad. Puedes cambiarle el nombre ahora o más tarde.",
-    "name": "Nombre",
+    "description": "Esto añade algo para toda la comunidad.",
+    "connectTitle": "Conectar {{name}}",
+    "connectDescription": "Conecta ahora aquello con lo que trabaja, o más tarde desde Integraciones en los ajustes de la comunidad.",
     "action": "Añadir a la comunidad",
     "done": "{{name}} añadida.",
     "adminOnly": "Pide al superadministrador de tu comunidad que añada este complemento.",
@@ -62,6 +70,7 @@
     "whereTitle": "Dónde trabaja",
     "whereDescription": "Muestra su página, y lee y cambia contenido, solo en las iniciativas que elijas.",
     "whereDescriptionNoPage": "Lee y cambia contenido solo en las iniciativas que elijas.",
+    "whereDescriptionTool": "Su herramienta solo está en las iniciativas que elijas. En cada una, la iniciativa la activa o desactiva, y sus roles deciden quién la usa.",
     "whoTitle": "Quién puede usarlo",
     "callersTitle": "Complementos que pueden usarla",
     "callersDescription": "Estos complementos de tu comunidad piden usar {{name}}. Cada uno que dejes marcado podrá hacerlo.",
@@ -90,8 +99,6 @@
     "personalScope": "Tu cuenta",
     "set": "Configurada",
     "notSet": "Sin configurar",
-    "accessHint": "Usa {{api}} — {{scopes}}",
-    "noScopes": "no indica permisos",
     "secretSet": "Ya configurada: escribe para sustituirla",
     "empty": "Sin configurar",
     "choose": "Elige una",
@@ -100,6 +107,7 @@
     "cleared": "Credencial borrada.",
     "memberSet": "Un administrador de la comunidad ya la ha configurado.",
     "memberNotSet": "Un administrador de la comunidad todavía tiene que configurarla.",
+    "platformExplainer": "El operador de este servidor conectó esto para todas las comunidades, así que está listo para usarse aquí. Solo él puede cambiarlo o desconectarlo.",
     "communityFlowExplainer": "Esta se concede en el proveedor en lugar de escribirse. Al conectar se abre su página de instalación, donde eliges la cuenta y qué puede ver este complemento.",
     "personalExplainer": "Esta te identifica a ti, así que cada miembro conecta su propia cuenta. Nadie más ve la tuya.",
     "connect": "Conectar",
@@ -188,8 +196,7 @@
   "settings": {
     "description": "Configura cómo se conecta este complemento.",
     "open": "Ajustes de {{name}}",
-    "adminTitle": "Ajustes de la comunidad",
-    "adminDescription": "Lo que la comunidad controla en este complemento. Solo lo ve el superadministrador."
+    "communitySettings": "Ajustes de la comunidad para este complemento"
   },
   "page": {
     "connecting": "Conectando…",
@@ -206,6 +213,7 @@
     "title": "Dónde trabaja este complemento",
     "description": "Este complemento muestra su página, y lee y cambia contenido, solo en las iniciativas que elijas.",
     "descriptionNoPage": "Este complemento lee y cambia contenido solo en las iniciativas que elijas.",
+    "descriptionTool": "La herramienta de este plug-in solo está en las iniciativas que elijas. En cada una, la iniciativa la activa o desactiva, y sus roles deciden quién la usa.",
     "all": "Todas las iniciativas actuales",
     "some": "Solo las iniciativas que yo elija",
     "none": "No se eligió ninguna iniciativa, así que este complemento no alcanza nada dentro de las iniciativas.",
@@ -222,7 +230,7 @@
     },
     "refused": {
       "title": "Sin conectar",
-      "body": "El otro servicio no completó el inicio de sesión. Aquí no ha cambiado nada: inténtalo de nuevo desde los ajustes del complemento."
+      "body": "Se rechazó la conexión: el otro servicio no completó el inicio de sesión o la cuenta no es tuya (en una organización, tienes que ser uno de sus propietarios). Aquí no ha cambiado nada: inténtalo de nuevo desde los ajustes del complemento."
     },
     "expired": {
       "title": "Ese enlace ha caducado",
@@ -239,10 +247,6 @@
     "sign_in_required": {
       "title": "Inicia sesión para terminar",
       "body": "Termina de conectar en el navegador donde has iniciado sesión en Initiative, como la persona que lo empezó."
-    },
-    "taken": {
-      "title": "Ya conectada en otro sitio",
-      "body": "Esta organización ya está conectada a otra comunidad de este servidor, así que aquí no ha cambiado nada. Para conectarla aquí, desconéctala primero allí, o quita la aplicación de la organización en el otro servicio y vuelve a conectarla."
     },
     "closeTab": "Puedes cerrar esta pestaña."
   },
@@ -273,10 +277,6 @@
       "files": {
         "read": "Leer archivos",
         "write": "Leer y cambiar archivos"
-      },
-      "counter_groups": {
-        "read": "Leer contadores",
-        "write": "Leer y cambiar contadores"
       },
       "calendars": {
         "read": "Leer calendarios",
@@ -344,5 +344,58 @@
   "permissions": {
     "use": "Usar",
     "named": "{{plugin}}: {{permission}}"
+  },
+  "tool": {
+    "namePlaceholder": "Ponle un nombre",
+    "readOnly": "Puedes leer esto, pero no cambiarlo.",
+    "byline": "Añadido {{added}} · cambiado {{changed}}",
+    "fields": {
+      "createdAt": "Añadido",
+      "createdBy": "Añadido por",
+      "updatedAt": "Último cambio"
+    },
+    "create": "Crear: {{name}}",
+    "loadError": "No se han podido cargar.",
+    "installsLoadError": "No se pudieron cargar las herramientas de esta comunidad.",
+    "empty": "Aún no hay nada aquí.",
+    "emptyBody": "Añade el primero para empezar.",
+    "createFirst": "Añadir el primero",
+    "noMatches": "Nada aquí coincide con tus filtros.",
+    "notFound": "Esto no está aquí",
+    "notFoundBody": "Puede que se haya eliminado, o que la herramienta a la que pertenece no esté instalada en esta comunidad.",
+    "backToTool": "Volver a {{name}}",
+    "actions": "Acciones",
+    "layout": {
+      "name": "Página de {{name}}",
+      "help": "Cómo se muestra cada uno al abrirlo. Lo que deja fuera queda oculto.",
+      "shipped": "Este es el diseño tal como lo trae su plug-in. Cambiarlo lo hace propio de este lugar.",
+      "titleHelp": "Cada uno muestra su nombre.",
+      "hiddenHelp": "Cada uno puede mostrar esto. Si lo quitas, queda oculto, y Añadir lo vuelve a poner.",
+      "parts": {
+        "byline": "Fechas",
+        "notice": "Aviso de solo lectura",
+        "actions": "Menú",
+        "relations": "Relaciones",
+        "comments": "Comentarios"
+      },
+      "partHelp": {
+        "byline": "Cuándo se añadió y se cambió por última vez.",
+        "notice": "Se lo dice a quien no puede cambiarlo.",
+        "actions": "Qué más se puede hacer con él.",
+        "relations": "Con qué está vinculado.",
+        "comments": "Su conversación."
+      },
+      "noItems": "Añade uno para ver aquí su diseño.",
+      "lists": {
+        "grid": "Cada uno como una tarjeta, en filas parejas.",
+        "masonry": "Cada uno como una tarjeta, cada una tan alta como es.",
+        "table": "Cada uno como una fila, con sus campos en columnas."
+      }
+    },
+    "accessSettings": "Configuración de acceso"
+  },
+  "filters": {
+    "searchLabel": "Nombre o texto",
+    "search": "Buscar por nombre o texto"
   }
 }

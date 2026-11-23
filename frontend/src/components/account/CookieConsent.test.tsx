@@ -67,19 +67,17 @@ describe("CookieConsent", () => {
     dismissReopenedConsent();
   });
 
-  it("puts the question to somebody arriving for the first time", async () => {
+  it("puts the question to somebody arriving, refusing and accepting one click each at the same weight", async () => {
     mount();
 
     expect(chooser()).toBeInTheDocument();
-  });
-
-  it("offers refusing and accepting as one click each, at the same weight", async () => {
-    mount();
-
     const reject = screen.getByRole("button", { name: /reject optional/i });
     const accept = screen.getByRole("button", { name: /accept all/i });
-
     expect(reject.className).toBe(accept.className);
+    // No close while the question is still open.
+    expect(screen.queryByRole("button", { name: /close/i })).not.toBeInTheDocument();
+    // No third party is claimed where the deployment configured none.
+    expect(screen.queryByText(/spam check/i)).not.toBeInTheDocument();
   });
 
   it("switches nothing on when the answer is no", async () => {
@@ -117,34 +115,23 @@ describe("CookieConsent", () => {
     expect(hasConsent(ConsentCategory.marketing)).toBe(false);
   });
 
-  it("starts every switch off, so ignoring the question grants nothing", async () => {
+  it("starts every switch off, so ignoring the question grants nothing, and essential has none", async () => {
     const user = userEvent.setup();
     mount();
 
     await user.click(screen.getByRole("button", { name: /^choose$/i }));
 
-    for (const toggle of within(chooser() as HTMLElement).getAllByRole("switch")) {
+    const toggles = within(chooser() as HTMLElement).getAllByRole("switch");
+    // The essential category has no alternative, so no switch.
+    expect(toggles).toHaveLength(2);
+    expect(screen.getByText(/always on/i)).toBeInTheDocument();
+    for (const toggle of toggles) {
       expect(toggle).not.toBeChecked();
     }
   });
 
-  it("gives the essential category no switch, because it has no alternative", async () => {
+  it("comes back when asked for again, showing what is in force, and closes leaving it alone", async () => {
     const user = userEvent.setup();
-    mount();
-
-    await user.click(screen.getByRole("button", { name: /^choose$/i }));
-
-    expect(within(chooser() as HTMLElement).getAllByRole("switch")).toHaveLength(2);
-    expect(screen.getByText(/always on/i)).toBeInTheDocument();
-  });
-
-  it("stays gone once answered", async () => {
-    mount({ stored: answered([]) });
-
-    expect(chooser()).not.toBeInTheDocument();
-  });
-
-  it("comes back when asked for again, showing what is in force", async () => {
     mount({ stored: answered(["analytics"]) });
 
     reopenConsent();
@@ -152,24 +139,11 @@ describe("CookieConsent", () => {
     expect(await screen.findByRole("region", { name: /^cookies$/i })).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: /analytics/i })).toBeChecked();
     expect(screen.getByRole("switch", { name: /marketing/i })).not.toBeChecked();
-  });
-
-  it("can be closed again, leaving the existing answer alone", async () => {
-    const user = userEvent.setup();
-    mount({ stored: answered(["analytics"]) });
-    reopenConsent();
-    await screen.findByRole("region", { name: /^cookies$/i });
 
     await user.click(screen.getByRole("button", { name: /close/i }));
 
     expect(chooser()).not.toBeInTheDocument();
     expect(hasConsent(ConsentCategory.analytics)).toBe(true);
-  });
-
-  it("offers no close while the question is still open", async () => {
-    mount();
-
-    expect(screen.queryByRole("button", { name: /close/i })).not.toBeInTheDocument();
   });
 
   it("offers a switch only for what the deployment actually uses", async () => {
@@ -203,6 +177,8 @@ describe("CookieConsent", () => {
     // the one button agrees to nothing.
     expect(screen.queryByRole("button", { name: /accept all/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^choose$/i })).not.toBeInTheDocument();
+    // No essential row, with nothing to contrast it with.
+    expect(screen.queryByText(/always on/i)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /got it/i }));
 
@@ -212,31 +188,16 @@ describe("CookieConsent", () => {
     }
   });
 
-  it("shows no essential row where there is nothing to contrast it with", async () => {
-    mocks.config = { ...mocks.config, cookieCategories: [] };
-    mount();
+  it.each([
+    ["once answered", {}, { stored: answered([]) }],
+    ["where the deployment has not asked it to", { cookieConsentEnabled: false }, {}],
+    // Rather than appearing and then vanishing.
+    ["while the deployment's answer is on its way", { isLoading: true }, {}],
+    ["in the installed app, which landed on no site", {}, { native: true }],
+  ])("says nothing %s", async (_label, config, options) => {
+    mocks.config = { ...mocks.config, ...config };
 
-    expect(screen.queryByText(/always on/i)).not.toBeInTheDocument();
-  });
-
-  it("says nothing where the deployment has not asked it to", async () => {
-    mocks.config = { ...mocks.config, cookieConsentEnabled: false };
-
-    mount();
-
-    expect(chooser()).not.toBeInTheDocument();
-  });
-
-  it("waits for the deployment's answer rather than appearing and then vanishing", async () => {
-    mocks.config = { ...mocks.config, isLoading: true };
-
-    mount();
-
-    expect(chooser()).not.toBeInTheDocument();
-  });
-
-  it("is not shown in the installed app, which landed on no site", async () => {
-    mount({ native: true });
+    mount(options);
 
     expect(chooser()).not.toBeInTheDocument();
   });
@@ -247,12 +208,6 @@ describe("CookieConsent", () => {
     mount();
 
     expect(screen.getByText(/Cloudflare Turnstile/)).toBeInTheDocument();
-  });
-
-  it("claims no third party where the deployment configured none", async () => {
-    mount();
-
-    expect(screen.queryByText(/spam check/i)).not.toBeInTheDocument();
   });
 
   it("points at the deployment's own privacy policy where it has one", async () => {

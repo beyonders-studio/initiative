@@ -3,10 +3,7 @@ path and run on rows an older release would have written."""
 
 from __future__ import annotations
 
-import importlib.util
 import json
-from pathlib import Path
-from types import ModuleType
 
 from sqlalchemy import text
 
@@ -16,17 +13,7 @@ from app.testing import (
     create_marketplace_listing,
     create_user,
 )
-
-_VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
-
-
-def _load(name: str) -> ModuleType:
-    path = _VERSIONS / name
-    spec = importlib.util.spec_from_file_location(path.stem, path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+from app.testing.later_revisions import load_revision
 
 
 async def _sql(session, sql, params=None):
@@ -56,7 +43,7 @@ async def test_plugin_pages_are_pages_and_back(session) -> None:
     await create_guild_plugin(session, guild, user, definition=_EMBEDS_DEFINITION)
     listing = await create_marketplace_listing(session)
     await session.commit()
-    migration = _load("20261008_0470_a_plugin_page_is_a_page.py")
+    migration = load_revision("20261008_0470_a_plugin_page_is_a_page.py")
     install_table = f'"{schema}".guild_plugins'
     versions = "public.marketplace_listing_versions"
 

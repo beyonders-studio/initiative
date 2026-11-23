@@ -3,7 +3,7 @@
   "schema": {
     "$id": "https://initiativetasks.com/schemas/plugin-manifest-v1.json",
     "title": "Initiative plug-in manifest (the 'definition' body)",
-    "description": "What a plug-in declares it can do. A plug-in is a container, which names its `service` and answers Initiative's calls, or declarative, which names its `hosts` and no service, and whose endpoints, connection checks, webhook events, schedules and actions Initiative runs itself from the requests and JSONata expressions written here, keeping the values they write on items; one plug-in is never both. This is the 'definition' field of the document served at /.well-known/initiative-plugin.json, NOT that whole document: a registrar also requires protocol_version, public_id and kind alongside it, and refuses a definition served bare. Generated from the platform's own validator vocabulary. A manifest that satisfies this schema is well-formed, not necessarily acceptable. Cross-references (the endpoint a widget binds, a requires term's connection, an endpoint's service prefix), the direction-specific rules on an endpoint, the features/blocks cross-check in both directions, UTF-8 byte-size caps, the rules tying a connection's flow and token to its scope and fields, what a webhooks block names, what a vendor setup writes to, whether every expression parses, what a declarative request and its steps name, the bounds, ids and endpoints of schedules, which terms each kind's schedules, actions, fields and webhook events take, the unique keys and ids of fields, parts, actions and settings, the unique values of a field's options, what a part's nodes, a field's element actions and an action's endpoint and params name, the placeholders in a part's text, and a part's size and depth are enforced by the platform on publish and are not expressible here."
+    "description": "What a plug-in declares it can do. A plug-in is a container, which names its `service` and answers Initiative's calls, or declarative, which names its `hosts` and no service, and whose endpoints, connection checks, webhook events, schedules and actions Initiative runs itself from the requests and JSONata expressions written here, keeping the values they write on items; one plug-in is never both. A tool plug-in is neither: it declares one tool in its `tool` block, runs no code, and Initiative creates and serves the tool as it does its own. This is the 'definition' field of the document served at /.well-known/initiative-plugin.json, NOT that whole document: a registrar also requires protocol_version, public_id and kind alongside it, and refuses a definition served bare. Generated from the platform's own validator vocabulary. A manifest that satisfies this schema is well-formed, not necessarily acceptable. Cross-references (the endpoint a widget binds, a requires term's connection, an endpoint's service prefix), the direction-specific rules on an endpoint, the features/blocks cross-check in both directions, UTF-8 byte-size caps, the rules tying a connection's flow and token to its scope and fields, what a webhooks block names, what a vendor setup writes to, whether every expression parses, what a declarative request and its steps name, the bounds, ids and endpoints of schedules, which terms each kind's schedules, actions, fields and webhook events take, the unique keys and ids of fields, parts, actions and settings, the unique values of a field's options, what a part's nodes, a field's element actions and an action's endpoint and params name, the placeholders in a part's text, a part's size and depth, what a tool's checks and required fields hold, the fields a tool's layouts name, the looks they draw them in, the item tables they preview, the fields they tint and sort by, the kinds of a table's lists, the slugs of their presets, and their size and depth are enforced by the platform on publish and are not expressible here."
   },
   "charsets": {
     "identifier": "-0123456789_abcdefghijklmnopqrstuvwxyz",
@@ -18,7 +18,9 @@
     "artwork": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/._-",
     "queryName": "-.0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ[]_abcdefghijklmnopqrstuvwxyz~",
     "metadataKey": "._0123456789abcdefghijklmnopqrstuvwxyz",
-    "uniqueSettingValue": "0123456789abcdefghijklmnopqrstuvwxyz"
+    "uniqueSettingValue": "0123456789abcdefghijklmnopqrstuvwxyz",
+    "toolKey": "_0123456789abcdefghijklmnopqrstuvwxyz",
+    "slug": "0123456789abcdefghijklmnopqrstuvwxyz"
   },
   "enums": {
     "feature": [
@@ -28,6 +30,7 @@
       "fields",
       "pages",
       "parts",
+      "tool",
       "widgets"
     ],
     "protocol": [
@@ -119,8 +122,6 @@
       "projects:write",
       "files:read",
       "files:write",
-      "counter_groups:read",
-      "counter_groups:write",
       "calendars:read",
       "calendars:write",
       "dashboards:read",
@@ -162,7 +163,6 @@
     "itemKind": [
       "task",
       "calendar_event",
-      "counter",
       "post"
     ],
     "fieldKind": [
@@ -179,6 +179,135 @@
       "select",
       "multi_select",
       "user_reference"
+    ],
+    "toolFieldKind": [
+      "text",
+      "number",
+      "date",
+      "datetime",
+      "checkbox",
+      "url",
+      "currency",
+      "select",
+      "multi_select",
+      "user_reference",
+      "scale",
+      "counter",
+      "color"
+    ],
+    "toolIcon": [
+      "beaker",
+      "book",
+      "bookmark",
+      "box",
+      "briefcase",
+      "calendar",
+      "camera",
+      "chart-bar",
+      "chart-line",
+      "chart-pie",
+      "clipboard-list",
+      "clock",
+      "dice-5",
+      "file-text",
+      "flag",
+      "flask-conical",
+      "folder",
+      "gauge",
+      "gift",
+      "hammer",
+      "heart",
+      "hourglass",
+      "image",
+      "inbox",
+      "kanban",
+      "layers",
+      "leaf",
+      "lightbulb",
+      "list",
+      "list-checks",
+      "map",
+      "map-pin",
+      "message-square",
+      "notebook",
+      "package",
+      "palette",
+      "puzzle",
+      "receipt",
+      "shield",
+      "shopping-cart",
+      "star",
+      "table",
+      "tag",
+      "target",
+      "timer",
+      "trophy",
+      "user",
+      "users",
+      "wallet",
+      "wrench"
+    ],
+    "toolColumn": [
+      "id",
+      "initiative_id",
+      "name",
+      "position",
+      "created_at",
+      "updated_at",
+      "created_by",
+      "created_by_kind",
+      "deleted_at",
+      "deleted_by",
+      "deleted_by_kind",
+      "purge_at",
+      "archived_at",
+      "held_at",
+      "hold_id",
+      "listing_uid",
+      "listing_version",
+      "comments_enabled",
+      "comments_locked_at",
+      "actions",
+      "tableoid",
+      "xmin",
+      "cmin",
+      "xmax",
+      "cmax",
+      "ctid"
+    ],
+    "toolLayoutField": [
+      "name",
+      "created_by",
+      "created_at",
+      "updated_at",
+      "tags"
+    ],
+    "toolSortField": [
+      "name",
+      "created_at",
+      "updated_at"
+    ],
+    "toolListKind": [
+      "grid",
+      "masonry",
+      "table"
+    ],
+    "toolDetailPart": [
+      "byline",
+      "notice",
+      "actions",
+      "relations",
+      "comments"
+    ],
+    "fieldDisplay": [
+      "number",
+      "stars",
+      "bar",
+      "clock"
+    ],
+    "sortDir": [
+      "asc",
+      "desc"
     ],
     "tone": [
       "accent",
@@ -234,6 +363,7 @@
     "connections": 20,
     "fieldsPerConnection": 12,
     "vendorFields": 12,
+    "vendorChecks": 12,
     "githubAppPermissions": 100,
     "githubAppEvents": 100,
     "flowScopes": 24,
@@ -253,6 +383,10 @@
     "fields": 32,
     "parts": 16,
     "actions": 16,
+    "toolFields": 32,
+    "toolItems": 4,
+    "toolActions": 16,
+    "toolChecks": 8,
     "permissions": 16,
     "partNodes": 50,
     "partDepth": 4,
@@ -274,7 +408,19 @@
     "dashboardWidgets": 50,
     "dashboardGridColumns": 12,
     "dashboardBindingParams": 12,
+    "dashboardWidgetOptions": 12,
+    "dashboardQueryLength": 20000,
     "identifierLength": 64,
+    "toolKeyLength": 17,
+    "layoutNodes": 300,
+    "layoutDepth": 6,
+    "layoutBytes": 65536,
+    "layoutTitleLength": 100,
+    "layoutPresets": 20,
+    "presetSorts": 4,
+    "slugLength": 64,
+    "previewItems": 8,
+    "previewFields": 4,
     "publicIdLength": 120,
     "pathLength": 200,
     "endpointIdLength": 200,
@@ -473,6 +619,10 @@
         "setup": {
           "ref": "vendorSetup",
           "description": "How the vendor's client can be made for a deployment by the vendor itself, rather than registered by hand. Absent: the operator enters every value."
+        },
+        "check": {
+          "ref": "vendorCheck",
+          "description": "How Initiative asks the vendor, when an operator saves the vendor values, whether they name one client it knows. Absent: the values are saved as they are typed."
         }
       }
     },
@@ -501,6 +651,153 @@
           "ref": "localizedText"
         }
       }
+    },
+    "vendorCheck": {
+      "type": "object",
+      "description": "A call Initiative makes to the vendor when an operator saves the vendor values, before they are written, to learn whether they name one client the vendor knows. An answer an 'expect' row refuses keeps the values from being written: the operator's form marks that row's fields and shows its message. When the vendor cannot be reached, an expression fails, or the answer is not 2xx and no row applies to it, the values are written and the form says the check could not run. It runs when a save sets a vendor value the check reads, as typed on the form or written by the vendor's setup.",
+      "required": [
+        "request",
+        "expect"
+      ],
+      "properties": {
+        "request": {
+          "ref": "vendorCheckRequest"
+        },
+        "sign": {
+          "ref": "vendorCheckSigning"
+        },
+        "auth": {
+          "ref": "vendorAuth",
+          "description": "How the signed JWT is put on the request. Absent: 'Authorization: Bearer <jwt>'. Only beside 'sign'."
+        },
+        "expect": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": "vendorChecks",
+          "items": {
+            "ref": "vendorCheckRule"
+          },
+          "description": "Tried in order. A row applies to an answer its 'status' matches and refuses it when its 'holds' does not answer true; the first row that refuses decides. An answer no row refuses is accepted."
+        }
+      },
+      "additionalProperties": false
+    },
+    "vendorCheckRequest": {
+      "type": "object",
+      "description": "The call a vendor check makes: https, and on one of the plug-in's hosts when it names hosts. It carries no connection's credential: with 'sign', the check's own signed JWT, and otherwise none.",
+      "required": [
+        "method",
+        "url"
+      ],
+      "properties": {
+        "method": {
+          "enum": "httpMethod"
+        },
+        "url": {
+          "ref": "expression",
+          "description": "The address, as an expression answering a string. Query parameters may be written into it or given in 'query'."
+        },
+        "query": {
+          "type": "object",
+          "maxProperties": "requestQuery",
+          "propertyNames": {
+            "ref": "queryName"
+          },
+          "additionalProperties": {
+            "ref": "expression"
+          },
+          "description": "Query parameters by name, each an expression. One answering null or nothing is left out, and a list repeats the parameter once per value."
+        },
+        "headers": {
+          "type": "object",
+          "maxProperties": "requestHeaders",
+          "propertyNames": {
+            "ref": "headerName"
+          },
+          "additionalProperties": {
+            "ref": "expression"
+          },
+          "description": "Headers by name, each an expression answering a string; one answering null or nothing is left out. Never the header the signed JWT is put in."
+        },
+        "body": {
+          "ref": "expression",
+          "description": "The JSON body, as an expression."
+        }
+      },
+      "additionalProperties": false
+    },
+    "vendorCheckSigning": {
+      "type": "object",
+      "description": "A JWT Initiative signs with a vendor value and sends as the check's credential, for a vendor that knows its client by such a JWT. Nothing is exchanged: the JWT itself is put on the request.",
+      "required": [
+        "iss",
+        "key"
+      ],
+      "properties": {
+        "iss": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": "urlLength",
+          "description": "The JWT's issuer, normally a vendor value such as '{vendor.app_id}'. May name vendor values as '{vendor.<key>}'."
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": "urlLength",
+          "description": "The signing key, as one secret vendor value: '{vendor.private_key}'. A PEM private key."
+        },
+        "alg": {
+          "enum": "jwtAlgorithm",
+          "default": "RS256"
+        },
+        "lifetime": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": "tokenLifetimeSeconds",
+          "default": 60,
+          "description": "How long the signed JWT lives, in seconds."
+        }
+      },
+      "additionalProperties": false
+    },
+    "vendorCheckRule": {
+      "type": "object",
+      "description": "One thing a vendor check's answer must show, and which vendor values are wrong when it does not.",
+      "required": [
+        "holds",
+        "fields",
+        "message"
+      ],
+      "properties": {
+        "status": {
+          "ref": "statusMatch",
+          "description": "The answers the row applies to. Absent: '2xx'."
+        },
+        "holds": {
+          "ref": "expression",
+          "description": "Must answer true for the answer to pass this row. Reads the answer as 'response' and the non-secret values being saved as 'vendor'. 'false' refuses every answer the row applies to."
+        },
+        "fields": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": "vendorFields",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "ref": "identifier"
+          },
+          "description": "The vendor fields that are wrong when the row refuses. The form marks them."
+        },
+        "message": {
+          "ref": "localizedText",
+          "description": "What the operator is told when the row refuses."
+        },
+        "shows": {
+          "ref": "expression",
+          "description": "A short text the form shows beside the message when the row refuses, such as the value the vendor holds instead. Reads what 'holds' reads. An answer that is not a string shows nothing."
+        }
+      },
+      "additionalProperties": false
     },
     "vendorSetup": {
       "description": "A flow at the vendor that creates the vendor's client and answers with its values. Initiative runs it from the operator's browser and writes what the vendor answers into the deployment's vendor values, so none is typed or copied. One member per flow, told apart by 'kind'.",
@@ -1056,6 +1353,12 @@
       "patternForm": "dotted",
       "patternPrefix": "plugins:",
       "description": "'plugins:<public_id>': permission to call another plug-in's public endpoints through the deployment, as this community or as one of its members, and to read the values that plug-in shows on items this one can read. Not one of the fixed scopes: the family is open, one per plug-in, and the public id after the prefix is the plug-in being called. The deployment never lets a plug-in address another directly; the call goes through it, and the plug-in called is handed its own references for whoever the call is for."
+    },
+    "toolScope": {
+      "type": "string",
+      "patternFrom": "toolKey",
+      "patternForm": "toolScope",
+      "description": "'<kind>:read' or '<kind>:write': a tool plug-in's tool, reached as a built-in tool's scopes reach its own: its rows and its items. The kind is the tool's key, '.', and its plug-in's uid in lower case ('counter_group.tsjvtcm0s7gv2x'). Not one of the fixed scopes: the family is open, one per tool plug-in, and names a tool only a community that installed it has; elsewhere it reaches nothing."
     },
     "endpoint": {
       "type": "object",
@@ -1820,6 +2123,1019 @@
         }
       }
     },
+    "tool": {
+      "type": "object",
+      "description": "The tool a tool plug-in declares. Once a community installs the plug-in, the tool works as a built-in tool does and is offered in every initiative: Initiative creates its tables in that community, and every tool's rules (sharing, trash, archive, holds, comments, tags, links, search, export, its switch and its create permission) hold for it without being declared. So a tool declares only what is its own: its key, names and icon, the fields of its own rows and of each item table, what their rows hold to, which item tables sit under which, which items stay open, what each table draws, and its actions. What a table draws is its 'layouts', in the layout format Initiative's own tools are drawn in: they are the tool's starting layouts, which each community then changes in its layout editor. Every row holds the universal columns ('toolColumn') beside the fields it declares.",
+      "required": [
+        "key",
+        "name",
+        "instance_name",
+        "icon",
+        "layouts"
+      ],
+      "properties": {
+        "key": {
+          "ref": "toolKey",
+          "description": "The tool's key: what its rows are called in Initiative's own names for it, such as 'counter_group'. Two plug-ins may declare the same key; Initiative tells them apart by the plug-in."
+        },
+        "name": {
+          "ref": "localizedText",
+          "description": "The tool's name, as the sidebar and the initiative's tool switches show it: 'Counters'."
+        },
+        "instance_name": {
+          "ref": "localizedText",
+          "description": "What one of its rows is called: 'Counter group'."
+        },
+        "icon": {
+          "enum": "toolIcon",
+          "description": "Its icon, by name, from the list Initiative draws."
+        },
+        "fields": {
+          "type": "array",
+          "maxItems": "toolFields",
+          "items": {
+            "ref": "toolField"
+          },
+          "description": "The fields of the tool's own rows, at most {toolFields}, each key at most once. Absent: its rows hold the universal columns alone."
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": "toolChecks",
+          "items": {
+            "ref": "toolCheck"
+          },
+          "description": "What every row of the table holds to, at most {toolChecks}. Initiative refuses a change that breaks one."
+        },
+        "layouts": {
+          "ref": "toolLayouts",
+          "description": "How the tool's own rows are listed, and how one of them is shown."
+        },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": "toolItems",
+          "items": {
+            "ref": "toolItem"
+          },
+          "description": "The item tables under the tool's rows, at most {toolItems}, two levels deep at most: an item sits under the tool or under an item that sits under the tool. Each key at most once, and never the tool's."
+        },
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": "toolActions",
+          "items": {
+            "ref": "toolAction"
+          },
+          "description": "What a reader may run on the tool's rows or its items, at most {toolActions}, each id at most once."
+        }
+      },
+      "additionalProperties": false
+    },
+    "toolKey": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": "toolKeyLength",
+      "patternFrom": "toolKey",
+      "patternForm": "letterFirst",
+      "description": "A key a tool declares: a lower-case letter, then lower-case letters, digits and '_', at most {toolKeyLength} characters, so a kind (the key, '.', the plug-in's uid) fits Initiative's kind columns. Initiative builds table and column names from it, so a field's key is never a universal column's name ('toolColumn') nor a field every row has ('toolLayoutField'), and never ends in '_id', which Initiative's own keys to a parent end in."
+    },
+    "toolField": {
+      "type": "object",
+      "description": "One field of a tool's rows or of an item table: a column of its own, typed by its kind, which Initiative draws, filters, sorts and exports as it does a property of the same kind.",
+      "required": [
+        "key",
+        "name",
+        "kind"
+      ],
+      "properties": {
+        "key": {
+          "ref": "toolKey",
+          "description": "Unique among its table's fields."
+        },
+        "name": {
+          "ref": "localizedText",
+          "description": "The field's label."
+        },
+        "kind": {
+          "enum": "toolFieldKind",
+          "description": "What the value is: 'text' a string; 'number' a number; 'date' a 'YYYY-MM-DD' string; 'datetime' an ISO 8601 string with its offset; 'checkbox' a boolean; 'url' an address; 'currency' an amount in the field's 'currency'; 'select' the value of one of its 'options'; 'multi_select' a list of them; 'user_reference' a person; 'scale' a number from 0 to 100; 'counter' a number a reader steps, bounded as its 'counter' says; 'color' a colour, as '#rrggbb'."
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$",
+          "description": "A currency field's ISO 4217 code, such as 'EUR': what its amounts are in. Required on one, and on no other kind."
+        },
+        "options": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": "selectOptions",
+          "items": {
+            "ref": "fieldOption"
+          },
+          "description": "A select or multi_select field's options, each value at most once. Required on one, and on no other kind."
+        },
+        "default": {
+          "description": "The value a new row starts with, of the field's kind: a string for text, url, date and datetime; '#rrggbb' or 'random' for color, 'random' being a colour Initiative picks from its palette for each new row; a number for number, currency and scale; a boolean for checkbox; an option's value for select; a list of them for multi_select. A counter starts at its 'initial', and a person is never a default. Absent: no value."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "The field is never empty: its column is NOT NULL. A required field has a 'default', which a row added without the field takes, and which every row already there takes when a version adds the field or makes it required. A counter's default is its 'initial', so it needs none, and a person is never a default, so a user_reference field is never required. Absent: false."
+        },
+        "counter": {
+          "ref": "toolCounter"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "currency"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "currency"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "select",
+                  "multi_select"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "options"
+            ]
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "toolCounter": {
+      "type": "object",
+      "description": "How a counter field moves: by 'step' a tap, never past 'min' or 'max', and back to 'initial' on a reset. Each is a number, or the key of a number field of the same table, so each row holds its own: {\"max\": \"max\"}. A counter field's only. Absent: a step of 1, no bounds, and 0.",
+      "properties": {
+        "min": {
+          "ref": "toolBound",
+          "description": "The lowest it goes. Absent: no floor."
+        },
+        "max": {
+          "ref": "toolBound",
+          "description": "The highest it goes. Absent: no ceiling."
+        },
+        "step": {
+          "ref": "toolBound",
+          "description": "How far a tap moves it; a number is above 0. Absent: 1."
+        },
+        "initial": {
+          "ref": "toolBound",
+          "description": "Where it starts and where a reset puts it. Absent: 0."
+        }
+      },
+      "additionalProperties": false
+    },
+    "toolBound": {
+      "description": "A number, or the key of a number field of the same table, read from the row.",
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "ref": "toolKey"
+        }
+      ]
+    },
+    "toolItem": {
+      "type": "object",
+      "description": "An item table of a tool: rows that sit under one of the tool's rows, or under another item's. Each is a table of its own, deleted with the row it sits under.",
+      "required": [
+        "key",
+        "name",
+        "fields",
+        "layouts"
+      ],
+      "properties": {
+        "key": {
+          "ref": "toolKey",
+          "description": "The item's key, unique among the tool's items and never the tool's: 'counter'."
+        },
+        "name": {
+          "ref": "localizedText",
+          "description": "What one item is called: 'Counter'."
+        },
+        "parent": {
+          "ref": "toolKey",
+          "description": "The key of the item it sits under, which itself sits under the tool. Absent: it sits under the tool's rows."
+        },
+        "fields": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": "toolFields",
+          "items": {
+            "ref": "toolField"
+          },
+          "description": "Its fields, at most {toolFields}, each key at most once."
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": "toolChecks",
+          "items": {
+            "ref": "toolCheck"
+          },
+          "description": "What every row of the table holds to, at most {toolChecks}. Initiative refuses a change that breaks one."
+        },
+        "layouts": {
+          "ref": "toolLayouts",
+          "description": "How the item is listed under the row it sits under, and how one is shown."
+        },
+        "open_while": {
+          "ref": "toolOpenWhile"
+        }
+      },
+      "additionalProperties": false
+    },
+    "toolOpenWhile": {
+      "type": "object",
+      "description": "When an item is still open: an open item blocks what it is linked to until it finishes, as a task blocks. One field of the item and exactly one condition on it: a number or counter field compared with a number or another such field ('below', 'at_most', 'above', 'at_least', 'equals', 'not_equals'); a checkbox that 'is' true or false; a select whose value is 'in' a list of its options; or a date or datetime 'not_passed' yet. Initiative turns it into its own query. Absent: the item never blocks.",
+      "required": [
+        "field"
+      ],
+      "minProperties": 2,
+      "properties": {
+        "field": {
+          "ref": "toolKey",
+          "description": "The item's field the condition reads."
+        },
+        "below": {
+          "ref": "toolOperand"
+        },
+        "at_most": {
+          "ref": "toolOperand"
+        },
+        "above": {
+          "ref": "toolOperand"
+        },
+        "at_least": {
+          "ref": "toolOperand"
+        },
+        "equals": {
+          "ref": "toolOperand"
+        },
+        "not_equals": {
+          "ref": "toolOperand"
+        },
+        "is": {
+          "type": "boolean",
+          "description": "A checkbox field: open while it holds this."
+        },
+        "in": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": "selectOptions",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          },
+          "description": "A select field: open while its value is one of these options."
+        },
+        "not_passed": {
+          "const": true,
+          "description": "A date or datetime field: open until it passes."
+        }
+      },
+      "additionalProperties": false
+    },
+    "toolCheck": {
+      "type": "object",
+      "description": "One thing every row of a table holds to, in 'open_while''s comparison grammar: a number or counter field of the table, and exactly one comparison of it with a number or another such field ('below', 'at_most', 'above', 'at_least', 'equals', 'not_equals'). Initiative makes it a CHECK on the table, so a row where either side is empty passes. For example, {\"field\": \"min\", \"at_most\": {\"field\": \"max\"}} and {\"field\": \"step\", \"above\": 0}.",
+      "required": [
+        "field"
+      ],
+      "minProperties": 2,
+      "properties": {
+        "field": {
+          "ref": "toolKey",
+          "description": "The table's field the check reads."
+        },
+        "below": {
+          "ref": "toolOperand"
+        },
+        "at_most": {
+          "ref": "toolOperand"
+        },
+        "above": {
+          "ref": "toolOperand"
+        },
+        "at_least": {
+          "ref": "toolOperand"
+        },
+        "equals": {
+          "ref": "toolOperand"
+        },
+        "not_equals": {
+          "ref": "toolOperand"
+        }
+      },
+      "additionalProperties": false
+    },
+    "toolOperand": {
+      "description": "What a number or counter field is compared with: a number, or {\"field\": key}, another number or counter field of the same table.",
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "object",
+          "required": [
+            "field"
+          ],
+          "properties": {
+            "field": {
+              "ref": "toolKey"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "toolAction": {
+      "type": "object",
+      "description": "Something a reader runs on one of the tool's rows or items, which Initiative does itself: it asks for the 'params' the action names, then makes the change 'write' answers, to the declared fields of the row it runs on and of the items directly under it, under the reader's own standing. So an action does nothing the reader could not do by hand.",
+      "required": [
+        "id",
+        "name",
+        "on",
+        "write"
+      ],
+      "properties": {
+        "id": {
+          "ref": "identifier",
+          "description": "Unique among the tool's actions."
+        },
+        "name": {
+          "ref": "localizedText",
+          "description": "The button's or the menu entry's label."
+        },
+        "on": {
+          "ref": "toolKey",
+          "description": "What it runs on: the tool's key, for its rows, or an item's key."
+        },
+        "params": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": "toolFields",
+          "uniqueItems": true,
+          "items": {
+            "ref": "toolKey"
+          },
+          "description": "Fields of the table it runs on, by key, that Initiative asks the reader for before it runs, in a form drawn from those fields."
+        },
+        "write": {
+          "ref": "expression",
+          "description": "The change Initiative makes, as one 'toolChange'. It reads 'item', the row it runs on: its 'id', 'name' and declared fields by key; 'items', the items directly under it, by item key, each a list of rows read as 'item' is; 'params', what the reader answered, by key; and 'now'. Answering nothing changes nothing."
+        },
+        "confirm": {
+          "ref": "localizedText",
+          "description": "A question Initiative asks before running it. Absent: it runs at once."
+        }
+      },
+      "additionalProperties": false
+    },
+    "toolChange": {
+      "type": "object",
+      "description": "What a tool action's 'write' answers: values for the declared fields of the row it runs on, of the items directly under it, or both. A null clears a field. Initiative holds each value to its field's kind and makes the change as the reader, so a change the reader may not make is refused whole.",
+      "properties": {
+        "set": {
+          "type": "object",
+          "propertyNames": {
+            "ref": "toolKey"
+          },
+          "description": "Values by field key, on the row the action runs on."
+        },
+        "items": {
+          "type": "object",
+          "propertyNames": {
+            "ref": "toolKey"
+          },
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "ref": "toolItemChange"
+            }
+          },
+          "description": "Changes by item key, to items directly under the row the action runs on, each naming one by its id. An id not under it changes nothing."
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "set"
+          ]
+        },
+        {
+          "required": [
+            "items"
+          ]
+        }
+      ],
+      "additionalProperties": false
+    },
+    "toolItemChange": {
+      "type": "object",
+      "description": "Values for one item's declared fields, by field key.",
+      "required": [
+        "id",
+        "set"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "set": {
+          "type": "object",
+          "propertyNames": {
+            "ref": "toolKey"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "toolLayouts": {
+      "type": "object",
+      "description": "What one of a tool's tables draws: the lists its rows are listed in, and how one of them is shown on its own page. Both are written in the layout format Initiative stores and draws for its own tools, naming the table's fields. On install they become the community's layouts for the table, which its people change in the layout editor as they change any tool's.",
+      "required": [
+        "lists",
+        "detail"
+      ],
+      "properties": {
+        "lists": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": {
+            "wholeOf": "toolListKind"
+          },
+          "items": {
+            "ref": "toolListLayout"
+          },
+          "description": "The ways its rows are listed, each of a different kind. Each person picks one, and the first is the one a person starts on."
+        },
+        "detail": {
+          "ref": "toolDetailLayout"
+        }
+      },
+      "additionalProperties": false
+    },
+    "toolListLayout": {
+      "type": "object",
+      "description": "One way a table's rows are listed: as a 'grid' of cards or a 'masonry' wall of them, each drawn as its 'card' says, or as a 'table', a column per field in 'columns'. At most {layoutNodes} parts and columns together, nested at most {layoutDepth} deep.",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": "toolListKind"
+        },
+        "card": {
+          "ref": "layoutCard",
+          "description": "What a grid's or a masonry wall's card shows of a row. Theirs only, and required on one."
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": "layoutNodes",
+          "items": {
+            "ref": "toolKey",
+            "description": "A field of the table the layout is for: one it declares, by its key, or one every row has ('toolLayoutField'): 'name', 'created_by' (who made it), 'created_at', 'updated_at' or 'tags'."
+          },
+          "description": "A table's columns, in order. A table's only, and required on one."
+        },
+        "displays": {
+          "type": "object",
+          "maxProperties": "toolFields",
+          "propertyNames": {
+            "ref": "toolKey"
+          },
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "enum": "fieldDisplay"
+              },
+              {
+                "ref": "toolDisplayFrom"
+              }
+            ]
+          },
+          "description": "How a scale or counter field the list shows is drawn, by its key: a scale as a 'number', 'stars' or a 'bar'; a counter as a 'number', a 'bar' or a 'clock'; or, as {\"from\": key}, in the look a select field of the row names, so each row keeps its own. A bar and a clock need the counter's 'min' and 'max', and a row missing one draws a number. Absent: a number."
+        },
+        "presets": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": "layoutPresets",
+          "items": {
+            "ref": "layoutPreset"
+          },
+          "description": "Sorts a person can pick the list in, at most {layoutPresets}, each slug at most once. Picking one sorts what the person sees; the rows' own order, which people drag, stays as it is."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "grid",
+                  "masonry"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "card"
+            ],
+            "not": {
+              "required": [
+                "columns"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "table"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "columns"
+            ],
+            "not": {
+              "required": [
+                "card"
+              ]
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "toolDisplayFrom": {
+      "type": "object",
+      "description": "A look read from the row: the key of a select field of the same table, each of whose options' values is a look the drawn field's kind has.",
+      "required": [
+        "from"
+      ],
+      "properties": {
+        "from": {
+          "ref": "toolKey"
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutPreset": {
+      "type": "object",
+      "description": "A named sort a list offers.",
+      "required": [
+        "slug",
+        "name",
+        "sort"
+      ],
+      "properties": {
+        "slug": {
+          "ref": "layoutSlug",
+          "description": "What a link to the preset carries."
+        },
+        "name": {
+          "ref": "localizedText",
+          "description": "The preset's name, in each reader's language."
+        },
+        "sort": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": "presetSorts",
+          "items": {
+            "ref": "layoutPresetSort"
+          },
+          "description": "What the list is sorted by, first to last, at most {presetSorts}, each field at most once."
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutPresetSort": {
+      "type": "object",
+      "required": [
+        "field"
+      ],
+      "properties": {
+        "field": {
+          "ref": "toolKey",
+          "description": "A field of the table: a number, counter, currency, scale, date, datetime or checkbox field it declares, or one every row has that sorts ('toolSortField'): 'name', 'created_at' or 'updated_at'."
+        },
+        "dir": {
+          "enum": "sortDir",
+          "description": "'asc', lowest first, or 'desc'. Absent: 'asc'."
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutSlug": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": "slugLength",
+      "patternFrom": "slug",
+      "patternForm": "hyphenated",
+      "description": "Lower-case letters and digits, words joined by single '-', at most {slugLength} characters: 'by-count'."
+    },
+    "toolDetailLayout": {
+      "type": "object",
+      "description": "How one row is shown on its own page, in three regions, each its parts in order: 'header' across the top, 'main' and 'side' beside it. A region left out holds nothing, and what is placed nowhere is not shown. At most {layoutNodes} parts across the three, nested at most {layoutDepth} deep.",
+      "minProperties": 1,
+      "properties": {
+        "header": {
+          "type": "array",
+          "maxItems": "layoutNodes",
+          "items": {
+            "ref": "layoutDetailPart"
+          }
+        },
+        "main": {
+          "type": "array",
+          "maxItems": "layoutNodes",
+          "items": {
+            "ref": "layoutDetailPart"
+          }
+        },
+        "side": {
+          "type": "array",
+          "maxItems": "layoutNodes",
+          "items": {
+            "ref": "layoutDetailPart"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutCard": {
+      "type": "object",
+      "description": "A card: what a list shows of one row, its parts in order.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "card"
+        },
+        "props": {
+          "ref": "layoutCardProps"
+        },
+        "children": {
+          "type": "array",
+          "maxItems": "layoutNodes",
+          "items": {
+            "ref": "layoutCardPart"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutCardProps": {
+      "type": "object",
+      "properties": {
+        "tint": {
+          "ref": "toolKey",
+          "description": "A color field of the table, which the card is drawn in. A row with no colour draws plain."
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutCardPart": {
+      "description": "One part of a card, told apart by 'type'.",
+      "oneOf": [
+        {
+          "ref": "layoutCard"
+        },
+        {
+          "ref": "layoutCardStack"
+        },
+        {
+          "ref": "layoutCardField"
+        },
+        {
+          "ref": "layoutProperties"
+        },
+        {
+          "ref": "layoutItems"
+        }
+      ]
+    },
+    "layoutCardStack": {
+      "type": "object",
+      "description": "A card's parts side by side or one above another.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "stack"
+        },
+        "props": {
+          "ref": "layoutStackProps"
+        },
+        "children": {
+          "type": "array",
+          "maxItems": "layoutNodes",
+          "items": {
+            "ref": "layoutCardPart"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutStackProps": {
+      "type": "object",
+      "description": "How a stack lays its parts out. Each absent: Initiative's own.",
+      "properties": {
+        "direction": {
+          "enum": [
+            "column",
+            "row"
+          ]
+        },
+        "gap": {
+          "enum": [
+            "xs",
+            "sm"
+          ],
+          "description": "The space between its parts."
+        },
+        "wrap": {
+          "type": "boolean",
+          "description": "A row runs onto a second line rather than past its edge."
+        },
+        "align": {
+          "enum": [
+            "start"
+          ],
+          "description": "Its parts keep their own width rather than filling the column."
+        },
+        "tone": {
+          "enum": [
+            "muted"
+          ],
+          "description": "Drawn in a quieter colour."
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutCardField": {
+      "type": "object",
+      "description": "One field of the row, drawn in its kind's look.",
+      "required": [
+        "type",
+        "props"
+      ],
+      "properties": {
+        "type": {
+          "const": "field"
+        },
+        "props": {
+          "ref": "layoutFieldProps"
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutFieldProps": {
+      "type": "object",
+      "required": [
+        "field"
+      ],
+      "properties": {
+        "field": {
+          "ref": "toolKey",
+          "description": "A field of the table the layout is for: one it declares, by its key, or one every row has ('toolLayoutField'): 'name', 'created_by' (who made it), 'created_at', 'updated_at' or 'tags'."
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutProperties": {
+      "type": "object",
+      "description": "Every property the community's initiative gives the row, in its own order.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "properties"
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutItems": {
+      "type": "object",
+      "description": "The row's first items of one item table, in their own order, each drawn small with the fields 'fields' names.",
+      "required": [
+        "type",
+        "props"
+      ],
+      "properties": {
+        "type": {
+          "const": "items"
+        },
+        "props": {
+          "ref": "layoutItemsProps"
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutItemsProps": {
+      "type": "object",
+      "required": [
+        "item",
+        "fields",
+        "limit"
+      ],
+      "properties": {
+        "item": {
+          "ref": "toolKey",
+          "description": "The key of an item table directly under the table the card is for."
+        },
+        "fields": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": "previewFields",
+          "items": {
+            "ref": "toolKey"
+          },
+          "description": "The item's fields each shows, in order, at most {previewFields}, each at most once: ones it declares, or ones every row has ('toolLayoutField'). Each is drawn as the item table's first list draws it."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": "previewItems",
+          "description": "How many it shows at most, up to {previewItems}."
+        },
+        "tint": {
+          "ref": "toolKey",
+          "description": "A color field of the item table, which each is drawn in."
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutDetailPart": {
+      "description": "One part of a page, told apart by 'type'.",
+      "oneOf": [
+        {
+          "ref": "layoutDetailStack"
+        },
+        {
+          "ref": "layoutSection"
+        },
+        {
+          "ref": "layoutDetailField"
+        },
+        {
+          "ref": "layoutProperties"
+        },
+        {
+          "ref": "layoutOwnPart"
+        }
+      ]
+    },
+    "layoutDetailStack": {
+      "type": "object",
+      "description": "A page's parts side by side or one above another.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "stack"
+        },
+        "props": {
+          "ref": "layoutStackProps"
+        },
+        "children": {
+          "type": "array",
+          "maxItems": "layoutNodes",
+          "items": {
+            "ref": "layoutDetailPart"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutSection": {
+      "type": "object",
+      "description": "A bordered group of a page's parts.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "section"
+        },
+        "props": {
+          "ref": "layoutSectionProps"
+        },
+        "children": {
+          "type": "array",
+          "maxItems": "layoutNodes",
+          "items": {
+            "ref": "layoutDetailPart"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutSectionProps": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": "layoutTitleLength",
+          "description": "Drawn as written, in every language, as the community's own section titles are."
+        },
+        "collapsed": {
+          "type": "boolean",
+          "description": "Drawn folded until the reader opens it."
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutDetailField": {
+      "type": "object",
+      "description": "One field of the row, which a reader edits there.",
+      "required": [
+        "type",
+        "props"
+      ],
+      "properties": {
+        "type": {
+          "const": "field"
+        },
+        "props": {
+          "ref": "layoutDetailFieldProps"
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutDetailFieldProps": {
+      "type": "object",
+      "required": [
+        "field"
+      ],
+      "properties": {
+        "field": {
+          "ref": "toolKey",
+          "description": "A field of the table the layout is for: one it declares, by its key, or one every row has ('toolLayoutField'): 'name', 'created_by' (who made it), 'created_at', 'updated_at' or 'tags'."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "A person fills it in to add a row, and cannot empty it once it is filled. Only a field the table declares, and never a counter or a checkbox, which are never empty."
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutOwnPart": {
+      "type": "object",
+      "description": "One of the parts every tool's page has ('toolDetailPart'): 'byline', who made it and when; 'notice', why the reader cannot change it; 'actions', the menu of what else can be done with it; 'relations', what it is linked to; 'comments'.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": "toolDetailPart"
+        }
+      },
+      "additionalProperties": false
+    },
     "permission": {
       "type": "object",
       "description": "Something the community decides who may do with the plug-in, at one level. Inside an initiative, its roles hold it as they hold a tool's permissions, and its managers and the community's admins always do. At the community level, its admins hold it as they hold the parts of administering the community, and a custom role on the admin rung keeps some of them. The plug-in names a permission and says whether members start with it; who holds it is the community's to decide.",
@@ -2224,7 +3540,7 @@
         },
         "type": {
           "ref": "identifier",
-          "description": "One of this manifest's own widget ids \u2014 bare, with no uid. The platform stamps the plug-in's uid on when it publishes, so the two can never disagree."
+          "description": "What draws the tile. A service plug-in's names one of this manifest's own widget ids, bare, with no uid: the platform stamps the plug-in's uid on when it publishes, so the two can never disagree. A tool plug-in's names one of Initiative's built-in widget types ('stat', 'progress', 'chart' and the rest), which Initiative checks."
         },
         "title": {
           "type": "string",
@@ -2253,11 +3569,21 @@
             }
           }
         },
+        "options": {
+          "type": "object",
+          "maxProperties": "dashboardWidgetOptions",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ],
+            "maxLength": "paramValueLength"
+          },
+          "description": "A built-in widget's options, as Initiative's own dashboard listings give them (a chart's 'mark'). Only a tool plug-in's tile has them, since only its type is a built-in widget; Initiative checks each against the widget."
+        },
         "binding": {
           "type": "object",
-          "required": [
-            "endpoint_id"
-          ],
           "properties": {
             "endpoint_id": {
               "ref": "namespacedId",
@@ -2274,7 +3600,33 @@
                 ],
                 "maxLength": "paramValueLength"
               }
+            },
+            "source": {
+              "const": "query",
+              "description": "'query' for a tool plug-in's tile, whose data is 'sql'. Left out for a service plug-in's, which names an endpoint."
+            },
+            "sql": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": "dashboardQueryLength",
+              "description": "A tool plug-in's tile's query: a SELECT that reads only the plug-in's own tables, named p_<uid in lower case>_<key>. It runs as whoever views the dashboard, so it shows only rows they may already read."
             }
+          },
+          "description": "Where the tile's data comes from. A service plug-in's tile names one of its own read endpoints ('endpoint_id', with 'params'). A tool plug-in has no endpoints: its tile is a query, {\"source\": \"query\", \"sql\": \"\u2026\"}, over the plug-in's own tables.",
+          "if": {
+            "required": [
+              "source"
+            ]
+          },
+          "then": {
+            "required": [
+              "sql"
+            ]
+          },
+          "else": {
+            "required": [
+              "endpoint_id"
+            ]
           }
         }
       }
@@ -2307,7 +3659,7 @@
       "type": "string",
       "minLength": 1,
       "maxLength": "expressionLength",
-      "description": "A JSONata expression (https://jsonata.org): standard JSONata, with no functions added. It reads one document. On the way out that holds 'params', the call's parameters as the caller sent them; 'connection', the non-secret fields of the connection the request names; 'connections', on an endpoint's requests and map, each connection its 'requires' names that the call has, by its id, holding the same fields; 'now', the time of the call in ISO 8601, which $now() and $millis() also answer; 'steps', each earlier step's answer by its name; and, on the call an action makes, 'item', the item it runs on: {kind, id, title}, and 'element', the 'ref' of the list element it was run from, if it was. On the way back it also holds 'response', the answer being read: {status, headers, body}, with header names in lowercase. Every expression of a declarative plug-in also reads 'settings', the install's settings by key, and 'aliases', each unique setting's earlier values by key, as a list, except a token's 'exchange_body', which reads only its connection. Each evaluation is bounded: at most {expressionTimeMs} milliseconds, {expressionDepth} levels of nesting and an answer of {expressionOutputBytes} bytes as JSON. An expression that fails or passes a bound answers 'unavailable: mapping-failed'."
+      "description": "A JSONata expression (https://jsonata.org): standard JSONata, with no functions added. It reads one document. On the way out that holds 'params', the call's parameters as the caller sent them; 'connection', the non-secret fields of the connection the request names; 'connections', on an endpoint's requests and map, each connection its 'requires' names that the call has, by its id, holding the same fields; 'now', the time of the call in ISO 8601, which $now() and $millis() also answer; 'steps', each earlier step's answer by its name; and, on the call an action makes, 'item', the item it runs on: {kind, id, title}, and 'element', the 'ref' of the list element it was run from, if it was. On the way back it also holds 'response', the answer being read: {status, headers, body}, with header names in lowercase. Every expression of a declarative plug-in also reads 'settings', the install's settings by key, and 'aliases', each unique setting's earlier values by key, as a list, except a token's 'exchange_body', which reads only its connection, and a vendor check's, which read only 'vendor', the non-secret vendor values being saved, by key, 'now' and, on the way back, 'response'. Each evaluation is bounded: at most {expressionTimeMs} milliseconds, {expressionDepth} levels of nesting and an answer of {expressionOutputBytes} bytes as JSON. An expression that fails or passes a bound answers 'unavailable: mapping-failed'."
     },
     "host": {
       "type": "string",
@@ -2782,8 +4134,11 @@
     ],
     "properties": {
       "plugin_kind": {
-        "const": "service",
-        "description": "The kind every plug-in manifest has, container or declarative: a declarative plug-in is one with no 'service' block."
+        "enum": [
+          "service",
+          "tool"
+        ],
+        "description": "'service' for a plug-in that serves or calls something, container or declarative: a declarative plug-in is one with no 'service' block. 'tool' for a tool plug-in, which declares one tool in its 'tool' block and runs no code: beside the tool it carries only 'features' (['tool'], with 'dashboards' when it declares them), 'dashboards', 'default_name', 'min_plugin_api', 'minimum_age', 'availability' and 'help'."
       },
       "service": {
         "type": "object",
@@ -2816,10 +4171,13 @@
                 },
                 {
                   "ref": "pluginScope"
+                },
+                {
+                  "ref": "toolScope"
                 }
               ]
             },
-            "description": "The scopes this plug-in asks a community to grant: what its installation and member tokens act with. The fixed scopes, and 'plugins:<public_id>' for each plug-in this one uses, to call its public endpoints and read the values it shows on items (at most {pluginScopes} of those). The community grants some or all of them when it installs the plug-in, and a token never carries more than was granted. Writing implies reading. Absent means none."
+            "description": "The scopes this plug-in asks a community to grant: what its installation and member tokens act with. The fixed scopes; 'plugins:<public_id>' for each plug-in this one uses, to call its public endpoints and read the values it shows on items; and '<kind>:read' or '<kind>:write' for each tool plug-in's tool it reaches (at most {pluginScopes} of those two together). The community grants some or all of them when it installs the plug-in, and a token never carries more than was granted. Writing implies reading. Absent means none."
           },
           "calls_plugins": {
             "type": "boolean",
@@ -2828,6 +4186,10 @@
           }
         },
         "description": "A container plug-in's service, which Initiative calls. Absent for a declarative plug-in, whose public id is its listing's."
+      },
+      "tool": {
+        "ref": "tool",
+        "description": "A tool plug-in's tool, and nothing else's."
       },
       "features": {
         "type": "array",
@@ -2896,6 +4258,9 @@
             },
             {
               "ref": "pluginScope"
+            },
+            {
+              "ref": "toolScope"
             }
           ]
         },
@@ -2971,7 +4336,7 @@
         "items": {
           "ref": "bundledDashboard"
         },
-        "description": "Ready-made arrangements of this plug-in's own widgets. Publishing the plug-in publishes one ordinary dashboard listing per entry, offered to communities that install the plug-in."
+        "description": "Ready-made dashboards that come with this plug-in. Publishing the plug-in publishes one ordinary dashboard listing per entry, offered to communities that install the plug-in. A service plug-in's arrange its own widgets, fed by its own read endpoints. A tool plug-in's are Initiative's built-in widgets, each drawing a query over the plug-in's own tables."
       },
       "fields": {
         "type": "array",

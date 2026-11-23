@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.80.0] - 2026-11-22
+
+### Added
+
+- **Initiative grows through plug-ins.** Tools few communities use move out of Initiative's core into plug-ins, Counters first, so a server no longer carries tables for a tool its communities don't use. The plug-in registry has been here for a while, but it was unstable while we spent months building robust tool features; it is now reaching stability, and what you can add to a community will keep growing. Tell us what you'd like to see with **Send feedback** in your account menu.
+
+  - **Counters is a free plug-in in the marketplace.** A community that has counter groups, or has Counters switched on in an initiative, gets it automatically on upgrade, in those initiatives with every group, counter, link, comment, tag, share and layout kept, each initiative's switch and role permissions as they were, and old links opening the plug-in's pages. A backup made before this release restores without its counter groups, and the restore lists each one as not restored. Tool plug-ins can bring dashboards over their own data, and Counters brings its Counter board.
+  - **GitHub 9.0.0 ties tasks to the code that does them.** Put a task's reference, such as `acme-42`, in a branch's name and the branch links to the task, as does a pull request that names it, shown on the task with its status, review and checks. Published releases, pre-releases and pushed tags are events your automations can act on. See [GitHub](docs/en/guides/github.md). **Server operators:** give the GitHub App the Members: *Read-only* organization permission, and have each organization's owner accept it in GitHub.
+
+  ![Party Vitals, a counter group from the Counters plug-in, with two hit-point counters as bars, a number and a segmented clock](docs/images/releases/counters-plugin.webp)
+
+- **Statuses that clear themselves, and show beside you.** **Set status** suggests the usual ones (In a meeting, Out sick, On vacation and more) and asks when to clear it: after 30 minutes, at the end of the day or week, at a time you pick, or never. It shows under your name on member lists and in the mention list, and **Pause notifications** in the same dialog holds email, mobile and desktop notifications until it clears. In the sidebar, click your status to change it, or the dot on your picture to change how you appear.
+- **Send something to someone, in the app.** **Send to…** beside the bell on a project, file, task, event or page puts it in their notifications, with a note if you add one, and tapping it opens it on whichever device they are using. Somebody who can't open it yet is let in if you can share it, or can ask for access. **Copy link** in the same dialog copies a link to it instead.
+- **Giving someone access tells them.** Adding a person in a thing's Access settings sends them a notification, with an optional note, and answers any request for access the new sharing covers, including sharing with their role or the whole initiative.
+- **Tools that plug-ins add work like the built-in ones.** Anything in one can be archived, trashed and put back, and takes tags, and the tool's own page has **Access settings**. Type `#` in a comment, description or page, or embed with `![[`, to link one of its rows: the link shows the row's name as it is now, and the row lists what points at it. Links to counters written before Counters became a plug-in keep working.
+- **Copy a page's link from the desktop app.** The share button beside Reload in the title bar copies the address of the page you're on, ready to open in a browser or send to someone.
+- **Quit the desktop app from its taskbar button on Windows.** Right-click it and choose **Quit Initiative**. Closing the window only tucks the app into the tray.
+- **A plug-in can check the values you give its vendor before they are saved.** A plug-in that declares a vendor check (plug-in kit 11) has its values asked about at the vendor when you save them on its settings page. Values the vendor doesn't know together, such as an app name that isn't the app the ID and key belong to, are not saved: the fields to fix are marked, with what the vendor has instead. When the vendor can't be reached, the values save and the page says they weren't checked.
+- **Connect a plug-in's account once for every community.** On a plug-in's page under Platform settings › Integrations, **Connect for every community** connects one account, such as a GitHub organization, that every community with the plug-in then uses. Communities see it as connected and can't change or disconnect it; **Disconnect** gives each community its own again.
+
+### Changed
+
+- **What's new reads like a blog.** The latest release leads the page with its picture and its first few changes. Each release's post gives every change its own headline under New, Changed and Fixed.
+- **Shared whiteboards send only what you change.** Drawing, moving or resizing sends the shapes you touched instead of the whole board, so a busy board keeps up as you draw. Two people editing different shapes at once no longer undo each other's work.
+- **The desktop app shows you as idle only when you're away from the computer.** Working in other programs keeps you online; it used to count only what you did in Initiative's own window.
+- **The sidebar shows which plug-ins need you.** A plug-in that connects to your own account carries a sliders icon that opens that, with a shortcut for the superadmin to the plug-in's settings. Any other plug-in shows a gear on hover to the superadmin only, which goes straight to its settings. Integrations shows each plug-in with its artwork, and plug-ins keep their listing's name.
+- **Marketplace listings show their screenshots like an app store.** Large pictures sit in a row under the listing's name, and each opens full size, where you can zoom in. A paid plug-in says whether it's a subscription or a one-time purchase, and one every community gets is marked **Included with Initiative**. Community calendar and Community contacts picture what each adds to a community, in your light or dark theme, and say in a few bullet points why to use them over an initiative's own.
+- **The My Tasks widget keeps its controls in view.** Its table reaches the card's edges, and while its rows scroll, the filter box, the column names and the page controls stay where they are, whatever size the widget is.
+- **Security cases say what to check, at the priority they deserve.** Each case opens with what its rule usually means and what to look at, and its task takes the rule's priority: a high rule files a high-priority task, a low one a low-priority task.
+- **Intake settings fit on one screen.** Platform → Intake picks the operations community first, then lists each kind of case on one line: where it lands, who to contact about it, and a switch for whether it's receiving. **Edit** opens the rest, and **Set up** routes a kind that isn't yet. The general contact sits under the list, and the switch that sends feedback to the Initiative team has its own section at the end.
+
+### Fixed
+
+- **Shapes and arrows keep the size you draw them on a shared whiteboard.** With the same whiteboard open somewhere else, such as the desktop app and a browser, a shape or arrow no longer shrinks to a fraction of its size when you let go.
+- **Fewer unexpected sign-outs on a laptop or phone that sleeps.** A tab or app nobody is looking at no longer renews its sign-in in the background; it waits until you come back to it, so a renewal can no longer be cut off by the device going to sleep.
+- **A whiteboard opens straight away.** Opening one could leave it loading until somebody else in it saved or you switched windows, and with nobody else in it, for good.
+- **Faces show as you typed them.** `>.>` no longer turns into a quote, `*_*` into italics or `~_~` into strikethrough, and the shrug keeps both arms: ¯\\\_(ツ)\_/¯
+- **Reload in the desktop app no longer leaves a blank window.** The page reloads where you were.
+- **An item's menu is always on its page.** A task, event or plug-in tool's row whose page layout leaves out its menu shows the menu at the top of the page, so archiving, deleting and its other actions are still there.
+- **Events that run past midnight.** On the month calendar, an evening event that ends after midnight is shown with its start time on the day it starts, not as a bar across two days. The list says when it stops on the second day ("Until 12:30am") instead of calling that day "All day". An event that ends at midnight no longer shows on the next day.
+- **A refused connection says why it may have been.** When connecting a plug-in's account is refused, the page says the account may not be one you control (for an organization, you need to be one of its owners), not only that the other service didn't finish.
+- **Going offline in a live document warns you once.** The one warning says your edits will sync, and it goes away when you're back online.
+- **The marketplace registry says which listing it skipped, and why.** After **Refresh now**, the warning names the listing ("Demo was skipped.") and the reason, and the registry's status lists everything the last update skipped. A listing whose version was republished with different content now says that its publisher has to publish a new version, instead of calling its contents not valid, and one whose code or name another registry listing holds says that too.
+- **A device that missed its own sign-in renewal no longer looks like a stolen session.** When a laptop sleeps or an app closes just as a renewal's answer comes back, the device sends its old token next time; that now files a low case of its own instead of a high one. A session that was signed out, or ended from another device, no longer files a case at all when its device next tries it.
+
 ## [0.79.2] - 2026-11-16
 
 ### Added

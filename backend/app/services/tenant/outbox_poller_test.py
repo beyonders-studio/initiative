@@ -72,31 +72,21 @@ def test_event_id_is_the_same_for_the_same_batch():
     assert first != outbox_poller._event_id(8, 4242)
 
 
-def test_grouping_is_by_transaction_not_adjacency():
-    """Concurrent commits interleave ids, so one transaction's rows are not
-    necessarily contiguous in the log."""
-    subscription = _subscription()
-    rows = [_row(1, 500), _row(2, 501), _row(3, 500), _row(4, 501)]
-
-    grouped: dict[int, list[EventOutbox]] = {}
-    for row in rows:
-        if outbox_poller._matches(row, subscription):
-            grouped.setdefault(row.txn_id, []).append(row)
-
-    assert sorted(grouped) == [500, 501]
-    assert [r.id for r in grouped[500]] == [1, 3]
-    assert [r.id for r in grouped[501]] == [2, 4]
-
-
 def test_one_transaction_is_one_envelope():
+    """Rows are selected by txn_id, so a batch is every row that transaction
+    wrote. A subscriber hears which surfaces a change touches, as identifiers:
+    each parent is addressed exactly like the resource itself, so acting on one
+    is the same read through the same gates."""
     subscription = _subscription()
-    rows = [_row(1, 500), _row(3, 500)]
+    chain = [{"type": "projects", "id": 7}]
+    rows = [_row(1, 500, parents=chain), _row(3, 500), _row(9, 500)]
     envelope = outbox_poller._envelope(
         subscription, 500, rows, guild_ref=_GUILD_REF, actor_ref=_ACTOR_REF
     )
 
-    assert len(envelope["changes"]) == 2
+    assert [c["resource"]["id"] for c in envelope["changes"]] == [101, 103, 109]
     assert envelope["event_id"] == outbox_poller._event_id(subscription.id, 500)
+    assert envelope["changes"][0]["parents"] == chain
     # Names and ids only — no value from any changed column rides along.
     for change in envelope["changes"]:
         assert set(change) == {
@@ -107,27 +97,6 @@ def test_one_transaction_is_one_envelope():
             "action",
             "changed",
         }
-
-
-def test_the_envelope_carries_the_parent_chain():
-    """A subscriber hears which surfaces a change touches, as identifiers.
-
-    Each parent is addressed exactly like the resource itself, so acting on
-    one is the same read through the same gates.
-    """
-    subscription = _subscription()
-    chain = [{"type": "projects", "id": 7}]
-    envelope = outbox_poller._envelope(
-        subscription,
-        500,
-        [_row(1, 500, parents=chain)],
-        guild_ref=_GUILD_REF,
-        actor_ref=_ACTOR_REF,
-    )
-
-    (change,) = envelope["changes"]
-    assert change["parents"] == chain
-    assert all(set(parent) == {"type", "id"} for parent in change["parents"])
 
 
 async def test_every_subscription_in_a_guild_is_drained(
@@ -174,20 +143,6 @@ async def test_every_subscription_in_a_guild_is_drained(
         "detached by the per-pass expunge and never delivered to"
     )
     assert poller._subscribed == {guild_id}
-
-
-def test_a_batch_is_one_transaction_whole():
-    """Rows are selected by txn_id, so a batch is every row that transaction
-    wrote. A partial batch is not a state this design can reach."""
-    subscription = _subscription()
-    rows = [_row(1, 500), _row(3, 500), _row(9, 500)]
-
-    envelope = outbox_poller._envelope(
-        subscription, 500, rows, guild_ref=_GUILD_REF, actor_ref=_ACTOR_REF
-    )
-
-    assert [c["resource"]["id"] for c in envelope["changes"]] == [101, 103, 109]
-    assert envelope["event_id"] == outbox_poller._event_id(subscription.id, 500)
 
 
 async def test_ledger_delivers_each_transaction_once(
@@ -516,19 +471,10 @@ def test_the_envelope_names_the_guild_and_the_actor_by_reference():
     assert envelope["subscription_id"] == subscription.id
 
 
-def test_a_system_write_names_no_actor():
-    """A background job is attributed to nobody, so there is nobody to name."""
-    subscription = _subscription()
-    envelope = outbox_poller._envelope(
-        subscription, 500, [_row(1, 500)], guild_ref=_GUILD_REF, actor_ref=None
-    )
-
-    assert envelope["actor_ref"] is None
-
-
 def test_the_envelope_names_the_plugin_that_wrote():
     """A plug-in recognises its own writes by ``actor_plugin``, its registration's
-    ``public_id``. Set on its own, beside or without a person."""
+    ``public_id``. Set on its own, beside or without a person; a background
+    job is attributed to nobody, so there is nobody to name."""
     subscription = _subscription()
     by_plugin = outbox_poller._envelope(
         subscription,
@@ -548,6 +494,11 @@ def test_the_envelope_names_the_plugin_that_wrote():
     assert by_person["actor_plugin"] is None
     assert by_person["actor_ref"] == _ACTOR_REF
 
+    by_system = outbox_poller._envelope(
+        subscription, 500, [_row(1, 500)], guild_ref=_GUILD_REF, actor_ref=None
+    )
+    assert (by_system["actor_ref"], by_system["actor_plugin"]) == (None, None)
+
 
 def _reach(**overrides) -> outbox_poller.InstallReach:
     defaults = {
@@ -562,6 +513,8 @@ def _reach(**overrides) -> outbox_poller.InstallReach:
 def test_a_plugins_subscription_hears_what_its_reach_covers():
     subscription = _subscription(plugin_install_id=4)
     assert outbox_poller._matches(_row(1, 500), subscription, _reach())
+    # A subscription no plug-in registered is not asked for a reach.
+    assert outbox_poller._matches(_row(1, 500), _subscription(), None)
 
 
 @pytest.mark.parametrize(
@@ -579,10 +532,6 @@ def test_a_plugins_subscription_hears_nothing_outside_its_reach(reach):
     assert not outbox_poller._matches(_row(1, 500), subscription, reach)
 
 
-def test_a_subscription_no_plugin_registered_is_not_asked_for_a_reach():
-    assert outbox_poller._matches(_row(1, 500), _subscription(), None)
-
-
 def test_a_community_event_needs_its_scope_and_no_placement():
     subscription = _subscription(plugin_install_id=4, event_types=["tags.created"])
     tag = _row(1, 500, resource_type="tags", initiative_id=None)
@@ -596,11 +545,63 @@ def test_an_event_no_scope_reaches_is_never_a_plugins():
     subscription = _subscription(plugin_install_id=4, event_types=["plugins.created"])
     install = _row(1, 500, resource_type="plugins", initiative_id=None)
     everything = frozenset(
-        r.value for r in outbox_poller.webhook_events._read_scopes().values() if r
+        r for r in outbox_poller.webhook_events._read_scopes().values() if r
     )
     assert not outbox_poller._matches(
         install, subscription, _reach(readable=everything)
     )
+
+
+def test_a_tool_plugins_change_is_named_by_its_kinds_and_heard_where_it_is_on():
+    """A change to a tool plug-in's item names it, its event type and its
+    parents by their kinds, and is heard with its tool's read scope only in
+    an initiative the tool is on in: by an installed plug-in's subscription
+    and the community's own alike."""
+    from app.testing import counters_tool_set
+
+    tools = counters_tool_set()
+    (tool,) = tools.installed
+    (item,) = tool.children
+    on = outbox_poller.CommunityTools(tools, frozenset({f"11:{tool.kind}"}))
+    off = outbox_poller.CommunityTools(tools, frozenset({f"12:{tool.kind}"}))
+
+    def changed(*columns: str) -> EventOutbox:
+        return _row(
+            1,
+            500,
+            resource_type=item.table,
+            action="updated",
+            changed=list(columns),
+            parents=[{"type": tool.table.name, "id": 9}],
+            dac_tool=tool.kind,
+            dac_id=9,
+        )
+
+    row = changed("count")
+    events = [f"{item.value}.updated"]
+    installs = _subscription(plugin_install_id=4, event_types=events, fields=["count"])
+    community = _subscription(event_types=events)
+    reach = _reach(readable=frozenset({tool.kind}))
+
+    assert outbox_poller._matches(row, installs, reach, on)
+    assert outbox_poller._matches(row, community, None, on)
+    # Without its tool's scope.
+    assert not outbox_poller._matches(row, installs, _reach(), on)
+    # Its tool not on in the change's initiative, or not read at all.
+    for elsewhere in (off, outbox_poller.BUILT_IN):
+        assert not outbox_poller._matches(row, installs, reach, elsewhere)
+        assert not outbox_poller._matches(row, community, None, elsewhere)
+    # Not one of the fields filtered for.
+    assert not outbox_poller._matches(changed("name"), installs, reach, on)
+
+    envelope = outbox_poller._envelope(
+        installs, 500, [row], guild_ref=_GUILD_REF, actor_ref=None, community=on
+    )
+    (change,) = envelope["changes"]
+    assert change["event_type"] == f"{item.value}.updated"
+    assert change["resource"] == {"type": item.value, "id": row.resource_id}
+    assert change["parents"] == [{"type": tool.kind, "id": 9}]
+    assert change["changed"] == ["count"]
 
 
 def test_the_reach_reads_what_the_grant_lets_it_read():

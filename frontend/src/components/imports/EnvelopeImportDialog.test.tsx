@@ -24,7 +24,7 @@ const initiative = buildInitiative({
     moderate: false,
     roster: true,
     view: [],
-    create: [Tool.counter_group, Tool.file, Tool.project, Tool.wiki],
+    create: [Tool.dashboard, Tool.file, Tool.project, Tool.wiki],
   },
 });
 
@@ -58,17 +58,17 @@ describe("EnvelopeImportDialog", () => {
       communityHttp.post("/imports/envelope", async ({ request }) => {
         sent = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(
-          { result: { entity_title: "Restored Group", created: {}, unmatched_handles: [] } },
+          { result: { entity_title: "Restored Board", created: {}, unmatched_handles: [] } },
           { status: 201 }
         );
       })
     );
 
     renderWithProviders(
-      <EnvelopeImportDialog tool={Tool.counter_group} open onOpenChange={() => {}} />
+      <EnvelopeImportDialog tool={Tool.dashboard} open onOpenChange={() => {}} />
     );
 
-    selectFile({ type: "initiative-counter-group", name: "Restored Group", schema_version: 1 });
+    selectFile({ type: "initiative-dashboard", name: "Restored Board", schema_version: 1 });
     // A single creatable initiative is auto-selected; the Import button enables.
     const importBtn = await screen.findByRole("button", { name: /^import$/i });
     await waitFor(() => expect(importBtn).not.toBeDisabled());
@@ -77,10 +77,10 @@ describe("EnvelopeImportDialog", () => {
     await waitFor(() => expect(sent).not.toBeNull());
     expect(sent).toMatchObject({
       initiative_id: 7,
-      envelope: { type: "initiative-counter-group" },
+      envelope: { type: "initiative-dashboard" },
     });
     await waitFor(() =>
-      expect(toast.success).toHaveBeenCalledWith(expect.stringContaining("Restored Group"))
+      expect(toast.success).toHaveBeenCalledWith(expect.stringContaining("Restored Board"))
     );
   });
 
@@ -88,19 +88,19 @@ describe("EnvelopeImportDialog", () => {
     server.use(
       communityHttp.post("/imports/envelope", () =>
         HttpResponse.json(
-          { result: { entity_title: "Restored Group", created: {}, unmatched_handles: [] } },
+          { result: { entity_title: "Restored Board", created: {}, unmatched_handles: [] } },
           { status: 201 }
         )
       )
     );
-    const listKey = ["/api/v1/c/1/counter-groups/", { initiative_id: 7 }];
+    const listKey = ["/api/v1/c/1/dashboards/", { initiative_id: 7 }];
     queryClient.setQueryData(listKey, { items: [] });
 
     renderWithProviders(
-      <EnvelopeImportDialog tool={Tool.counter_group} open onOpenChange={() => {}} />
+      <EnvelopeImportDialog tool={Tool.dashboard} open onOpenChange={() => {}} />
     );
 
-    selectFile({ type: "initiative-counter-group", name: "Restored Group", schema_version: 1 });
+    selectFile({ type: "initiative-dashboard", name: "Restored Board", schema_version: 1 });
     const importBtn = await screen.findByRole("button", { name: /^import$/i });
     await waitFor(() => expect(importBtn).not.toBeDisabled());
     await userEvent.click(importBtn);
@@ -197,26 +197,24 @@ describe("EnvelopeImportDialog", () => {
     expect(confirmed).toEqual({});
   });
 
-  it("rejects a file whose type belongs to a different tool", async () => {
+  it.each([
+    [
+      { type: "initiative-file", name: "Notes", schema_version: 1 },
+      /import it from that tool's page/i,
+    ],
+    [{ hello: "world" }, /isn't a recognized Initiative export/i],
+  ])("rejects a file that is not this tool's export: %j", async (envelope, refusal) => {
     renderWithProviders(
-      <EnvelopeImportDialog tool={Tool.counter_group} open onOpenChange={() => {}} />
+      <EnvelopeImportDialog tool={Tool.dashboard} open onOpenChange={() => {}} />
     );
-    selectFile({ type: "initiative-file", name: "Notes", schema_version: 1 });
-    expect(await screen.findByText(/import it from that tool's page/i)).toBeInTheDocument();
+    selectFile(envelope);
+    expect(await screen.findByText(refusal)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^import$/i })).toBeDisabled();
-  });
-
-  it("rejects a file that isn't an Initiative export", async () => {
-    renderWithProviders(
-      <EnvelopeImportDialog tool={Tool.counter_group} open onOpenChange={() => {}} />
-    );
-    selectFile({ hello: "world" });
-    expect(await screen.findByText(/isn't a recognized Initiative export/i)).toBeInTheDocument();
   });
 
   it("ignores a slow read of an earlier file when a newer one is picked", async () => {
     renderWithProviders(
-      <EnvelopeImportDialog tool={Tool.counter_group} open onOpenChange={() => {}} />
+      <EnvelopeImportDialog tool={Tool.dashboard} open onOpenChange={() => {}} />
     );
     const input = document.querySelector<HTMLInputElement>('input[type="file"]');
     if (!input) throw new Error("no file input");
@@ -234,8 +232,8 @@ describe("EnvelopeImportDialog", () => {
     input.dispatchEvent(new Event("change", { bubbles: true }));
 
     // Second pick, mid-flight: a valid matching file that resolves immediately.
-    selectFile({ type: "initiative-counter-group", name: "Good Group", schema_version: 1 });
-    await waitFor(() => expect(screen.getByText(/Good Group/)).toBeInTheDocument());
+    selectFile({ type: "initiative-dashboard", name: "Good Board", schema_version: 1 });
+    await waitFor(() => expect(screen.getByText(/Good Board/)).toBeInTheDocument());
 
     // The earlier read finishes last with a wrong-tool payload — it must NOT
     // overwrite the newer selection's accepted state.

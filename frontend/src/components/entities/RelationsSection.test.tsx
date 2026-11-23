@@ -23,11 +23,11 @@ import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import {
   ActorKind,
-  EndpointKind,
   type RelationshipRead,
   SearchEntityType,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
+import { EndpointKind } from "@/lib/relationships";
 
 /**
  * Sigma draws the graph to a WebGL canvas, which jsdom has none of. The renderer
@@ -220,17 +220,11 @@ describe("RelationsSection", () => {
     expect(within(blocks).getByText("Held up by me")).toBeInTheDocument();
   });
 
-  it("takes a symmetric link whichever way it runs", async () => {
+  it("takes a symmetric link whichever way it runs, and draws no heading for a relation nothing has", async () => {
     renderSection([row("attached", "inbound", "Attached from the far side")]);
 
     const attached = await sectionNamed("Attached");
     expect(within(attached).getByText("Attached from the far side")).toBeInTheDocument();
-  });
-
-  it("draws no heading for a relation nothing has", async () => {
-    renderSection([row("attached", "outbound", "Only this")]);
-
-    await screen.findByText("Only this");
     expect(screen.queryByRole("heading", { name: "Blocked by" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Part of" })).not.toBeInTheDocument();
   });
@@ -245,6 +239,8 @@ describe("RelationsSection", () => {
     renderSection(rows);
 
     expect(await screen.findByText(/Nothing linked yet\./)).toBeInTheDocument();
+    // No four ways of looking at nothing.
+    expect(screen.queryByRole("button", { name: "How to show these" })).not.toBeInTheDocument();
   });
 
   it("does not offer to unlink something read out of a body", async () => {
@@ -493,13 +489,6 @@ describe("RelationsSection", () => {
     expect(await screen.findByText("1 / 3")).toBeInTheDocument();
   });
 
-  it("names itself after the thing it is about", async () => {
-    // "Relations" is a word about the data model. A task has connections.
-    renderSection([]);
-
-    expect(await screen.findByRole("heading", { name: "Connections" })).toBeInTheDocument();
-  });
-
   it("says how many blockers are still open, not how many there ever were", async () => {
     // A bare count outlives the work it describes, which is most of why the
     // heading stopped meaning anything.
@@ -507,20 +496,6 @@ describe("RelationsSection", () => {
 
     const section = await sectionNamed("Blocked by");
     expect(within(section).getByText("1 of 2 still open")).toBeInTheDocument();
-  });
-
-  it("does not offer four ways of looking at nothing", async () => {
-    renderSection([]);
-
-    await screen.findByText(/Nothing linked yet\./);
-    expect(screen.queryByRole("button", { name: "How to show these" })).not.toBeInTheDocument();
-  });
-
-  it("offers the ways of looking once there is something to look at", async () => {
-    renderSection([row("attached", "outbound", "Something")]);
-
-    await screen.findByText("Something");
-    expect(screen.getByRole("button", { name: "How to show these" })).toBeInTheDocument();
   });
 
   it("writes the link out as a sentence naming both ends", async () => {

@@ -22,7 +22,7 @@ describe("BulkExportButton", () => {
   it("exports a selection its viewer owns every item of", () => {
     renderWithProviders(
       <BulkExportButton
-        tool={Tool.counter_group}
+        tool={Tool.wiki}
         items={[
           { id: 1, can: ownerCan() },
           { id: 2, can: ownerCan() },
@@ -36,7 +36,7 @@ describe("BulkExportButton", () => {
   it("says why when one of the selection is only theirs to edit", () => {
     renderWithProviders(
       <BulkExportButton
-        tool={Tool.counter_group}
+        tool={Tool.wiki}
         items={[
           { id: 1, can: ownerCan() },
           { id: 2, can: writerCan() },
@@ -106,5 +106,47 @@ describe("BulkExportButton for files", () => {
     expect(
       screen.getByRole("button", { name: "These share no format they can all be exported to." })
     ).toBeDisabled();
+  });
+});
+
+describe("BulkExportButton for a tool plug-in", () => {
+  it("offers the formats its tool's read names and exports by its kind", async () => {
+    const kind = "counter_group.tsjvtcm0s7gv2x";
+    let sent: { ids: string[]; format: string | null } | null = null;
+    server.use(
+      communityHttp.get(`/plugin-tools/${kind}`, () =>
+        HttpResponse.json({
+          kind,
+          key: "counter_group",
+          name: { en: "Counters" },
+          instance_name: { en: "Counter group" },
+          icon: "gauge",
+          fields: [],
+          items: [],
+          actions: [],
+          export_formats: ["json", "csv", "xlsx"],
+        })
+      ),
+      communityHttp.get(`/exports/${kind}`, ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        sent = { ids: params.getAll("ids"), format: params.get("format") };
+        return new HttpResponse("a,b", {
+          status: 200,
+          headers: {
+            "Content-Type": "text/csv",
+            "Content-Disposition": 'attachment; filename="scores.csv"',
+          },
+        });
+      })
+    );
+    renderWithProviders(<BulkExportButton tool={kind} items={[{ id: 3, can: ownerCan() }]} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Export" }));
+    expect(await screen.findByRole("button", { name: /json/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /excel|xlsx/i })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /csv/i }));
+    await userEvent.click(screen.getByRole("button", { name: /start export/i }));
+
+    await waitFor(() => expect(sent).toEqual({ ids: ["3"], format: "csv" }));
   });
 });

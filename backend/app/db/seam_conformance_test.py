@@ -37,6 +37,7 @@ from typing import get_args
 
 import pytest
 from fastapi.routing import APIWebSocketRoute, iter_route_contexts
+from httpx2 import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -69,7 +70,6 @@ from app.services.content_sockets import sockets
 from app.testing import (
     Actor,
     create_access_grant,
-    create_counter_group,
     create_file,
     create_project,
     create_resource_grant,
@@ -81,6 +81,7 @@ from app.testing import (
     route_as_install,
 )
 from app.testing.plugin_clients import CLIENT, install_plugin
+from app.testing.tool_plugins import add_counter, install_tool_plugin
 
 pytestmark = pytest.mark.seam
 
@@ -434,6 +435,7 @@ async def test_every_socket_admits_through_the_seam(
     session: AsyncSession,
     acting_user: Callable[..., Awaitable[Actor]],
     socket_client: TestClient,
+    client: AsyncClient,
 ) -> None:
     admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     guild, initiative, owner = admin.guild, admin.initiative, admin.user
@@ -441,10 +443,14 @@ async def test_every_socket_admits_through_the_seam(
     await create_access_grant(
         session, user=visitor, guild=guild, purpose="settings", access_level="admin"
     )
-    group = await create_counter_group(session, initiative, owner)
     file = await create_file(session, initiative, owner)
     wiki = await create_wiki(session, initiative, owner)
     page = await create_wiki_page(session, wiki, owner)
+    # A tool plug-in's row, on the socket every tool plug-in's rows share.
+    seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
+    await install_tool_plugin(client, session, seat)
+    tools, tool_row, _ = await add_counter(session, guild.id, initiative.id)
+    (tool,) = tools.installed
 
     base = f"/api/v1/c/{guild.id}"
     #: Every socket, with the reader it admits (the community's administrator)
@@ -452,8 +458,8 @@ async def test_every_socket_admits_through_the_seam(
     #: community's configuration and none of its content — or, for the
     #: account's own stream, a token that is none.
     channels = {
-        "/api/v1/c/{community_id}/counter-groups/{group_id}/ws": (
-            f"{base}/counter-groups/{group.id}/ws"
+        "/api/v1/c/{community_id}/plugin-tools/{kind}/{row_id}/ws": (
+            f"{base}/plugin-tools/{tool.kind}/{tool_row}/ws"
         ),
         "/api/v1/c/{community_id}/events/updates": f"{base}/events/updates",
         "/api/v1/c/{community_id}/collaboration/files/{file_id}/collaborate": (

@@ -1,7 +1,9 @@
 import {
+  CounterLook,
   type CounterSettingsInput,
   type CounterSettingsOutput,
   type CurrencyCode,
+  type DisplayFrom,
   type FileType,
   type ListLayoutDefinitionInputDisplays,
   MetadataType,
@@ -59,7 +61,10 @@ export const slugify = (raw: string): string =>
 
 /** How a scale or a counter is drawn: a scale as a number, five stars or a
  *  bar; a counter as a number, a bar or a clock. */
-export type FieldDisplay = NonNullable<ListLayoutDefinitionInputDisplays>[string];
+export type FieldDisplay = Exclude<
+  NonNullable<ListLayoutDefinitionInputDisplays>[string],
+  DisplayFrom
+>;
 
 /** How each way of drawing a scale is offered, in order. */
 export const SCALE_DISPLAYS = ["number", "stars", "bar"] as const satisfies FieldDisplay[];
@@ -73,6 +78,7 @@ export const counterSettings = (settings: CounterSettingsInput | null | undefine
   min: settings?.min ?? null,
   max: settings?.max ?? null,
   initial: settings?.initial ?? 0,
+  look: settings?.look ?? (CounterLook.number as CounterLook),
 });
 
 /** `count` held to a counter's bounds. */

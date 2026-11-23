@@ -21,7 +21,6 @@ import {
 import { getReadCalendarQueryKey, readCalendar } from "@/api/generated/calendars/calendars";
 import { getReadCommentQueryKey, readComment } from "@/api/generated/comments/comments";
 import { getReadContactQueryKey, readContact } from "@/api/generated/contacts/contacts";
-import { getReadCounterGroupQueryKey, readCounterGroup } from "@/api/generated/counters/counters";
 import { getReadDashboardQueryKey, readDashboard } from "@/api/generated/dashboards/dashboards";
 import {
   getReadCollectionQueryKey,
@@ -29,9 +28,14 @@ import {
   readCollection,
   readFile,
 } from "@/api/generated/files/files";
-import { SearchEntityType, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { SearchEntityType, type ShareStanding, Tool } from "@/api/generated/initiativeAPI.schemas";
+import {
+  getReadPluginToolRowQueryKey,
+  readPluginToolRow,
+} from "@/api/generated/plugin-tools/plugin-tools";
 import { getReadPostQueryKey, readPost } from "@/api/generated/posts/posts";
 import { getReadProjectQueryKey, readProject } from "@/api/generated/projects/projects";
+import { getReadShareStandingQueryKey, readShareStanding } from "@/api/generated/sharing/sharing";
 import { getReadTaskQueryKey, readTask } from "@/api/generated/tasks/tasks";
 import {
   getReadWikiPageQueryKey,
@@ -39,6 +43,7 @@ import {
   readWiki,
   readWikiPage,
 } from "@/api/generated/wikis/wikis";
+import { isToolPluginKind, toolPluginRowRoute } from "@/lib/toolPlugins";
 import {
   collectionRoute,
   eventRoute,
@@ -72,10 +77,6 @@ const TOOL_READS: Record<
   [Tool.file]: {
     key: getReadFileQueryKey,
     read: readFile,
-  },
-  [Tool.counter_group]: {
-    key: getReadCounterGroupQueryKey,
-    read: readCounterGroup,
   },
   [Tool.calendar]: {
     key: getReadCalendarQueryKey,
@@ -116,8 +117,7 @@ type Resolve = (read: Read, communityId: number, id: number) => Promise<string>;
 
 /**
  * The kinds that live inside a tool and can be read by their own id, keyed by
- * the child-kind registry ({@link PARENT_TOOL}). A counter is read by id
- * (`/counters/{id}`), but nothing links to one yet.
+ * the child-kind registry ({@link PARENT_TOOL}).
  */
 const CHILD_RESOLVERS: Partial<Record<keyof typeof PARENT_TOOL, Resolve>> = {
   task: async (read, communityId, id) => {
@@ -154,7 +154,7 @@ const CHILD_RESOLVERS: Partial<Record<keyof typeof PARENT_TOOL, Resolve>> = {
 
 /**
  * What `/go/{refType}/{id}` can resolve, by ref type: every tool and every
- * child kind above, each named by its kebab singular (`counter-group`,
+ * child kind above, each named by its kebab singular (`calendar`,
  * `calendar-event`). Derived from the tool registry and the child kinds, so a
  * new tool is addressable here the day it exists.
  */
@@ -189,6 +189,21 @@ const resolveComment: Resolve = async (read, communityId, id) => {
 };
 RESOLVERS.set("comment", resolveComment);
 
+/** A tool plug-in's row, the tool's own or an item's, by its kind
+ *  (`counter-group.abc123`, its key kebab-cased as every ref type is): the page
+ *  every tool plug-in's rows share, in its initiative. None for any other ref
+ *  type. */
+const pluginToolResolver = (refType: string): Resolve | null => {
+  const kind = refType.replaceAll("-", "_");
+  if (!isToolPluginKind(kind)) return null;
+  return async (read, communityId, id) => {
+    const row = await read(getReadPluginToolRowQueryKey(communityId, kind, id), () =>
+      readPluginToolRow(communityId, kind, id)
+    );
+    return toolPluginRowRoute(row.initiative_id, kind, id);
+  };
+};
+
 /** The fragment a link to one comment ends in. */
 export const commentAnchor = (commentId: number): string => `#comment-${commentId}`;
 
@@ -204,12 +219,13 @@ export const isSearchEntityType = (value: string): value is SearchEntityType =>
   Object.hasOwn(SearchEntityType, value);
 
 /**
- * The ref type addressing an entity of a given kind — its kebab singular — or
- * `null` for a kind that has no address of its own (a counter, a tag).
+ * The ref type addressing an entity of a given kind — its kebab singular, and
+ * for a tool plug-in's row, its kind kebabed (`counter-group.abc123`) — or
+ * `null` for a kind that has no address of its own (a tag).
  */
-export const entityRefTypeFor = (type: SearchEntityType): string | null => {
+export const entityRefTypeFor = (type: string): string | null => {
   const kebab = type.replaceAll("_", "-");
-  return isEntityRefType(kebab) ? kebab : null;
+  return isEntityRefType(kebab) || isToolPluginKind(type) ? kebab : null;
 };
 
 /**
@@ -217,13 +233,44 @@ export const entityRefTypeFor = (type: SearchEntityType): string | null => {
  * resolved — it was deleted, the reader can't see it, or its parent is gone.
  * Callers send `null` to the community home rather than guessing at an address.
  */
+/**
+ * Where something the reader can't open but may know is there lives, built from
+ * its presence (`/share-requests/standing`): the tool that decides it and its
+ * initiative. Its page then offers to ask for it, so a link sent to somebody
+ * who can't open it yet still leads somewhere they can act. Outside the
+ * reader's initiatives nothing is present, and this is `null` as before.
+ */
+const PRESENT_CHILD_ROUTES: Record<string, (standing: ShareStanding, id: number) => string> = {
+  task: (standing, id) => taskRoute(standing.initiative_id, standing.resource_id, id),
+  "calendar-event": (standing, id) => eventRoute(standing.initiative_id, standing.resource_id, id),
+  "wiki-page": (standing, id) => wikiPageRoute(standing.initiative_id, standing.resource_id, id),
+  collection: (standing, id) => collectionRoute(standing.initiative_id, id),
+};
+
+const resolvePresent = async (
+  read: Read,
+  communityId: number,
+  refType: string,
+  id: number
+): Promise<string | null> => {
+  const kind = refType.replaceAll("-", "_");
+  const child = PRESENT_CHILD_ROUTES[refType];
+  const tool = TOOLS.find((t) => t === kind);
+  if (!isSearchEntityType(kind) || (!child && !tool)) return null;
+  const params = { kind, entity_id: id };
+  const standing = await read(getReadShareStandingQueryKey(communityId, params), () =>
+    readShareStanding(communityId, params)
+  );
+  return child ? child(standing, id) : toolDetailRoute(tool as Tool, standing.initiative_id, id);
+};
+
 export async function resolveEntityPath(
   queryClient: QueryClient,
   communityId: number,
   refType: string,
   entityId: number
 ): Promise<string | null> {
-  const resolve = RESOLVERS.get(refType);
+  const resolve = RESOLVERS.get(refType) ?? pluginToolResolver(refType);
   if (!Number.isFinite(entityId) || !resolve) return null;
 
   const read = <T>(queryKey: readonly unknown[], queryFn: () => Promise<T>) =>
@@ -232,7 +279,13 @@ export async function resolveEntityPath(
   try {
     return await resolve(read, communityId, entityId);
   } catch {
-    // Deleted, or the reader can't see it. The caller lands on the community home.
-    return null;
+    // The reader can't open it: where they may know it is there, its page
+    // offers to ask for it. Deleted, or not there for them at all, and the
+    // caller lands on the community home.
+    try {
+      return await resolvePresent(read, communityId, refType, entityId);
+    } catch {
+      return null;
+    }
   }
 }

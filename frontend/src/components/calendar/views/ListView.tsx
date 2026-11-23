@@ -17,10 +17,19 @@ import { nonEmptyPropertySummaries } from "@/ui/properties/propertyHelpers";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 import type { CalendarEntry } from "../CalendarView";
-import { type CalendarViewBaseProps, dateKey, EntryType, kindLabelKey, parseEntry } from "./shared";
+import {
+  type CalendarViewBaseProps,
+  dateKey,
+  EntryType,
+  kindLabelKey,
+  lastDayOf,
+  parseEntry,
+} from "./shared";
 
-// Multi-day entries expand so each spanned day gets its own row.
-type ListRow = { entry: CalendarEntry; displayDate: Date; isSpanDay: boolean };
+// Multi-day entries expand so each day they are on gets its own row. A timed
+// entry's row says its hours on the day it starts, when it stops on the day it
+// ends, and "All day" on any day between.
+type ListRow = { entry: CalendarEntry; displayDate: Date; when: "hours" | "until" | "allDay" };
 
 export function ListView({
   entries,
@@ -54,17 +63,23 @@ export function ListView({
       const { start, end } = parseEntry(entry);
       if (Number.isNaN(start.getTime())) continue;
 
-      const endDay = Number.isNaN(end.getTime()) ? start : end;
-      const cursor = new Date(Math.max(startOfDay(start).getTime(), monthStart.getTime()));
-      const last = new Date(Math.min(startOfDay(endDay).getTime(), monthEnd.getTime()));
+      const firstDay = startOfDay(start);
+      const lastDay = lastDayOf(entry, start, end);
+      const cursor = new Date(Math.max(firstDay.getTime(), monthStart.getTime()));
+      const last = new Date(Math.min(lastDay.getTime(), monthEnd.getTime()));
 
       while (cursor <= last) {
         if (cursor >= monthStart && cursor <= monthEnd) {
-          result.push({
-            entry,
-            displayDate: new Date(cursor),
-            isSpanDay: cursor > startOfDay(start),
-          });
+          // A later day is "All day" when the event runs to that day's end,
+          // midnight included, and says when it stops otherwise.
+          const runsToDayEnd = end >= startOfDay(addDays(cursor, 1));
+          const when =
+            entry.allDay || (cursor > firstDay && runsToDayEnd)
+              ? "allDay"
+              : cursor > firstDay
+                ? "until"
+                : "hours";
+          result.push({ entry, displayDate: new Date(cursor), when });
         }
         cursor.setTime(startOfDay(addDays(cursor, 1)).getTime());
       }
@@ -86,7 +101,7 @@ export function ListView({
   return (
     <TooltipProvider delayDuration={200}>
       <div className="space-y-1">
-        {rows.map(({ entry, displayDate, isSpanDay }) => {
+        {rows.map(({ entry, displayDate, when }) => {
           const { start, end } = parseEntry(entry);
           const chips = nonEmptyPropertySummaries(entry.properties);
 
@@ -210,9 +225,11 @@ export function ListView({
 
               {/* Time */}
               <span className="shrink-0 pt-1 text-muted-foreground text-xs">
-                {entry.allDay || isSpanDay
+                {when === "allDay"
                   ? t("common:calendar.allDay")
-                  : `${formatTime(start)} – ${formatTime(end)}`}
+                  : when === "until"
+                    ? t("common:calendar.until", { time: formatTime(end) })
+                    : `${formatTime(start)} – ${formatTime(end)}`}
               </span>
             </button>
           );

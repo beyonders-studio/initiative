@@ -15,7 +15,6 @@ import { useTranslation } from "react-i18next";
 import type {
   ListCalendarsParams,
   ListContactsParams,
-  ListCounterGroupsParams,
   ListDashboardsParams,
   ListFilesParams,
   ListPostsParams,
@@ -41,7 +40,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 type ToolListParams = {
   [Tool.project]: ListProjectsParams;
   [Tool.file]: ListFilesParams;
-  [Tool.counter_group]: ListCounterGroupsParams;
   [Tool.calendar]: ListCalendarsParams;
   [Tool.dashboard]: ListDashboardsParams;
   [Tool.post]: ListPostsParams;
@@ -94,16 +92,21 @@ export type ToolFilterFieldsProps<T extends Tool = Tool> = {
 };
 
 type SearchTagFieldsProps = ToolFilterFieldsProps & {
-  tool: Tool;
+  /** The tool's own namespace, which holds `filters.searchLabel`. */
+  ns: string;
   /** Placeholder key in the tool's own namespace. */
   placeholder: string;
+  /** The initiative's property conditions, which a tool plug-in's rows
+   *  hold none of. */
+  properties?: boolean;
 };
 
 /** A search box, a tag picker and property conditions — what most tool lists
  *  narrow by. */
-const SearchTagFields = ({
-  tool,
+export const SearchTagFields = ({
+  ns,
   placeholder,
+  properties = true,
   value,
   onChange,
   initiativeId,
@@ -111,7 +114,7 @@ const SearchTagFields = ({
 }: SearchTagFieldsProps) => {
   // The tool's own namespace is named after it, so the loose translate
   // signature rather than the statically-typed one.
-  const { t: translate } = useTranslation([toolCamelPlural(tool) as FlatNamespace, "tags"]);
+  const { t: translate } = useTranslation([ns as FlatNamespace, "tags"]);
   const t = translate as TranslateFn;
   const id = useId();
   const appendOption = useAppendPropertyOption();
@@ -149,18 +152,20 @@ const SearchTagFields = ({
         </div>
         {children}
       </div>
-      <PropertyFilter
-        value={parsePropertyFilters(value.property_filters)}
-        onChange={(next) =>
-          onChange({
-            ...value,
-            property_filters: next.length > 0 ? JSON.stringify(next) : undefined,
-          })
-        }
-        definitions={definitions}
-        appendOption={appendOption}
-        searchMembers={searchMembers}
-      />
+      {properties ? (
+        <PropertyFilter
+          value={parsePropertyFilters(value.property_filters)}
+          onChange={(next) =>
+            onChange({
+              ...value,
+              property_filters: next.length > 0 ? JSON.stringify(next) : undefined,
+            })
+          }
+          definitions={definitions}
+          appendOption={appendOption}
+          searchMembers={searchMembers}
+        />
+      ) : null}
     </>
   );
 };
@@ -183,7 +188,7 @@ const FileFilterFields = ({
 
   return (
     <SearchTagFields
-      tool={Tool.file}
+      ns={toolCamelPlural(Tool.file)}
       placeholder="filters.searchFiles"
       value={value}
       onChange={onChange}
@@ -242,7 +247,7 @@ const ContactFilterFields = ({
 
   return (
     <SearchTagFields
-      tool={Tool.contact}
+      ns={toolCamelPlural(Tool.contact)}
       placeholder="filters.searchContacts"
       value={value}
       onChange={onChange}
@@ -279,7 +284,7 @@ const ContactFilterFields = ({
 };
 
 const searchAndTags = (tool: Tool, placeholder: string) => (props: ToolFilterFieldsProps) => (
-  <SearchTagFields tool={tool} placeholder={placeholder} {...props} />
+  <SearchTagFields ns={toolCamelPlural(tool)} placeholder={placeholder} {...props} />
 );
 
 /** Every tool's filter fields. A mapped type over the tool enum, so a new tool
@@ -287,7 +292,6 @@ const searchAndTags = (tool: Tool, placeholder: string) => (props: ToolFilterFie
 const TOOL_FILTER_FIELDS: { [T in Tool]: ComponentType<ToolFilterFieldsProps<T>> } = {
   [Tool.project]: searchAndTags(Tool.project, "filters.searchProjects"),
   [Tool.file]: FileFilterFields,
-  [Tool.counter_group]: searchAndTags(Tool.counter_group, "filters.searchGroups"),
   [Tool.calendar]: searchAndTags(Tool.calendar, "filters.searchCalendars"),
   [Tool.dashboard]: searchAndTags(Tool.dashboard, "filters.searchDashboards"),
   [Tool.post]: searchAndTags(Tool.post, "filters.searchPosts"),

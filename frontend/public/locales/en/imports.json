@@ -103,6 +103,7 @@
       "assets": "{{restored}} files restored, {{deduped}} already present",
       "unmatchedHandles": "Some people weren't placed. Nobody here matched them, or you can't add them to this initiative: {{handles}}",
       "failedEntries": "Items that failed to import:",
+      "skippedEntries": "Items left out:",
       "nothing": "Nothing was imported.",
       "failedRows_one": "{{count}} row was left out:",
       "failedRows_other": "{{count}} rows were left out:",
@@ -303,7 +304,6 @@
       "initiative-post": "Post",
       "initiative-wiki": "Wiki",
       "initiative-contact": "Contact",
-      "initiative-counter-group": "Counter group",
       "initiative-dashboard": "Dashboard",
       "contacts-csv": "Contacts from a spreadsheet"
     },

@@ -225,6 +225,10 @@ ROLE_GRANTS = Guc("app.role_grants", Kind.NAMES, standing=True)
 ROLE_DENIES = Guc("app.role_denies", Kind.NAMES, standing=True)
 #: ``"<initiative id>:<tool>"`` where the initiative's switch is on.
 ENABLED_TOOLS = Guc("app.enabled_tools", Kind.NAMES, standing=True)
+#: The kinds of the tool plug-ins' tools that are there for the community,
+#: and those of them that may be written.
+OPEN_TOOLS = Guc("app.open_tools", Kind.NAMES, standing=True, read_once=True)
+WRITABLE_TOOLS = Guc("app.writable_tools", Kind.NAMES, standing=True, read_once=True)
 #: Initiatives where the reader's role holds "Full access".
 OVERRIDE_INITIATIVES = Guc("app.override_initiatives", Kind.IDS, standing=True)
 #: The community's sign-in policy is satisfied by this session.

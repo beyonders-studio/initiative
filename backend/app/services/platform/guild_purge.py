@@ -46,9 +46,12 @@ from app.db import cohorts, post_commit
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.guild_migrations import GUILD_SCHEMA_REGEX
 from app.db.holds import refuse_while_held
+from app.db.plugin_tools import provisioned_tools
 from app.db.request_context import SystemGuild, Unattributed
-from app.db.schema_provisioning import deprovision_guild
+from app.db.schema_provisioning import deprovision_guild, provision_community_tools
 from app.db.session import SystemSessionLocal, set_rls_context
+from app.db.soft_delete_filter import select_including_deleted
+from app.db.tool_rows import ToolRow
 from app.models.platform.guild import CommunityStatus, Guild
 from app.models.platform.plugin_community_hook import PluginCommunityHook
 from app.models.platform.plugin_install import (
@@ -56,8 +59,10 @@ from app.models.platform.plugin_install import (
     PluginInstallClaim,
     PluginInstallStatus,
 )
+from app.models.tenant.guild_plugin import GuildPlugin
 from app.services import audit as audit_service
 from app.services.marketplace import community_hooks, plugin_refs
+from app.services.marketplace.tool_plugins import is_tool_plugin, tool_kinds
 from app.services.platform import rules
 from app.services.platform.retention import (
     COMMUNITY_DELETION,
@@ -140,13 +145,22 @@ async def _uninstall_deleted(
 
     One staff also suspended there is removed without a word to it: nothing is
     queued for it, nothing is revoked at its vendor, and what waited in its
-    queue for the community is discarded with the row."""
+    queue for the community is discarded with the row.
+
+    A tool plug-in goes with its tool (:func:`_purge_tool`), and, once its
+    install is gone, its tables, with the community's rules rendered again
+    without it, before its index row: a step that fails is taken again by the
+    next sweep. While the platform holds any of its content the whole step
+    waits for the next sweep."""
     from app.services.tenant import guild_plugins as guild_plugins_service
+    from app.services.tenant.attachments import delete_blobs
 
     guild_id, install_id = install.guild_id, install.install_id
-    deleted_at = install.status_changed_at
+    listing_uid, deleted_at = install.listing_uid, install.status_changed_at
     suspended = install.suspended_at is not None
     public_id: str | None = None
+    tool = True  # or an install an earlier sweep removed before its tables
+    released: set[str] = set()
     await session.commit()
     async with cohorts.system_session(guild_id) as guild_session:
         await set_rls_context(guild_session, SystemGuild(guild_id))
@@ -170,10 +184,16 @@ async def _uninstall_deleted(
             return
         if plugin is not None:
             public_id = await guild_plugins_service.install_public_id(plugin)
+            tool = is_tool_plugin(plugin.definition)
+            if tool:
+                released = await _purge_tool(guild_session, guild_id, plugin)
             await guild_plugins_service.uninstall_plugin(
                 guild_session, plugin, actor_user_id=None, suspended=suspended
             )
         await guild_session.commit()
+    delete_blobs(guild_id, released)
+    if tool:
+        await provision_community_tools(guild_id, uninstalled=listing_uid)
     if suspended and public_id is not None:
         await session.exec(
             delete(PluginCommunityHook).where(
@@ -190,6 +210,26 @@ async def _uninstall_deleted(
         )
     await session.commit()
     await post_commit.settle(guild_session)
+
+
+async def _purge_tool(
+    session: AsyncSession, guild_id: int, plugin: GuildPlugin
+) -> set[str]:
+    """Purge a tool plug-in's rows as the trash purges a tool's (refused
+    while the platform holds any of them), then the rules and grants naming
+    its kinds. Returns the stored names to delete once it commits."""
+    from app.services.tenant.initiative_tools import forget_tool
+    from app.services.tenant.soft_delete import hard_purge_entities
+
+    tools = await provisioned_tools(guild_id)
+    kinds = tool_kinds(plugin.definition, listing_uid=plugin.listing_uid)
+    tool = tools.by_kind[kinds[0]]
+    rows = (await session.exec(select_including_deleted(tool.table.c.id))).all()
+    released = await hard_purge_entities(
+        session, [ToolRow(tool.table, {"id": row_id}) for row_id in rows], tools=tools
+    )
+    await forget_tool(session, kinds)
+    return released
 
 
 async def uninstall_deleted_plugins(session: AsyncSession, *, now: datetime) -> int:

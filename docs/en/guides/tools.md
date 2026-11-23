@@ -22,7 +22,7 @@ Everything that lives inside an initiative is a **tool**: a project, a file, a c
 
 -   :material-counter: __Counters__
 
-    Numbers that move: tallies, totals, scores, seats left.
+    Numbers that move: tallies, totals, scores, seats left. A free plug-in.
 
     [:octicons-arrow-right-24: Counters](counters.md)
 
@@ -99,7 +99,7 @@ So "I can't see Dashboards at all" is a role question, for an initiative manager
 You need a role that can create that kind of tool. If the button isn't there, ask one of the initiative's managers.
 
 1. Open the initiative and select the tool's tab, such as **Dashboards**.
-2. Select the create button: **Add Project**, **New file**, **Create Counter Group**, **New Dashboard**, **New Post**, **New Wiki** or **New contact**. On the **Calendar** tab, it's **New Calendar** in the list of calendars. On a phone, it's the **+** at the bottom of the screen.
+2. Select the create button: **Add Project**, **New file**, **New Counter group**, **New Dashboard**, **New Post**, **New Wiki** or **New contact**. On the **Calendar** tab, it's **New Calendar** in the list of calendars. On a phone, it's the **+** at the bottom of the screen.
 3. Type a **Name**, and a description if you like.
 4. To change who can see it, open **Advanced options**. Everyone in the initiative can view it unless you say otherwise.
 5. Select the create button at the bottom of the dialog.
@@ -159,7 +159,7 @@ Select **Settings** at the top of the tool's page. You need edit access; the **A
 |---|---|
 | **Details** | The name and description, **Template** (projects and files), **Tags**, **Metadata** and **Comments**. |
 | **Access** | Who can see and edit it. See [Sharing](../sharing/sharing-projects-and-files.md). |
-| **Layouts** | Projects and counter groups only. See [Layouts](layouts.md). |
+| **Layouts** | Projects only. See [Layouts](layouts.md). |
 | The tool's own tabs | A project's **Task statuses**, **Task types** and **Properties**, for instance. |
 | **Advanced** | **Duplicate**, **Export**, **Archive** and the **Danger Zone**. |
 
@@ -182,7 +182,7 @@ Every tool but a post can be copied.
 
 The copy brings everything inside it, with tags and links: a project its tasks, a calendar its events and repeats, a wiki its published pages. It keeps its sharing while it stays in the same initiative, and metadata values only carry over within the same initiative too. Anyone who can read a template can copy it. An initiative set to keep its content in won't copy anything out to another initiative.
 
-A post is published once, and the next one is a new post. The things inside a tool (a task, a counter, an event, a wiki page) copy on their own as well, with "(Copy)" on the name; each tool's page says where.
+A post is published once, and the next one is a new post. The things inside a tool (a task, an event, a wiki page) copy on their own as well, with "(Copy)" on the name; each tool's page says where.
 
 ## Export a tool
 

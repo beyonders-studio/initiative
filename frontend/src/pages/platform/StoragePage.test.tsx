@@ -41,7 +41,7 @@ describe("StoragePage", () => {
     backfillMutate.mockClear();
   });
 
-  it("shows S3 fields prefilled from the saved config", async () => {
+  it("shows S3 fields prefilled, and saves without the secret left blank (keeps stored key)", async () => {
     renderPage();
     const bucket = (await screen.findByLabelText("Bucket")) as HTMLInputElement;
     expect(bucket.value).toBe("existing-bucket");
@@ -49,11 +49,7 @@ describe("StoragePage", () => {
     const secret = screen.getByLabelText("Secret access key") as HTMLInputElement;
     expect(secret.value).toBe("");
     expect(secret.placeholder).toMatch(/unchanged/i);
-  });
-
-  it("saves without the secret when the field is left blank (keeps stored key)", async () => {
-    renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(updateMutate).toHaveBeenCalledTimes(1);
     const payload = updateMutate.mock.calls[0][0];
@@ -72,16 +68,13 @@ describe("StoragePage", () => {
     expect(updateMutate.mock.calls[0][0].s3_secret_access_key).toBe("brand-new-secret");
   });
 
-  it("runs a connection test with the current form values", async () => {
+  it("runs a connection test with the current form values, and starts a backfill", async () => {
     renderPage();
     fireEvent.click(await screen.findByRole("button", { name: "Test connection" }));
     expect(testMutate).toHaveBeenCalledTimes(1);
     expect(testMutate.mock.calls[0][0].s3_bucket).toBe("existing-bucket");
-  });
 
-  it("starts a backfill", async () => {
-    renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Start backfill" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start backfill" }));
     expect(backfillMutate).toHaveBeenCalledTimes(1);
   });
 

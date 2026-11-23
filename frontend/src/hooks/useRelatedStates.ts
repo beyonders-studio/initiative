@@ -1,11 +1,8 @@
 import { useMemo } from "react";
 
-import {
-  EndpointKind,
-  type RelationshipRead,
-  type SmartChipState,
-} from "@/api/generated/initiativeAPI.schemas";
+import type { RelationshipRead, SmartChipState } from "@/api/generated/initiativeAPI.schemas";
 import { useChipStates } from "@/hooks/useSmartChips";
+import { EndpointKind } from "@/lib/relationships";
 import { chipAspect, chipKindsFor, chipRef } from "@/lib/smartChips";
 
 /**

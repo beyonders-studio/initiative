@@ -19,6 +19,7 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import type { ExportExtraAction, ExportFormatOption } from "@/components/exports/ExportButton";
 import type { ExportContentSeed } from "@/components/exports/ExportWizard";
+import type { GrantsChange } from "@/hooks/toolHooks";
 
 /**
  * The slice of a tool's read schema its settings need. Every tool — counter
@@ -81,7 +82,7 @@ export interface ToolSettingsContextValue {
   update?: ToolMutation<{ name?: string; description?: string | null }>;
   /** Marks it a template or takes it back. Only tools with templates pass it. */
   template?: ToolMutation<{ is_template: boolean }>;
-  setGrants: ToolMutation<ResourceGrantSchema[]>;
+  setGrants: ToolMutation<GrantsChange>;
   remove: ToolMutation<number>;
   /** Extra cards for the Details section, e.g. a calendar's color. */
   detailsExtra?: ReactNode;

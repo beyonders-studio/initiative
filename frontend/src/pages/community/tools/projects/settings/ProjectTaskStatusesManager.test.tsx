@@ -8,17 +8,13 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { buildProjectTaskStatus } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { TaskStatusRead } from "@/api/generated/initiativeAPI.schemas";
-
-vi.mock("@/lib/mascotToast", () => ({
-  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
-}));
 
 import { ProjectTaskStatusesManager } from "./ProjectTaskStatusesManager";
 
@@ -102,10 +98,6 @@ const openDeleteFor = async (name: string) => {
 };
 
 describe("ProjectTaskStatusesManager delete dialog", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it("sends no fallback when the reader leaves the choice to the project", async () => {
     const deletes = captureDeletes();
     renderManager();
@@ -118,26 +110,18 @@ describe("ProjectTaskStatusesManager delete dialog", () => {
     expect(deletes[0].body).toEqual({ fallback_status_id: null });
   });
 
-  it("offers every other column, not only the target's own category", async () => {
+  it("offers every other column, and sends the one picked, across categories", async () => {
+    const deletes = captureDeletes();
     renderManager();
 
     const user = await openDeleteFor("Blocked");
     await user.click(await screen.findByRole("combobox", { name: /move tasks to/i }));
-
     // Blocked is `todo` and has no `todo` sibling, which is exactly the case
     // the old same-category rule could not express.
     for (const name of ["In Progress", "Done", "To Do"]) {
       expect(await screen.findByRole("option", { name })).toBeInTheDocument();
     }
     expect(screen.queryByRole("option", { name: "Blocked" })).not.toBeInTheDocument();
-  });
-
-  it("sends the column the reader picked, across categories", async () => {
-    const deletes = captureDeletes();
-    renderManager();
-
-    const user = await openDeleteFor("Blocked");
-    await user.click(await screen.findByRole("combobox", { name: /move tasks to/i }));
     await user.click(await screen.findByRole("option", { name: "In Progress" }));
     await user.click(screen.getByRole("button", { name: /^delete$/i }));
 
@@ -168,10 +152,6 @@ describe("ProjectTaskStatusesManager delete dialog", () => {
 });
 
 describe("ProjectTaskStatusesManager table", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it("saves a column moved to another category, with that category's look", async () => {
     const updates: unknown[] = [];
     server.use(

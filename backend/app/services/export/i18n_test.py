@@ -1,9 +1,8 @@
-"""Export-content i18n: catalog parity across locales + the translation seam."""
+"""Export-content i18n: catalog parity across locales. A report localizing to
+its creator is tested through the export endpoints."""
 
 import json
 from pathlib import Path
-
-from app.services.export.i18n import et, export_locale
 
 _LOCALES_DIR = Path(__file__).resolve().parents[2] / "locales"
 _LOCALES = ("en", "de", "es", "fr")
@@ -48,40 +47,3 @@ def test_every_task_priority_enum_value_has_a_catalog_entry():
             assert f"priority.{priority.value}" in keys, (
                 f"{locale} missing priority.{priority.value}"
             )
-
-
-def test_plural_and_interpolation_variants_present_in_every_locale():
-    """The summary keys are plural (``_one``/``_other``); every locale must
-    carry both variants or a count would fall back to English mid-sentence."""
-    for locale in _LOCALES:
-        keys = _flatten(_catalog(locale))
-        for base in ("summary.tasks", "summary.items", "summary.counters"):
-            assert f"{base}_one" in keys and f"{base}_other" in keys
-
-
-def test_et_translates_and_interpolates():
-    assert et("fields.title", "es") == "Tarea"
-    assert et("status.held", "fr") == "En attente"
-    assert et("footer.project", "de", name="Ada") == "Ada — Projektbericht"
-
-
-def test_et_selects_plural_by_count():
-    assert et("summary.tasks", "en", count=1) == "1 task"
-    assert et("summary.tasks", "en", count=3) == "3 tasks"
-    assert et("summary.counters", "fr", count=2) == "2 compteurs"
-
-
-def test_et_falls_back_to_english_for_unknown_locale():
-    assert et("fields.task_status_id", "zz") == "Status"
-
-
-def test_export_locale_defaults_to_english():
-    class _NoLocale:
-        pass
-
-    assert export_locale(_NoLocale()) == "en"
-
-    class _WithLocale:
-        locale = "fr"
-
-    assert export_locale(_WithLocale()) == "fr"

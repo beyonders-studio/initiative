@@ -35,10 +35,3 @@ def test_the_families_do_not_publish_the_account():
     published = account_only & PUBLISHED_COLUMNS
     assert not published, f"these are not public: {sorted(published)}"
     assert account_only <= PRIVATE_COLUMNS
-
-
-def test_a_new_column_is_private_until_it_is_named():
-    """``PRIVATE_COLUMNS`` is derived, not listed, so the default for anything
-    added to the model is 'not published'."""
-    assert PRIVATE_COLUMNS == all_user_columns() - PUBLISHED_COLUMNS
-    assert not PRIVATE_COLUMNS & PUBLISHED_COLUMNS

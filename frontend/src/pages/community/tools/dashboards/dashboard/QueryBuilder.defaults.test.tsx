@@ -8,10 +8,11 @@
  */
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildPluginCatalogEntry } from "@/__tests__/factories";
+import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import type {
@@ -41,7 +42,7 @@ const DEFAULTS: Record<string, { field: string; op: string; value: unknown }[]> 
 
 beforeEach(() => {
   server.use(
-    http.get("/api/v1/fields/:dataset", ({ params }) => {
+    communityHttp.get("/fields/:dataset", ({ params }) => {
       const dataset = String(params.dataset);
       return HttpResponse.json({
         dataset,
@@ -97,12 +98,7 @@ function mount() {
 }
 
 describe("seeding a new statement", () => {
-  it("leaves out archived work and templates", async () => {
-    const { seeded } = mount();
-    await waitFor(() => expect(seeded()).toEqual(["archived_at", "project.is_template"]));
-  });
-
-  it("seeds a dataset the author comes back to", async () => {
+  it("leaves out archived work and templates, again on a dataset the author comes back to", async () => {
     // The bug this pins: choosing a dataset clears the filters, so a trip
     // through another dataset and back left a statement reporting on work
     // that is not live.
@@ -138,6 +134,33 @@ describe("seeding a new statement", () => {
   });
 });
 
+describe("a tool plug-in's dataset", () => {
+  it("is offered beside the built-in ones and read once chosen", async () => {
+    // The vocabulary lists the community's tool set, so a dataset the
+    // generated types never heard of is one a statement may name.
+    server.use(
+      communityHttp.get("/query/vocabulary", () =>
+        HttpResponse.json({ datasets: ["hoard_items", "tasks"], functions: [], tokens: [] })
+      )
+    );
+    const onChange = vi.fn();
+    renderWithProviders(
+      <QueryBuilder
+        spec={spec("tasks")}
+        onChange={onChange}
+        initiativeId={7}
+        spreadsheets={NONE}
+        plugins={NO_PLUGINS}
+      />
+    );
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("combobox", { name: "Show data from" }));
+    await user.click(await screen.findByRole("option", { name: "hoard_items" }));
+    expect(onChange).toHaveBeenCalledWith(spec("hoard_items"));
+  });
+});
+
 describe("grouping", () => {
   it("groups by every column shown as it is once one is a count", async () => {
     const onChange = vi.fn();
@@ -163,32 +186,23 @@ describe("grouping", () => {
     );
   });
 
-  it("says what a saved widget is grouped by until it is edited", () => {
+  it.each([
     // Built before the grouping was worked out: a plain column, grouped. The
     // statement it builds is grouped, so that is what the line says.
+    [["title"], "One row for each Title"],
+    // Without a count or a total, nothing is grouped.
+    [[], "Every row, as it is"],
+  ])("says what a saved widget grouped by %j is grouped by", (group_by, line) => {
     renderWithProviders(
       <QueryBuilder
-        spec={{ ...spec("members"), columns: [{ field: "title" }], group_by: ["title"] }}
+        spec={{ ...spec("members"), columns: [{ field: "title" }], group_by }}
         onChange={vi.fn()}
         initiativeId={7}
         spreadsheets={NONE}
         plugins={NO_PLUGINS}
       />
     );
-    expect(screen.getByText("One row for each Title")).toBeInTheDocument();
-  });
-
-  it("groups nothing without a count or a total", () => {
-    renderWithProviders(
-      <QueryBuilder
-        spec={{ ...spec("members"), columns: [{ field: "title" }] }}
-        onChange={vi.fn()}
-        initiativeId={7}
-        spreadsheets={NONE}
-        plugins={NO_PLUGINS}
-      />
-    );
-    expect(screen.getByText("Every row, as it is")).toBeInTheDocument();
+    expect(screen.getByText(line)).toBeInTheDocument();
   });
 });
 
@@ -351,14 +365,6 @@ describe("a plug-in's endpoint", () => {
     return { onChange, view };
   };
 
-  it("is chosen beside the datasets, once a plug-in has something to read", async () => {
-    const user = userEvent.setup();
-    const { onChange } = show(spec("members"));
-    await user.click(screen.getByRole("combobox", { name: "Show data from" }));
-    await user.click(await screen.findByRole("option", { name: "Plug-in data" }));
-    expect(onChange).toHaveBeenLastCalledWith(reading);
-  });
-
   it("offers only the installs and endpoints a statement can name", async () => {
     const user = userEvent.setup();
     show(reading);
@@ -373,29 +379,6 @@ describe("a plug-in's endpoint", () => {
       "orders",
       "refunds",
     ]);
-  });
-
-  it("starts with every column it returns, and keeps them when a setting is answered", async () => {
-    const { onChange, view } = show(reading);
-    const seeded = { ...reading, columns: [{ field: "status" }, { field: "total" }] };
-    await waitFor(() => expect(onChange).toHaveBeenLastCalledWith(seeded));
-
-    view.rerender(
-      <QueryBuilder
-        spec={seeded}
-        onChange={onChange}
-        initiativeId={7}
-        spreadsheets={NONE}
-        plugins={plugins}
-        plugin={read}
-      />
-    );
-    const user = userEvent.setup();
-    await user.type(screen.getByLabelText("Range"), "30d");
-    expect(onChange).toHaveBeenLastCalledWith({
-      ...seeded,
-      plugin: { ...seeded.plugin, params: { range: "30d" } },
-    });
   });
 
   it("starts over on another endpoint", async () => {

@@ -44,7 +44,7 @@ from app.services.marketplace.definitions import (
 )
 from app.services.query import resolve
 from app.services.tenant.dashboard_definition import WIDGET_SPECS
-from app.testing import route_session_to_guild
+from app.testing import route_session_to_guild, switch_tools
 
 pytestmark = pytest.mark.always
 
@@ -240,21 +240,13 @@ class TestShippedManifests:
                     f"{public_id}/{widget['id']} binds to {binding.get('source')!r}, "
                     "which no shipped dashboard should"
                 )
-                resolve(binding["sql"])
-
-    async def test_every_shipped_dashboard_fills_the_slots_it_draws(self):
-        """A tile that returns fewer columns than its widget requires draws
-        nothing at all — the table fallback, on a dashboard somebody installed
-        expecting a chart."""
-        for manifest in load_builtin_manifests():
-            if manifest.get("kind") != "dashboard":
-                continue
-            for widget in manifest["definition"]["widgets"]:
-                spec = WIDGET_SPECS[widget["type"]]
+                # A tile that returns fewer columns than its widget requires
+                # draws nothing at all — the table fallback, on a dashboard
+                # somebody installed expecting a chart.
                 required = [slot for slot in spec.shape if slot.required]
-                columns = resolve(widget["binding"]["sql"]).column_types
+                columns = resolve(binding["sql"]).column_types
                 assert len(columns) >= len(required), (
-                    f"{manifest['public_id']}/{widget['id']}: {widget['type']} "
+                    f"{public_id}/{widget['id']}: {widget['type']} "
                     f"needs {len(required)} columns, the statement returns "
                     f"{len(columns)}"
                 )
@@ -284,13 +276,9 @@ class TestShippedManifests:
         assert landed == len(expected)
         assert set((await _seeded(session)).keys()) == expected
 
-    async def test_every_shipped_listing_can_be_installed_now(self, session):
-        """A built-in ships inside the app that renders it, so there is no build
-        on which it is offered but refused. A version floor naming a release that
-        has not happened yet would put every listing in exactly that state."""
-        await seed_builtin_listings(session)
-        await session.commit()
-
+        # A built-in ships inside the app that renders it, so there is no build
+        # on which it is offered but refused: a version floor naming a release
+        # that has not happened yet would put every listing in exactly that state.
         for listing in (await _seeded(session)).values():
             version = await catalog_service.resolve_installable_version(
                 session, listing
@@ -306,10 +294,9 @@ class TestShippedManifests:
         await seed_builtin_listings(session)
         await session.commit()
         actor = await acting_user(guild_role=CommunityRole.member, initiative=True)
-        for tool in TOOL_LISTING_KINDS.values():
-            setattr(actor.initiative, tool.view_permission, True)
-        session.add(actor.initiative)
-        await session.commit()
+        await switch_tools(
+            session, actor.initiative, dict.fromkeys(TOOL_LISTING_KINDS.values(), True)
+        )
 
         for manifest in load_builtin_manifests():
             if manifest["kind"] not in TOOL_LISTING_KINDS:
@@ -546,27 +533,13 @@ class TestWithdrawingWhatIsNoLongerShipped:
         assert listings["core.bundler"].available is True
         assert listings["core.bundler-overview"].available is True
 
-    async def test_dropping_the_bundling_plugin_withdraws_its_dashboard(
-        self, session, tmp_path
-    ):
-        await self._seed_dir(
-            tmp_path,
-            [
-                self._bundling_manifest(
-                    uid="BNDAPP00000002",
-                    public_id="core.bundler2",
-                    dash_uid="DASHB0ARD00003",
-                )
-            ],
-        )
-        await seed_builtin_listings(session, tmp_path)
-
-        (tmp_path / "core.bundler2.json").unlink()
+        # Dropping the bundling plug-in withdraws its dashboard with it.
+        (tmp_path / "core.bundler.json").unlink()
         await seed_builtin_listings(session, tmp_path)
 
         listings = await _seeded(session)
-        assert listings["core.bundler2"].available is False
-        assert listings["core.bundler2-overview"].available is False
+        assert listings["core.bundler"].available is False
+        assert listings["core.bundler-overview"].available is False
 
     async def test_an_operator_listing_is_not_this_build_to_withdraw(
         self, session, tmp_path

@@ -41,6 +41,7 @@ from app.core.security_rules import (
     MAX_KEYS_PER_RULE,
     Envelope,
     SecurityRule,
+    Severity,
     Signal,
     signal_envelope,
 )
@@ -308,21 +309,32 @@ async def _open(crossing: Crossing) -> bool:
     """Write the one line a crossing gets, and open or add to its case.
     Returns whether the case is done with: ``False`` to try again."""
     from app.core.intake import IntakeStream
+    from app.models.tenant.task import TaskPriority
     from app.services.platform.intake import CaseRefs, open_case
 
     rule = crossing.rule
     if crossing.line is None:
         crossing.line = _write_line(crossing)
     line = crossing.line
+    newest = crossing.bucket.event_uuid
     try:
         await open_case(
             IntakeStream.security,
             title=rule.title,
             body=(
-                f"Rule `{rule.name}` ({rule.severity.value}): {crossing.count} in "
-                f"{_span(rule.window)}, against a threshold of {rule.threshold}.\n\n"
-                f"The audit line `{line['event_uuid']}` "
-                "(`security.threshold_crossed`) names what was counted."
+                f"{rule.guidance}\n\n"
+                f"{crossing.count} in {_span(rule.window)}, against a threshold of "
+                f"{rule.threshold} (rule `{rule.name}`, {rule.severity.value}). The "
+                f"audit line `{line['event_uuid']}` (`security.threshold_crossed`) "
+                "names what was counted"
+                + (f", and `{newest}` is the newest event counted." if newest else ".")
+            ),
+            # A case is as urgent as its rule: high is high, and a rule there
+            # only to keep a record is low.
+            priority=(
+                TaskPriority.low
+                if rule.severity is Severity.info
+                else TaskPriority(rule.severity.value)
             ),
             refs=CaseRefs(
                 subject_user=crossing.bucket.subject_user,

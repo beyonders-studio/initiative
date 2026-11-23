@@ -65,6 +65,7 @@ from sqlalchemy import (
     or_,
     true,
     tuple_,
+    update,
     values,
 )
 from sqlalchemy.dialects.postgresql import distinct_on
@@ -83,6 +84,7 @@ from app.core.messages import (
     QueryMessages,
 )
 from app.core.plugin_scopes import tool_resource
+from app.core.tool_set import BUILTIN_TOOLS, ToolRecord, ToolSet
 from app.core.tools import (
     INSTALL_METADATA_KIND,
     ITEM_KINDS,
@@ -101,8 +103,10 @@ from app.db.session import (
     RLS_CONTEXT_MAX_AGE_SECONDS,
     guild_context,
     routed_guild_id,
+    routed_tools,
     set_rls_context,
 )
+from app.db.tool_rows import ToolRow, locate
 from app.models.platform.identity_ref import IdentityEntity
 from app.models.platform.user import User
 from app.models.platform.user_profile_view import MemberProfile
@@ -158,17 +162,21 @@ class PropertyLinkSpec:
     model (from its table), the tool whose sharing governs it, and the column
     on the row naming that tool's row — ``None`` where the row IS the tool row.
     ``shared`` is false for a row no sharing governs (a collection), which
-    answers to its tool in its initiative alone.
+    answers to its tool in its initiative alone. A tool plug-in's row
+    (:func:`link_for` a ``ToolRow``) has its table for a model and its tool's
+    record, and carries its tool's row with it.
     """
 
     target: str
-    model: type[SQLModel]
-    tool: Tool
+    model: type[SQLModel] | Table
+    tool: Tool | ToolRecord
     via: str | None
     changed: ValuesChanged | None = None
     shared: bool = True
 
     def governing_id(self, row: Any) -> int:
+        if isinstance(row, ToolRow):
+            return row.tool["id"]
         return row.id if self.via is None else getattr(row, self.via)
 
     def governing(self, row: Any, initiative_id: int | None) -> Any:
@@ -190,7 +198,7 @@ _CHANGED: dict[str, ValuesChanged] = {"calendar_event": _occurrences_follow}
 
 
 def _link(target: str, models: dict[str, type[SQLModel]]) -> PropertyLinkSpec:
-    table = entity_tables()[target]
+    table = entity_tables(BUILTIN_TOOLS)[target]
     kind = KINDS[target]
     if kind.standalone:
         return PropertyLinkSpec(
@@ -220,13 +228,22 @@ PROPERTY_LINKS: dict[str, PropertyLinkSpec] = _links()
 
 #: The same registry keyed by model, so a caller holding rows need not also say
 #: what they are. Derived, never a second list.
-PROPERTY_LINKS_BY_MODEL: dict[type[SQLModel], PropertyLinkSpec] = {
+PROPERTY_LINKS_BY_MODEL: dict[type[SQLModel] | Table, PropertyLinkSpec] = {
     spec.model: spec for spec in PROPERTY_LINKS.values()
 }
 
 
-def link_for(entity: Any) -> PropertyLinkSpec:
-    """The spec for a row or its model. Raises for a type that carries none."""
+def link_for(entity: Any, tools: ToolSet = BUILTIN_TOOLS) -> PropertyLinkSpec:
+    """The spec for a row or its model, or for a tool plug-in's row, one of
+    ``tools``'. Raises for a type that carries none."""
+    if isinstance(entity, ToolRow):
+        kind = tools.table_kinds[entity.table.name]
+        located = locate(tools, kind)
+        if located is None:  # pragma: no cover - a row of a table no tool has
+            raise KeyError(f"{kind} is no installed tool's")
+        return PropertyLinkSpec(
+            target=kind, model=entity.table, tool=located.tool, via=None
+        )
     model = entity if isinstance(entity, type) else type(entity)
     try:
         return PROPERTY_LINKS_BY_MODEL[model]
@@ -552,7 +569,7 @@ async def write_values(
     Answers whether the write changes ``row`` beyond its signatures, which a
     replace of every value always does.
     """
-    spec = link_for(row)
+    spec = link_for(row, routed_tools(session))
     held = _of(spec.target, [row.id]) & _values_of(_carried(row, collection_id))
     named_ids = [
         *(removed or ()),
@@ -796,11 +813,17 @@ async def set_values(
     # A collection's metadata is the collection's, so it leaves the file as
     # it was; and signing the row leaves it as it was, so a later signature
     # doesn't read as a change since an earlier one.
-    if changed and collection_id is None and hasattr(row, "updated_at"):
+    if changed and collection_id is None and isinstance(row, ToolRow):
+        await session.exec(
+            update(row.table)
+            .where(row.table.c.id == row.id)
+            .values(updated_at=datetime.now(UTC))
+        )
+    elif changed and collection_id is None and hasattr(row, "updated_at"):
         row.updated_at = datetime.now(UTC)
         session.add(row)
     await session.flush()
-    spec = link_for(row)
+    spec = link_for(row, routed_tools(session))
     if spec.changed is not None:
         await spec.changed(session, row)
 
@@ -844,8 +867,9 @@ async def _write_in_place(
     """``values`` onto ``row`` in the caller's transaction, held to the row's
     own initiative as the policies read it."""
     await session.flush()
+    target = link_for(row, routed_tools(session)).target
     initiative_id = (
-        await session.exec(select(func.entity_initiative(link_for(row).target, row.id)))
+        await session.exec(select(func.entity_initiative(target, row.id)))
     ).one()
     await write_values(
         session,
@@ -857,10 +881,10 @@ async def _write_in_place(
 
 
 async def copy_values(
-    session: AsyncSession, model: type[SQLModel], copies: Mapping[int, int]
+    session: AsyncSession, entity: Any, copies: Mapping[int, int]
 ) -> None:
     """Give each copy the values its source holds (``{source_id: copy_id}``,
-    rows of ``model``), replacing its own. Two statements however many rows,
+    rows of ``entity``'s kind: a model, or a row), replacing its own. Two statements however many rows,
     and two more for tasks.
 
     For a duplicate or an occurrence: the same properties apply, so each pair
@@ -874,7 +898,7 @@ async def copy_values(
     """
     if not copies:
         return
-    target = link_for(model).target
+    target = link_for(entity, routed_tools(session)).target
     # The copies' pending changes first (a series' override takes its calendar
     # just before), so their values are held to where they now sit.
     await session.flush()
@@ -904,7 +928,7 @@ async def copy_values(
             .where(_of(target, copies.keys()), properties),
         )
     )
-    if model is not Task:
+    if target != "task":
         return
     projects = col(MetadataDefinition.project_id).is_not(None) & unsigned
     await session.exec(
@@ -1413,7 +1437,7 @@ async def annotate_properties(session: AsyncSession, entities: Iterable[Any]) ->
     if not rows:
         return
     by_id = await summaries_by_id(
-        session, link_for(rows[0]).target, [r.id for r in rows]
+        session, link_for(rows[0], routed_tools(session)).target, [r.id for r in rows]
     )
     for row in rows:
         object.__setattr__(row, "properties", by_id.get(row.id, []))

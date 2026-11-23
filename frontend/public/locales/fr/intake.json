@@ -1,30 +1,27 @@
 {
   "ownerOnly": "Seuls les propriétaires de la plateforme peuvent configurer où arrive le travail d'exploitation.",
   "contacts": {
-    "title": "Qui contacter",
-    "description": "L’adresse qu’un avis indique lorsqu’il invite quelqu’un à prendre contact — par exemple une personne dont le compte ou la communauté est suspendu. Un type de travail sans adresse propre utilise le contact général ; sans aucun des deux, l’avis renvoie à la personne qui gère ce serveur.",
     "generalLabel": "Contact général",
     "generalPlaceholder": "nom@example.com",
     "streamPlaceholder": "Utilise le contact général",
     "save": "Enregistrer les contacts",
     "saving": "Enregistrement…",
     "saved": "Contacts enregistrés.",
-    "saveError": "Impossible d’enregistrer les contacts."
+    "saveError": "Impossible d’enregistrer les contacts.",
+    "generalHelp": "Pour tout type de cas sans contact propre. Sans aucun, un avis indique de contacter la personne qui gère ce serveur."
   },
   "community": {
     "title": "Communauté d'exploitation",
-    "description": "La communauté qui reçoit le travail de sécurité, de modération, d'assistance et de retours de cette installation.",
+    "description": "Où arrivent les cas de sécurité, de modération, d'assistance et les retours, dans les projets que vous choisissez ci-dessous.",
     "label": "Communauté",
     "placeholder": "Choisissez une communauté",
     "none": "Aucune — ne rien diriger",
-    "helpText": "Une communauté ordinaire à tous égards. Le projet dans lequel chaque canal arrive se règle ci-dessous, à l'intérieur.",
     "saveError": "Impossible d'enregistrer la communauté d'exploitation.",
     "clearTitle": "Cesser de diriger le travail d'exploitation ?",
     "clearBody": "Tous les canaux cessent de recevoir. Les projets et tout ce qu'ils contiennent restent tels quels, et choisir de nouveau cette communauté rétablit la configuration.",
     "clearConfirm": "Cesser de diriger"
   },
   "streams": {
-    "chooseCommunityFirst": "Choisissez une communauté ci-dessus, puis indiquez où arrive chaque canal.",
     "security": {
       "title": "Sécurité",
       "description": "Cas ouverts par les règles qui surveillent cette installation."
@@ -48,8 +45,6 @@
   },
   "stream": {
     "notSetUp": "Non configuré",
-    "receiving": "Reçoit",
-    "paused": "En pause",
     "setUpHelp": "En le configurant, vous obtenez un projet prêt à l'emploi avec ses propres statuts et champs, que vous pourrez réorganiser ensuite comme bon vous semble. Ou dirigez le canal vers un projet que vous avez déjà.",
     "initiativeLabel": "Initiative",
     "initiativePlaceholder": "Choisissez une initiative",
@@ -64,7 +59,6 @@
     "caseTypeDefault": "Le type par défaut du projet",
     "ideaTypeLabel": "Le type qui met une tâche sur la page Suggestions",
     "ideaTypeNone": "Aucun : rien n'est publié",
-    "enabledLabel": "Reçoit les nouveaux cas",
     "lastCase": "Dernier cas ouvert le {{when}}.",
     "noCasesYet": "Aucun cas pour l'instant.",
     "unbind": "Cesser de diriger ce canal",
@@ -83,7 +77,12 @@
     "statusRolesHelp": "Un dossier dans le premier statut affiche « En attente de votre réponse » à son demandeur. Quand il répond, le dossier passe au second.",
     "noAwaitingHelp": "Sans statut choisi, les demandeurs voient Reçu, En cours et Clôturé, jamais « En attente de votre réponse ».",
     "sharesIsolated": "Un autre canal arrive aussi dans cette initiative. Les dossiers de sécurité et de modération devraient avoir leur propre initiative, pour que seules les personnes qui les traitent puissent les lire.",
-    "sharesWithIsolated": "Cette initiative reçoit aussi des dossiers de sécurité ou de modération, qui devraient avoir leur propre initiative. Dirigez l'un des canaux ailleurs."
+    "sharesWithIsolated": "Cette initiative reçoit aussi des dossiers de sécurité ou de modération, qui devraient avoir leur propre initiative. Dirigez l'un des canaux ailleurs.",
+    "contactLabel": "Contact",
+    "contactHelp": "L'adresse qu'un avis donne quand il invite quelqu'un à prendre contact au sujet de ce type de cas. Laissé vide, le contact général est utilisé.",
+    "save": "Enregistrer",
+    "saving": "Enregistrement…",
+    "saved": "Enregistré."
   },
   "help": {
     "action": "Demander de l'aide",
@@ -332,7 +331,7 @@
     "error": "Impossible d'envoyer. Réessayez dans un instant."
   },
   "feedbackSwitch": {
-    "title": "Avis",
+    "title": "Retours à l'équipe Initiative",
     "description": "Les idées, les problèmes et les compliments vont à l'équipe qui fait Initiative. Désactivé, personne ici ne voit Envoyer un avis et rien n'est envoyé.",
     "label": "Permettre d'envoyer un avis à l'équipe d'Initiative",
     "error": "Impossible de modifier ce réglage. Réessayez dans un instant."
@@ -425,5 +424,17 @@
       "card": "la carte",
       "text": "le texte"
     }
+  },
+  "rows": {
+    "landsIn": "Arrive dans",
+    "contact": "Contact",
+    "usesGeneral": "Contact général",
+    "chooseCommunity": "Choisissez une communauté pour acheminer les cas. Les contacts fonctionnent sans elle.",
+    "sharesInitiative": "Partage son initiative avec un autre type de cas",
+    "receivingLabel": "Recevoir les nouveaux cas {{stream}}",
+    "edit": "Modifier",
+    "setUp": "Configurer",
+    "editLabel": "Modifier {{stream}}",
+    "setUpLabel": "Configurer {{stream}}"
   }
 }

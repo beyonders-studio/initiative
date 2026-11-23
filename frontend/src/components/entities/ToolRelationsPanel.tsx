@@ -14,16 +14,16 @@
 
 import type { ReactNode } from "react";
 
-import type { EndpointRef, Tool } from "@/api/generated/initiativeAPI.schemas";
+import type { EndpointRef } from "@/api/generated/initiativeAPI.schemas";
 import type { RelationsLayout } from "@/components/entities/RelationsSection";
 import { RelationsSection } from "@/components/entities/RelationsSection";
-import { referenceTypeFor } from "@/lib/references";
 import type { RelationGroupKey } from "@/lib/relationships";
 import type { ToolRelationEntity } from "@/lib/tools";
 
 interface ToolRelationsPanelProps {
-  /** Which tool answers for these links — whose cache a write refreshes. */
-  tool: Tool;
+  /** Which tool answers for these links, by its kind — whose cache a write
+   *  refreshes. */
+  tool: string;
   /** The tool entity itself, as its read schema returns it. */
   entity: ToolRelationEntity | null | undefined;
   /** The thing whose links these are, where it is not the tool entity itself —
@@ -59,7 +59,7 @@ export const ToolRelationsPanel = ({
   const initiativeId = entity.initiative_id ?? null;
   if (initiativeId == null) return null;
 
-  const anchorType = target?.type ?? referenceTypeFor(tool);
+  const anchorType = target?.type ?? tool;
   const anchorId = target?.id ?? entity.id;
 
   return (

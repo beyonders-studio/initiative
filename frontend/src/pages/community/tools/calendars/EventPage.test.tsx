@@ -70,51 +70,37 @@ beforeEach(() => {
 });
 
 describe("an event's page", () => {
-  it("keeps an imported quarter-hour start and seconds when editing only the end", async () => {
-    const start = new Date("2026-07-01T09:15:27.123").toISOString();
-    serve(
-      buildCalendarEvent({
-        id: 9,
-        title: "Imported event",
-        start_at: start,
-        end_at: new Date("2026-07-01T10:15:00").toISOString(),
-      })
-    );
-    open();
-    const user = userEvent.setup();
-    const when = await screen.findByRole("group", { name: /^when$/i });
-    const selectors = within(when).getAllByRole("combobox");
-    const endTime = selectors[1];
-    if (!endTime) throw new Error("Missing end time selector");
-    await user.click(endTime);
-    await user.click(await screen.findByRole("option", { name: "11:00 AM" }));
-    await waitFor(() => expect(sent).toHaveLength(1));
-    expect(sent[0]).toMatchObject({
-      start_at: start,
-      end_at: new Date("2026-07-01T11:00:00").toISOString(),
-    });
-  });
-
-  it("retains the second occurrence of a repeated hour when editing the end", async () => {
-    vi.stubEnv("TZ", "Europe/Amsterdam");
-    const start = "2026-10-25T01:30:27.123Z";
-    serve(
-      buildCalendarEvent({
-        id: 9,
-        title: "Fold event",
-        start_at: start,
-        end_at: "2026-10-25T02:30:00Z",
-      })
-    );
+  // Editing only the end keeps the start to the second, and the second of an
+  // hour a clock change repeats.
+  it.each([
+    [
+      "an imported quarter-hour start and seconds",
+      null,
+      new Date("2026-07-01T09:15:27.123").toISOString(),
+      new Date("2026-07-01T10:15:00").toISOString(),
+      "11:00 AM",
+      new Date("2026-07-01T11:00:00").toISOString(),
+    ],
+    [
+      "the second occurrence of a repeated hour",
+      "Europe/Amsterdam",
+      "2026-10-25T01:30:27.123Z",
+      "2026-10-25T02:30:00Z",
+      "4:00 AM",
+      "2026-10-25T03:00:00.000Z",
+    ],
+  ])("keeps %s when editing only the end", async (_, tz, start, end, option, endAfter) => {
+    if (tz) vi.stubEnv("TZ", tz);
+    serve(buildCalendarEvent({ id: 9, title: "Imported event", start_at: start, end_at: end }));
     open();
     const user = userEvent.setup();
     const when = await screen.findByRole("group", { name: /^when$/i });
     const endTime = within(when).getAllByRole("combobox")[1];
     if (!endTime) throw new Error("Missing end time selector");
     await user.click(endTime);
-    await user.click(await screen.findByRole("option", { name: "4:00 AM" }));
+    await user.click(await screen.findByRole("option", { name: option }));
     await waitFor(() => expect(sent).toHaveLength(1));
-    expect(sent[0]).toMatchObject({ start_at: start, end_at: "2026-10-25T03:00:00.000Z" });
+    expect(sent[0]).toMatchObject({ start_at: start, end_at: endAfter });
   });
 
   it("saves a field on its own, and only that field", async () => {
@@ -171,11 +157,23 @@ describe("an event's page", () => {
         description: "Bring the numbers",
         location: "Room 2",
         can: { edit: false },
+        properties: [
+          buildPropertySummary({
+            name: "Agenda",
+            type: MetadataType.url,
+            value: "https://example.com/agenda",
+          }),
+        ],
       })
     );
     open();
 
     expect(await screen.findByText("Bring the numbers")).toBeInTheDocument();
+    // A property's value as it reads elsewhere, a link opening.
+    expect(screen.getByRole("link", { name: /example\.com\/agenda/ })).toHaveAttribute(
+      "href",
+      "https://example.com/agenda"
+    );
     expect(screen.getByText("Room 2")).toBeInTheDocument();
     // The page shows it, and no box to change it in.
     expect(screen.getByRole("heading", { level: 1, name: "Standup" })).toBeInTheDocument();
@@ -358,28 +356,6 @@ describe("an event's page", () => {
         { location: null, ...target },
         { location: "Room 2", ...target },
       ])
-    );
-  });
-
-  it("shows a reader a property's value as it reads elsewhere, a link opening", async () => {
-    serve(
-      buildCalendarEvent({
-        id: 9,
-        can: { edit: false },
-        properties: [
-          buildPropertySummary({
-            name: "Agenda",
-            type: MetadataType.url,
-            value: "https://example.com/agenda",
-          }),
-        ],
-      })
-    );
-    open();
-
-    expect(await screen.findByRole("link", { name: /example\.com\/agenda/ })).toHaveAttribute(
-      "href",
-      "https://example.com/agenda"
     );
   });
 

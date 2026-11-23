@@ -19,7 +19,6 @@
   "platformSettings": "Configuración de la plataforma",
   "signOut": "Cerrar sesión",
   "viewDocumentation": "Ver documentación",
-  "alphaBadge": "ALFA",
   "initiativeSettings": "Configuración de la iniciativa",
   "initiativeActions": "Acciones de la iniciativa",
   "createFile": "Crear archivo",
@@ -64,9 +63,6 @@
     "finalizing": "Finalizando redirección…",
     "goHome": "Volver al inicio"
   },
-  "counterGroups": "Contadores",
-  "allCounterGroups": "Todos los contadores",
-  "createCounterGroup": "Nuevo grupo de contadores",
   "createExternally": "Se crea en {{name}}",
   "operatorDashboard": "Panel de operador",
   "requestsWaiting_one": "{{count}} pendiente",

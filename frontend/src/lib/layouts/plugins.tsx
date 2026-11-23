@@ -19,10 +19,9 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import type { PluginDataParam } from "@/api/pluginData";
 import { PluginParamControl } from "@/components/plugins/PluginParamControl";
-import contract from "@/contract/manifest.contract.json";
+import { caps } from "@/contract/manifest.contract.json";
 import { useCommunityPlugins, useRunPluginAction } from "@/hooks/useCommunityPlugins";
 import { withParamAnswer } from "@/lib/widgets/pluginParams";
-import { type LocalizedText, localized } from "@/lib/widgets/widgetMeta";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
@@ -40,6 +39,7 @@ import type { LayoutPlugins } from "@/ui/layouts/LayoutEditor";
 import { Section } from "@/ui/layouts/section";
 import { formatDate, formatDateTime } from "@/ui/lib/formatDate";
 import { numberFormat } from "@/ui/lib/intl";
+import { type LocalizedText, localized } from "@/ui/lib/localized";
 import { cn } from "@/ui/lib/utils";
 import type { PluginFilterField } from "@/ui/properties/PropertyFilter";
 import { PropertyValueCell, ScaleValue } from "@/ui/properties/PropertyValueCell";
@@ -268,7 +268,7 @@ export const pluginFilterFields = (
   );
 
 /** How many parts of one install a tree may place, as the contract says. */
-export const MAX_PLUGIN_PARTS = contract.caps.partsPlacedPerItem;
+export const MAX_PLUGIN_PARTS = caps.partsPlacedPerItem;
 
 /** What an item's page draws of the plug-ins until its layout is saved: each
  *  install's fields, then its parts up to {@link MAX_PLUGIN_PARTS}, as it

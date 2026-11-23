@@ -183,6 +183,48 @@ async def test_old_windows_are_forgotten(session):
     assert gone >= 1
 
 
+async def test_a_replay_files_at_its_grade_and_the_case_says_what_to_check(
+    session, security_desk
+):
+    """One replayed sign-in token is a high case, unless it is a device whose
+    renewal answer never reached it: that is low. Each case's task carries its
+    rule's priority and opens with what the rule means."""
+    from app.models.tenant.task import Task, TaskPriority
+
+    for user_id, lost in ((7, False), (8, True)):
+        security_signals.observe(
+            {
+                "event_type": AuditEventType.AUTH_REFRESH_REUSE_DETECTED.value,
+                "event_uuid": f"evt-{user_id}",
+                "target_user_id": user_id,
+                "detail": {"lost_reply": lost},
+            },
+            now=_AT,
+        )
+    crossings = await security_signals.flush()
+    assert {c.rule.name: c.bucket.subject_user for c in crossings} == {
+        "refresh_reuse": 7,
+        "refresh_resent": 8,
+    }
+
+    cases = await _cases(session, security_desk.id)
+    await set_rls_context(session, SystemGuild(security_desk.id))
+    tasks = {
+        case.dedupe_key.split(":")[1]: (
+            await session.exec(select(Task).where(Task.id == case.task_id))
+        ).one()
+        for case in cases
+    }
+    await set_rls_context(session, Unattributed())
+    assert {name: task.priority for name, task in tasks.items()} == {
+        "refresh_reuse": TaskPriority.high,
+        "refresh_resent": TaskPriority.low,
+    }
+    for name, task in tasks.items():
+        assert str(task.description).startswith(BY_NAME[name].guidance[:40])
+        assert "`evt-" in str(task.description)
+
+
 async def test_a_failed_flush_gives_its_counts_back(session, monkeypatch):
     """A brief outage loses nothing: a one-off event still trips its rule."""
     from app.db import cohorts

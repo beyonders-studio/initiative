@@ -6,7 +6,6 @@ import {
   type CommentCreate,
   type CommentRead,
   ModerationAct,
-  type Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
@@ -17,7 +16,6 @@ import { useReadOnOpen } from "@/hooks/useNotifications";
 import { linkedCommentId } from "@/lib/entityResolver";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
-import { referenceTypeFor } from "@/lib/references";
 import { referenceRef } from "@/lib/smartChips";
 import { getUserDisplayName } from "@/lib/userDisplay";
 import { Button } from "@/ui/button";
@@ -33,15 +31,8 @@ export interface CommentWithReplies extends CommentRead {
   replies: CommentWithReplies[];
 }
 
-/** What a comment thread hangs off: any tool entity, plus tasks (a project's
- *  child, not a tool of its own). */
-/** What a comment can hang off: a tool entity, or one of the content-level
- *  extras that carries a thread of its own. Mirrors the backend's
- *  `COMMENT_TARGETS`. */
-export type CommentEntity = "task" | "wiki_page" | "collection" | Tool;
-
 interface CommentSectionProps {
-  entityType: CommentEntity;
+  entityType: string;
   entityId: number;
   comments?: CommentRead[];
   onCommentCreated?: (comment: CommentRead) => void;
@@ -185,10 +176,7 @@ export const CommentSection = ({
   // What this thread is a remark about. A comment on a page does not link to
   // the page it is written on, so no composer here offers it — the box at the
   // top, and every reply and edit below.
-  const subject = useMemo(
-    () => referenceRef(referenceTypeFor(entityType), entityId),
-    [entityType, entityId]
-  );
+  const subject = useMemo(() => referenceRef(entityType, entityId), [entityType, entityId]);
 
   const createComment = useCreateComment({
     onSuccess: (comment) => {
@@ -267,18 +255,12 @@ export const CommentSection = ({
     return map;
   }, [comments]);
 
-  // Each entity kind carries its id under its own `<entity>_id` field, and a
-  // comment names exactly one.
-  const buildPayload = (commentBody: string, parentCommentId?: number): CommentCreate => {
-    const payload: CommentCreate = {
-      content: commentBody,
-    };
-    payload[`${entityType}_id`] = entityId;
-    if (parentCommentId) {
-      payload.parent_comment_id = parentCommentId;
-    }
-    return payload;
-  };
+  const buildPayload = (commentBody: string, parentCommentId?: number): CommentCreate => ({
+    content: commentBody,
+    subject_type: entityType,
+    subject_id: entityId,
+    ...(parentCommentId ? { parent_comment_id: parentCommentId } : {}),
+  });
 
   const handleSubmit = (commentContent: string) => {
     const normalized = commentContent.trim();

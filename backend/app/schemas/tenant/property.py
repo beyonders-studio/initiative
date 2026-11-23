@@ -16,7 +16,6 @@ from pydantic import (
 from app.core.currencies import CURRENCY_CODES
 from app.core.identity_boundary import names_withheld, responding_to_install
 from app.core.messages import PropertyMessages
-from app.core.tools import PROPERTY_TARGETS
 from app.models.tenant.metadata import PLUGIN_ONLY_TYPES, MetadataType
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.platform.user import PluginPerson
@@ -28,16 +27,6 @@ MAX_PROPERTY_FILTERS = 5
 _SLUG_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_\-]*$"
 _HEX_COLOR_PATTERN = r"^#[0-9A-Fa-f]{6}$"
 _SELECT_TYPES = {MetadataType.select, MetadataType.multi_select}
-
-# Derived, never re-declared: every Tool value plus every sub-tool (see
-# PROPERTY_TARGETS in app.core.tools). A new Tool lands here — and in the
-# OpenAPI spec / generated frontend types — automatically.
-PropertyTarget = Enum(
-    "PropertyTarget", {name: name for name in PROPERTY_TARGETS}, type=str
-)
-PropertyTarget.__doc__ = (
-    "What can carry custom property values: every tool and sub-tool."
-)
 
 if TYPE_CHECKING:
     # Built below from the ISO list at runtime; to a type checker, a str enum.
@@ -57,10 +46,21 @@ class PropertyOption(SanitizedBaseModel):
     color: str | None = Field(default=None, pattern=_HEX_COLOR_PATTERN)
 
 
+class CounterLook(StrEnum):
+    """How a counter field is drawn: a number, a progress bar or a segmented
+    clock. A bar and a clock need both bounds; a counter without them is
+    drawn as a number."""
+
+    number = "number"
+    bar = "bar"
+    clock = "clock"
+
+
 class CounterSettings(SanitizedBaseModel):
     """How a counter field moves: by ``step`` a tap, never past ``min`` or
     ``max``, and back to ``initial`` on a reset. A counter with no value
-    holds ``initial``."""
+    holds ``initial``. ``look`` is how it is drawn wherever a list's layout
+    says nothing else."""
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
@@ -68,6 +68,7 @@ class CounterSettings(SanitizedBaseModel):
     min: float | None = Field(default=None, allow_inf_nan=False)
     max: float | None = Field(default=None, allow_inf_nan=False)
     initial: float = Field(default=0, allow_inf_nan=False)
+    look: CounterLook = CounterLook.number
 
     @model_validator(mode="after")
     def _ordered(self) -> CounterSettings:

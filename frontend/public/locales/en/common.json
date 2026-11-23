@@ -4,6 +4,9 @@
   "help": "Help",
   "helpDraft": "Help request draft",
   "reloadPage": "Reload page",
+  "copyPageLink": "Copy link to this page",
+  "pageLinkCopied": "Link copied",
+  "pageLinkCopyFailed": "Couldn't copy the link",
   "deletedUserName": "Deleted user #{{id}}",
   "user": "User",
   "userWithId": "User #{{id}}",
@@ -76,6 +79,7 @@
     "viewMode": "View mode",
     "noEntries": "No events",
     "allDay": "All day",
+    "until": "Until {{time}}",
     "more": "+{{count}} more",
     "start": "Start",
     "due": "Due"
@@ -330,11 +334,6 @@
       "this": "this file",
       "plural": "files"
     },
-    "counter_group": {
-      "name": "Counter group",
-      "this": "this counter group",
-      "plural": "counter groups"
-    },
     "calendar": {
       "name": "Calendar",
       "this": "this calendar",
@@ -369,11 +368,6 @@
       "name": "Event",
       "this": "this event",
       "plural": "events"
-    },
-    "counter": {
-      "name": "Counter",
-      "this": "this counter",
-      "plural": "counters"
     },
     "wiki_page": {
       "name": "Page",

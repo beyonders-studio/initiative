@@ -26,9 +26,11 @@ from enum import Enum
 from types import SimpleNamespace
 from typing import Any, TypeVar
 
+from sqlalchemy import Table
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.core.user_display import display_name
 from app.core.user_input_validators import resolve_zone
 from app.models.tenant.metadata import MetadataType
@@ -179,11 +181,13 @@ def needs_bucket(ds: Dataset, spec: FieldSpec) -> bool:
     return _how(ds, spec) is _How.date
 
 
-def describe_groupings(dataset_name: str) -> list[dict[str, Any]]:
-    """The fields a list of the dataset groups by, in the order a client
-    offers them: a bucketed ordering first (the date window), then by control
-    as a filter list orders them."""
-    ds = dataset(dataset_name)
+def describe_groupings(
+    dataset_name: str, tools: ToolSet = BUILTIN_TOOLS
+) -> list[dict[str, Any]]:
+    """The fields a list of the dataset, in a community with ``tools``,
+    groups by, in the order a client offers them: a bucketed ordering first
+    (the date window), then by control as a filter list orders them."""
+    ds = dataset(dataset_name, tools)
     found = [spec for spec in ds.fields if groupable(ds, spec)]
     found.sort(key=lambda spec: (not spec.buckets, _KIND_ORDER[spec.kind], spec.name))
     return [
@@ -308,7 +312,8 @@ def _dataset_for_table(table: str) -> Dataset | None:
 def _referenced_dataset(ds: Dataset, spec: FieldSpec) -> Dataset | None:
     # The stored column's key: a field's expression may wrap it, as
     # ``created_by`` is read only where its kind is ``member``.
-    for fk in getattr(ds.model.__table__.columns.get(spec.name), "foreign_keys", ()):
+    table = ds.model if isinstance(ds.model, Table) else ds.model.__table__
+    for fk in getattr(table.columns.get(spec.name), "foreign_keys", ()):
         return _dataset_for_table(fk.target_fullname.split(".")[0])
     return None
 

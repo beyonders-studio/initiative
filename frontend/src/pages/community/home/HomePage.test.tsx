@@ -24,7 +24,7 @@ import {
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
-import type { BannerTextAlign } from "@/api/generated/initiativeAPI.schemas";
+import type { BannerTextAlign, InitiativeRead } from "@/api/generated/initiativeAPI.schemas";
 import { queryClient } from "@/lib/queryClient";
 import { setItem } from "@/lib/storage";
 import { isToolEnabled, TOOLS } from "@/lib/tools";
@@ -38,7 +38,7 @@ const READER = buildUser({ id: 42 });
 
 /** The listing is the reader's own memberships, community admin or not, so the
  *  stub carries their role, and may view every tool the initiative has on. */
-function stubInitiatives(overrides: Record<string, boolean> = {}) {
+function stubInitiatives(overrides: Partial<InitiativeRead> = {}) {
   const initiative = buildInitiative({
     id: INITIATIVE_ID,
     name: "Apollo",
@@ -83,7 +83,7 @@ const NEBULA = () => buildInitiativeDirectoryEntry({ id: 9, name: "Nebula", join
  *  has to lead. */
 type FeedCase = [
   label: string,
-  community: { initiative?: Record<string, boolean> },
+  community: { initiative?: Partial<InitiativeRead> },
   entry: Parameters<typeof buildActivityEntry>[0],
   href: string,
 ];
@@ -104,7 +104,7 @@ function stubFeed(...entries: ReturnType<typeof buildActivityEntry>[]) {
  *  has to lead. */
 type CommentCase = [
   label: string,
-  community: { initiative?: Record<string, boolean> },
+  community: { initiative?: Partial<InitiativeRead> },
   entry: NonNullable<Parameters<typeof buildRecentActivityEntry>[0]>,
   says: string,
   href: string,
@@ -211,7 +211,11 @@ describe("HomePage", () => {
       renderHomeFor({ member_count, online_count });
 
       await screen.findByRole("heading", { level: 1 });
-      expect(screen.getByText(members)).toBeInTheDocument();
+      // The count is the way into the community's roster.
+      expect(screen.getByRole("link", { name: new RegExp(members) })).toHaveAttribute(
+        "href",
+        "/c/1/members"
+      );
       if (online) {
         expect(screen.getByText(online)).toBeInTheDocument();
       } else {
@@ -265,19 +269,19 @@ describe("HomePage", () => {
     ],
     [
       "a tool entity, to that entity",
-      { initiative: { counter_groups_enabled: true } },
+      { initiative: { tools: { wiki: true } } },
       {
         title: "Combat Order",
-        entity_type: "counter_group",
+        entity_type: "wiki",
         entity_id: 8,
-        tool: "counter_group",
+        tool: "wiki",
         tool_id: 8,
       },
-      "/c/1/i/5/counter-groups/8",
+      "/c/1/i/5/wikis/8",
     ],
     [
       "a community-level calendar, at the community route",
-      { initiative: { calendars_enabled: true } },
+      { initiative: { tools: { calendar: true } } },
       {
         title: "Club Nights",
         entity_type: "calendar",
@@ -322,21 +326,21 @@ describe("HomePage", () => {
     ],
     [
       "a comment left on a tool entity, to that entity",
-      { initiative: { counter_groups_enabled: true } },
+      { initiative: { tools: { wiki: true } } },
       {
         comment_id: 12,
         content: "Order looks wrong",
-        entity_type: "counter_group",
+        entity_type: "wiki",
         entity_id: 8,
         entity_name: "Combat Order",
         initiative_id: 5,
       },
       "on Combat Order",
-      "/c/1/i/5/counter-groups/8",
+      "/c/1/i/5/wikis/8",
     ],
     [
       "a community-level calendar's comment, at the community route",
-      { initiative: { calendars_enabled: true } },
+      { initiative: { tools: { calendar: true } } },
       {
         comment_id: 13,
         content: "Moving this to Thursday",
@@ -355,25 +359,17 @@ describe("HomePage", () => {
     renderHome({ node: "comments" });
 
     expect(await screen.findByText(says)).toBeInTheDocument();
+    // Shown in the tray, under their circle.
+    const rail = screen.getByRole("navigation", { name: "Community activity" });
+    expect(within(rail).getByRole("link", { name: "Comments" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
     expect(screen.getByText(String(entry.content))).toBeInTheDocument();
     expect(screen.getByRole("link", { name: new RegExp(String(entry.content)) })).toHaveAttribute(
       "href",
       href
     );
-  });
-
-  it("shows the community's comments in the tray, under their circle", async () => {
-    stubInitiatives();
-    stubRecentComment({ content: "Still here" });
-
-    renderHome({ node: "comments" });
-
-    const rail = await screen.findByRole("navigation", { name: "Community activity" });
-    expect(within(rail).getByRole("link", { name: "Comments" })).toHaveAttribute(
-      "aria-current",
-      "page"
-    );
-    expect(await screen.findByText("Still here")).toBeInTheDocument();
   });
 
   it("says so when the community has no comments yet", async () => {
@@ -616,6 +612,12 @@ describe("HomePage", () => {
       .parentElement as HTMLElement;
     expect(within(mine).getByRole("link", { name: "Apollo" })).toBeInTheDocument();
     expect(within(joinable).getByRole("button", { name: "Join" })).toBeInTheDocument();
+
+    // The whole section folds away from its heading, and the rest of the page
+    // is untouched by the fold.
+    await userEvent.click(screen.getByRole("button", { name: /Initiatives/ }));
+    await waitFor(() => expect(screen.queryByText("Nebula")).not.toBeInTheDocument());
+    expect(screen.getByRole("navigation", { name: "Community activity" })).toBeInTheDocument();
   });
 
   it("asks no directory for a guest", async () => {
@@ -637,19 +639,6 @@ describe("HomePage", () => {
     expect(asked).toBe(false);
   });
 
-  it("folds the whole initiatives section away from its heading", async () => {
-    stubInitiatives();
-    stubDirectory([NEBULA()]);
-
-    renderHome();
-
-    await userEvent.click(await screen.findByRole("button", { name: /Initiatives/ }));
-
-    await waitFor(() => expect(screen.queryByText("Nebula")).not.toBeInTheDocument());
-    // The rest of the page is untouched by the fold.
-    expect(screen.getByRole("navigation", { name: "Community activity" })).toBeInTheDocument();
-  });
-
   it("offers a community admin the create dialog from the section header", async () => {
     stubInitiatives();
     stubDirectory([NEBULA()]);
@@ -662,6 +651,15 @@ describe("HomePage", () => {
     expect(await screen.findByRole("dialog")).toHaveTextContent("What is it called?");
   });
 
+  it("offers an admin an invite beside the member count", async () => {
+    stubInitiatives();
+
+    renderHome();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Invite members" }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+  });
+
   it("keeps creating out of a member's hands", async () => {
     stubInitiatives();
     stubDirectory([NEBULA()]);
@@ -671,6 +669,8 @@ describe("HomePage", () => {
     expect(await screen.findByRole("heading", { name: "Initiatives" })).toBeInTheDocument();
     // The backend refuses it either way; the affordance doesn't pretend.
     expect(screen.queryByRole("button", { name: /New initiative/i })).not.toBeInTheDocument();
+    // Nor offers an invite to somebody who hands none out.
+    expect(screen.queryByRole("button", { name: "Invite members" })).toBeNull();
   });
 
   it("opens the create dialog for the ?create=true deep link", async () => {

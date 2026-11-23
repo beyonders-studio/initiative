@@ -416,6 +416,13 @@ async def test_a_renewal_asks_again_and_ends_with_the_initiative_sign_in(
     claims = _claims(renewed.json()["id_token"])
     assert "nonce" not in claims
     assert claims["sub"] == _claims(first["id_token"])["sub"]
+    # Spent only by its own plug-in.
+    unauthenticated = await client.post(
+        TOKEN_URL,
+        data={"grant_type": "refresh_token", "refresh_token": first["refresh_token"]},
+    )
+    assert unauthenticated.status_code == 401
+    assert unauthenticated.json()["error"] == "invalid_client"
 
     # Signing out of Initiative ends the plug-in's session at its next renewal.
     await auth_sessions.revoke_all_for_user(session, user_id=installed.seat.user.id)
@@ -425,32 +432,6 @@ async def test_a_renewal_asks_again_and_ends_with_the_initiative_sign_in(
     )
     assert ended.status_code == 400
     assert ended.json()["error"] == "invalid_grant"
-
-
-async def test_a_refresh_token_is_spent_only_by_its_own_plugin(
-    client: AsyncClient, session: AsyncSession, acting_user, role_session
-):
-    installed = await _offered(session, acting_user, role_session)
-    headers = await signed_in_headers(session, installed.seat.user)
-    request = _request()
-    returned = await _code(client, headers, request, community_id=installed.guild.id)
-    first = (
-        await _spend(
-            client,
-            grant_type="authorization_code",
-            code=returned["code"],
-            redirect_uri=REDIRECT,
-            code_verifier=request["_verifier"],
-        )
-    ).json()
-
-    response = await client.post(
-        TOKEN_URL,
-        data={"grant_type": "refresh_token", "refresh_token": first["refresh_token"]},
-    )
-
-    assert response.status_code == 401
-    assert response.json()["error"] == "invalid_client"
 
 
 async def test_the_provider_publishes_where_to_find_it(client: AsyncClient):

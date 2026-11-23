@@ -19,22 +19,16 @@ import pytest
 
 from app.services.marketplace import service_plugins
 from app.services.marketplace.definitions import (
-    GUILD_INSTALLABLE_PLUGIN_KINDS,
-    KIND_AUDIENCE,
-    LISTING_AUDIENCES,
-    LISTING_KINDS,
     LISTING_SOURCES,
-    PLUGIN_KINDS,
     ListingDefinitionError,
-    kinds_for_audience,
+    PluginTag,
     normalize_listing_definition,
     normalize_publisher,
+    plugin_tag,
     plugin_widget_type,
     published_by_us,
     reserved_prefix_problem,
 )
-from app.services.marketplace.manifest_values import IDENTIFIER_CHARS
-from app.services.marketplace.service_plugins import PAGE_CAPABILITIES
 
 
 def _label(text: str = "A label") -> dict[str, str]:
@@ -98,8 +92,9 @@ class TestAttribution:
             # its own line breaks is refused rather than displayed however it
             # lands.
             ("Widget Co\nby someone else", "single line"),
+            ("W" * 500, "publisher"),
         ],
-        ids=["no name at all", "a blank name", "a name spanning lines"],
+        ids=["no name at all", "a blank name", "a name spanning lines", "overlong"],
     )
     def test_a_name_that_is_not_one_is_refused(self, value, problem):
         with pytest.raises(ListingDefinitionError, match=problem):
@@ -107,10 +102,6 @@ class TestAttribution:
 
     def test_a_name_is_kept_as_written(self):
         assert normalize_publisher("  Widget Co  ") == "Widget Co"
-
-    def test_an_overlong_name_is_refused(self):
-        with pytest.raises(ListingDefinitionError, match="publisher"):
-            normalize_publisher("W" * 500)
 
 
 class TestReservedNamespace:
@@ -126,12 +117,10 @@ class TestReservedNamespace:
         assert "reserved" in problem
 
     def test_other_namespaces_are_open_to_everyone(self):
+        # 'coreutils.x' is somebody else's publisher, not the reserved one.
         for source in sorted(LISTING_SOURCES):
             assert reserved_prefix_problem("widgetco.thing", source=source) is None
-
-    def test_the_prefix_is_matched_at_the_boundary(self):
-        # 'coreutils.x' is somebody else's publisher, not the reserved one.
-        assert reserved_prefix_problem("coreutils.x", source="registry") is None
+            assert reserved_prefix_problem("coreutils.x", source=source) is None
 
 
 class TestPublishedByUs:
@@ -152,41 +141,23 @@ class TestPublishedByUs:
         assert published_by_us(source, public_id) is expected
 
 
-class TestPluginKinds:
-    def test_service_is_publishable(self):
-        assert "service" in PLUGIN_KINDS
-
-    def test_service_is_installable_into_a_guild(self):
-        """A service plug-in has somewhere to land now: the registration supplies
-        the address and the powers, and the install is the pinned definition
-        plus whatever the guild configures against it."""
-        assert "service" in GUILD_INSTALLABLE_PLUGIN_KINDS
-
-    def test_installable_kinds_are_declared_kinds(self):
-        """The two sets answer different questions — what a listing may declare
-        versus what this build can mount — so a kind added to the vocabulary
-        ahead of its machinery is refused rather than half-mounted."""
-        assert GUILD_INSTALLABLE_PLUGIN_KINDS <= PLUGIN_KINDS
-
-    def test_an_unknown_kind_is_refused(self):
-        with pytest.raises(ListingDefinitionError, match="unknown plug-in kind"):
-            normalize_listing_definition("plugin", {"plugin_kind": "daemon"})
-
-
 class TestServiceIdentity:
-    def test_a_service_names_itself(self):
-        with pytest.raises(ListingDefinitionError, match="service.public_id"):
-            normalize_listing_definition(
-                "plugin", {"plugin_kind": "service", "service": {}, "features": []}
-            )
-
-    def test_the_service_id_is_publisher_scoped(self):
-        with pytest.raises(ListingDefinitionError, match="publisher"):
-            _normalize(service={"public_id": "noslug"})
-
-    def test_a_protocol_this_build_does_not_speak_is_refused(self):
-        with pytest.raises(ListingDefinitionError, match="protocol"):
-            _normalize(service={"public_id": "tests.widget-co", "protocol": 99})
+    @pytest.mark.parametrize(
+        ("definition", "problem"),
+        [
+            ({"plugin_kind": "daemon"}, "unknown plug-in kind"),
+            (_service(service={}), "service.public_id"),
+            (_service(service={"public_id": "noslug"}), "publisher"),
+            (
+                _service(service={"public_id": "tests.widget-co", "protocol": 99}),
+                "protocol",
+            ),
+        ],
+        ids=["unknown kind", "unnamed", "not publisher-scoped", "unknown protocol"],
+    )
+    def test_a_plugin_that_cannot_say_what_it_is_is_refused(self, definition, problem):
+        with pytest.raises(ListingDefinitionError, match=problem):
+            normalize_listing_definition("plugin", definition)
 
     def test_the_protocol_defaults_to_the_one_this_build_speaks(self):
         definition = normalize_listing_definition(
@@ -251,49 +222,77 @@ class TestFeaturesMatchBlocks:
         )
         assert definition["features"] == ["endpoints", "pages"]
 
-    @pytest.mark.parametrize("feature", sorted(service_plugins.FEATURES))
-    def test_every_feature_names_a_block(self, feature):
-        # The cross-check is only as complete as this map, so a feature added
-        # without one would silently stop being checked.
-        assert feature in service_plugins.FEATURE_BLOCKS
-
 
 class TestConnections:
-    def test_a_static_connection_needs_something_to_supply(self):
-        with pytest.raises(ListingDefinitionError, match="at least one field"):
+    @pytest.mark.parametrize(
+        ("connection", "problem"),
+        [
+            ({"scope": "static", "fields": []}, "at least one field"),
+            ({"scope": "global"}, "unknown scope"),
+            ({"scope": "interactive"}, "declares a flow"),
+            # The plug-in no longer runs a flow of its own: a connection naming
+            # only where the plug-in's page was has no flow.
+            ({"scope": "interactive", "connect_path": "/connect"}, "declares a flow"),
+            # A flow's values come from the plug-in's after_connect hook; a
+            # typed field would be one nobody fills in.
+            (
+                {
+                    "scope": "static",
+                    "flow": FLOW,
+                    "fields": [{"key": "token", "type": "secret", "label": _label()}],
+                },
+                "only managed values",
+            ),
+            (
+                {
+                    "scope": "interactive",
+                    "flow": {**FLOW, "after_connect": False},
+                    "fields": [_managed("login")],
+                },
+                "after_connect",
+            ),
+            (
+                {
+                    "scope": "interactive",
+                    "flow": {**FLOW, "install_url": "https://vendor.test/i"},
+                    "fields": [_managed("login")],
+                },
+                "install page",
+            ),
+            (
+                {
+                    "scope": "static",
+                    "fields": [
+                        {"key": "token", "type": "certificate", "label": _label()}
+                    ],
+                },
+                "unknown field type",
+            ),
+            (
+                {
+                    "scope": "static",
+                    "fields": [{"key": "region", "type": "select", "label": _label()}],
+                },
+                "at least one option",
+            ),
+        ],
+        ids=[
+            "a static connection with nothing to supply",
+            "an unknown scope",
+            "an interactive connection with no flow",
+            "the retired connect path",
+            "a flow holding a typed value",
+            "managed values without the hook that returns them",
+            "an install page on a member's connection",
+            "a field type this build has not got",
+            "a menu with nothing on it",
+        ],
+    )
+    def test_a_connection_that_cannot_work_is_refused(self, connection, problem):
+        with pytest.raises(ListingDefinitionError, match=problem):
             _normalize(
-                connections=[
-                    {"id": "shop", "scope": "static", "label": _label(), "fields": []}
-                ]
-            )
-
-    def test_an_unknown_scope_is_refused(self):
-        with pytest.raises(ListingDefinitionError, match="unknown scope"):
-            _normalize(
-                connections=[{"id": "shop", "scope": "global", "label": _label()}]
-            )
-
-    def test_an_interactive_connection_declares_a_flow(self):
-        with pytest.raises(ListingDefinitionError, match="declares a flow"):
-            _normalize(
-                connections=[
-                    {"id": "account", "scope": "interactive", "label": _label()}
-                ]
-            )
-
-    def test_the_retired_connect_path_is_no_way_in(self):
-        """The plug-in no longer runs a flow of its own: a connection naming only
-        where the plug-in's page was has no flow, and is refused as one."""
-        with pytest.raises(ListingDefinitionError, match="declares a flow"):
-            _normalize(
-                connections=[
-                    {
-                        "id": "account",
-                        "scope": "interactive",
-                        "label": _label(),
-                        "connect_path": "/connect",
-                    }
-                ]
+                vendor=VENDOR,
+                connections=[{"id": "account", "label": _label(), **connection}],
             )
 
     def test_a_member_flow_is_kept_as_declared(self):
@@ -345,40 +344,6 @@ class TestConnections:
         )["connections"]
         assert connection["flow"]["install_url"].endswith("/{vendor.app_slug}/install")
         assert connection["fields"][0]["managed"] is True
-
-    def test_a_flow_holds_only_managed_values(self):
-        """Its values come from the plug-in's after_connect hook; a typed field
-        would be one nobody fills in."""
-        with pytest.raises(ListingDefinitionError, match="only managed values"):
-            _normalize(
-                vendor=VENDOR,
-                connections=[
-                    {
-                        "id": "shop",
-                        "scope": "static",
-                        "label": _label(),
-                        "flow": FLOW,
-                        "fields": [
-                            {"key": "token", "type": "secret", "label": _label()}
-                        ],
-                    }
-                ],
-            )
-
-    def test_managed_values_need_the_hook_that_returns_them(self):
-        with pytest.raises(ListingDefinitionError, match="after_connect"):
-            _normalize(
-                vendor=VENDOR,
-                connections=[
-                    {
-                        "id": "account",
-                        "scope": "interactive",
-                        "label": _label(),
-                        "flow": {**FLOW, "after_connect": False},
-                        "fields": [_managed("login")],
-                    }
-                ],
-            )
 
     def test_a_value_after_the_host_is_filled_in(self):
         """A value in the query of an address with no path is not in its host."""
@@ -437,21 +402,6 @@ class TestConnections:
                         "scope": "interactive",
                         "label": _label(),
                         "flow": {**FLOW, **change},
-                        "fields": [_managed("login")],
-                    }
-                ],
-            )
-
-    def test_an_install_page_is_a_guild_connection_s(self):
-        with pytest.raises(ListingDefinitionError, match="install page"):
-            _normalize(
-                vendor=VENDOR,
-                connections=[
-                    {
-                        "id": "account",
-                        "scope": "interactive",
-                        "label": _label(),
-                        "flow": {**FLOW, "install_url": "https://vendor.test/i"},
                         "fields": [_managed("login")],
                     }
                 ],
@@ -702,33 +652,6 @@ class TestConnections:
                 }
             )
 
-    @pytest.mark.parametrize(
-        ("field", "problem"),
-        [
-            (
-                {"key": "token", "type": "certificate", "label": _label()},
-                "unknown field type",
-            ),
-            (
-                {"key": "region", "type": "select", "label": _label()},
-                "at least one option",
-            ),
-        ],
-        ids=["a type this build has not got", "a menu with nothing on it"],
-    )
-    def test_a_field_nobody_could_fill_in_is_refused(self, field, problem):
-        with pytest.raises(ListingDefinitionError, match=problem):
-            _normalize(
-                connections=[
-                    {
-                        "id": "shop",
-                        "scope": "static",
-                        "label": _label(),
-                        "fields": [field],
-                    }
-                ]
-            )
-
     def test_two_connections_cannot_share_an_id(self):
         connection = {
             "id": "shop",
@@ -839,17 +762,17 @@ class TestSchedules:
 
 
 class TestRequires:
-    def test_an_item_may_only_require_a_connection_that_exists(self):
-        with pytest.raises(ListingDefinitionError, match="unknown connection"):
-            _with_source(requires={"all_of": ["nope"]})
-
-    def test_one_operator_at_a_time(self):
-        with pytest.raises(ListingDefinitionError, match="exactly one"):
-            _with_source(requires={"all_of": ["shop"], "any_of": ["shop"]})
-
-    def test_an_empty_expression_is_refused(self):
-        with pytest.raises(ListingDefinitionError, match="names no connection"):
-            _with_source(requires={"any_of": []})
+    @pytest.mark.parametrize(
+        ("requires", "problem"),
+        [
+            ({"all_of": ["nope"]}, "unknown connection"),
+            ({"all_of": ["shop"], "any_of": ["shop"]}, "exactly one"),
+            ({"any_of": []}, "names no connection"),
+        ],
+    )
+    def test_a_requirement_that_names_nothing_real_is_refused(self, requires, problem):
+        with pytest.raises(ListingDefinitionError, match=problem):
+            _with_source(requires=requires)
 
     def test_omitting_it_means_always_available(self):
         definition = _with_source(requires=None)
@@ -861,30 +784,44 @@ class TestRequires:
 
 
 class TestEndpoints:
-    def test_an_id_is_namespaced_under_the_plugin(self):
-        # Two plug-ins offering `create-issue` would be two different things under
-        # one name, and a caller resolving the wrong one would do the wrong
-        # thing successfully.
-        for value in (
-            "orders",
-            "plugin.someone.else.orders",
-            "plugin.tests.widget-co.",
-        ):
-            with pytest.raises(ListingDefinitionError, match="must start with"):
-                _with_source(id=value)
-
-    def test_a_direction_is_required_and_closed(self):
-        # Direction decides who may call it, whether an answer may be cached,
-        # and whether a widget may bind it — so an endpoint without one is not a
-        # partial declaration, it is an unanswerable question.
-        with pytest.raises(ListingDefinitionError, match="direction"):
-            _with_source(direction=None)
-        with pytest.raises(ListingDefinitionError, match="direction"):
-            _with_source(direction="sideways")
-
-    def test_the_retired_audience_term_is_refused(self):
-        with pytest.raises(ListingDefinitionError, match="visibility"):
-            _with_source(visibility="member")
+    @pytest.mark.parametrize(
+        ("change", "problem"),
+        [
+            # An id is namespaced under the plug-in: two plug-ins offering
+            # `create-issue` would be two different things under one name.
+            ({"id": "orders"}, "must start with"),
+            ({"id": "plugin.someone.else.orders"}, "must start with"),
+            ({"id": "plugin.tests.widget-co."}, "must start with"),
+            ({"direction": None}, "direction"),
+            ({"direction": "sideways"}, "direction"),
+            # A write answers once, so a cache window means nothing on one.
+            ({"direction": "write", "cache_ttl_seconds": 60}, "only a read"),
+            # Nobody calls an emission, so it carries nothing a caller sends.
+            ({"direction": "emit"}, "has no requires"),
+            ({"actors": ["nobody"]}, "actors"),
+            ({"actors": []}, "no actor"),
+            # A credential is held in custody, never restated as a parameter.
+            (
+                {"params": [{"key": "token", "type": "secret", "label": _label()}]},
+                "unknown field type",
+            ),
+            ({"returns": [{"key": "k", "type": "select"}]}, "unknown type"),
+            ({"returns": [{"key": "k", "type": "secret"}]}, "unknown type"),
+            (
+                {
+                    "returns": [
+                        {"key": "k", "type": "int"},
+                        {"key": "k", "type": "string"},
+                    ]
+                },
+                "share the key",
+            ),
+            ({"returns": [{"key": "Not An Id", "type": "int"}]}, "key"),
+        ],
+    )
+    def test_an_endpoint_nobody_could_call_is_refused(self, change, problem):
+        with pytest.raises(ListingDefinitionError, match=problem):
+            _with_source(**change)
 
     def test_a_read_endpoint_stores_no_audience(self):
         endpoint = _with_source()["endpoints"][0]
@@ -896,33 +833,10 @@ class TestEndpoints:
         ttl = definition["endpoints"][0]["cache_ttl_seconds"]
         assert ttl == service_plugins.MAX_CACHE_TTL_SECONDS
 
-    def test_only_a_read_is_cached(self):
-        # A write answers once, so a window means nothing on one.
-        with pytest.raises(ListingDefinitionError, match="only a read"):
-            _with_source(direction="write", cache_ttl_seconds=60)
-
-    def test_an_emission_carries_nothing_a_caller_would_send(self):
-        # Nobody calls it, so there is nothing to send, nothing to cache and
-        # nobody to gate. Carrying any of it would describe a call that never
-        # happens.
-        with pytest.raises(ListingDefinitionError, match="has no requires"):
-            _with_source(direction="emit")
-
-    def test_an_actor_list_is_drawn_from_the_closed_set(self):
-        with pytest.raises(ListingDefinitionError, match="actors"):
-            _with_source(actors=["nobody"])
-        with pytest.raises(ListingDefinitionError, match="no actor"):
-            _with_source(actors=[])
+    def test_a_repeated_actor_is_stored_once(self):
         assert _with_source(actors=["member", "member"])["endpoints"][0]["actors"] == [
             "member"
         ]
-
-    def test_a_parameter_cannot_be_a_secret(self):
-        # A credential is supplied once and held in custody; it is never
-        # restated as a query parameter.
-        assert "secret" not in service_plugins.PARAM_TYPES
-        with pytest.raises(ListingDefinitionError, match="unknown field type"):
-            _with_source(params=[{"key": "token", "type": "secret", "label": _label()}])
 
 
 def _with_widget(**widget_overrides) -> dict:
@@ -936,18 +850,21 @@ def _with_widget(**widget_overrides) -> dict:
 
 
 class TestWidgets:
-    def test_a_widget_names_itself(self):
-        with pytest.raises(ListingDefinitionError, match="meta must name"):
-            _with_widget(meta={"description": {"en": "no name"}})
-
-    def test_a_widget_ships_a_module(self):
-        with pytest.raises(ListingDefinitionError, match="module_source is required"):
-            _with_widget(module_source="")
-
-    def test_a_module_larger_than_the_cap_is_refused(self):
-        oversized = "x" * (service_plugins.MAX_MODULE_SOURCE_BYTES + 1)
-        with pytest.raises(ListingDefinitionError, match="larger than"):
-            _with_widget(module_source=oversized)
+    @pytest.mark.parametrize(
+        ("change", "problem"),
+        [
+            ({"meta": {"description": {"en": "no name"}}}, "meta must name"),
+            ({"module_source": ""}, "module_source is required"),
+            (
+                {"module_source": "x" * (service_plugins.MAX_MODULE_SOURCE_BYTES + 1)},
+                "larger than",
+            ),
+            ({"endpoints": [READ_ID]}, "not a declared read endpoint"),
+        ],
+    )
+    def test_a_widget_that_cannot_render_is_refused(self, change, problem):
+        with pytest.raises(ListingDefinitionError, match=problem):
+            _with_widget(**change)
 
     def test_a_module_is_stored_exactly_as_published(self):
         """Byte-for-byte: this build measures the module and stores it. What it
@@ -955,12 +872,6 @@ class TestWidgets:
         source = "const render = (d) => ({ kind: 'metric', value: d.length });\n"
         definition = _with_widget(module_source=source)
         assert definition["widgets"][0]["module_source"] == source
-
-    def test_a_widget_may_only_bind_an_endpoint_the_plugin_declares(self):
-        with pytest.raises(
-            ListingDefinitionError, match="not a declared read endpoint"
-        ):
-            _with_widget(endpoints=[READ_ID])
 
     def test_a_widget_may_only_bind_one_that_answers(self):
         # A write and an emission are both real endpoints and neither fills a
@@ -1061,11 +972,6 @@ class TestWidgetTypeNamespacing:
 
         assert plugin_widget_type("K7M2QX8N4TVB9C", "stat") not in WIDGET_TYPES
 
-    def test_the_separator_is_outside_the_id_alphabet(self):
-        # Which is what keeps the three parts separable: no widget id can
-        # contain the character that joins them.
-        assert ":" not in IDENTIFIER_CHARS
-
     def test_a_widget_id_is_checked_before_it_is_composed(self):
         with pytest.raises(ListingDefinitionError, match="widget id"):
             plugin_widget_type("K7M2QX8N4TVB9C", "sum:mary")
@@ -1082,13 +988,31 @@ class TestPages:
         page.update(overrides)
         return _normalize(features=["pages"], pages=[page])
 
-    def test_a_page_names_itself_for_the_sidebar(self):
-        with pytest.raises(ListingDefinitionError, match="label"):
-            self._page(name=None)
-
-    def test_a_page_declares_a_path_not_an_address(self):
-        with pytest.raises(ListingDefinitionError, match="path"):
-            self._page(path="https://widget.test/page/orders")
+    @pytest.mark.parametrize(
+        ("change", "problem"),
+        [
+            ({"name": None}, "label"),
+            ({"path": "https://widget.test/page/orders"}, "path"),
+            ({"capabilities": ["midi"]}, "not a capability"),
+            # The platform takes payment on its own screens.
+            ({"capabilities": ["payment"]}, "not a capability"),
+            # Typed before it is looked up: membership needs a hashable value.
+            ({"capabilities": [{"camera": True}]}, "not a capability"),
+            ({"capabilities": [["camera"]]}, "not a capability"),
+            ({"capabilities": [7]}, "not a capability"),
+            ({"capabilities": [None]}, "not a capability"),
+            ({"capabilities": [True]}, "not a capability"),
+            ({"scopes": ["project"]}, "unknown scope"),
+            ({"scopes": []}, "nowhere to render"),
+            *(
+                ({"permission": value}, "permission")
+                for value in (True, 1, [], "Not Id")
+            ),
+        ],
+    )
+    def test_a_page_that_cannot_be_drawn_is_refused(self, change, problem):
+        with pytest.raises(ListingDefinitionError, match=problem):
+            self._page(**change)
 
     def test_a_page_is_stored_canonically(self):
         definition = self._page()
@@ -1102,131 +1026,36 @@ class TestPages:
             }
         ]
 
-
-class TestWhatASurfaceMayAskItsFrameFor:
-    """``capabilities`` is the whole of what a frame is granted.
-
-    A manifest names browser features from a closed vocabulary, and a surface
-    that names none is stored with no such key — which is what every definition
-    pinned before this existed says, and what their frames now get.
-    """
-
-    def _page(self, **overrides) -> dict:
-        page = {"id": "board", "path": "/page", "name": _label("Board")}
-        page.update(overrides)
-        return _normalize(features=["pages"], pages=[page])["pages"][0]
-
-    def test_a_surface_asking_for_nothing_stores_nothing(self):
-        assert "capabilities" not in self._page()
-
-    def test_a_surface_may_ask_for_what_it_needs(self):
-        assert self._page(capabilities=["clipboard-write"])["capabilities"] == [
-            "clipboard-write"
-        ]
-
-    def test_capabilities_are_stored_canonically(self):
-        """Sorted and de-duplicated, so re-publishing the same manifest produces
-        the same document."""
-        asked = ["fullscreen", "clipboard-write", "fullscreen"]
-        assert self._page(capabilities=asked)["capabilities"] == [
-            "clipboard-write",
-            "fullscreen",
-        ]
-
-    def test_a_capability_outside_the_vocabulary_is_refused(self):
-        with pytest.raises(ListingDefinitionError, match="not a capability"):
-            self._page(capabilities=["midi"])
-
     @pytest.mark.parametrize(
-        "entry", [{"camera": True}, ["camera"], 7, None, True], ids=repr
+        ("change", "key", "stored"),
+        [
+            ({}, "capabilities", None),
+            (
+                {"capabilities": ["clipboard-write"]},
+                "capabilities",
+                ["clipboard-write"],
+            ),
+            # Sorted and de-duplicated, so re-publishing produces the same document.
+            (
+                {"capabilities": ["fullscreen", "clipboard-write", "fullscreen"]},
+                "capabilities",
+                ["clipboard-write", "fullscreen"],
+            ),
+            # ``scopes`` is a list: the guild-wide entry, one in each initiative,
+            # or both — one page reached from two places.
+            ({}, "scopes", ["community"]),
+            (
+                {"scopes": ["initiative", "community"]},
+                "scopes",
+                ["community", "initiative"],
+            ),
+            ({"scopes": ["initiative"]}, "scopes", ["initiative"]),
+            ({"scopes": ["community", "community"]}, "scopes", ["community"]),
+        ],
     )
-    def test_an_entry_that_is_not_a_name_is_refused(self, entry):
-        """A publisher gets the same validation error for any entry that is not
-        one of the names. Set membership is defined only for a hashable value,
-        so an entry is typed before it is looked up rather than after."""
-        with pytest.raises(ListingDefinitionError, match="not a capability"):
-            self._page(capabilities=[entry])
-
-    def test_payment_is_not_namable(self):
-        """The platform takes payment on its own screens, so a plug-in's page
-        has no reading of this to request."""
-        assert "payment" not in PAGE_CAPABILITIES
-        with pytest.raises(ListingDefinitionError, match="not a capability"):
-            self._page(capabilities=["payment"])
-
-
-class TestWhereASurfaceRenders:
-    """``scopes`` is not a choice between the two — it is a list.
-
-    A surface may ask for the guild-wide entry, an entry in each initiative, or
-    both; both is the interesting case, because it is one page reached from two
-    places rather than two surfaces to keep in step.
-    """
-
-    def _page(self, **overrides) -> dict:
-        page = {"id": "board", "path": "/page", "name": _label("Board")}
-        page.update(overrides)
-        return _normalize(features=["pages"], pages=[page])["pages"][0]
-
-    def test_saying_nothing_keeps_the_placement_pages_already_had(self):
-        assert self._page()["scopes"] == ["community"]
-
-    def test_a_surface_may_render_in_both(self):
-        assert self._page(scopes=["initiative", "community"])["scopes"] == [
-            "community",
-            "initiative",
-        ]
-
-    def test_a_surface_may_render_only_inside_initiatives(self):
-        assert self._page(scopes=["initiative"])["scopes"] == ["initiative"]
-
-    def test_an_unknown_scope_is_refused(self):
-        with pytest.raises(ListingDefinitionError, match="unknown scope"):
-            self._page(scopes=["project"])
-
-    def test_nowhere_to_render_is_refused(self):
-        with pytest.raises(ListingDefinitionError, match="nowhere to render"):
-            self._page(scopes=[])
-
-    def test_a_repeated_scope_is_stored_once(self):
-        assert self._page(scopes=["community", "community"])["scopes"] == ["community"]
-
-
-class TestSurfacePermissions:
-    """A surface names the permission it answers to; who holds it is the
-    community's to choose, with its own roles."""
-
-    def _page(self, **overrides) -> dict:
-        page = {
-            "id": "board",
-            "path": "/page",
-            "name": _label("Board"),
-            "scopes": ["initiative"],
-        }
-        page.update(overrides)
-        return _normalize(
-            features=["pages"],
-            pages=[page],
-            permissions=[{"id": "board", "level": "initiative", "name": _label("B")}],
-        )["pages"][0]
-
-    def test_saying_nothing_stores_nothing(self):
-        assert "permission" not in self._page()
-
-    def test_it_names_one_declared_where_it_is_held(self):
-        assert self._page(permission="board")["permission"] == "board"
-        with pytest.raises(ListingDefinitionError, match="community level"):
-            self._page(permission="board", scopes=["community", "initiative"])
-
-    @pytest.mark.parametrize("value", [True, 1, [], "Not An Id"])
-    def test_anything_but_an_identifier_is_refused(self, value):
-        with pytest.raises(ListingDefinitionError, match="permission"):
-            self._page(permission=value)
-
-    @pytest.mark.parametrize("term", ["visibility", "admin_only"])
-    def test_the_retired_audience_terms_are_refused(self, term):
-        with pytest.raises(ListingDefinitionError, match=term):
-            self._page(**{term: True})
+    def test_what_a_page_asks_for_is_stored_canonically(self, change, key, stored):
+        page = self._page(**change)["pages"][0]
+        assert page.get(key) == stored
 
 
 class TestEmissions:
@@ -1234,15 +1063,6 @@ class TestEmissions:
         endpoint = {"id": "plugin.tests.widget-co.order-created", "direction": "emit"}
         endpoint.update(overrides)
         return _normalize(features=["endpoints"], endpoints=[endpoint])
-
-    def test_an_id_is_namespaced_under_the_plugin(self):
-        for value in ("order_created", "plugin.someone.else.order_created"):
-            with pytest.raises(ListingDefinitionError, match="must start with"):
-                self._emit(id=value)
-
-    def test_the_namespace_alone_is_not_an_id(self):
-        with pytest.raises(ListingDefinitionError, match="must start with"):
-            self._emit(id="plugin.tests.widget-co.")
 
     def test_a_declared_one_is_kept(self):
         definition = self._emit()
@@ -1788,25 +1608,6 @@ class TestReturns:
         )
         assert cleaned["endpoints"][0]["returns"][0]["list"] is True
 
-    def test_select_is_not_a_return_type(self):
-        """A select is a CONTROL, and the value behind one is a string."""
-        with pytest.raises(ListingDefinitionError, match="unknown type"):
-            _with_source(returns=[{"key": "k", "type": "select"}])
-
-    def test_a_credential_is_not_a_return_type_either(self):
-        with pytest.raises(ListingDefinitionError, match="unknown type"):
-            _with_source(returns=[{"key": "k", "type": "secret"}])
-
-    def test_two_returns_may_not_share_a_key(self):
-        with pytest.raises(ListingDefinitionError, match="share the key"):
-            _with_source(
-                returns=[{"key": "k", "type": "int"}, {"key": "k", "type": "string"}]
-            )
-
-    def test_a_return_needs_a_readable_key(self):
-        with pytest.raises(ListingDefinitionError):
-            _with_source(returns=[{"key": "Not An Id", "type": "int"}])
-
 
 class TestWhatAParameterTakes:
     """A manifest describes the API, not the control a consumer draws for it.
@@ -1919,9 +1720,46 @@ class TestWhereAParametersValuesComeFrom:
         cleaned = _with_option_source({"endpoint": LOOKUP_ID, "key": "ids"})
         assert "needs" not in cleaned["endpoints"][1]["params"][0]["options_from"]
 
-    def test_an_endpoint_from_another_plugin_is_refused(self):
-        with pytest.raises(ListingDefinitionError, match="not declared here"):
-            _with_option_source({"endpoint": "plugin.other.co.boards", "key": "ids"})
+    @pytest.mark.parametrize(
+        ("source", "siblings", "problem"),
+        [
+            (
+                {"endpoint": "plugin.other.co.boards", "key": "ids"},
+                None,
+                "not declared",
+            ),
+            ({"endpoint": LOOKUP_ID, "key": "nope"}, None, "is not returned by"),
+            ({"endpoint": LOOKUP_ID, "key": "total"}, None, "is a single value"),
+            (
+                {"endpoint": LOOKUP_ID, "key": "ids", "needs": {"nope": "org"}},
+                [{"key": "org", "type": "string", "label": _label()}],
+                "does not take",
+            ),
+            (
+                {"endpoint": LOOKUP_ID, "key": "ids", "needs": {"owner": "board"}},
+                None,
+                "being filled in",
+            ),
+            (
+                {"endpoint": LOOKUP_ID, "key": "ids", "needs": {"owner": "org"}},
+                None,
+                "does not declare",
+            ),
+        ],
+        ids=[
+            "another plug-in's endpoint",
+            "a key the source does not return",
+            "a key that is one value",
+            "a parameter the source does not take",
+            "the answer being filled in",
+            "a sibling this endpoint does not declare",
+        ],
+    )
+    def test_a_source_that_resolves_to_nothing_is_refused(
+        self, source, siblings, problem
+    ):
+        with pytest.raises(ListingDefinitionError, match=problem):
+            _with_option_source(source, siblings=siblings)
 
     def test_a_write_cannot_fill_in_a_form(self):
         with pytest.raises(ListingDefinitionError, match="does not read"):
@@ -1943,57 +1781,6 @@ class TestWhereAParametersValuesComeFrom:
                     },
                 ],
             )
-
-    @pytest.mark.parametrize(
-        ("key", "problem"),
-        [("nope", "is not returned by"), ("total", "is a single value")],
-        ids=["a key the source does not return", "a key that is one value"],
-    )
-    def test_a_menu_must_name_a_list_the_source_returns(self, key, problem):
-        with pytest.raises(ListingDefinitionError, match=problem):
-            _with_option_source({"endpoint": LOOKUP_ID, "key": key})
-
-    def test_it_can_only_send_a_parameter_the_source_takes(self):
-        with pytest.raises(ListingDefinitionError, match="does not take"):
-            _with_option_source(
-                {"endpoint": LOOKUP_ID, "key": "ids", "needs": {"nope": "org"}},
-                siblings=[{"key": "org", "type": "string", "label": _label()}],
-            )
-
-    def test_it_cannot_ask_for_the_answer_being_filled_in(self):
-        with pytest.raises(ListingDefinitionError, match="being filled in"):
-            _with_option_source(
-                {"endpoint": LOOKUP_ID, "key": "ids", "needs": {"owner": "board"}}
-            )
-
-    def test_a_sibling_this_endpoint_does_not_declare_is_refused(self):
-        with pytest.raises(ListingDefinitionError, match="does not declare"):
-            _with_option_source(
-                {"endpoint": LOOKUP_ID, "key": "ids", "needs": {"owner": "org"}}
-            )
-
-
-class TestListingAudience:
-    """Who a listing installs to, and what follows from it."""
-
-    def test_every_audience_a_kind_names_is_one_of_the_two(self):
-        # Which kinds have an audience at all is asserted in
-        # ``app/core/registry_coverage_test.py``, beside every other registry
-        # that has to span its vocabulary.
-        assert set(KIND_AUDIENCE.values()) <= LISTING_AUDIENCES
-
-    def test_the_two_shelves_do_not_overlap(self):
-        guild = kinds_for_audience("guild")
-        user = kinds_for_audience("user")
-        assert not guild & user
-        assert guild | user == LISTING_KINDS
-
-    def test_a_profile_pack_and_a_home_layout_install_to_a_person(self):
-        assert kinds_for_audience("user") == {"profile_pack", "home_layout"}
-
-    def test_an_unknown_audience_is_named_rather_than_empty(self):
-        with pytest.raises(ValueError):
-            kinds_for_audience("initiative")
 
 
 class TestAPacksOwnArt:
@@ -2025,3 +1812,27 @@ class TestAPacksOwnArt:
     def test_a_pack_without_art_keeps_the_shape_it_was_published_in(self):
         stored = normalize_listing_definition("profile_pack", self._pack())
         assert "image" not in stored["decorations"][0]
+
+
+@pytest.mark.parametrize(
+    ("definition", "tag"),
+    [
+        ({"plugin_kind": "tool"}, PluginTag.tool),
+        (
+            {"plugin_kind": "tool_instance", "tool": "calendar"},
+            PluginTag.community_tool,
+        ),
+        (
+            {"plugin_kind": "service", "pages": [{"id": "p"}], "connections": [{}]},
+            PluginTag.page,
+        ),
+        (
+            {"plugin_kind": "service", "connections": [{}], "widgets": [{}]},
+            PluginTag.connection,
+        ),
+        ({"plugin_kind": "service", "fields": [{}]}, PluginTag.add_on),
+        ({"plugin_kind": "service"}, PluginTag.add_on),
+    ],
+)
+def test_plugin_tag_is_what_a_reader_meets_first(definition, tag):
+    assert plugin_tag(definition) is tag

@@ -18,9 +18,8 @@ It answers two questions without visiting a guild schema: which installs an
 plug-in has (``GET /plugin-platform/installations``), and which installs a vendor
 delivery belongs to (``POST /plugin-hooks/{public_id}``). ``hook_route`` is the
 stored value of the field the plug-in's ``webhooks.route`` names, written when a
-connect stores it and cleared when it is removed. While ``exclusive``, the
-negation of the registration's ``shared_routes``, one community holds each route
-of a listing's installs.
+connect stores it and cleared when it is removed. Every community that connected
+the same vendor account holds its route, and a delivery goes to each.
 
 Beside it, ``plugin_install_claims`` holds the values each install holds for
 its plug-in's unique settings, current and earlier, in one index over every
@@ -30,7 +29,7 @@ the install when it is removed.
 
 Written by the ``plugin_index`` sweep from each community's installs, which
 their writes arm (:mod:`app.services.marketplace.plugin_installs`); a connect
-claims its route first. Reached by the system engine; besides it, an installed
+writes its route as it stores the value. Reached by the system engine; besides it, an installed
 plug-in's standing reads its own install's row, and billing's sync writes the
 statuses of the community it is routed to.
 """
@@ -50,12 +49,10 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    text,
 )
 from sqlmodel import Field, SQLModel
 
 __all__ = [
-    "EXCLUSIVE_ROUTE_INDEX",
     "HOOK_ROUTE_MAX_LENGTH",
     "SERVING_STATES",
     "SETTING_KEY_LENGTH",
@@ -68,9 +65,6 @@ __all__ = [
 
 #: The widest route value kept.
 HOOK_ROUTE_MAX_LENGTH = 200
-
-#: The index holding each route of an exclusive install to one community.
-EXCLUSIVE_ROUTE_INDEX = "uq_plugin_installs_exclusive_route"
 
 #: A setting's key and a unique setting's value at their widest: the contract's
 #: ``identifierLength`` and ``uniqueSettingValueLength``, as column widths.
@@ -120,13 +114,6 @@ class PluginInstall(SQLModel, table=True):
         ),
         Index("ix_plugin_installs_hook_route", "listing_uid", "hook_route"),
         Index("ix_plugin_installs_listing", "listing_uid", "guild_id", "install_id"),
-        Index(
-            EXCLUSIVE_ROUTE_INDEX,
-            "listing_uid",
-            "hook_route",
-            unique=True,
-            postgresql_where=text("exclusive AND hook_route IS NOT NULL"),
-        ),
     )
 
     guild_id: int = Field(
@@ -143,12 +130,6 @@ class PluginInstall(SQLModel, table=True):
         default=None,
         sa_column=Column(String(length=HOOK_ROUTE_MAX_LENGTH), nullable=True),
     )
-    #: The negation of its registration's ``shared_routes``: while true, this
-    #: install's route is held by this community alone.
-    exclusive: bool = Field(
-        default=True,
-        sa_column=Column(Boolean, nullable=False, server_default="true"),
-    )
     #: The community's status as its plug-in was last told it, by the
     #: ``community_status`` hook. The community-hook worker compares it with
     #: ``guilds.status`` and tells the plug-in when the two differ, so a status
@@ -163,6 +144,14 @@ class PluginInstall(SQLModel, table=True):
     )
     #: When ``status`` last moved: a deletion's window counts from it.
     status_changed_at: datetime | None = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
+    #: When the community's admin uninstalled it, a tool plug-in, consenting
+    #: to its content being deleted when the deletion window ends: stamped
+    #: with the move to ``deleted``, so it is the community's uninstall only
+    #: while ``status_changed_at`` is the same moment. Until then the
+    #: community may install it again.
+    uninstalled_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     #: Staff suspended the install here, and who did.

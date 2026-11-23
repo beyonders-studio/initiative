@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { delay, HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 
-import { buildUserSummary } from "@/__tests__/factories";
+import { buildToolPlugin, buildUserSummary, TOOL_PLUGIN_UID } from "@/__tests__/factories";
+import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage, renderWithProviders } from "@/__tests__/helpers/render";
 
@@ -34,21 +35,33 @@ const answerWithPeople = (...people: ReturnType<typeof buildUserSummary>[]) =>
   );
 
 describe("CommentContent", () => {
-  it("renders markdown inline formatting", () => {
-    const { container } = renderContent("Ship **now**, not *later*.");
+  it("renders markdown: inline formatting, lists, headings, code, GFM tables and strikethrough", () => {
+    const { container } = renderContent(
+      [
+        "Ship **now**, not *later*.",
+        "",
+        "## Plan",
+        "",
+        "- first",
+        "- second",
+        "",
+        "Run `pnpm test` first.",
+        "",
+        "| a | b |",
+        "| - | - |",
+        "| 1 | 2 |",
+        "",
+        "~~dropped~~",
+      ].join("\n")
+    );
 
     expect(container.querySelector("strong")).toHaveTextContent("now");
     expect(container.querySelector("em")).toHaveTextContent("later");
-  });
-
-  it("renders lists, headings, and code", () => {
-    const { container } = renderContent(
-      ["## Plan", "", "- first", "- second", "", "Run `pnpm test` first."].join("\n")
-    );
-
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Plan");
     expect(container.querySelectorAll("li")).toHaveLength(2);
     expect(container.querySelector("code")).toHaveTextContent("pnpm test");
+    expect(container.querySelectorAll("th")).toHaveLength(2);
+    expect(container.querySelector("del")).toHaveTextContent("dropped");
   });
 
   it("renders fenced code blocks without interpreting their contents", () => {
@@ -57,15 +70,6 @@ describe("CommentContent", () => {
     const code = container.querySelector("pre code");
     expect(code).toHaveTextContent("@[Ada](3) **not bold**");
     expect(container.querySelector("strong")).toBeNull();
-  });
-
-  it("renders GFM tables and strikethrough", () => {
-    const { container } = renderContent(
-      ["| a | b |", "| - | - |", "| 1 | 2 |", "", "~~dropped~~"].join("\n")
-    );
-
-    expect(container.querySelectorAll("th")).toHaveLength(2);
-    expect(container.querySelector("del")).toHaveTextContent("dropped");
   });
 
   it("keeps single newlines as line breaks", () => {
@@ -173,6 +177,17 @@ describe("CommentContent", () => {
     expect(await screen.findByRole("link", { name: /Fix login/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Runbook/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Apollo/ })).toBeInTheDocument();
+  });
+
+  it("links a tool plug-in's row by its kind, named as its tool names it", async () => {
+    server.use(
+      communityHttp.get("/plugins/", () => HttpResponse.json({ items: [buildToolPlugin()] }))
+    );
+    const kind = `book.${TOOL_PLUGIN_UID.toLowerCase()}`;
+    renderLinkedContent(`see #${kind}[Dune](3)`);
+
+    const link = await screen.findByRole("link", { name: /Book.*Dune/ });
+    expect(link.getAttribute("href")).toMatch(new RegExp(`/go/${kind}/3$`));
   });
 
   it("keeps a mention rendered beside its surrounding markdown", async () => {

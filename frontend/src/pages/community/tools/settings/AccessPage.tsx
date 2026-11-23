@@ -10,43 +10,35 @@
 
 import { useTranslation } from "react-i18next";
 
-import { ShareControl } from "@/components/access/ShareControl";
 import { ShareRequestsCard } from "@/components/access/ShareRequests";
+import { SharingSettings } from "@/components/access/SharingSettings";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
-import { toast } from "@/lib/mascotToast";
 import { Card, CardContent, CardDescription, CardHeader } from "@/ui/card";
 
 import { useToolSettings } from "./ToolSettingsContext";
 
 export const AccessPage = () => {
-  const { t } = useTranslation(["common", "access"]);
+  const { t } = useTranslation("access");
   const { tool, entity, setGrants } = useToolSettings();
 
   if (!entity.can.edit) {
     return <SettingsPermissionRequired scope="tool" />;
   }
 
-  const ownerId = entity.grants.find((grant) => grant.level === "owner")?.user_id ?? null;
-
   return (
     <div className="space-y-6">
       {entity.can.share ? <ShareRequestsCard tool={tool} entityId={entity.id} /> : null}
       <Card>
         <CardHeader>
-          <CardDescription>{t("access:share.settingsDescription")}</CardDescription>
+          <CardDescription>{t("share.settingsDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
-          <ShareControl
+          <SharingSettings
             initiativeId={entity.initiative_id ?? 0}
             grants={entity.grants}
-            ownerId={ownerId}
-            ownerPlugin={entity.owner_plugin ?? null}
-            onChange={(grants) =>
-              setGrants.mutate(grants, {
-                onSuccess: () => toast.success(t("common:toolSettings.permissionsUpdated")),
-              })
-            }
-            disabled={!entity.can.share || setGrants.isPending}
+            ownerPlugin={entity.owner_plugin}
+            canShare={entity.can.share}
+            setGrants={setGrants}
           />
         </CardContent>
       </Card>

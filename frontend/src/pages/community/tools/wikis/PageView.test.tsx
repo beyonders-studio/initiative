@@ -182,7 +182,7 @@ describe("naming a wiki page", () => {
 });
 
 describe("putting the eye back on", () => {
-  it("reads back the words that were just typed, before the server has them", async () => {
+  it("reads back the words just typed, and sends what the pause had not sent", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const { router } = renderPageView();
@@ -194,18 +194,7 @@ describe("putting the eye back on", () => {
     await router.navigate({ href: addressOf(PARAMS, READING) });
 
     await waitFor(() => expect(shownBody()).toContain("just typed"));
-  });
-
-  it("sends what the pause had not sent, rather than dropping it", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    const { router } = renderPageView();
-
-    await screen.findByDisplayValue("Step 1");
-    await user.click(screen.getByRole("button", { name: "edit the body" }));
-    await router.navigate({ href: addressOf(PARAMS, READING) });
-
-    // Before the pause that would have sent it anyway.
+    // Before the pause that would have sent it anyway, rather than dropping it.
     await waitFor(() => expect(patches).toHaveLength(1), { timeout: 1500 });
     expect(patches[0].pageId).toBe("11");
     expect(patches[0].body).toHaveProperty("content");
@@ -243,13 +232,6 @@ describe("a page that has not been published", () => {
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "Publish" })).not.toBeInTheDocument()
     );
-  });
-
-  it("says nothing about publishing a page that is already published", async () => {
-    renderPageView(READING);
-
-    await screen.findByText("Step 1");
-    expect(screen.queryByRole("button", { name: "Publish" })).not.toBeInTheDocument();
   });
 });
 

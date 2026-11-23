@@ -12,41 +12,13 @@ from app.models.platform.access_grant import AccessGrant
 from app.models.platform.guild import CommunityRole
 from app.testing import (
     Actor,
-    create_counter_group,
+    create_access_grant,
     create_guild,
     create_project,
+    create_wiki,
 )
 
 GRANTS = "/api/v1/access-grants/"
-
-
-async def _approved_grant(
-    session: AsyncSession,
-    *,
-    grantee: Actor,
-    host: Actor,
-    level: str = "read",
-    reason: str = "ticket",
-    expires_in: timedelta = timedelta(hours=1),
-) -> AccessGrant:
-    """A live (or, with a negative ``expires_in``, a lapsed) approved grant on
-    ``host``'s community, approved by ``host``."""
-    now = datetime.now(UTC)
-    grant = AccessGrant(
-        user_id=grantee.user.id,
-        guild_id=host.guild.id,
-        access_level=level,
-        status="approved",
-        reason=reason,
-        requested_duration_minutes=60,
-        requested_by_id=grantee.user.id,
-        approved_by_id=host.user.id,
-        decided_at=now,
-        expires_at=now + expires_in,
-    )
-    session.add(grant)
-    await session.commit()
-    return grant
 
 
 async def _request_access(client: AsyncClient, actor: Actor, guild, **body) -> object:
@@ -145,13 +117,15 @@ async def test_queue_live_filter_excludes_expired(
     the active list pages accurately."""
     host = await acting_user("owner", guild_role=CommunityRole.admin)
     support = await acting_user("support")
-    await _approved_grant(session, grantee=support, host=host, reason="live one")
-    await _approved_grant(
+    await create_access_grant(
+        session, user=support.user, guild=host.guild, reason="live one"
+    )
+    await create_access_grant(
         session,
-        grantee=support,
-        host=host,
+        user=support.user,
+        guild=host.guild,
         reason="stale one",
-        expires_in=-timedelta(hours=1),
+        expires_at=datetime.now(UTC) - timedelta(hours=1),
     )
 
     queue = await client.get(
@@ -277,12 +251,7 @@ async def test_revoke_and_cancel(
     "tool,path,make",
     [
         pytest.param(Tool.project, "projects", create_project, id="a-project"),
-        pytest.param(
-            Tool.counter_group,
-            "counter-groups",
-            create_counter_group,
-            id="a-counter-group",
-        ),
+        pytest.param(Tool.wiki, "wikis", create_wiki, id="a-wiki"),
     ],
 )
 async def test_a_grant_reaches_a_tools_content_not_who_it_is_shared_with(
@@ -294,7 +263,9 @@ async def test_a_grant_reaches_a_tools_content_not_who_it_is_shared_with(
     support = await acting_user("support")
     target = await acting_user()
     resource = await make(session, host.initiative, host.user)
-    await _approved_grant(session, grantee=support, host=host, level="read_write")
+    await create_access_grant(
+        session, user=support.user, guild=host.guild, access_level="read_write"
+    )
 
     resp = await client.put(
         host.g(f"/{path}/{resource.id}/grants"),
@@ -316,7 +287,7 @@ async def test_grantee_sees_guild_content(
         "owner", guild_role=CommunityRole.admin, initiative=True, project=True
     )
     support = await acting_user("support")
-    await _approved_grant(session, grantee=support, host=host)
+    await create_access_grant(session, user=support.user, guild=host.guild)
 
     headers = support.headers
     initiatives = await client.get(host.g("/initiatives/"), headers=headers)
@@ -379,7 +350,9 @@ async def test_a_scoped_read_write_grant_cannot_author_tools(
     """
     host = await acting_user("owner", guild_role=CommunityRole.admin, initiative=True)
     grantee = await acting_user(tier)
-    await _approved_grant(session, grantee=grantee, host=host, level="read_write")
+    await create_access_grant(
+        session, user=grantee.user, guild=host.guild, access_level="read_write"
+    )
 
     initiative = await client.get(
         host.g(f"/initiatives/{host.initiative.id}"), headers=grantee.headers
@@ -410,7 +383,7 @@ async def test_grant_read_carries_guild_status(
 
     host = await acting_user("owner", guild_role=CommunityRole.admin)
     support = await acting_user("support")
-    await _approved_grant(session, grantee=support, host=host)
+    await create_access_grant(session, user=support.user, guild=host.guild)
 
     host.guild.status = CommunityStatus.suspended.value
     session.add(host.guild)
@@ -438,7 +411,7 @@ async def test_the_queue_is_read_by_approvers_on_their_own_tier(
     caller's platform tier: an approver sees somebody else's grant, named."""
     host = await acting_user("owner", guild_role=CommunityRole.admin)
     support = await acting_user("support")
-    grant = await _approved_grant(session, grantee=support, host=host)
+    grant = await create_access_grant(session, user=support.user, guild=host.guild)
     reader = await acting_user(tier)
 
     queue = await client.get(f"{GRANTS}queue", headers=reader.headers)
@@ -458,7 +431,7 @@ async def test_a_grantee_reads_their_own_grant_and_not_somebody_elses(
     host = await acting_user("owner", guild_role=CommunityRole.admin)
     support = await acting_user("support")
     other = await acting_user("support")
-    grant = await _approved_grant(session, grantee=support, host=host)
+    grant = await create_access_grant(session, user=support.user, guild=host.guild)
 
     own = await client.get(GRANTS, headers=support.headers)
     assert own.status_code == 200, own.text
@@ -530,10 +503,21 @@ async def test_a_grant_past_its_window_is_marked_expired(
     host = await acting_user(guild_role=CommunityRole.admin)
     other_host = await acting_user(guild_role=CommunityRole.admin)
     grantee = await acting_user("support")
-    lapsed = await _approved_grant(
-        session, grantee=grantee, host=host, expires_in=timedelta(minutes=-5)
+    lapsed = await create_access_grant(
+        session,
+        user=grantee.user,
+        guild=host.guild,
+        expires_at=datetime.now(UTC) - timedelta(minutes=5),
     )
-    live = await _approved_grant(session, grantee=grantee, host=other_host)
+    live = await create_access_grant(session, user=grantee.user, guild=other_host.guild)
+    # A grant that ended some other way already has its ending recorded.
+    revoked = await create_access_grant(
+        session,
+        user=grantee.user,
+        guild=(await acting_user(guild_role=CommunityRole.admin)).guild,
+        status="revoked",
+        expires_at=datetime.now(UTC) - timedelta(minutes=5),
+    )
     capfd.readouterr()
 
     assert await service.expire_due(session) == 1
@@ -543,40 +527,15 @@ async def test_a_grant_past_its_window_is_marked_expired(
 
     await session.refresh(lapsed)
     await session.refresh(live)
+    await session.refresh(revoked)
     assert lapsed.status == "expired"
     assert live.status == "approved"
+    assert revoked.status == "revoked"
     decided = emitted(capfd, AuditEventType.ACCESS_GRANT_DECIDED)
     assert [(e["target"]["id"], e["detail"]["decision"]) for e in decided] == [
         (lapsed.id, "expired")
     ]
     assert decided[0]["actor_user_id"] is None
-
-
-async def test_a_revoked_grant_is_not_recorded_as_expiring(
-    session: AsyncSession, acting_user, capfd
-):
-    """A grant that ended some other way already has its ending recorded; the
-    sweep claims only grants still marked approved."""
-    from app.core.audit_events import AuditEventType
-    from app.services.platform import access_grants as service
-    from app.testing.audit import emitted
-
-    host = await acting_user(guild_role=CommunityRole.admin)
-    grantee = await acting_user("support")
-    revoked = await _approved_grant(
-        session, grantee=grantee, host=host, expires_in=timedelta(minutes=-5)
-    )
-    revoked.status = "revoked"
-    session.add(revoked)
-    await session.commit()
-    capfd.readouterr()
-
-    assert await service.expire_due(session) == 0
-    await session.commit()
-
-    await session.refresh(revoked)
-    assert revoked.status == "revoked"
-    assert emitted(capfd, AuditEventType.ACCESS_GRANT_DECIDED) == []
 
 
 async def test_a_moderate_grant_is_for_those_who_moderate(

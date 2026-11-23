@@ -21,16 +21,20 @@ from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.collection import Collection
-from app.models.tenant.comment import Comment
+from app.models.tenant.comment import Comment, said_on
 from app.models.tenant.content_hold import ContentHold
 from app.models.tenant.intake import IntakeCase
 from app.models.tenant.task import Task
 from app.services.platform import holds as holds_service
 from app.testing import (
+    COUNTERS_UID,
+    add_counter,
     create_collection,
     create_comment,
     create_file,
     create_user,
+    install_tool_plugin,
+    thread_path,
 )
 from app.testing.factories import create_access_grant, get_auth_headers
 
@@ -54,7 +58,7 @@ async def _hold(client, actor, target_type: str, target_id: int, **extra):
 
 async def _thread(client, actor, task_id: int) -> list[dict]:
     response = await client.get(
-        actor.g("/comments/"), params={"task_id": task_id}, headers=actor.headers
+        actor.g(thread_path("task", task_id)), headers=actor.headers
     )
     assert response.status_code == 200, response.text
     return response.json()["comments"]
@@ -317,7 +321,7 @@ async def test_a_moderate_grantee_reads_what_is_held_and_others_dont(
     ).status_code == 201
     guild = scene["guild"]
     path = f"/api/v1/c/{guild.id}/comments/"
-    params = {"task_id": scene["task"].id}
+    params = {"subject_type": "task", "subject_id": scene["task"].id}
 
     moderator = await _moderator(session, guild)
     seen = await client.get(path, params=params, headers=get_auth_headers(moderator))
@@ -597,7 +601,7 @@ async def test_a_hold_standing_30_days_is_noted_on_its_case(
     await _system(session, operations["guild"].id)
     notes = (
         await session.exec(
-            select(Comment.system_kind).where(Comment.task_id == hold.case_task_id)
+            select(Comment.system_kind).where(said_on("task", hold.case_task_id))
         )
     ).all()
     assert "hold_reminder" in notes
@@ -684,3 +688,64 @@ async def test_holding_a_case_in_the_operations_community_under_itself(
     held = (await session.exec(select(Task).where(Task.id == case.task_id))).one()
     assert held.held_at is not None
     await set_rls_context(session, Unattributed())
+
+
+async def test_a_tool_plugins_row_is_held_listed_and_released(
+    client, session, scene, operations, acting_user, reading_as, monkeypatch
+):
+    """A row of a tool plug-in's tool is held as a built-in tool's row is:
+    with the item inside it, it reads as absent to the community, the
+    platform lists it by its name, and restoring it puts both back, with one
+    system connection at a time."""
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from sqlmodel.ext.asyncio.session import AsyncSession
+
+    from app.db import cohorts
+    from app.db import session as db_session
+
+    guild = scene["guild"]
+    seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
+    await install_tool_plugin(client, session, seat)
+    adding = await reading_as(scene["mod"].user.id, guild.id)
+    group, counter = (await add_counter(adding, guild.id, scene["initiative"].id))[1:]
+    await adding.commit()
+    kind = f"counter_group.{COUNTERS_UID.lower()}"
+    seen = text(
+        f"SELECT (SELECT count(*) FROM p_{COUNTERS_UID.lower()}_counter_group"
+        f" WHERE id = :g) + (SELECT count(*) FROM p_{COUNTERS_UID.lower()}_counter"
+        " WHERE id = :c)"
+    )
+
+    async def rows_read() -> int:
+        reader = await reading_as(scene["admin"].user.id, guild.id)
+        return (await reader.exec(seen, params={"g": group, "c": counter})).one()[0]
+
+    assert await rows_read() == 2
+    assert (await _hold(client, scene["mod"], kind, group)).status_code == 201
+    assert await rows_read() == 0
+
+    moderator = await _moderator(session, guild)
+    holds = await client.get(
+        f"/api/v1/c/{guild.id}/holds", headers=get_auth_headers(moderator)
+    )
+    (listed,) = holds.json()
+    assert (listed["target_type"], listed["target_id"], listed["label"]) == (
+        kind,
+        group,
+        "Scores",
+    )
+    one = create_async_engine(
+        db_session.system_engine.url, pool_size=1, max_overflow=0, pool_timeout=3
+    )
+    maker = async_sessionmaker(
+        bind=one, autoflush=False, expire_on_commit=False, class_=AsyncSession
+    )
+    with monkeypatch.context() as patched:
+        patched.setattr(db_session, "system_engine", one)
+        patched.setattr(cohorts, "system_sessionmaker", lambda _guild_id: maker)
+        try:
+            released = await _release(client, moderator, guild, listed["id"], "restore")
+        finally:
+            await one.dispose()
+    assert released.status_code == 200, released.text
+    assert await rows_read() == 2

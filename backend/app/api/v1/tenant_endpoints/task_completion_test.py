@@ -5,7 +5,7 @@ A task carries a completion timestamp exactly when its status sits in the
 boundary — including recategorising a status, which flips done-ness for a whole
 column without writing a single task row.
 
-The rule itself is unit-tested in
+The rule's unresolved-status case is unit-tested in
 ``app/services/tenant/task_completion_test.py``.
 """
 
@@ -62,71 +62,32 @@ async def _set_status(
     return response.json()
 
 
-# --- creation ---------------------------------------------------------------
+# --- creation and status changes on the task --------------------------------
 
 
-async def test_task_created_in_done_status_is_complete(
+async def test_a_task_is_complete_exactly_while_its_status_is_done(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
+    """Created into a status, the task keeps it; moving into done stamps it,
+    and reopening it un-completes it so the timestamp does not linger."""
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     statuses = await _statuses(session, a.project)
+    done, todo = statuses[TaskStatusCategory.done], statuses[TaskStatusCategory.todo]
 
-    task = await _create_task(client, a, status_id=statuses[TaskStatusCategory.done].id)
-
-    assert task["completed_at"] is not None
-
-
-async def test_task_created_in_open_status_is_incomplete(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    statuses = await _statuses(session, a.project)
-
-    task = await _create_task(client, a, status_id=statuses[TaskStatusCategory.todo].id)
-
+    finished = await _create_task(client, a, status_id=done.id)
+    assert finished["task_status_id"] == done.id
+    assert finished["completed_at"] is not None
+    task = await _create_task(client, a, status_id=todo.id)
     assert task["completed_at"] is None
 
-
-# --- status changes on the task --------------------------------------------
-
-
-async def test_moving_into_done_stamps_completed_at(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    statuses = await _statuses(session, a.project)
-    task = await _create_task(client, a, status_id=statuses[TaskStatusCategory.todo].id)
-    assert task["completed_at"] is None
-
-    updated = await _set_status(
-        client, a, task["id"], statuses[TaskStatusCategory.done].id
-    )
-
+    updated = await _set_status(client, a, task["id"], done.id)
     assert updated["completed_at"] is not None
-
-
-async def test_moving_out_of_done_clears_completed_at(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Reopening a task un-completes it — the timestamp must not linger."""
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    statuses = await _statuses(session, a.project)
-    task = await _create_task(client, a, status_id=statuses[TaskStatusCategory.done].id)
-    assert task["completed_at"] is not None
-
-    updated = await _set_status(
+    reopened = await _set_status(
         client, a, task["id"], statuses[TaskStatusCategory.in_progress].id
     )
-
-    assert updated["completed_at"] is None
+    assert reopened["completed_at"] is None
 
 
 async def test_moving_between_done_statuses_keeps_the_original_time(
@@ -151,7 +112,7 @@ async def test_moving_between_done_statuses_keeps_the_original_time(
     assert updated["completed_at"] == completed_at
 
 
-async def test_kanban_drag_into_done_stamps_completed_at(
+async def test_kanban_drag_across_done_stamps_and_clears_completed_at(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
     """The reorder endpoint carries a status per item — the drag-to-Done path."""
@@ -161,84 +122,30 @@ async def test_kanban_drag_into_done_stamps_completed_at(
     statuses = await _statuses(session, a.project)
     task = await _create_task(client, a, status_id=statuses[TaskStatusCategory.todo].id)
 
-    response = await client.post(
-        a.g("/tasks/reorder"),
-        headers=a.headers,
-        json={
-            "project_id": a.project.id,
-            "items": [
-                {
-                    "id": task["id"],
-                    "task_status_id": statuses[TaskStatusCategory.done].id,
-                    "position": 0,
-                }
-            ],
-        },
-    )
-
-    assert response.status_code == 200, response.text
-    assert (await _get_task(client, a, task["id"]))["completed_at"] is not None
-
-
-async def test_kanban_drag_out_of_done_clears_completed_at(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    statuses = await _statuses(session, a.project)
-    task = await _create_task(client, a, status_id=statuses[TaskStatusCategory.done].id)
-
-    response = await client.post(
-        a.g("/tasks/reorder"),
-        headers=a.headers,
-        json={
-            "project_id": a.project.id,
-            "items": [
-                {
-                    "id": task["id"],
-                    "task_status_id": statuses[TaskStatusCategory.todo].id,
-                    "position": 0,
-                }
-            ],
-        },
-    )
-
-    assert response.status_code == 200, response.text
-    assert (await _get_task(client, a, task["id"]))["completed_at"] is None
+    for category, completed in (
+        (TaskStatusCategory.done, True),
+        (TaskStatusCategory.todo, False),
+    ):
+        response = await client.post(
+            a.g("/tasks/reorder"),
+            headers=a.headers,
+            json={
+                "project_id": a.project.id,
+                "items": [
+                    {
+                        "id": task["id"],
+                        "task_status_id": statuses[category].id,
+                        "position": 0,
+                    }
+                ],
+            },
+        )
+        assert response.status_code == 200, response.text
+        stamped = (await _get_task(client, a, task["id"]))["completed_at"]
+        assert (stamped is not None) is completed
 
 
 # --- recategorising a status (no task row is written) -----------------------
-
-
-async def test_recategorising_a_column_out_of_done_clears_its_tasks(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Flipping a Done column to another category reopens everything in it."""
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    statuses = await _statuses(session, a.project)
-    # A second done status, so the project still has one after the flip.
-    keeper = await client.post(
-        a.g(f"/projects/{a.project.id}/task-statuses/"),
-        headers=a.headers,
-        json={"name": "Shipped", "category": "done"},
-    )
-    assert keeper.status_code == 201, keeper.text
-
-    done_status = statuses[TaskStatusCategory.done]
-    task = await _create_task(client, a, status_id=done_status.id)
-    assert task["completed_at"] is not None
-
-    response = await client.patch(
-        a.g(f"/projects/{a.project.id}/task-statuses/{done_status.id}"),
-        headers=a.headers,
-        json={"category": "in_progress"},
-    )
-
-    assert response.status_code == 200, response.text
-    assert (await _get_task(client, a, task["id"]))["completed_at"] is None
 
 
 async def test_recategorising_a_column_into_done_stamps_its_tasks(
@@ -265,7 +172,8 @@ async def test_recategorising_a_column_into_done_stamps_its_tasks(
 async def test_recategorising_a_column_leaves_other_columns_alone(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
-    """The realignment is scoped to the edited status, not the whole project."""
+    """Flipping a Done column to another category reopens everything in it;
+    the realignment is scoped to the edited status, not the whole project."""
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )

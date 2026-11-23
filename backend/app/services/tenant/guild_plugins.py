@@ -47,6 +47,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.audit_events import AuditEventType
 from app.core.messages import GuildPluginMessages
 from app.core.plugin_scopes import ordered_scopes, plugin_scope, plugin_scope_target
+from app.core.tool_set import ToolRecord
 from app.core.tools import Tool
 from app.db.guild_standing import GuildContext
 from app.db.session import routed_guild_id
@@ -74,6 +75,7 @@ from app.services.marketplace.service_plugins import (
     members_hold,
     surface_permission,
 )
+from app.services.marketplace.tool_plugins import is_tool_plugin
 from app.services.platform import guilds as guilds_service
 from app.services.tenant import ownership as ownership_service
 from app.services.tenant import plugin_config as plugin_config_service
@@ -908,7 +910,9 @@ async def set_setting(
 # per initiative. An initiative with no row is one the plug-in is not placed in.
 # Placement is the seat's answer to "where does this belong", so it applies to
 # everyone including guild admins. Who reaches the plug-in where it appears is
-# the initiative's roles' answer (:func:`holds_permission`).
+# the initiative's roles' answer (:func:`holds_permission`). A tool plug-in's
+# tool is, where it is not placed, as a built-in tool switched off there
+# (``app.db.guild_standing``).
 
 
 class PlacementError(ValueError):
@@ -968,6 +972,23 @@ async def placed_initiative_ids(session: AsyncSession, install_id: int) -> set[i
         )
     )
     return set(rows.all())
+
+
+async def tool_placed(
+    session: AsyncSession, tool: ToolRecord, initiative_id: int
+) -> bool:
+    """Whether the install bringing the tool plug-in's ``tool`` is placed in
+    the initiative: where its tool can be used."""
+    return (
+        await session.exec(
+            select(PluginPlacement.initiative_id)
+            .join(GuildPlugin, col(GuildPlugin.id) == PluginPlacement.install_id)
+            .where(
+                GuildPlugin.listing_uid == tool.listing_uid,
+                PluginPlacement.initiative_id == initiative_id,
+            )
+        )
+    ).first() is not None
 
 
 async def is_placed(
@@ -1399,14 +1420,15 @@ def initiative_surface_ids(definition: Any) -> set[str]:
 
 
 def has_initiative_surfaces(definition: Any) -> bool:
-    """Whether the plug-in has anything to place in an initiative: a page
-    rendering there, or fields, sections or actions on items, which are drawn
-    in the item's initiative to whoever its placement admits
+    """Whether the plug-in has anything to place in an initiative: a tool, a
+    page rendering there, or fields, sections or actions on items, which are
+    drawn in the item's initiative to whoever its placement admits
     (:data:`ITEM_SURFACE`)."""
     if not isinstance(definition, dict):
         return False
     return bool(
-        initiative_surface_ids(definition)
+        is_tool_plugin(definition)
+        or initiative_surface_ids(definition)
         or _declared(definition, "fields", "key")
         or _declared(definition, "parts", "id")
         or _declared(definition, "actions", "id")
@@ -1521,6 +1543,7 @@ def item_openability(
     context: GuildContext,
     age_allows: bool = True,
     frozen: bool = False,
+    platform: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> list[ItemOpenability]:
     """What of the plug-in the viewer meets on items, in each initiative it is
     placed in where they meet anything: each field, part and action whose
@@ -1531,15 +1554,19 @@ def item_openability(
     action while those its endpoint requires do too. A member's own connection
     an action requires is theirs to make when they run it, and so is one a
     declarative plug-in's endpoint requires, whose call may run on it; a
-    container's endpoint is called as the installation. A frozen community
-    runs none, and a viewer too young for the plug-in meets none of it."""
+    container's endpoint is called as the installation. A connection the
+    platform holds (``platform``) holds a value. A frozen community runs
+    none, and a viewer too young for the plug-in meets none of it."""
     if not age_allows:
         return []
     definition = plugin.definition if isinstance(plugin.definition, dict) else {}
 
     def met(entry: dict, members_connect: bool = False) -> bool:
         return plugin_config_service.installation_meets(
-            plugin, entry.get("requires"), members_connect=members_connect
+            plugin,
+            entry.get("requires"),
+            members_connect=members_connect,
+            platform=platform,
         )
 
     declarative = registration_lookup.is_declarative(definition)

@@ -52,7 +52,7 @@ async def test_a_guild_admin_can_claim_unowned_content(
     owners = await ownership_service.summarize_unowned_content(
         session, guild_id=admin.guild.id
     )
-    assert (Tool.project, project.id) not in {(i.tool, i.id) for i in owners}
+    assert (Tool.project, project.id) not in {(i.tool.kind, i.id) for i in owners}
 
 
 async def test_content_cannot_be_handed_to_an_ordinary_member(

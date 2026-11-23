@@ -2,12 +2,15 @@ import { FileDown } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { FileType, Tool, ToolCan } from "@/api/generated/initiativeAPI.schemas";
+import type { FileType, ToolCan } from "@/api/generated/initiativeAPI.schemas";
+import { useReadPluginTool } from "@/api/generated/plugin-tools/plugin-tools";
 import { ExportWizard, type ExportWizardScope } from "@/components/exports/ExportWizard";
-import { selectionExportFormats } from "@/components/exports/formats";
+import { genericFormatOptions, selectionExportFormats } from "@/components/exports/formats";
+import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { exportFilenameStem } from "@/lib/exportDownload";
 import { everyCan } from "@/lib/permissions";
-import { toolRouteSegment } from "@/lib/tools";
+import { toolText } from "@/lib/toolPlugins";
+import { isBuiltInTool, toolRouteSegment } from "@/lib/tools";
 import { Button } from "@/ui/button";
 
 type EntitiesExportButtonProps = Omit<Extract<ExportWizardScope, { kind: "entities" }>, "kind"> & {
@@ -43,8 +46,9 @@ export function EntitiesExportButton({
 
 interface BulkExportButtonProps {
   /** The canonical tool — endpoint, selector param, and formats all derive
-   * from the registry, so a bulk-export surface can't drift per page. */
-  tool: Tool;
+   * from the registry, so a bulk-export surface can't drift per page — or a
+   * tool plug-in's kind, whose formats its read names. */
+  tool: string;
   /** The selected entities, with what the viewer may do to each — and, for
    * files, the type that decides which formats they export to. */
   items: { id: number; can: ToolCan; file_type?: FileType }[];
@@ -56,8 +60,19 @@ interface BulkExportButtonProps {
  * owner's rung, as deleting is — and in a format every one of them has, and
  * shown disabled otherwise. */
 export function BulkExportButton({ tool, items }: BulkExportButtonProps) {
-  const { t } = useTranslation("exports");
-  const formats = selectionExportFormats(tool, items);
+  const { t, i18n } = useTranslation("exports");
+  const builtIn = isBuiltInTool(tool) ? tool : null;
+  const plugin = useReadPluginTool(useActiveCommunityId(), tool, {
+    query: { enabled: builtIn === null },
+  }).data;
+  const formats = builtIn
+    ? selectionExportFormats(builtIn, items)
+    : plugin && genericFormatOptions(plugin.export_formats);
+  const name = builtIn
+    ? toolRouteSegment(builtIn)
+    : plugin
+      ? toolText(plugin.name, i18n.language)
+      : tool;
   if (!formats || items.length === 0) {
     return null;
   }
@@ -72,7 +87,7 @@ export function BulkExportButton({ tool, items }: BulkExportButtonProps) {
       tool={tool}
       ids={items.map((item) => item.id)}
       formats={formats}
-      filenameStem={exportFilenameStem(toolRouteSegment(tool), toolRouteSegment(tool))}
+      filenameStem={exportFilenameStem(name, plugin?.key ?? name)}
     />
   );
 }

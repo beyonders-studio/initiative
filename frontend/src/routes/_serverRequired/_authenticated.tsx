@@ -225,7 +225,7 @@ function AppLayout() {
   }
 
   const toClearTarget = (item: PersonalItemRead): ClearRecentTarget => ({
-    entityType: item.entity_type,
+    entityType: item.entity_type as Tool,
     entityId: item.entity_id,
     communityId: item.community_id,
   });

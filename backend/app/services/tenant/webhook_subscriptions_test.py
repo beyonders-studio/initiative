@@ -177,6 +177,9 @@ async def test_a_community_subscription_hears_every_initiative(
 # ---------------------------------------------------------------------------
 
 
+# The cases a request reaches are held in ``webhooks_install_test``; these are
+# the standings an install token there does not easily take.
+
 #: Another plug-in's event, and the plug-in that emits it.
 _GH_EVENT = "plugin.tests.gh.issue_opened"
 _EMITTERS = {_GH_EVENT: "tests.gh"}
@@ -201,15 +204,6 @@ def _install_context(**overrides):
 @pytest.mark.parametrize(
     ("overrides", "event_types", "initiative_id"),
     [
-        pytest.param({}, ["files.created"], None, id="community-wide"),
-        pytest.param({}, ["files.updated"], 12, id="a-placed-initiative"),
-        pytest.param({"scope_initiative_id": 11}, ["files.deleted"], 11, id="narrowed"),
-        pytest.param(
-            {"install_read": ("files", "projects")},
-            ["files.created", "tasks.created"],
-            None,
-            id="every-tool-held",
-        ),
         pytest.param(
             {"token_scopes": frozenset({"plugins:tests.gh"})},
             [_GH_EVENT],
@@ -246,24 +240,13 @@ def test_an_install_may_subscribe_within_its_standing(
 @pytest.mark.parametrize(
     ("overrides", "event_types", "initiative_id"),
     [
-        pytest.param({}, ["tasks.created"], None, id="tool-scope-missing"),
-        pytest.param(
-            {}, ["files.created", "tasks.created"], None, id="one-type-uncovered"
-        ),
         pytest.param({}, ["plugins.created"], None, id="no-scope-reaches-it"),
-        pytest.param(
-            {"scope_initiative_id": 11},
-            ["files.created"],
-            None,
-            id="narrowed-community-wide",
-        ),
         pytest.param(
             {"scope_initiative_id": 11},
             ["files.created"],
             12,
             id="narrowed-other-initiative",
         ),
-        pytest.param({}, ["files.created"], 13, id="not-placed"),
         pytest.param({}, [_GH_EVENT], None, id="plugins-scope-missing"),
         pytest.param(
             {"token_scopes": frozenset({"community:admin"})},
@@ -318,23 +301,6 @@ async def _install_subscribes(role_session, install, *, initiative_id=None):
         ),
     )
     return row
-
-
-async def test_an_install_registers_a_subscription_naming_no_person(
-    session: AsyncSession, role_session, acting_user
-):
-    from app.db.install_standing_test import _install
-
-    install = await _install(
-        session, acting_user, role_session, granted=["files:write"]
-    )
-    row = await _install_subscribes(role_session, install)
-    assert row.plugin_install_id == install.plugin.id
-    assert (row.created_by, row.created_by_kind) == (
-        install.plugin.id,
-        ActorKind.plugin,
-    )
-    assert row.initiative_id is None
 
 
 async def test_a_narrowed_install_cannot_write_a_community_subscription(

@@ -4,14 +4,13 @@ A `#` link, a `[[ ]]` link and a smart chip all name the same thing: one row,
 in one guild schema. Resolving one asks two questions — *what is it called now* and
 *may this request see it* — and neither answer is written down here.
 
-Both come from :data:`~app.db.search_index.SEARCH_SOURCES`, which every
-searchable table already declares:
-
-- ``title`` — the column holding the row's name (``name``, ``title``, ``label``).
-- ``dac_tool`` / ``dac_id`` — the resource whose sharing governs the row, which
-  is often its parent: a task is shared as part of its project.
-
-So a tool added to that registry becomes referenceable, resolvable and gated
+The name is the ``title`` column the search registry
+(:func:`~app.db.search_index.search_sources`) declares for every searchable
+table. The tool whose sharing governs a row, which is often its parent's (a
+task is shared as part of its project), is the one the path its row security
+is rendered from names (``app.db.initiative_rls.governing_walk``). Both are
+read in the community's tool set, so a tool plug-in's rows resolve as a built-in tool's do,
+and a tool added to either registry becomes referenceable, resolvable and gated
 without an edit here. What this module states is only the shape of the
 derivation, and the two kinds that are deliberately not referenceable.
 """
@@ -21,29 +20,45 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
+from functools import lru_cache
 
 from sqlalchemy import Select, Table, case, func, literal, null, select, text
 from sqlalchemy.dialects.postgresql import array as pg_array
-from sqlmodel import SQLModel
 
 from app.core import usernames
 from app.core.references import NOT_REFERENCEABLE
-from app.core.relationships import PERSON, EndpointKind
+from app.core.relationships import PERSON
 from app.core.search import SearchEntityType
-from app.core.tools import Tool
+from app.core.tool_set import KEPT_TOOL_SETS, ToolSet
 from app.core.user_display import display_name
 from app.db.authorization import standing_arg
 from app.db.blocking import open_expr
-from app.db.initiative_rls import INITIATIVE_PATHS
-from app.db.search_index import SEARCH_SOURCES
+from app.db.initiative_rls import governing_walk, paths_for
+from app.db.search_index import SEARCH_SOURCES, search_sources
+from app.db.session import routed_tools
+from app.db.tool_rows import joined_up
 from app.models.platform.user_profile_view import MemberProfile
 
 
-def _table_for(entity_type: SearchEntityType) -> str:
-    for table, source in SEARCH_SOURCES.items():
-        if source.entity_type == entity_type:
-            return table
-    raise KeyError(entity_type)
+@lru_cache(KEPT_TOOL_SETS)
+def _tables_by_kind(tools: ToolSet) -> dict[str, str]:
+    """Each kind's table, in a community with ``tools``."""
+    return {
+        source.entity_type: table for table, source in search_sources(tools).items()
+    }
+
+
+def _table_for(entity_type: str, tools: ToolSet) -> str:
+    return _tables_by_kind(tools)[entity_type]
+
+
+def referenceable(entity_type: str, tools: ToolSet) -> bool:
+    """Whether a reference may name this kind in a community with ``tools``:
+    a kind it has rows of, built in or a tool plug-in's, that is not one of
+    :data:`~app.core.references.NOT_REFERENCEABLE`."""
+    return (
+        entity_type in _tables_by_kind(tools) and entity_type not in NOT_REFERENCEABLE
+    )
 
 
 def referenceable_types() -> tuple[SearchEntityType, ...]:
@@ -51,7 +66,7 @@ def referenceable_types() -> tuple[SearchEntityType, ...]:
     return tuple(
         sorted(
             (
-                source.entity_type
+                SearchEntityType(source.entity_type)
                 for source in SEARCH_SOURCES.values()
                 if source.entity_type not in NOT_REFERENCEABLE
             ),
@@ -60,15 +75,15 @@ def referenceable_types() -> tuple[SearchEntityType, ...]:
     )
 
 
-def title_column(entity_type: SearchEntityType):
+def title_column(entity_type: str, *, tools: ToolSet):
     """The column holding what a row of this kind is called."""
-    table = _table_for(entity_type)
-    return SQLModel.metadata.tables[table].c[SEARCH_SOURCES[table].title]
+    table = _table_for(entity_type, tools)
+    return tools.tables[table].c[search_sources(tools)[table].title]
 
 
-def id_column(entity_type: SearchEntityType):
+def id_column(entity_type: str, *, tools: ToolSet):
     """The column addressing a row of this kind."""
-    return SQLModel.metadata.tables[_table_for(entity_type)].c["id"]
+    return tools.tables[_table_for(entity_type, tools)].c["id"]
 
 
 @dataclass(frozen=True)
@@ -106,7 +121,8 @@ class Visual:
 
 
 #: Keyed by table, the way :data:`~app.db.search_index.SEARCH_SOURCES` is. A
-#: table with no entry has no look of its own, which is most of them.
+#: table with no entry has no look of its own, which is most of them, but for
+#: a tool plug-in's table with a colour field, which takes its first one.
 VISUALS: dict[str, Visual] = {
     "files": Visual(
         image=("featured_image_url",),
@@ -117,7 +133,6 @@ VISUALS: dict[str, Visual] = {
     ),
     "projects": Visual(icon="icon"),
     "calendars": Visual(color="color"),
-    "counters": Visual(color="color"),
     "tags": Visual(color="color"),
 }
 
@@ -128,7 +143,11 @@ def _live(table: Table):
 
 
 def visible_ids(
-    entity_type: SearchEntityType, user_id: int | None, *, need_write: bool = False
+    entity_type: str,
+    user_id: int | None,
+    *,
+    tools: ToolSet,
+    need_write: bool = False,
 ) -> Select:
     """Ids of this kind that ``user_id`` may open, or may edit.
 
@@ -143,45 +162,30 @@ def visible_ids(
     say, because reaching a thing and changing it are different questions and
     only the caller knows which it is asking.
     """
-    table_name = _table_for(entity_type)
-    source = SEARCH_SOURCES[table_name]
-    table = SQLModel.metadata.tables[table_name]
+    table_name = _table_for(entity_type, tools)
+    table = tools.tables[table_name]
 
     statement = select(table.c["id"])
     live = _live(table)
     if live is not None:
         statement = statement.where(live)
 
-    if source.dac_tool is None:
+    walk = governing_walk(table_name, paths_for(tools))
+    if walk is None:
         if not need_write:
             return statement
         return statement.where(
-            func.entity_access(
-                entity_type.value, table.c["id"], True, True, standing_arg()
-            )
+            func.entity_access(entity_type, table.c["id"], True, True, standing_arg())
         )
 
-    resource = SQLModel.metadata.tables[source.dac_tool.plural]
-    if resource is table:
-        # The row IS the shared resource — a project, a file. Nothing to
-        # join to; it answers for itself.
-        return statement.where(
-            func.resource_access(
-                source.dac_tool.value,
-                table.c["id"],
-                user_id,
-                table.c["initiative_id"],
-                need_write,
-                standing_arg(),
-            )
-        )
-
-    # The row is shared as part of its parent: a task by its project, an event
-    # by its calendar. The pair naming that parent is the one the index stores.
-    local = table.c[source.dac_id] if source.dac_id else table.c["id"]
-    return statement.select_from(table.join(resource, resource.c["id"] == local)).where(
+    # The row is the shared resource (a project, a file), which answers for
+    # itself, or is shared as part of the tool it is in: a task by its
+    # project, an event by its calendar.
+    tool, hops = walk
+    joined, resource = joined_up(table, hops, tools)
+    return statement.select_from(joined).where(
         func.resource_access(
-            source.dac_tool.value,
+            tool.kind,
             resource.c["id"],
             user_id,
             resource.c["initiative_id"],
@@ -192,18 +196,19 @@ def visible_ids(
 
 
 async def live_ids(
-    session, entity_type: SearchEntityType, ids: Sequence[int]
+    session, entity_type: str, ids: Sequence[int], *, tools: ToolSet
 ) -> set[int]:
     """Which of these ids still exist and this session may read.
 
     Asked as the session itself, which is what a caller mid-save wants: the
     question is what the person writing this content can point at, and their
     connection answers it the same way it answers every other statement.
+    ``tools`` is the community's tool set; a kind it cannot reference has none.
     """
     wanted = [int(i) for i in dict.fromkeys(ids)]
-    if not wanted:
+    if not wanted or not referenceable(entity_type, tools):
         return set()
-    table = SQLModel.metadata.tables[_table_for(entity_type)]
+    table = tools.tables[_table_for(entity_type, tools)]
     statement = select(table.c["id"]).where(table.c["id"].in_(wanted))
     live = _live(table)
     if live is not None:
@@ -212,20 +217,21 @@ async def live_ids(
 
 
 async def unfrozen_ids(
-    session, entity_type: SearchEntityType, ids: Sequence[int]
+    session, entity_type: str, ids: Sequence[int], *, tools: ToolSet
 ) -> set[int]:
     """Which of these are still taking writes — not archived or trashed, and
     not sitting under something that is.
 
     Asked through ``resource_frozen``, the same declaration the freeze
     policies are rendered from, so a caller checking before it writes and the
-    database deciding afterwards are reading one answer.
+    database deciding afterwards are reading one answer. ``tools`` is the
+    community's tool set; a kind it cannot reference has none.
     """
     wanted = [int(i) for i in dict.fromkeys(ids)]
-    if not wanted:
+    if not wanted or not referenceable(entity_type, tools):
         return set()
-    table_name = _table_for(entity_type)
-    table = SQLModel.metadata.tables[table_name]
+    table_name = _table_for(entity_type, tools)
+    table = tools.tables[table_name]
     rows = await session.exec(
         select(table.c["id"]).where(
             table.c["id"].in_(wanted),
@@ -263,7 +269,12 @@ def _visual_exprs(table_name: str, table: Table):
     A kind declaring nothing selects NULLs rather than being special-cased by the
     caller, so the shape of the row is the same whatever is asked for.
     """
-    visual = VISUALS.get(table_name, Visual())
+    visual = VISUALS.get(table_name) or Visual(
+        color=next(
+            (column.name for column in table.c if column.info.get("field") == "color"),
+            None,
+        )
+    )
 
     if visual.image:
         # A row with no picture reports no pictures, not one that is null.
@@ -287,42 +298,40 @@ def _visual_exprs(table_name: str, table: Table):
     return (images, icon, color, *facets, link_url)
 
 
-def _governing_tool(table_name: str, table: Table):
-    """``(tool, id-expression)`` naming what a row of this kind is addressed
-    inside — its project for a task, its calendar for an event.
+def _container(table_name: str, table: Table, tools: ToolSet):
+    """What a row of this kind is addressed inside, as select pieces: the
+    tool's kind, the join from the kind's table up to the tool's row, the
+    tool's id, and the tool's name.
 
-    The same pair a search hit carries, from the same declaration, because a
-    link to a thing with no page of its own needs its parent's id to be built at
-    all. A kind whose governing tool differs per row (only a comment, which is
-    not referenceable) reports none rather than a guess.
+    The same pair a search hit carries, because a link to a thing with no page
+    of its own needs its parent's id to be built at all. A name on its own
+    identifies nothing in a list of mixed things either: six projects run
+    from one template hold six tasks called "Do a thing", and the project is
+    the only thing that tells them apart. A kind that governs itself — which
+    every tool does — names no container, and a kind no one tool governs
+    names no tool.
+
+    Left joins: a container this reader cannot see leaves the name blank
+    rather than dropping a row they were allowed to resolve.
     """
-    source = SEARCH_SOURCES[table_name]
-    if source.dac_tool is None or source.dac_sql is not None:
-        return None, null()
-    local = table.c[source.dac_id] if source.dac_id else table.c["id"]
-    return source.dac_tool, local
-
-
-def _container_title(table_name: str, table: Table, tool: Tool | None):
-    """The table holding what a row is addressed inside, and its name column.
-
-    A name on its own identifies nothing in a list of mixed things: six
-    projects run from one template hold six tasks called "Do a thing", and the
-    project is the only thing that tells them apart. A kind that governs itself
-    — which every tool does — has no container to name and reports none.
-    """
-    source = SEARCH_SOURCES[table_name]
-    if tool is None or source.dac_id is None:
-        return None, null()
-    container = SQLModel.metadata.tables[tool.plural]
-    return container, container.c[SEARCH_SOURCES[tool.plural].title]
+    walk = governing_walk(table_name, paths_for(tools))
+    if walk is None:
+        return None, table, null(), null()
+    tool, hops = walk
+    if not hops:
+        return tool.kind, table, table.c["id"], null()
+    joined, container = joined_up(table, hops, tools, isouter=True)
+    # The row's own key names its tool where the tool is its parent.
+    tool_id = table.c[hops[0][0]] if len(hops) == 1 else container.c["id"]
+    title = container.c[search_sources(tools)[tool.table.name].title]
+    return tool.kind, joined, tool_id, title
 
 
 @dataclass(frozen=True)
 class Resolved:
     """What a reference turned out to name."""
 
-    entity_type: EndpointKind
+    entity_type: str
     id: int
     title: str | None
     #: The initiative the row belongs to. None means one of two different
@@ -345,7 +354,7 @@ class Resolved:
     #: The tool this row is addressed inside, and which one of them. A task is
     #: addressed in its project and an event in its calendar, so a link to one
     #: cannot be built from its own id alone.
-    tool: Tool | None = None
+    tool: str | None = None
     tool_id: int | None = None
     #: What that tool is CALLED, for the surfaces that show a list of mixed
     #: things: "Do a thing" says nothing until it says which project. None for
@@ -375,21 +384,26 @@ class Resolved:
 
 
 async def resolve_many(
-    session, entity_type: EndpointKind, ids: Sequence[int], *, user_id: int | None
+    session, entity_type: str, ids: Sequence[int], *, user_id: int | None
 ) -> dict[int, Resolved]:
     """The rows of one kind this reader may open, keyed by id.
 
     One query for the lot. The initiative comes from the same
-    ``INITIATIVE_PATHS`` entry that renders the kind's RLS, so a surface asking
+    ``paths_for`` entry that renders the kind's RLS, so a surface asking
     "are these two in one initiative" and the policy deciding who may read them
     are working from one declaration rather than two.
 
     A person is read as the community shows them, by name, avatar and handle,
     whoever they are to it now: a link outlives a membership, as a comment by
     them does. They belong to no initiative and are never archived.
+
+    A kind this session's community does not have resolves nothing.
     """
     wanted = [int(i) for i in dict.fromkeys(ids)]
-    if not wanted:
+    tools = routed_tools(session)
+    if not wanted or (
+        entity_type != PERSON.value and entity_type not in _tables_by_kind(tools)
+    ):
         return {}
 
     if entity_type == PERSON.value:
@@ -412,9 +426,9 @@ async def resolve_many(
             for person in people.scalars().all()
         }
 
-    table_name = _table_for(entity_type)
-    table = SQLModel.metadata.tables[table_name]
-    path = INITIATIVE_PATHS.get(table_name)
+    table_name = _table_for(entity_type, tools)
+    table = tools.tables[table_name]
+    path = paths_for(tools).get(table_name)
     initiative = text(path.initiative_expr(table_name)) if path is not None else null()
     archived = (
         table.c["archived_at"].isnot(None)
@@ -426,13 +440,12 @@ async def resolve_many(
     images, icon, color, doc_type, mime, filename, link_url = _visual_exprs(
         table_name, table
     )
-    tool, tool_id = _governing_tool(table_name, table)
-    container, tool_title = _container_title(table_name, table, tool)
-    is_open = open_expr(table_name, table)
+    tool, joined, tool_id, tool_title = _container(table_name, table, tools)
+    is_open = open_expr(table)
 
     stmt = select(
         table.c["id"],
-        title_column(entity_type),
+        title_column(entity_type, tools=tools),
         initiative,
         archived,
         updated,
@@ -447,15 +460,11 @@ async def resolve_many(
         tool_title,
         is_open,
         starts,
-    ).select_from(table)
-    if container is not None:
-        # Left: a container this reader cannot see leaves the name blank rather
-        # than dropping a row they were allowed to resolve.
-        stmt = stmt.join(container, container.c["id"] == tool_id, isouter=True)
+    ).select_from(joined)
     rows = await session.exec(
         stmt.where(
             table.c["id"].in_(wanted),
-            table.c["id"].in_(visible_ids(entity_type, user_id)),
+            table.c["id"].in_(visible_ids(entity_type, user_id, tools=tools)),
         )
     )
     return {
@@ -485,7 +494,7 @@ async def resolve_many(
 
 
 async def resolve_one(
-    session, entity_type: EndpointKind, entity_id: int, *, user_id: int | None
+    session, entity_type: str, entity_id: int, *, user_id: int | None
 ) -> Resolved | None:
     """:func:`resolve_many` for one id."""
     found = await resolve_many(session, entity_type, [entity_id], user_id=user_id)

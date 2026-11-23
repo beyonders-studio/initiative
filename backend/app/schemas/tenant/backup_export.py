@@ -45,7 +45,7 @@ class ManifestEntry(SanitizedBaseModel):
     """One exported file inside the archive."""
 
     path: str
-    tool: str  # "project" | "file" | "counter_group" | "calendar" | "post"
+    tool: str  # "project" | "file" | "calendar" | "post" | …
     type: str  # envelope type, or "file"
     schema_version: int | None = None  # None for foreign formats
     entity_id: int

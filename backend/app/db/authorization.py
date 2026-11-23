@@ -54,7 +54,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from app.core.plugin_scopes import PluginScopeResource, tool_resource
+from app.core.plugin_scopes import PluginScopeResource
+from app.core.tool_set import BUILTIN_TOOLS, ToolRecord, ToolSet
 from app.core.tools import Tool
 from app.db import gucs
 from app.models.platform.access_grant import (
@@ -64,7 +65,6 @@ from app.models.platform.access_grant import (
 )
 from app.models.platform.guild import AdminSurface, CommunityRole
 from app.models.platform.user import UserRole
-from app.models.tenant.initiative import DEFAULT_PERMISSION_VALUES, PermissionKey
 from app.models.tenant.resource_grant import (
     RESOURCE_LEVEL_LADDER,
     WRITE_LEVELS,
@@ -779,7 +779,7 @@ class Legs:
 
     def guild_row_writer(self, surface: AdminSurface) -> str:
         """Who makes and changes a row that belongs to the whole community
-        rather than one initiative (:data:`COMMUNITY_ROWS`): the system, a
+        rather than one initiative (``ToolSpec.community_rows``): the system, a
         holder of ``surface``, a live write grant, or an installed plug-in on
         a token not narrowed to one initiative, as itself or for a member
         holding ``surface``."""
@@ -789,27 +789,10 @@ class Legs:
         )
 
 
-@dataclass(frozen=True)
-class CommunityRows:
-    """How a tool's rows that belong to the whole community, rather than one
-    initiative, are written."""
-
-    #: The admin surface whose holders make such a row and change it.
-    surface: AdminSurface
-    #: Whether a write grant on such a row changes it too. A contact holds
-    #: nothing but itself, so writing one is changing it; a write grant on a
-    #: calendar writes its events, and the calendar is the surface's.
-    granted_writes_row: bool = False
-
-
-#: The tools whose rows may belong to the whole community (``initiative_id``
-#: NULL), each held by the community plug-in that mounts it.
-COMMUNITY_ROWS: dict[Tool, CommunityRows] = {
-    Tool.calendar: CommunityRows(AdminSurface.community_calendars),
-    Tool.contact: CommunityRows(
-        AdminSurface.community_contacts, granted_writes_row=True
-    ),
-}
+def community_surface(tool: Tool | ToolRecord) -> AdminSurface:
+    """The admin surface whose holders make and change the rows of ``tool``
+    that belong to the whole community (``ToolSpec.community_rows``)."""
+    return AdminSurface(f"community_{tool.plural}")
 
 
 def standing_arg():
@@ -846,8 +829,15 @@ POLICY_SEAT = f"({IN_POLICY.this_guild} AND {gucs.GUILD_SEAT.once})"
 
 def plugin_scope(resource: str, write: bool, legs: Legs) -> str:
     """An installed plug-in holds ``resource``'s read scope, or its write scope
-    when ``write``. ``resource`` is a ``PluginScopeResource`` value."""
-    name = PluginScopeResource(getattr(resource, "value", resource)).value
+    when ``write``. ``resource`` is a ``PluginScopeResource`` value, or a tool
+    plug-in's kind, which names its tool's scope."""
+    from app.db.plugin_tools import is_plugin_kind
+
+    value = getattr(resource, "value", resource)
+    if is_plugin_kind(value):
+        name = value
+    else:
+        name = PluginScopeResource(value).value
     held = legs.field("install_write" if write else "install_read")
     return f"({legs.install_id} IS NULL OR '{name}' = ANY ({held}))"
 
@@ -952,9 +942,6 @@ $function$
 
 """
 
-#: Each tool's view key: all a guest's role permits in an initiative they reach
-#: only through items shared with them.
-_VIEW_KEYS = sql_values(tool.view_permission for tool in Tool)
 
 #: Gate 3: what a member's role in the initiative permits.
 #:
@@ -963,7 +950,11 @@ _VIEW_KEYS = sql_values(tool.view_permission for tool in Tool)
 #: turns off — so the answer is a membership test rather than a three-table
 #: join per row. A manager holds every key, stored or not; for everyone else a
 #: stored row decides, and the tool's own default decides when there is none.
-INITIATIVE_ROLE_PERMITS = f"""\
+#: A guest's role permits only each tool's view key, in an initiative they
+#: reach only through items shared with them.
+def _initiative_role_permits(tools: ToolSet) -> str:
+    view_keys = sql_values(tool.view_permission for tool in tools)
+    return f"""\
 CREATE OR REPLACE FUNCTION initiative_role_permits(p_initiative_id integer, p_user_id integer, p_key text, p_default boolean, p_st standing)
  RETURNS boolean
  LANGUAGE plpgsql
@@ -987,13 +978,14 @@ BEGIN
                               = ANY ({_B.field("role_denies")}))
              )
              OR (p_initiative_id = ANY ({_B.guest_items})
-                 AND p_key IN ({_VIEW_KEYS}))
+                 AND p_key IN ({view_keys}))
         ))
     ;
 END
 $function$
 
 """
+
 
 #: Gate 4: per-resource sharing (the ``resource_grants`` table).
 #:
@@ -1125,32 +1117,38 @@ _OWNER = ResourceAccessLevel.owner.value
 _MAY_CHANGE = f"""(p_archived_at IS NULL AND p_deleted_at IS NULL
         AND NOT {_B.content_hold})"""
 
+
 #: The request may change the row itself, as the table's write policy answers
 #: it for a row naming no initiative (``initiative_rls.direct_or_guild``): by
 #: its tool's writer, or a write grant where that changes the row
-#: (:data:`COMMUNITY_ROWS`). Read where ``v_level`` is the request's rung.
-_WRITES_ROW = f"""(p_initiative_id IS NOT NULL
+#: (``ToolSpec.community_rows``). Read where ``v_level`` is the request's rung.
+def _writes_row(tools: ToolSet) -> str:
+    return f"""(p_initiative_id IS NOT NULL
                OR COALESCE((CASE p_tool {
-    " ".join(
-        f"WHEN '{tool.value}' THEN ({_B.guild_row_writer(rows.surface)}"
-        + (f" OR v_level IN ({_WRITE_RUNGS})" if rows.granted_writes_row else "")
-        + ")"
-        for tool, rows in COMMUNITY_ROWS.items()
-    )
-} END), false))"""
+        " ".join(
+            f"WHEN '{tool.kind}' THEN ({_B.guild_row_writer(community_surface(tool))}"
+            + (f" OR v_level IN ({_WRITE_RUNGS})" if rows.granted_writes_row else "")
+            + ")"
+            for tool in tools
+            if (rows := tool.spec.community_rows) is not None
+        )
+    } END), false))"""
+
 
 #: The request may change who the resource is shared with: it is the owner,
 #: in its own right rather than through an access grant, it may change the row
 #: itself, and — if it is an installed plug-in — it holds ``sharing:write`` and
 #: the tool's write scope.
-_SHARES = f"""(v_level = '{_OWNER}'
+def _shares(tools: ToolSet) -> str:
+    return f"""(v_level = '{_OWNER}'
         AND NOT {_B.pam_any}
-        AND {_WRITES_ROW}
+        AND {_writes_row(tools)}
         AND ({_B.install_id} IS NULL
              OR ('{PluginScopeResource.sharing.value}' = ANY ({_B.field("install_write")})
                  AND COALESCE((CASE p_tool
-                   {" ".join(f"WHEN '{t.value}' THEN '{tool_resource(t).value}'" for t in Tool)}
+                   {" ".join(f"WHEN '{t.kind}' THEN '{t.scope}'" for t in tools)}
                    END) = ANY ({_B.field("install_write")}), false))))"""
+
 
 #: The actions the request may take on one tool row. The routes check this
 #: list before doing anything, and the row's ``can`` reports it to the client,
@@ -1161,10 +1159,10 @@ _SHARES = f"""(v_level = '{_OWNER}'
 #:   tasks).
 #: - ``edit``: as contribute, and the request may change the row itself. A row
 #:   that belongs to the whole community rather than one initiative is changed
-#:   by the writer its policy names (``COMMUNITY_ROWS``).
+#:   by the writer its policy names (``ToolSpec.community_rows``).
 #: - ``delete``: owner, the row can be changed, and the request may change
 #:   the row itself (as ``edit``).
-#: - ``share``: as delete, and see ``_SHARES`` above.
+#: - ``share``: as delete, and see :func:`_shares` above.
 #: - ``configure`` (projects): owner or a manager of the initiative who is
 #:   not a guest, and the row can be changed.
 #: - ``export``: owner, on a row of no initiative or of one the request reads
@@ -1173,7 +1171,8 @@ _SHARES = f"""(v_level = '{_OWNER}'
 #: - ``unarchive``: as edit, for a row that was archived on its own. A row
 #:   archived because its initiative was archived comes back with the
 #:   initiative instead.
-RESOURCE_ACTIONS = f"""\
+def _resource_actions(tools: ToolSet) -> str:
+    return f"""\
 CREATE OR REPLACE FUNCTION resource_actions(p_tool text, p_resource_id integer, p_user_id integer, p_initiative_id integer, p_archived_at timestamp with time zone, p_deleted_at timestamp with time zone, p_st standing)
  RETURNS text[]
  LANGUAGE plpgsql
@@ -1195,14 +1194,14 @@ BEGIN
     IF {_MAY_CHANGE} THEN
         IF v_level IN ({_WRITE_RUNGS}) THEN
             v_actions := v_actions || 'contribute'::text;
-            IF {_WRITES_ROW} THEN
+            IF {_writes_row(tools)} THEN
                 v_actions := v_actions || 'edit'::text;
             END IF;
         END IF;
-        IF v_level = '{_OWNER}' AND {_WRITES_ROW} THEN
+        IF v_level = '{_OWNER}' AND {_writes_row(tools)} THEN
             v_actions := v_actions || 'delete'::text;
         END IF;
-        IF {_SHARES} THEN
+        IF {_shares(tools)} THEN
             v_actions := v_actions || 'share'::text;
         END IF;
         IF v_level = '{_OWNER}'
@@ -1213,7 +1212,7 @@ BEGIN
     ELSIF p_archived_at IS NOT NULL
           AND NOT {_B.content_hold}
           AND v_level IN ({_WRITE_RUNGS})
-          AND {_WRITES_ROW}
+          AND {_writes_row(tools)}
           AND (p_initiative_id IS NULL
                OR NOT resource_frozen('initiatives', p_initiative_id)) THEN
         v_actions := v_actions || 'unarchive'::text;
@@ -1224,11 +1223,13 @@ $function$
 
 """
 
+
 #: Whether the request may change who a resource is shared with. The same
-#: rule as ``share`` in :data:`RESOURCE_ACTIONS`, for the policies on
+#: rule as ``share`` in :func:`_resource_actions`, for the policies on
 #: ``resource_grants``. It skips the archived/trashed check, which those rows
 #: already get from ``app.db.frozen``.
-RESOURCE_SHARES = f"""\
+def _resource_shares(tools: ToolSet) -> str:
+    return f"""\
 CREATE OR REPLACE FUNCTION resource_shares(p_tool text, p_resource_id integer, p_user_id integer, p_initiative_id integer, p_st standing)
  RETURNS boolean
  LANGUAGE plpgsql
@@ -1237,19 +1238,19 @@ AS $function$
 DECLARE
     v_level text := resource_level(p_tool, p_resource_id, p_user_id, p_initiative_id, p_st);
 BEGIN
-    RETURN NOT {_B.content_hold} AND {_SHARES};
+    RETURN NOT {_B.content_hold} AND {_shares(tools)};
 END
 $function$
 
 """
 
 
-def _author_arms() -> str:
+def _author_arms(tools: ToolSet) -> str:
     return "\n".join(
-        f"      WHEN '{tool.value}' THEN\n"
-        f"        SELECT created_by INTO v_author FROM {tool.plural}"
+        f"      WHEN '{tool.kind}' THEN\n"
+        f"        SELECT created_by INTO v_author FROM {tool.table.name}"
         f" WHERE id = p_resource_id AND created_by_kind = 'member';"
-        for tool in Tool
+        for tool in tools
     )
 
 
@@ -1257,7 +1258,8 @@ def _author_arms() -> str:
 #: owns it now. Lets an
 #: owner row be written that gives unowned content back to its author (trash
 #: restore does this), by someone who is not its owner.
-RESOURCE_RECLAIMABLE = f"""\
+def _resource_reclaimable(tools: ToolSet) -> str:
+    return f"""\
 CREATE OR REPLACE FUNCTION resource_reclaimable(p_tool text, p_resource_id integer, p_user_id integer)
  RETURNS boolean
  LANGUAGE plpgsql
@@ -1267,7 +1269,7 @@ DECLARE
     v_author integer;
 BEGIN
     CASE p_tool
-{_author_arms()}
+{_author_arms(tools)}
       ELSE
         RETURN false;
     END CASE;
@@ -1283,6 +1285,7 @@ END
 $function$
 
 """
+
 
 #: The people each resource in ``p_resource_ids`` is shared with, as
 #: ``(resource_id, user_id)`` rows. ``permissions.audience`` narrows it to who
@@ -1362,35 +1365,41 @@ $function$
 """
 
 
-def _initiative_tool_actions() -> str:
-    """Two checks per tool, only when the initiative has the tool switched on:
+def _initiative_tool_actions(tools: ToolSet) -> str:
+    """Two checks per tool, only when the initiative has the tool switched on
+    (and, for a tool plug-in's, its install placed there):
     ``view:<tool>`` if the reader's role allows viewing it, and
     ``create:<tool>`` if the role allows creating it, the community is not
     read-only, and the reader is not here through an access grant (those can
     edit existing things but not create new ones)."""
     arms = []
     community = _B.field("community_tools")
-    for tool in Tool:
+    for tool in tools:
         # The community's switch where it set one, the initiative's otherwise.
         switch = (
-            f"(CASE WHEN '{tool.value}=on' = ANY ({community}) THEN true"
-            f" WHEN '{tool.value}=off' = ANY ({community}) THEN false"
-            f" ELSE v_initiative.{tool.view_permission} END)"
+            f"(CASE WHEN '{tool.kind}=on' = ANY ({community}) THEN true"
+            f" WHEN '{tool.kind}=off' = ANY ({community}) THEN false"
+            f" ELSE '{tool.view_permission}' = ANY (v_switched) END)"
         )
-        view_default = str(
-            DEFAULT_PERMISSION_VALUES[PermissionKey(tool.view_permission)]
-        ).lower()
-        create_default = str(
-            DEFAULT_PERMISSION_VALUES[PermissionKey(tool.create_permission)]
-        ).lower()
+        if tool.installed:
+            # A tool plug-in's tool is there only where its install is placed.
+            switch = (
+                f"({switch} AND EXISTS (SELECT 1 FROM plugin_placements pp"
+                " JOIN guild_plugins a ON a.id = pp.install_id"
+                f" WHERE a.listing_uid = '{tool.listing_uid}'"
+                " AND pp.initiative_id = p_initiative_id))"
+            )
+        # A tool's own default: viewing as its switch is, creating off.
+        view_default = str(tool.spec.on_by_default).lower()
+        create_default = "false"
         arms.append(
             f"""    IF {switch} THEN
         IF initiative_role_permits(p_initiative_id, p_user_id, '{tool.view_permission}', {view_default}, p_st) THEN
-            v_actions := v_actions || 'view:{tool.value}'::text;
+            v_actions := v_actions || 'view:{tool.kind}'::text;
         END IF;
         IF NOT {_B.content_hold} AND NOT {_B.pam_any}
            AND initiative_role_permits(p_initiative_id, p_user_id, '{tool.create_permission}', {create_default}, p_st) THEN
-            v_actions := v_actions || 'create:{tool.value}'::text;
+            v_actions := v_actions || 'create:{tool.kind}'::text;
         END IF;
     END IF;"""
         )
@@ -1407,20 +1416,26 @@ def _initiative_tool_actions() -> str:
 #: - ``roster``: read who is in it — a member (a guest in it included), a
 #:   community admin or a grantee; not a guest given items in it.
 #: - ``view:<tool>`` and ``create:<tool>`` per tool.
-INITIATIVE_ACTIONS = f"""\
+def _initiative_actions(tools: ToolSet) -> str:
+    return f"""\
 CREATE OR REPLACE FUNCTION initiative_actions(p_initiative_id integer, p_user_id integer, p_st standing)
  RETURNS text[]
  LANGUAGE plpgsql
  STABLE
 AS $function$
 DECLARE
-    v_initiative initiatives%ROWTYPE;
+    v_switched text[];
     v_actions text[] := ARRAY[]::text[];
 BEGIN
-    SELECT * INTO v_initiative FROM initiatives WHERE id = p_initiative_id;
+    PERFORM 1 FROM initiatives WHERE id = p_initiative_id;
     IF NOT FOUND THEN
         RETURN v_actions;
     END IF;
+    -- The initiative's own switches: its rules with no role and no install.
+    SELECT COALESCE(array_agg(r.key::text), ARRAY[]::text[]) INTO v_switched
+    FROM initiative_rules r
+    WHERE r.initiative_id = p_initiative_id
+      AND r.initiative_role_id IS NULL AND r.install_id IS NULL AND r.enabled;
     IF {_B.system} OR {_B.holds(AdminSurface.initiatives)}
        OR ({_B.this_guild} AND NOT {_B.guest}
            AND p_initiative_id = ANY ({_B.field("manager_initiatives")})) THEN
@@ -1434,12 +1449,13 @@ BEGIN
            AND p_initiative_id = ANY ({_B.field("member_initiatives")})) THEN
         v_actions := v_actions || 'roster'::text;
     END IF;
-{_initiative_tool_actions()}
+{_initiative_tool_actions(tools)}
     RETURN v_actions;
 END
 $function$
 
 """
+
 
 #: Who holds a guild's top seat — its sign-in configuration and its billing.
 #:
@@ -1552,23 +1568,30 @@ $function$
 
 """
 
-GUILD_AUTHORIZATION_FUNCTIONS: tuple[tuple[str, str], ...] = (
-    *READ_FUNCTIONS,
-    ("current_standing", CURRENT_STANDING),
-    ("reads_held", READS_HELD),
-    ("reader_initiatives", READER_INITIATIVES),
-    ("initiative_access", INITIATIVE_ACCESS),
-    ("initiative_full_access", INITIATIVE_FULL_ACCESS),
-    ("initiative_role_permits", INITIATIVE_ROLE_PERMITS),
-    ("resource_level", RESOURCE_LEVEL),
-    ("resource_access", RESOURCE_ACCESS),
-    ("resource_actions", RESOURCE_ACTIONS),
-    ("resource_shares", RESOURCE_SHARES),
-    ("resource_granted", RESOURCE_GRANTED),
-    ("resource_reclaimable", RESOURCE_RECLAIMABLE),
-    ("resource_audience", RESOURCE_AUDIENCE),
-    ("initiative_actions", INITIATIVE_ACTIONS),
-)
+
+def guild_authorization_functions(tools: ToolSet) -> tuple[tuple[str, str], ...]:
+    """The guild functions of a community with ``tools``, in render order."""
+    return (
+        *READ_FUNCTIONS,
+        ("current_standing", CURRENT_STANDING),
+        ("reads_held", READS_HELD),
+        ("reader_initiatives", READER_INITIATIVES),
+        ("initiative_access", INITIATIVE_ACCESS),
+        ("initiative_full_access", INITIATIVE_FULL_ACCESS),
+        ("initiative_role_permits", _initiative_role_permits(tools)),
+        ("resource_level", RESOURCE_LEVEL),
+        ("resource_access", RESOURCE_ACCESS),
+        ("resource_actions", _resource_actions(tools)),
+        ("resource_shares", _resource_shares(tools)),
+        ("resource_granted", RESOURCE_GRANTED),
+        ("resource_reclaimable", _resource_reclaimable(tools)),
+        ("resource_audience", RESOURCE_AUDIENCE),
+        ("initiative_actions", _initiative_actions(tools)),
+    )
+
+
+#: The guild functions of the built-in tools.
+GUILD_AUTHORIZATION_FUNCTIONS = guild_authorization_functions(BUILTIN_TOOLS)
 
 #: Argument types of every function that lives in a guild schema — the five
 #: above plus the three ``frozen`` and ``initiative_rls`` render there. What
@@ -1594,6 +1617,11 @@ GUILD_FUNCTION_SIGNATURES: dict[str, str] = {
     "entity_access": "(text, integer, boolean, boolean, public.standing)",
     "entity_initiative": "(text, integer)",
     "content_item_of": "(text, integer, jsonb)",
+    # What ``guild_ddl`` renders from the community's tools: a comment's trash
+    # following what it is on, and a person leaving its content.
+    "fn_comment_trash_follows": "()",
+    "member_departs": "(text, integer, integer)",
+    "fn_initiative_departure": "()",
 }
 
 #: Functions an earlier render put in a guild schema under a name or
@@ -1611,13 +1639,15 @@ RETIRED_GUILD_FUNCTION_SIGNATURES: tuple[tuple[str, str], ...] = (
 )
 
 
-def render_guild_authorization_functions() -> str:
+def render_guild_authorization_functions(tools: ToolSet) -> str:
     """The guild functions as schema-relative DDL, for the RLS render.
 
     Each text is one statement; the render is a script, so each is
     terminated here.
     """
-    return "\n".join(sql.rstrip() + ";" for _name, sql in GUILD_AUTHORIZATION_FUNCTIONS)
+    return "\n".join(
+        sql.rstrip() + ";" for _name, sql in guild_authorization_functions(tools)
+    )
 
 
 def authorization_functions_digest() -> str:

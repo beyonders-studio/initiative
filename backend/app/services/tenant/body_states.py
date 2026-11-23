@@ -8,8 +8,8 @@ only what changed. How depends on the editor whose state it is:
 
 - a file or wiki page is the Lexical editor's, which only the editor itself
   maps (:mod:`app.services.editor_engine`);
-- a whiteboard is one Excalidraw scene, held as a JSON string under
-  ``excalidraw.scene`` (``WhiteboardDocumentEditor.tsx``);
+- a whiteboard is an Excalidraw scene, one entry per element in
+  ``excalidraw.elements`` (``whiteboardRoom.ts``);
 - a spreadsheet is a ``sheets`` map of sheet containers
   (``spreadsheet/workbookDoc.ts``).
 
@@ -21,6 +21,8 @@ from __future__ import annotations
 
 import json
 import logging
+import secrets
+import time
 from collections.abc import Callable
 from typing import Any, Protocol
 
@@ -113,12 +115,21 @@ class _Lexical:
         return await editor_engine.apply(state, content)
 
 
+#: Where a whiteboard's scene lives: one entry per element, keyed by id, as
+#: the editor keeps it (``whiteboardRoom.ts``).
+_ELEMENTS = "excalidraw.elements"
+_FILES = "excalidraw.files"
+_APP_STATE = "excalidraw.appState"
+#: The map that once held the whole scene as one JSON string under ``scene``,
+#: and now says which layout the state is in.
 _SCENE_MAP = "excalidraw"
-_SCENE_KEY = "scene"
+_LEGACY_SCENE_KEY = "scene"
+_LAYOUT_KEY = "layout"
+_LAYOUT = "elements"
 
 
 def _scene(value: Any) -> dict | None:
-    """The scene a whiteboard's live value holds, or ``None`` for none."""
+    """The scene a whiteboard's former single value holds, or ``None``."""
     if not isinstance(value, str):
         return None
     try:
@@ -129,9 +140,35 @@ def _scene(value: Any) -> dict | None:
     return scene if isinstance(scene, dict) else None
 
 
+def _element_order(element: dict) -> tuple[bool, str, str]:
+    """Fractional-index order, ties by id, as the editor orders a scene."""
+    index = element.get("index")
+    return (not isinstance(index, str), index or "", str(element.get("id")))
+
+
+def _int(value: Any) -> int:
+    return int(value) if isinstance(value, (int, float)) else 0
+
+
+def _bumped(element: dict, past: dict) -> dict:
+    """``element`` as a newer edit than ``past``: editors keep whichever copy
+    has the higher version, so one that does not move past the copy they hold
+    would be ignored."""
+    version = _int(past.get("version")) + 1
+    if _int(element.get("version")) >= version:
+        return element
+    return element | {
+        "version": version,
+        "versionNonce": secrets.randbelow(2**31),
+        "updated": int(time.time() * 1000),
+    }
+
+
 class _Whiteboard:
-    """The scene is one value, written whole: the editor resolves concurrent
-    drawing the same way, last write wins."""
+    """Each element is its own entry, so a write changes the elements that
+    differ and leaves the rest, and anybody drawing them, alone. A deleted
+    element stays as a tombstone (``isDeleted``) for the editors to order
+    against their own edits; the content leaves it out."""
 
     @staticmethod
     def _normalized(content: Any) -> dict:
@@ -143,20 +180,68 @@ class _Whiteboard:
         return await self.apply(b"", self._normalized(content))
 
     def holds_body(self, state: bytes) -> bool:
-        return _read(state).get(_SCENE_MAP, type=Map).get(_SCENE_KEY) is not None
+        # A state from before the scene was kept per element holds no body in
+        # this layout, so the room makes one from the content beside it.
+        return _read(state).get(_SCENE_MAP, type=Map).get(_LAYOUT_KEY) == _LAYOUT
 
     async def render(self, state: bytes) -> dict | None:
-        scene = _scene(_read(state).get(_SCENE_MAP, type=Map).get(_SCENE_KEY))
-        return None if scene is None else self._normalized(scene)
+        doc = _read(state)
+        meta = doc.get(_SCENE_MAP, type=Map)
+        if meta.get(_LAYOUT_KEY) != _LAYOUT:
+            scene = _scene(meta.get(_LEGACY_SCENE_KEY))
+            return None if scene is None else self._normalized(scene)
+        elements = sorted(
+            (
+                _js(element)
+                for element in doc.get(_ELEMENTS, type=Map).values()
+                if isinstance(element, dict) and not element.get("isDeleted")
+            ),
+            key=_element_order,
+        )
+        used = {element.get("fileId") for element in elements}
+        files = {
+            file_id: _js(file)
+            for file_id, file in doc.get(_FILES, type=Map).items()
+            if file_id in used and isinstance(file, dict)
+        }
+        app_state = {
+            key: _js(value) for key, value in doc.get(_APP_STATE, type=Map).items()
+        }
+        return self._normalized(
+            {"elements": elements, "appState": app_state, "files": files}
+        )
 
     async def apply(self, state: bytes, content: dict) -> bytes:
         def write(doc: Doc) -> None:
-            scene = doc.get(_SCENE_MAP, type=Map)
-            if _same(_scene(scene.get(_SCENE_KEY)), content):
-                return
-            scene[_SCENE_KEY] = json.dumps(
-                content, separators=(",", ":"), ensure_ascii=False
-            )
+            meta = doc.get(_SCENE_MAP, type=Map)
+            if _LEGACY_SCENE_KEY in meta:
+                del meta[_LEGACY_SCENE_KEY]
+            if meta.get(_LAYOUT_KEY) != _LAYOUT:
+                meta[_LAYOUT_KEY] = _LAYOUT
+
+            elements = doc.get(_ELEMENTS, type=Map)
+            wanted = {
+                element["id"]: element
+                for element in content["elements"]
+                if isinstance(element, dict) and isinstance(element.get("id"), str)
+            }
+            for element_id, held in list(elements.items()):
+                if element_id in wanted or not isinstance(held, dict):
+                    continue
+                if not held.get("isDeleted"):
+                    # Kept as a tombstone, newer than the copy editors hold.
+                    elements[element_id] = _bumped(
+                        _js(held) | {"isDeleted": True}, held
+                    )
+            for element_id, element in wanted.items():
+                held = elements.get(element_id)
+                if not isinstance(held, dict):
+                    elements[element_id] = element
+                elif not _same(held, element):
+                    elements[element_id] = _bumped(element, held)
+
+            _sync(doc.get(_FILES, type=Map), content["files"])
+            _sync(doc.get(_APP_STATE, type=Map), content["appState"])
 
         return _written(state, write)
 

@@ -1,6 +1,7 @@
 import { Fragment, memo, type ReactNode, useMemo } from "react";
 
-import type { PropertySummary } from "@/api/generated/initiativeAPI.schemas";
+import type { ItemsProps, PropertySummary } from "@/api/generated/initiativeAPI.schemas";
+import { getContrastingTextColor } from "@/ui/lib/contrast";
 import { cn } from "@/ui/lib/utils";
 import { nonEmptyPropertySummaries } from "@/ui/properties/propertyHelpers";
 
@@ -10,6 +11,7 @@ import {
   isEmptyValue,
   type LayoutEnv,
   type LayoutVariant,
+  plainValue,
   propertyFieldId,
 } from "./fields";
 import { Section } from "./section";
@@ -240,12 +242,99 @@ export const LAYOUT_PARTS = {
   ),
 };
 
+const HEX_DIGITS = "0123456789abcdefABCDEF";
+
+/** The colour an item's field `fieldId` holds (`#rrggbb`), or none. */
+export const tintOf = <I,>(
+  fieldId: unknown,
+  item: I,
+  fields: ReadonlyMap<string, FieldDef<I>>
+): string | undefined => {
+  if (typeof fieldId !== "string") return undefined;
+  const value = plainValue(fields.get(fieldId)?.value(item));
+  return typeof value === "string" &&
+    value.length === 7 &&
+    value[0] === "#" &&
+    [...value.slice(1)].every((digit) => HEX_DIGITS.includes(digit))
+    ? value
+    : undefined;
+};
+
+/** Drawn in `color`, its words legible on it. */
+const tinted = (color: string) => ({
+  backgroundColor: color,
+  color: getContrastingTextColor(color),
+});
+
+/** The first items of one of an item's item tables, each a line of the
+ *  fields the part names, drawn in its own colour where the part says. Each
+ *  field keeps its own width, spread across the line; where they do not fit
+ *  side by side, the next drops beneath the one before. */
+const ItemsPreview = <I,>({
+  props,
+  item,
+  view,
+}: {
+  props: ItemsProps;
+  item: I;
+  view: LayoutContext<I>;
+}) => {
+  const preview = view.env.itemPreview?.(item, props.item, props.limit);
+  if (!preview?.items.length) return null;
+  const lines: LayoutContext<unknown> = {
+    fields: preview.fields,
+    variant: view.variant,
+    env: preview.env,
+    oneLine: true,
+  };
+  return (
+    <ul className="w-full min-w-0 space-y-1">
+      {preview.items.slice(0, props.limit).map((child, index) => {
+        const color = tintOf(props.tint, child, preview.fields);
+        return (
+          <li
+            // Keyed by place: the items keep their own order.
+            key={index}
+            className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-0.5 rounded-sm bg-muted px-1.5 py-0.5 text-xs *:w-auto"
+            style={color ? tinted(color) : undefined}
+          >
+            {props.fields.map((id) => {
+              const field = preview.fields.get(id);
+              return field ? (
+                <Fragment key={id}>{renderField(field, field.value(child), child, lines)}</Fragment>
+              ) : null;
+            })}
+          </li>
+        );
+      })}
+    </ul>
+  );
+};
+
 const PARTS = {
   ...LAYOUT_PARTS,
   // The board draws the card's frame, which carries the drag and the measuring;
-  // the card lays out what is inside it.
-  card: <I,>(node: LayoutNode, item: I, view: LayoutContext<I>, parts: Parts<I>) =>
-    renderChildren(node, item, view, parts),
+  // the card lays out what is inside it, in the colour its `tint` field holds,
+  // each part on a line of its own.
+  card: <I,>(node: LayoutNode, item: I, view: LayoutContext<I>, parts: Parts<I>) => {
+    const color = tintOf(node.props?.tint, item, view.fields);
+    const children = renderChildren(node, item, view, parts);
+    return color ? (
+      <div
+        className="flex w-full min-w-0 flex-col items-start gap-1 rounded-md p-2"
+        style={tinted(color)}
+      >
+        {children}
+      </div>
+    ) : (
+      children
+    );
+  },
+  // A row's first items of one of its item tables.
+  items: <I,>(node: LayoutNode, item: I, view: LayoutContext<I>) =>
+    node.props ? (
+      <ItemsPreview props={node.props as unknown as ItemsProps} item={item} view={view} />
+    ) : null,
   field: <I,>(node: LayoutNode, item: I, view: LayoutContext<I>) => {
     const field = view.fields.get(String(node.props?.field));
     return field ? renderField(field, field.value(item), item, view) : null;

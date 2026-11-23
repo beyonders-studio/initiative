@@ -10,7 +10,6 @@ import { MoreHorizontal } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import { useReadCounter } from "@/api/generated/counters/counters";
 import {
   type CollectionFileSummary,
   type CollectionRead,
@@ -23,16 +22,13 @@ import {
 import { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
 import { TaskFilters } from "@/components/tasks/TaskFilters";
 import { TaskStatusPriorityFilters } from "@/components/tasks/TaskStatusPriorityFilters";
-import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useCalendarEntries } from "@/hooks/useCalendarEntries";
 import { useCalendarEvent } from "@/hooks/useCalendarEvents";
-import { useCounterGroup } from "@/hooks/useCounters";
 import { usePost, usePostsFeed } from "@/hooks/usePosts";
 import { useTask, useTasks } from "@/hooks/useTasks";
 import { type CalendarFilters, EMPTY_CALENDAR_FILTERS } from "@/lib/filters/calendarFilters";
 import { buildTaskListParams, EMPTY_TASK_FILTERS } from "@/lib/filters/taskFilters";
-import { COUNTER_DETAIL } from "@/lib/layouts/counterLayout";
 import { EVENT_DETAIL } from "@/lib/layouts/eventLayout";
 import { CALENDAR_PRESETS } from "@/lib/layouts/events";
 import { FILE_DETAIL } from "@/lib/layouts/fileLayout";
@@ -65,14 +61,14 @@ const wordsOf = (key: string): EditableDetail["words"] => ({
 });
 
 /** The detail tree's regions, as a detail draws them. */
-const regionsOf = (tree: LayoutNode): StoredRegions => ({
+export const regionsOf = (tree: LayoutNode): StoredRegions => ({
   header: tree.children?.[0]?.children ?? [],
   main: tree.children?.[1]?.children ?? [],
   side: tree.children?.[2]?.children ?? [],
 });
 
 /** What a detail's menu is drawn as, where nothing in it is used. */
-const ActionsPreview = () => (
+export const ActionsPreview = () => (
   <Button type="button" variant="outline" size="icon" tabIndex={-1} aria-hidden>
     <MoreHorizontal className="h-4 w-4" />
   </Button>
@@ -221,40 +217,6 @@ const EventPreview = ({ initiativeId, tree }: { initiativeId: number; tree: Layo
   );
 };
 
-/** The group's counter detail drawn with its first counter. */
-const CounterPreview = ({
-  groupId,
-  initiativeId,
-  tree,
-}: {
-  groupId: number;
-  initiativeId: number;
-  tree: LayoutNode;
-}) => {
-  const group = useCounterGroup(groupId);
-  const listed = group.data?.counters[0];
-  // Its own read carries the plug-ins' values, which the group's list does not.
-  const read = useReadCounter(useActiveCommunityId(), listed?.id ?? 0, undefined, {
-    query: { placeholderData: listed, enabled: listed !== undefined },
-  });
-  return (
-    <ItemPreview
-      detail={COUNTER_DETAIL}
-      tree={tree}
-      item={read.data ?? listed}
-      none={group.isSuccess}
-      empty="counterDetail.noItems"
-      context={() => ({
-        readOnly: false,
-        groupId,
-        initiativeId,
-        leaving: LEFT,
-        actions: <ActionsPreview />,
-      })}
-    />
-  );
-};
-
 /** The notice detail drawn with the initiative's first notice. */
 const PostPreview = ({ initiativeId, tree }: { initiativeId: number; tree: LayoutNode }) => {
   const feed = usePostsFeed({ initiative_id: initiativeId });
@@ -299,14 +261,6 @@ export const eventDetail = (initiativeId: number): EditableDetail => ({
   words: wordsOf("eventDetail"),
   fields: EVENT_DETAIL.fields,
   preview: (tree) => <EventPreview initiativeId={initiativeId} tree={tree} />,
-});
-
-/** A counter group's counter detail. */
-export const counterDetail = (groupId: number, initiativeId: number): EditableDetail => ({
-  spec: COUNTER_DETAIL.spec,
-  words: wordsOf("counterDetail"),
-  fields: COUNTER_DETAIL.fields,
-  preview: (tree) => <CounterPreview groupId={groupId} initiativeId={initiativeId} tree={tree} />,
 });
 
 /** A file's page in a collection drawn where the collection opens it: a
@@ -369,14 +323,6 @@ export const postDetail = (initiativeId: number): EditableDetail => ({
   fields: POST_DETAIL.fields,
   preview: (tree) => <PostPreview initiativeId={initiativeId} tree={tree} />,
 });
-
-/** The item detail each tool lays out on its own, with no list of its own to
- *  lay out beside it: what its editor offers. */
-export const ITEM_DETAILS: Partial<
-  Record<Tool, (id: number, initiativeId: number) => EditableDetail>
-> = {
-  [Tool.counter_group]: counterDetail,
-};
 
 /** A project's lists' presets: its tasks' filters, and a table's sort. */
 export const taskPresets = (project: LayoutProject) =>

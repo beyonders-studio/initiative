@@ -6,7 +6,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http, type PathParams } from "msw";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { buildUser } from "@/__tests__/factories";
 import { server } from "@/__tests__/helpers/msw-server";
@@ -15,11 +15,6 @@ import type {
   ProviderPlacementResponse,
   ProviderPlacementRuleRead,
 } from "@/api/generated/initiativeAPI.schemas";
-
-vi.mock("@/lib/mascotToast", () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
-}));
-
 import { queryClient } from "@/lib/queryClient";
 
 import { PlacementPage } from "./PlacementPage";
@@ -114,22 +109,11 @@ describe("PlacementPage", () => {
     expect(screen.getByText("Joins Partners as an admin")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add a rule for Entra" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add a rule for Keycloak" })).toBeInTheDocument();
-  });
 
-  it("marks only the rule that is not applying", async () => {
-    renderPage();
-
-    await screen.findByText("Everybody from idp = acme-adfs");
+    // Only the rule that is not applying is marked.
     expect(screen.getAllByText("Not applying")).toHaveLength(1);
     const partnersRow = screen.getByText("Joins Partners as an admin").closest("li");
-    expect(partnersRow).not.toBeNull();
     expect(within(partnersRow as HTMLElement).getByText("Not applying")).toBeInTheDocument();
-  });
-
-  it("notes a provider that reports no groups", async () => {
-    renderPage();
-
-    expect(await screen.findByText(/this provider reports no groups yet/i)).toBeInTheDocument();
     // Only Keycloak lacks a groups claim.
     expect(screen.getAllByText(/this provider reports no groups yet/i)).toHaveLength(1);
   });

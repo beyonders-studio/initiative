@@ -16,7 +16,7 @@ collection), its own rule.
 # annotations re-evaluate it where cfg is out of scope → FastAPI drops the path
 # param and 422s.
 
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Annotated, Any
 
@@ -34,21 +34,24 @@ from app.core.messages import (
     KindMessages,
     PluginMessages,
 )
-from app.core.plugin_scopes import PluginScopeAccess, scope_name, tool_resource
+from app.core.plugin_scopes import PluginScopeAccess
+from app.core.tool_set import ToolRecord
 from app.core.tools import KIND_BY_TABLE, KINDS, Tool, kind_refusal
 from app.db.frozen import ancestor_is_frozen, row_is_frozen
 from app.db.guild_standing import InstallContext
 from app.db.initiative_rls import governing_path
-from app.db.session import require_actor_context
+from app.db.session import require_actor_context, routed_tools
+from app.db.tool_rows import load_row, locate
+from app.models.platform.notification import NotificationType
 from app.models.platform.user import User
 from app.models.tenant.calendar_event import CalendarEvent
 from app.models.tenant.collection import Collection
-from app.models.tenant.counter import Counter
-from app.models.tenant.initiative import Initiative, PermissionKey
+from app.models.tenant.initiative import Initiative
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.models.tenant.task import Task
 from app.models.tenant.wiki import WikiPage
 from app.schemas.tenant.resource_grant import ResourceGrantSchema, initiative_readable
+from app.services import notifications as notifications_service
 from app.services import permissions as permissions_service
 from app.services import reachability
 from app.services import rls as rls_service
@@ -57,15 +60,20 @@ from app.services.tenant import calendar_events as events_service
 from app.services.tenant import calendars as calendars_service
 from app.services.tenant import collections as collections_service
 from app.services.tenant import contacts as contacts_service
-from app.services.tenant import counters as counters_service
 from app.services.tenant import dashboards as dashboards_service
 from app.services.tenant import files as files_service
 from app.services.tenant import initiatives as initiatives_service
-from app.services.tenant import named_people, project_grants, task_queries
+from app.services.tenant import (
+    named_people,
+    plugin_tool_rows,
+    project_grants,
+    task_queries,
+)
 from app.services.tenant import ownership as ownership_service
 from app.services.tenant import posts as posts_service
+from app.services.tenant import share_requests as share_requests_service
 from app.services.tenant import wikis as wikis_service
-from app.services.tenant.initiative_tools import tool_on
+from app.services.tenant.initiative_tools import switch, tool_on_in
 
 CurrentUserDep = Annotated[User, Depends(get_current_active_user)]
 
@@ -90,23 +98,16 @@ class ResourceAccessConfig:
     #: count, a project's statuses, a file's body — has one, so a gate
     #: check does not cost every caller the queries none of them reads.
     hydrated_loader: Callable[..., Awaitable[Any]] | None = None
-    #: A path parameter that differs from ``<tool>_id``.
-    id_param: str | None = None
 
     @property
     def path_param(self) -> str:
         """The path parameter a row is addressed by."""
-        return self.id_param or f"{self.tool.value}_id"
+        return f"{self.tool.value}_id"
 
     @property
     def dac_kind(self) -> Tool:
         """Key into ``permissions.DAC_RESOURCES``."""
         return self.tool
-
-    @property
-    def feature_attr(self) -> str:
-        """The initiative flag gating the whole tool."""
-        return self.tool.view_permission
 
 
 RESOURCE_ACCESS: dict[Tool, ResourceAccessConfig] = {
@@ -119,10 +120,6 @@ RESOURCE_ACCESS: dict[Tool, ResourceAccessConfig] = {
         Tool.file,
         files_service.get_file_for_grants,
         hydrated_loader=files_service.get_file_hydrated,
-    ),
-    # Counter group routes name their row ``group_id``.
-    Tool.counter_group: ResourceAccessConfig(
-        Tool.counter_group, counters_service.get_counter_group, id_param="group_id"
     ),
     Tool.calendar: ResourceAccessConfig(Tool.calendar, calendars_service.get_calendar),
     Tool.dashboard: ResourceAccessConfig(
@@ -162,7 +159,9 @@ def governing_tool(table: str) -> Tool:
     return path[0]
 
 
-def require_tool_enabled(kind: Tool, initiative: Any, context: ActorContext) -> None:
+async def require_tool_enabled(
+    session: Any, kind: Tool | ToolRecord, initiative: Any
+) -> None:
     """Raise 403 unless ``initiative`` has ``kind``'s master switch on.
 
     Gate 3's first half at the moment of creation, where there is no row yet for
@@ -171,18 +170,16 @@ def require_tool_enabled(kind: Tool, initiative: Any, context: ActorContext) -> 
     refusal again at each create endpoint.
 
     The database asks the same question on INSERT — the rendered policy's
-    ``{plural}_enabled`` leg. This runs first so the answer is a named 403
-    rather than a row that silently fails to appear.
+    switch leg. This runs first so the answer is a named 403 rather than a row
+    that silently fails to appear.
     """
-    if RESOURCE_ACCESS[kind].feature_attr is not None and not tool_on(
-        context, initiative, kind
-    ):
+    if not await tool_on_in(session, initiative, kind):
         raise kind.disabled()
 
 
 async def require_create(
     session: Any,
-    kind: Tool,
+    kind: Tool | ToolRecord,
     initiative: Any,
     user: User | None,
     guild_context: ActorContext,
@@ -204,7 +201,7 @@ async def require_create(
         session,
         initiative_id=initiative.id,
         user=user,
-        permission_key=PermissionKey(kind.create_permission),
+        permission_key=kind.create_permission,
     ):
         return
     raise kind.create_denied()
@@ -212,7 +209,7 @@ async def require_create(
 
 async def prepare_create(
     session: Any,
-    kind: Tool,
+    kind: Tool | ToolRecord,
     initiative_id: int | None,
     user: User | None,
     guild_context: ActorContext,
@@ -232,20 +229,22 @@ async def prepare_create(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=InitiativeMessages.NOT_FOUND,
         )
-    require_tool_enabled(kind, initiative, guild_context)
+    await require_tool_enabled(session, kind, initiative)
     await require_create(session, kind, initiative, user, guild_context)
     return initiative
 
 
-def duplicate_sharing(source: Any, *, initiative_id: int) -> list[ResourceGrantSchema]:
-    """Who a duplicate of ``source`` is shared with: the same people and roles
-    as ``source`` while it stays in the same initiative, where they exist, and
-    the create default when it goes to another. ``source.grants`` is loaded."""
-    if initiative_id != source.initiative_id:
+def duplicate_sharing(
+    grants: Iterable[Any], *, beside: bool
+) -> list[ResourceGrantSchema]:
+    """Who a duplicate of a row shared as ``grants`` say is shared with: the
+    same people and roles while it stays ``beside`` it, in its initiative,
+    where they exist, and the create default when it goes to another."""
+    if not beside:
         return initiative_readable()
     return [
         ResourceGrantSchema.model_validate(grant)
-        for grant in source.grants
+        for grant in grants
         if grant.level != ResourceAccessLevel.owner and grant.plugin_install_id is None
     ]
 
@@ -276,7 +275,9 @@ def refuse_plugin_sharing(actor: ActorContext, payload: Any, *fields: str) -> No
     require_install_may_share(actor, None)
 
 
-def require_install_may_share(actor: ActorContext, kind: Tool | None) -> None:
+def require_install_may_share(
+    actor: ActorContext, kind: Tool | ToolRecord | None
+) -> None:
     """Raise 403 unless an installed plug-in's standing lets it change sharing:
     ``sharing:write``, the tool's write scope when ``kind`` is named, and the
     roster reads a sharing change makes. A person passes; their rung on the
@@ -291,7 +292,7 @@ def require_install_may_share(actor: ActorContext, kind: Tool | None) -> None:
         )
     needed = list(_SHARING_READS)
     if kind is not None:
-        needed.append(scope_name(tool_resource(kind), PluginScopeAccess.write))
+        needed.append(f"{kind.scope}:{PluginScopeAccess.write.value}")
     if not all(actor.holds(scope) for scope in needed):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -315,7 +316,7 @@ def refuse_install_community_share(
 async def apply_plugin_initial_sharing(
     session: Any,
     actor: ActorContext,
-    kind: Tool,
+    kind: Tool | ToolRecord,
     *,
     resource_id: int,
     initiative_id: int | None,
@@ -333,7 +334,7 @@ async def apply_plugin_initial_sharing(
         return
     if payload is None or "grants" not in payload.model_fields_set:
         return
-    require_install_may_share(actor, kind)
+    require_install_may_share(actor, routed_tools(session).by_kind[kind])
     refuse_install_community_share(actor, initiative_id)
     await permissions_service.replace_resource_grants(
         session,
@@ -351,7 +352,7 @@ async def apply_plugin_initial_sharing(
 async def grant_initial_sharing(
     session: Any,
     actor: ActorContext,
-    kind: Tool,
+    kind: Tool | ToolRecord,
     *,
     user: User | None,
     resource_id: int,
@@ -410,7 +411,7 @@ def authorize(
     ``access="write"`` is an edit."""
     cfg = RESOURCE_ACCESS[kind]
     initiative = getattr(row, "initiative", None)
-    if initiative is not None and not tool_on(context, initiative, kind):
+    if initiative is not None and not switch(context, initiative, kind):
         raise kind.disabled()
     permissions_service.require_access(
         permissions_service.DAC_RESOURCES[cfg.dac_kind],
@@ -477,7 +478,6 @@ class SubTool:
 SUB_TOOLS: dict[type, SubTool] = {
     Task: SubTool(task_queries.load_for_change),
     CalendarEvent: SubTool(events_service.get_event),
-    Counter: SubTool(counters_service.get_counter, name="name"),
     WikiPage: SubTool(
         wikis_service.get_page,
         copy_resets={"yjs_state": None, "yjs_updated_at": None},
@@ -524,7 +524,7 @@ async def require_may_change(
             status_code=status.HTTP_409_CONFLICT,
             detail=CommonMessages.CONTENT_IS_FROZEN,
         )
-    require_tool_enabled(kind.tool, row.initiative, context)
+    await require_tool_enabled(session, kind.tool, row.initiative)
     await require_create(session, kind.tool, row.initiative, user, context)
 
 
@@ -584,16 +584,54 @@ async def load_kind(
     entity_id: int,
     user: User | None,
     guild_context: ActorContext,
+    *,
+    access: str = "read",
+    action: Action | None = None,
 ) -> Any:
     """A tool or a row inside one, by its kind, read as its own page reads it
-    and refused in its own words."""
+    and refused in its own words: a model's instance, or a tool plug-in's row
+    (``app.db.tool_rows.ToolRow``), which answers to its tool's sharing as a
+    task answers to its project's. A kind the community does not have is not
+    found."""
     from app.db.base import MODELS_BY_TABLE
 
+    tools = routed_tools(session)
+    located = locate(tools, kind)
+    if located is not None:
+        row = await load_row(session, located, tools, entity_id)
+        if row is None:
+            raise kind_refusal(kind, KindMessages.NOT_FOUND, 404)
+        # Its tool on in the row's initiative, as a built-in tool's is.
+        await plugin_tool_rows.require_on(
+            session, located, int(row.tool["initiative_id"])
+        )
+        permissions_service.require_access(
+            permissions_service.DacResource(located.tool),
+            row,
+            context=guild_context,
+            access=access,
+            action=action,
+        )
+        return row
+    if kind not in KINDS:
+        raise kind_refusal(kind, KindMessages.NOT_FOUND, 404)
     if KINDS[kind].parent is None:
         return await load_authorized(
-            session, Tool(kind), entity_id, user, guild_context
+            session,
+            Tool(kind),
+            entity_id,
+            user,
+            guild_context,
+            access=access,
+            action=action,
         )
-    return await load_child(session, MODELS_BY_TABLE[KINDS[kind].table], entity_id)
+    return await load_child(
+        session,
+        MODELS_BY_TABLE[KINDS[kind].table],
+        entity_id,
+        access=access,
+        action=action,
+    )
 
 
 def parent_of(row: Any) -> Any:
@@ -653,14 +691,16 @@ def _missing(model: type) -> Exception:
 
 async def set_resource_grants(
     session: Any,
-    kind: Tool,
+    kind: str,
     resource_id: int,
     user: User | None,
     guild_context: ActorContext,
     grants: list[ResourceGrantSchema],
+    note: str | None = None,
 ) -> None:
-    """Replace one resource's sharing the unified way: load + 404, authorize
-    the share action (``Action.share``), rebuild every non-owner grant from
+    """Replace the sharing of one row of the tool ``kind`` names, a built-in
+    tool's or a tool plug-in's, the unified way: load + 404, authorize the
+    share action (``Action.share``), rebuild every non-owner grant from
     ``grants`` (owner preserved), then take anyone the new sharing does not
     reach off the content inside it (``named_people.sweep``). Commits. Raises
     ``HTTPException`` 404 (missing) / 403 (no manage access) / 409 (archived or
@@ -669,28 +709,34 @@ async def set_resource_grants(
 
     An installed plug-in changes sharing where a person with its rung could, and
     only with ``sharing:write`` and the tool's write scope
-    (:func:`require_install_may_share`)."""
-    require_install_may_share(guild_context, kind)
-    row = await load_authorized(
-        session,
-        kind,
-        resource_id,
-        user,
-        guild_context,
-        action=Action.share,
+    (:func:`require_install_may_share`).
+
+    A person's change is told: each pending request the new sharing reaches is
+    answered (``share_requests.settle_reached``), and each person it newly
+    names, or raises to edit, hears they were let in, with ``note`` where the
+    giver wrote one. A grant to a role or to every member tells only those who
+    asked."""
+    tool = routed_tools(session).by_kind[kind]
+    require_install_may_share(guild_context, tool)
+    row = await load_kind(
+        session, tool.kind, resource_id, user, guild_context, action=Action.share
     )
     refuse_install_community_share(guild_context, row.initiative_id)
-    settled = named_people.Governing.of(kind, row)
-    if kind is Tool.file:
+    settled = named_people.Governing.of(tool, row)
+    if tool.kind == Tool.file:
         # Who a collection may name is whoever can open a file in it.
         collections_service.settle_after_commit(session, left_files=[row.id])
-    await permissions_service.replace_resource_grants(
+    resource_id = row.id
+    owner = await ownership_service.current_owner(
+        session, tool=tool, resource_id=resource_id
+    )
+    before, after = await permissions_service.replace_resource_grants(
         session,
-        resource_type=kind,
-        resource_id=row.id,
+        resource_type=tool.kind,
+        resource_id=resource_id,
         guild_id=guild_context.guild_id,
         initiative_id=row.initiative_id,
-        owner_id=ownership_service.owner_user_id_of(row),
+        owner_id=owner.user_id if owner is not None else None,
         grants=grants,
         actor_user_id=guild_context.user_id,
         by_install=isinstance(guild_context, InstallContext),
@@ -700,3 +746,57 @@ async def set_resource_grants(
     # sharing does not reach are let go, once that sharing is committed.
     if await named_people.sweep(session, settled):
         await session.commit()
+    if user is not None:
+        await _tell_let_in(session, tool, resource_id, user, before, after, note)
+        await session.commit()
+
+
+async def _tell_let_in(
+    session: Any,
+    tool: ToolRecord,
+    resource_id: int,
+    giver: User,
+    before: dict[tuple[str, int | None], str],
+    after: dict[tuple[str, int | None], str],
+    note: str | None,
+) -> None:
+    """Tell whoever a change of sharing let in: those who asked, however it
+    reaches them, then those it names who were not named before or could only
+    view."""
+    told = await share_requests_service.settle_reached(
+        session,
+        tool=tool,
+        resource_id=resource_id,
+        sharing=after,
+        answerer=giver,
+        note=note,
+        before=before,
+    )
+    let_in: dict[ResourceAccessLevel, list[int]] = {}
+    for (grantee, user_id), level in after.items():
+        was = before.get((grantee, user_id))
+        if grantee != "user" or user_id is None or user_id in told:
+            continue
+        if was is not None and ResourceAccessLevel(was).reaches(
+            ResourceAccessLevel(level)
+        ):
+            continue
+        let_in.setdefault(ResourceAccessLevel(level), []).append(user_id)
+    if not let_in:
+        return
+    name = await notifications_service.actor_name(session, giver)
+    about = (tool.kind, resource_id)
+    title = (await share_requests_service.names(session, [about])).get(about, "")
+    for level, user_ids in let_in.items():
+        await notifications_service.notify(
+            session,
+            NotificationType.share_granted,
+            user_ids,
+            about=about,
+            key=share_requests_service.granted_key(level, note),
+            values={"answerer": name, "count": "1", "title": title, "note": note or ""},
+            data=share_requests_service.granted_data(
+                name, level, tool.kind, resource_id, note
+            ),
+            actor=giver,
+        )

@@ -29,7 +29,7 @@ import type {
   PropertyValueInput,
   TimelineResponse,
 } from "@/api/generated/initiativeAPI.schemas";
-import { PropertyTarget } from "@/api/generated/initiativeAPI.schemas";
+import { ContentKind } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
@@ -138,7 +138,7 @@ export const collectionMetadataSaves = (collectionId: number) => {
       name,
       readKey: (communityId, id) => heldKey(name, communityId, id),
       patch: () => Promise.reject(new Error("a file's collection metadata takes no patch")),
-      properties: PropertyTarget.file,
+      properties: ContentKind.file,
       setProperties: (communityId, fileId, body) =>
         setCollectionFileMetadata(communityId, collectionId, fileId, body),
       lists: () => q.allCollections(),

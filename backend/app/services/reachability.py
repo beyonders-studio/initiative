@@ -24,43 +24,16 @@ from app.db.session import set_rls_context
 
 
 def _comment_initiative() -> ColumnElement[int | None]:
-    """A comment's initiative, through whichever parent it names.
-
-    A comment hangs off exactly one of them, so the parents are tried in the
-    order they are declared for the policies and the first that answers wins.
-    A parent that is not itself a tool entity takes the hop its registry entry
-    names — a task belongs to a project, a wiki page to a wiki — because the
-    initiative is the tool's.
-    """
+    """A comment's initiative: its subject's, as the gate functions resolve a
+    ``(kind, id)`` pair."""
     from sqlalchemy import func as sa_func
 
-    from app.db.initiative_rls import COMMENT_PARENTS
+    from app.db.initiative_rls import ENTITY_INITIATIVE_FN
     from app.models.tenant.comment import Comment
 
-    lookups = []
-    for column, parent in COMMENT_PARENTS.items():
-        tool = MODELS_BY_TABLE.get(
-            parent.governed_by.plural if parent.governed_by else parent.table
-        )
-        if tool is None:  # pragma: no cover - a tool always has a table
-            continue
-        if parent.tool_fk is None:
-            lookups.append(
-                select(tool.initiative_id)
-                .where(tool.id == getattr(Comment, column))
-                .scalar_subquery()
-            )
-            continue
-        mid = MODELS_BY_TABLE.get(parent.table)
-        if mid is None:  # pragma: no cover - a declared parent always has one
-            continue
-        lookups.append(
-            select(tool.initiative_id)
-            .join(mid, getattr(mid, parent.tool_fk) == tool.id)
-            .where(mid.id == getattr(Comment, column))
-            .scalar_subquery()
-        )
-    return sa_func.coalesce(*lookups)
+    return getattr(sa_func, ENTITY_INITIATIVE_FN)(
+        Comment.subject_type, Comment.subject_id
+    )
 
 
 def _initiative_query(model: Any, row_id: int) -> Select[tuple[int, int | None]]:
@@ -73,8 +46,9 @@ def _initiative_query(model: Any, row_id: int) -> Select[tuple[int, int | None]]
     Most tables carry ``initiative_id``. A row that does not — a task, a wiki
     page — reaches one through the thing it belongs to, and which hops those
     are is already declared for the policies (``INITIATIVE_PATHS``), so they
-    are read from there rather than a second time here. A comment names one of
-    several parents, so it is read through the same chain its own policies use.
+    are read from there rather than a second time here. A comment names its
+    subject by kind, so it is read through the function its policies' kinds
+    resolve through.
     """
     from app.models.tenant.comment import Comment
 

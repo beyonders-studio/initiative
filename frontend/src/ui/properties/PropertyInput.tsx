@@ -1,8 +1,9 @@
-import { ChevronDown, Minus, Plus, RotateCcw, Star, X } from "lucide-react";
+import { ChevronDown, Maximize2, Minus, Plus, RotateCcw, Star, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
+  CounterLook,
   MetadataType,
   type PropertyOption,
   type PropertySummary,
@@ -12,11 +13,14 @@ import { Checkbox } from "@/ui/checkbox";
 import { Combobox } from "@/ui/combobox";
 import { DateTimePicker } from "@/ui/date-time-picker";
 import { Input } from "@/ui/input";
+import { getContrastingTextColor } from "@/ui/lib/contrast";
 import { toPickerValue } from "@/ui/lib/localDateTime";
 import { cn } from "@/ui/lib/utils";
 import { type Member, type MemberId, MemberPicker, type SearchMembers } from "@/ui/member-picker";
 import { Slider } from "@/ui/slider";
 
+import { CounterFocusDialog, type CounterFocusHost } from "./CounterFocus";
+import { type CounterShown, CounterView } from "./CounterView";
 import { type FileFieldFiles, FileFieldInput } from "./FileFieldInput";
 import { extractUser } from "./PropertyValueCell";
 import {
@@ -51,8 +55,9 @@ export interface PropertyInputProps {
   canOpen?: { tool: string; id: number | null | undefined };
   /** Adds an option named `label` to a select property, or finds the one
    *  already named so, and answers with it. A failure is told by this, and
-   *  rejects. */
-  appendOption: (
+   *  rejects. Left out, its options are fixed and none is made from what is
+   *  typed. */
+  appendOption?: (
     definition: { id: number; options: PropertyOption[] },
     label: string
   ) => Promise<PropertyOption>;
@@ -61,9 +66,15 @@ export interface PropertyInputProps {
   /** Who a pre-set `user_reference` value names, so the picker shows them
    *  without a search round-trip. Without it, the value is looked up. */
   selectedUser?: Member<MemberId> | null;
-  /** How a scale is set: as a number, by stars, or along a bar. A number
-   *  without. */
+  /** How a scale is set: as a number, by stars, or along a bar; a number
+   *  without. How a counter is drawn: a number, a bar or a clock; in its own
+   *  look without. */
   display?: FieldDisplay | null;
+  /** The id of its text box or checkbox, for a label beside it to name. */
+  id?: string;
+  /** A counter's full screen as its page gives it. Without it, it is titled
+   *  with the field's name, on the page's colours, and opens on its own. */
+  focus?: CounterFocusHost;
   /** Steps a counter from what it holds when the step lands, so two people
    *  stepping it at once both count. Without it, a step is a value like any
    *  other: something nothing has saved yet, a filter. */
@@ -200,7 +211,8 @@ const ScaleInput = ({
 };
 
 /** A counter: stepped down and up by its step, typed, or reset to its
- *  initial value, never past its bounds. */
+ *  initial value, never past its bounds, and drawn in its look. It opens
+ *  full screen, where it steps the same way. */
 const CounterInput = ({
   definition,
   value,
@@ -208,6 +220,8 @@ const CounterInput = ({
   onStep,
   disabled,
   className,
+  display,
+  focus,
 }: {
   definition: PropertyDefinitionLike;
   value: unknown;
@@ -215,56 +229,110 @@ const CounterInput = ({
   onStep?: (up: boolean) => void;
   disabled: boolean;
   className?: string;
+  display?: FieldDisplay | null;
+  focus?: CounterFocusHost;
 }) => {
   const { t } = useTranslation("properties");
+  const [opened, setOpened] = useState(false);
+  const focused = focus?.open ?? opened;
+  const setFocused = focus?.onOpenChange ?? setOpened;
+  const color = focus?.color ?? null;
   const settings = counterSettings(definition.counter);
   const count = counterCount(settings, value);
   const step = (up: boolean) => (onStep ? onStep(up) : onChange(steppedCount(settings, value, up)));
+  const reset = () => onChange(withinBounds(settings, settings.initial));
+  // As typed: the bounds hold it once it is saved, not a digit at a time.
+  const type = (typed: string) => onChange(numericValue(typed));
+  const shown: CounterShown = {
+    count: String(count),
+    step: String(settings.step),
+    min: settings.min === null ? null : String(settings.min),
+    max: settings.max === null ? null : String(settings.max),
+    look: (display ?? settings.look) as CounterLook,
+  };
+  const drawn = shown.look !== CounterLook.number && shown.min !== null && shown.max !== null;
+  // A reader sees its count, and opens it full screen, but steps nothing.
+  const stepButton = (up: boolean) =>
+    disabled ? null : (
+      <Button
+        type="button"
+        variant="outline"
+        size="icon-sm"
+        aria-label={t(up ? "input.stepUp" : "input.stepDown", { name: definition.name })}
+        disabled={
+          up
+            ? settings.max !== null && count >= settings.max
+            : settings.min !== null && count <= settings.min
+        }
+        onClick={() => step(up)}
+      >
+        {up ? <Plus className="h-4 w-4" /> : <Minus className="h-4 w-4" />}
+      </Button>
+    );
   return (
     <div className={cn("flex items-center gap-1", className)}>
-      <Button
-        type="button"
-        variant="outline"
-        size="icon-sm"
-        aria-label={t("input.stepDown", { name: definition.name })}
-        disabled={disabled || (settings.min !== null && count <= settings.min)}
-        onClick={() => step(false)}
-      >
-        <Minus className="h-4 w-4" />
-      </Button>
-      <Input
-        type="number"
-        inputMode="decimal"
-        step="any"
-        aria-label={definition.name}
-        value={coerceNumber(value)}
-        // As typed: the bounds hold it once it is saved, not a digit at a time.
-        onChange={(e) => onChange(numericValue(e.target.value))}
-        placeholder={String(settings.initial)}
-        disabled={disabled}
-        className="w-24 bg-transparent text-center tabular-nums"
-      />
-      <Button
-        type="button"
-        variant="outline"
-        size="icon-sm"
-        aria-label={t("input.stepUp", { name: definition.name })}
-        disabled={disabled || (settings.max !== null && count >= settings.max)}
-        onClick={() => step(true)}
-      >
-        <Plus className="h-4 w-4" />
-      </Button>
+      {stepButton(false)}
+      {drawn ? (
+        <div className="flex min-w-0 flex-1 justify-center px-2">
+          <CounterView
+            counter={shown}
+            name={definition.name}
+            disabled={disabled}
+            textColor="currentColor"
+            onCommit={type}
+            size="lg"
+          />
+        </div>
+      ) : (
+        <Input
+          type="number"
+          inputMode="decimal"
+          step="any"
+          aria-label={definition.name}
+          value={coerceNumber(value)}
+          onChange={(e) => type(e.target.value)}
+          placeholder={String(settings.initial)}
+          disabled={disabled}
+          className="w-24 bg-transparent text-center tabular-nums"
+        />
+      )}
+      {stepButton(true)}
+      {disabled ? null : (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="text-muted-foreground"
+          aria-label={t("input.reset", { name: definition.name })}
+          disabled={count === withinBounds(settings, settings.initial)}
+          onClick={reset}
+        >
+          <RotateCcw className="h-4 w-4" />
+        </Button>
+      )}
       <Button
         type="button"
         variant="ghost"
         size="icon-sm"
         className="text-muted-foreground"
-        aria-label={t("input.reset", { name: definition.name })}
-        disabled={disabled || count === withinBounds(settings, settings.initial)}
-        onClick={() => onChange(withinBounds(settings, settings.initial))}
+        aria-label={t("counter.focus.open", { name: definition.name })}
+        onClick={() => setFocused(true)}
       >
-        <RotateCcw className="h-4 w-4" />
+        <Maximize2 className="h-4 w-4" />
       </Button>
+      <CounterFocusDialog
+        open={focused}
+        onOpenChange={setFocused}
+        counter={shown}
+        name={focus?.name ?? definition.name}
+        color={color}
+        textColor={getContrastingTextColor(color)}
+        disabled={disabled}
+        onStep={step}
+        onCommit={type}
+        onReset={disabled ? undefined : reset}
+        navigation={focus?.navigation}
+      />
     </div>
   );
 };
@@ -286,6 +354,8 @@ export const PropertyInput = ({
   onStep,
   files,
   updatedAt,
+  focus,
+  id,
 }: PropertyInputProps) => {
   const { t } = useTranslation("properties");
 
@@ -298,6 +368,7 @@ export const PropertyInput = ({
     case MetadataType.text: {
       return (
         <Input
+          id={id}
           type="text"
           value={coerceString(value)}
           onChange={(e) => {
@@ -314,6 +385,7 @@ export const PropertyInput = ({
     case MetadataType.number: {
       return (
         <Input
+          id={id}
           type="number"
           inputMode="numeric"
           value={coerceNumber(value)}
@@ -338,6 +410,7 @@ export const PropertyInput = ({
       return (
         <div className={cn("flex items-center gap-2", className)}>
           <Input
+            id={id}
             type="number"
             inputMode="decimal"
             step="any"
@@ -380,6 +453,8 @@ export const PropertyInput = ({
           onStep={onStep}
           disabled={disabled}
           className={className}
+          display={display}
+          focus={focus}
         />
       );
     }
@@ -388,6 +463,7 @@ export const PropertyInput = ({
       return (
         <div className={cn("flex h-9 items-center", className)}>
           <Checkbox
+            id={id}
             checked={coerceBoolean(value)}
             onCheckedChange={(checked) => onChange(checked === true)}
             disabled={disabled}
@@ -399,6 +475,7 @@ export const PropertyInput = ({
     case MetadataType.url: {
       return (
         <Input
+          id={id}
           type="url"
           value={coerceString(value)}
           onChange={(e) => {
@@ -594,7 +671,7 @@ const PropertyOptionPicker = ({
 
   // A failure rejects, so the picker keeps the typed name to try again.
   const handleCreate = async (label: string) => {
-    if (adding) return;
+    if (adding || !appendOption) return;
     setAdding(true);
     try {
       const id = "id" in definition ? definition.id : definition.property_id;
@@ -632,8 +709,12 @@ const PropertyOptionPicker = ({
     })),
     open,
     onOpenChange: setOpen,
-    typedLabel: (typed: string) => typed && t("input.createOption", { label: typed }),
-    onCreate: handleCreate,
+    ...(appendOption
+      ? {
+          typedLabel: (typed: string) => typed && t("input.createOption", { label: typed }),
+          onCreate: handleCreate,
+        }
+      : {}),
     loading: adding,
     searchPlaceholder: t("input.searchOptions"),
     emptyMessage: t("picker.empty"),

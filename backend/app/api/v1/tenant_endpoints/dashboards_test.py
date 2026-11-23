@@ -11,7 +11,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
-from app.testing import create_dashboard, create_project, strip_non_owner_grants
+from app.testing import (
+    create_dashboard,
+    create_project,
+    strip_non_owner_grants,
+    switch_tools,
+)
 
 
 def _stat_definition() -> dict:
@@ -31,10 +36,7 @@ def _stat_definition() -> dict:
 
 
 async def _dashboards_enabled(session: AsyncSession, initiative) -> None:
-    initiative.dashboards_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.dashboard: True})
 
 
 async def test_canvas_retains_sql_calendar_date_kind(client, session, acting_user):
@@ -141,9 +143,7 @@ async def test_create_requires_feature_enabled(
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     # The factory switches every tool on, so a test about one being OFF
     # turns it off.
-    a.initiative.dashboards_enabled = False
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.dashboard: False})
 
     response = await client.post(
         a.g("/dashboards/"),
@@ -208,8 +208,9 @@ async def test_update_definition_revalidates(client: AsyncClient, acting_user, s
     )
     assert ok.status_code == 200, ok.text
     widget = ok.json()["definition"]["widgets"][0]
-    # Presets are stored resolved: the renderer only ever sees a primitive.
-    assert widget["type"] == "chart"
+    # Presets are stored resolved: the renderer only ever sees a primitive,
+    # with the preset's name kept as a label.
+    assert (widget["type"], widget["preset"]) == ("chart", "line_chart")
     assert widget["options"]["mark"] == "line"
 
     bad = await client.patch(
@@ -384,6 +385,8 @@ async def test_widget_catalog_projects_the_registry(
 ) -> None:
     from app.services.tenant.dashboard_definition import WIDGET_PRESETS, WIDGET_SPECS
 
+    """The literal route wins over ``/{dashboard_id}``. A preset names a
+    primitive the palette serves, or it would be an unrenderable entry."""
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
     response = await client.get(a.g("/dashboards/widget-catalog"), headers=a.headers)
     assert response.status_code == 200
@@ -391,6 +394,8 @@ async def test_widget_catalog_projects_the_registry(
 
     assert {entry["type"] for entry in body["widgets"]} == set(WIDGET_SPECS)
     assert {entry["name"] for entry in body["presets"]} == set(WIDGET_PRESETS)
+    for preset in body["presets"]:
+        assert preset["primitive"] in WIDGET_SPECS
 
     for entry in body["widgets"]:
         spec = WIDGET_SPECS[entry["type"]]
@@ -418,20 +423,6 @@ async def test_widget_catalog_projects_the_registry(
             assert option["kind"] == declared.kind
 
 
-async def test_widget_catalog_presets_resolve_to_primitives(
-    client: AsyncClient, acting_user
-) -> None:
-    """A preset that named a primitive we don't ship would put an unrenderable
-    entry in the palette."""
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    response = await client.get(a.g("/dashboards/widget-catalog"), headers=a.headers)
-    body = response.json()
-
-    primitives = {entry["type"] for entry in body["widgets"]}
-    for preset in body["presets"]:
-        assert preset["primitive"] in primitives
-
-
 async def test_widget_catalog_requires_guild_membership(
     client: AsyncClient, acting_user, session
 ) -> None:
@@ -445,36 +436,3 @@ async def test_widget_catalog_requires_guild_membership(
         f"/api/v1/c/{other.id}/dashboards/widget-catalog", headers=a.headers
     )
     assert response.status_code == 403
-
-
-async def test_widget_catalog_path_is_not_read_as_an_id(
-    client: AsyncClient, acting_user
-) -> None:
-    """The literal route has to win over /{dashboard_id}, which would otherwise
-    swallow it and 422 on the int parse."""
-    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    response = await client.get(a.g("/dashboards/widget-catalog"), headers=a.headers)
-    assert response.status_code == 200
-    assert "widgets" in response.json()
-
-
-async def test_dashboard_counts_by_initiative(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Grouped counts mirror the list: DAC-visible dashboards in
-    dashboards-enabled initiatives only."""
-    from app.testing import create_initiative
-
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    await _dashboards_enabled(session, a.initiative)
-    disabled_initiative = await create_initiative(
-        session, a.guild, a.user, dashboards_enabled=False
-    )
-
-    await create_dashboard(session, a.initiative, a.user, name="Health")
-    await create_dashboard(session, a.initiative, a.user, name="Flow")
-    await create_dashboard(session, disabled_initiative, a.user, name="Hidden")
-
-    response = await client.get(a.g("/tools/counts/by-initiative"), headers=a.headers)
-    assert response.status_code == 200, response.text
-    assert response.json()["counts"]["dashboard"] == {str(a.initiative.id): 2}

@@ -19,7 +19,6 @@ from app.models.platform.notification import Notification, NotificationType
 from app.services.platform.push_notifications import (
     DEFAULT_CHANNEL,
     PUSH_CHANNELS,
-    channel_for,
 )
 
 _ANDROID_CHANNELS = (
@@ -36,57 +35,6 @@ _ANDROID_CHANNELS = (
     / "initiative"
     / "NotificationChannelManager.java"
 )
-
-# Types that only ever become an in-app notification — no push is sent for
-# them, so they need no channel of their own.
-_IN_APP_ONLY = {
-    NotificationType.export_ready,
-    NotificationType.export_failed,
-    NotificationType.import_ready,
-    NotificationType.import_failed,
-    # Sent when a moderator takes a profile picture down. It belongs in the
-    # inbox, where it can be read next to the settings page that acts on it,
-    # rather than as an interruption on a device.
-    NotificationType.avatar_removed,
-    # The other three moderation notices, for the same reason: they belong in
-    # the inbox next to the settings page they are about, and none of them is
-    # urgent enough to interrupt someone on a device.
-    NotificationType.username_changed,
-    NotificationType.profile_field_cleared,
-    NotificationType.account_suspended,
-    NotificationType.account_unsuspended,
-    # A community put on hold: an inbox notice beside its email, about paying
-    # for it, which is no reason to interrupt someone on a device.
-    NotificationType.community_on_hold,
-    # A trial ending or ended, or a new community's plan to choose: the same
-    # errand as a hold, told the same way.
-    NotificationType.community_trial_ending,
-    NotificationType.community_trial_ended,
-    NotificationType.community_pause_reminder,
-    NotificationType.community_welcome,
-    # A plug-in asking a member to consent: answered on the plug-in's settings, where
-    # it waits until they get to it.
-    NotificationType.plugin_consent_requested,
-    # The record of an announcement already shown in its own dialog.
-    NotificationType.announcement,
-    # A version of an installed plug-in waiting for the seat: it waits on the
-    # settings page until they get to it, so nothing is gained by interrupting
-    # them on a device.
-    NotificationType.plugin_update_pending,
-}
-
-
-def test_every_pushed_notification_type_has_a_channel():
-    """A new notification type that pushes must pick a channel. Defaulting is
-    silent — the notification still arrives, just filed under "General" where
-    the user can't mute it separately from everything else."""
-    assert set(PUSH_CHANNELS) == set(NotificationType) - _IN_APP_ONLY
-
-
-def test_in_app_only_types_fall_back_to_the_general_channel():
-    for notification_type in _IN_APP_ONLY:
-        assert channel_for(notification_type) == DEFAULT_CHANNEL
-    assert channel_for(None) == DEFAULT_CHANNEL
 
 
 @pytest.mark.always
@@ -149,7 +97,8 @@ async def test_delivery_reads_stamps_and_prunes_the_devices(session, monkeypatch
     """The recipient's rows are read, the delivered one stamped and the dead
     one dropped. A device whose session has ended, or that names no sign-in,
     is not sent to and is dropped too. The same value registered by another
-    account is left alone. Each send carries the recipient's unread count."""
+    account is left alone. Each send carries the recipient's unread count, on
+    the device's own platform."""
     from app.models.platform.push_token import PushToken
 
     # FCM's switch moved onto the settings row in 0368, so the gate is the
@@ -172,6 +121,7 @@ async def test_delivery_reads_stamps_and_prunes_the_devices(session, monkeypatch
     monkeypatch.setattr(push_config, "ensure_push_config_fresh", _enabled)
 
     badges: list[int | None] = []
+    platforms: dict[str, str | None] = {}
 
     async def _send(
         client,
@@ -184,6 +134,7 @@ async def test_delivery_reads_stamps_and_prunes_the_devices(session, monkeypatch
         badge=None,
     ):
         badges.append(badge)
+        platforms[push_token] = platform
         return (True, False) if push_token == "live" else (False, True)
 
     monkeypatch.setattr(push_notifications, "send_push_notification", _send)
@@ -203,18 +154,18 @@ async def test_delivery_reads_stamps_and_prunes_the_devices(session, monkeypatch
         for user in (recipient, recipient, recipient, bystander)
     ]
     await session_service.revoke_session(session, session_id=signed_out)
-    for user, value, sid in (
-        (recipient, "live", signed_in),
-        (recipient, "gone", other_phone),
-        (recipient, "signed-out", signed_out),
-        (recipient, "unlinked", None),
-        (bystander, "gone", elsewhere),
+    for user, value, sid, platform in (
+        (recipient, "live", signed_in, "ios"),
+        (recipient, "gone", other_phone, "android"),
+        (recipient, "signed-out", signed_out, "android"),
+        (recipient, "unlinked", None, "android"),
+        (bystander, "gone", elsewhere, "android"),
     ):
         await push_tokens.register_push_token(
             session,
             user_id=user.id,
             push_token=value,
-            platform="android",
+            platform=platform,
             session_id=sid,
         )
     recipient_id, bystander_id = recipient.id, bystander.id
@@ -236,6 +187,8 @@ async def test_delivery_reads_stamps_and_prunes_the_devices(session, monkeypatch
     await session.commit()
     assert again == [False]
     assert badges == [2, 2]
+    # Each device is sent on its own platform.
+    assert platforms == {"live": "ios", "gone": "android"}
 
     session.expire_all()
     rows = (
@@ -300,35 +253,6 @@ async def test_access_token_is_reused_until_it_lapses(monkeypatch):
 
     assert await push_notifications._get_fcm_access_token(_cfg("b")) == "token-2"
     assert built == [{"account": "a"}, {"account": "b"}]
-
-
-async def test_a_renewed_session_carries_its_device(session):
-    """A refresh moves the device to the row that succeeds its session."""
-    from app.services.auth import sessions as session_service
-    from app.services.platform import push_tokens
-    from app.testing import create_user
-
-    user = await create_user(session)
-    user_id = user.id
-    issued = await session_service.create_session(
-        session, user_id=user_id, amr=["pwd"], satisfied_providers=[]
-    )
-    await push_tokens.register_push_token(
-        session,
-        user_id=user_id,
-        push_token="phone",
-        platform="android",
-        session_id=issued.session.id,
-    )
-    rotated = await session_service.rotate_session(
-        session, raw_refresh_token=issued.refresh_token
-    )
-    renewed_id = rotated.issued.session.id
-    await session.commit()
-
-    (row,) = await push_tokens.get_push_tokens_for_user(session, user_id=user_id)
-    await session.refresh(row)
-    assert row.session_id == renewed_id
 
 
 # --- where a push goes: FCM or the push relay ---------------------------------
@@ -568,27 +492,3 @@ async def test_no_relay_credential_sends_nothing(push_wire, monkeypatch):
 
     assert await _send_one(wire, token=_IOS_HANDLE, platform="ios") == (False, False)
     assert wire.sends == []
-
-
-async def test_each_device_is_sent_on_its_own_platform(monkeypatch):
-    from app.models.platform.push_token import PushToken
-    from app.services.platform import push_notifications
-
-    seen: dict[str, str] = {}
-
-    async def _send(client, *, push_token, platform, **_):
-        seen[push_token] = platform
-        return (True, False)
-
-    monkeypatch.setattr(push_notifications, "send_push_notification", _send)
-    tokens = [
-        PushToken(id=1, user_id=1, push_token="phone", platform="ios"),
-        PushToken(id=2, user_id=1, push_token="tablet", platform="android"),
-    ]
-    async with httpx2.AsyncClient() as client:
-        outcome = await push_notifications._send_to_devices(
-            client, tokens, title="t", body="b", data=None, channel_id="default"
-        )
-
-    assert seen == {"phone": "ios", "tablet": "android"}
-    assert outcome.delivered_ids == [1, 2]

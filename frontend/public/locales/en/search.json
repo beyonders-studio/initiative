@@ -24,8 +24,6 @@
     "project": "Project",
     "task": "Task",
     "file": "File",
-    "counter_group": "Counter group",
-    "counter": "Counter",
     "calendar": "Calendar",
     "calendar_event": "Event",
     "dashboard": "Dashboard",

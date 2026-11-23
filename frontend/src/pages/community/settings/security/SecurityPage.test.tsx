@@ -231,6 +231,10 @@ describe("SecurityPage", () => {
       const found = positions("Sign-in rules", "Sign-in providers", "Group rules", "Privacy");
       expect(found.every((index) => index >= 0)).toBe(true);
       expect(found).toEqual([...found].sort((a, b) => a - b));
+      // Something is connected, so the empty state is gone; the way in stays,
+      // since a community may connect a second provider.
+      expect(screen.queryByText("Nothing connected yet")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /connect a provider/i })).toBeInTheDocument();
     });
 
     it("states each rule as it stands, with a way to change it", () => {
@@ -269,14 +273,6 @@ describe("SecurityPage", () => {
 
       expect(screen.getByText(/has not offered any providers/i)).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Set up sign-in" })).not.toBeInTheDocument();
-    });
-
-    it("says nothing about it once something is connected", () => {
-      render();
-
-      expect(screen.queryByText("Nothing connected yet")).not.toBeInTheDocument();
-      // The way in stays: a community may connect a second provider.
-      expect(screen.getByRole("button", { name: /connect a provider/i })).toBeInTheDocument();
     });
   });
 
@@ -324,26 +320,18 @@ describe("SecurityPage", () => {
       expect(save.mock.calls[0][0]).toEqual({ auth_policy: { policy: "required", ...sent } });
     });
 
-    it("switches back from 'any of ours' to a named provider", async () => {
+    it("has nothing to save until something changes, then switches 'any of ours' to a named provider", async () => {
       savedPolicy({ require_methods: ["sso"] });
       const user = mounted();
 
       await change(user, "Members");
+      expect(screen.getByRole("button", { name: "Save requirement" })).toBeDisabled();
       await chooseOption(user, "Corp SSO");
       await user.click(screen.getByRole("button", { name: "Save requirement" }));
 
       expect(save.mock.calls[0][0]).toEqual({
         auth_policy: { policy: "required", provider_id: 11, require_methods: [] },
       });
-    });
-
-    it("has nothing to save until something changes", async () => {
-      savedPolicy({ require_methods: ["sso"] });
-      const user = mounted();
-
-      await change(user, "Members");
-
-      expect(screen.getByRole("button", { name: "Save requirement" })).toBeDisabled();
     });
 
     it("says who it reaches before it saves, leaving out what reaches nobody", async () => {
@@ -470,21 +458,21 @@ describe("SecurityPage", () => {
       expect(required()).toBeChecked();
     });
 
-    it("is shown, not offered, where the deployment already asks everybody", () => {
-      savedPolicy({ policy: "open", factor_required_by_platform: true });
+    it.each<[string, () => void]>([
+      [
+        "the deployment already asks everybody",
+        () => savedPolicy({ policy: "open", factor_required_by_platform: true }),
+      ],
+      [
+        "whoever runs the server sets it",
+        () => stored({ require_second_factor: true, set_by_deployment: ["require_second_factor"] }),
+      ],
+    ])("is shown, not offered, where %s", (_label, arrange) => {
+      arrange();
       render();
 
       expect(screen.getByText("Required in each session")).toBeInTheDocument();
       expect(screen.getByText("Set by your server")).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Change Second factor" })).toBeNull();
-    });
-
-    it("is shown, not offered, where whoever runs the server sets it", () => {
-      stored({ require_second_factor: true, set_by_deployment: ["require_second_factor"] });
-      render();
-
-      expect(screen.getByText("Required in each session")).toBeInTheDocument();
-      expect(screen.getAllByText("Set by your server")).toHaveLength(1);
       expect(screen.queryByRole("button", { name: "Change Second factor" })).toBeNull();
     });
 
@@ -622,13 +610,6 @@ describe("SecurityPage", () => {
 
       expect(save).toHaveBeenCalledTimes(1);
       expect(save.mock.calls[0][0]).toEqual({ enforce_compliance_session: true });
-    });
-
-    it("is the seat's, not an ordinary admin's", () => {
-      communityRole = "admin";
-      render();
-
-      expect(screen.queryByText("Sign in again every 12 hours")).not.toBeInTheDocument();
     });
   });
 

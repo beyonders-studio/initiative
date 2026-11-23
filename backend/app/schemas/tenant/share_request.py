@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import Field, model_validator
@@ -95,8 +96,11 @@ class ShareRequestAnswer(SanitizedBaseModel):
     approve: bool
     #: The rung a yes gives; the one asked for where it is left out.
     level: ResourceAccessLevel | None = None
-    #: Whether a yes reaches the requester or the whole initiative.
-    scope: ShareRequestScope = ShareRequestScope.user
+    #: Whether a yes reaches the requester or the whole initiative. A role is
+    #: what the sharing settings reach, never an answer.
+    scope: Literal[ShareRequestScope.user, ShareRequestScope.initiative] = (
+        ShareRequestScope.user
+    )
     #: Whether a no is told to the requester.
     tell: bool = False
 

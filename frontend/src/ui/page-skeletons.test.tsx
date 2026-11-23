@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { CardGridSkeleton, PageSkeleton, SkeletonRegion, TableSkeleton } from "./page-skeletons";
+import { PageSkeleton, SkeletonRegion, TableSkeleton } from "./page-skeletons";
 
 describe("SkeletonRegion", () => {
   it("is a busy status region announcing the shared loading label", () => {
@@ -36,13 +36,6 @@ describe("TableSkeleton", () => {
     expect(rows).toHaveLength(5);
     expect(within(rows[0]).getAllByRole("columnheader")).toHaveLength(3);
     expect(within(rows[1]).getAllByRole("cell")).toHaveLength(3);
-  });
-});
-
-describe("CardGridSkeleton", () => {
-  it("draws one card per count", () => {
-    const { container } = render(<CardGridSkeleton count={5} />);
-    expect(container.querySelectorAll(".rounded-2xl")).toHaveLength(5);
   });
 });
 

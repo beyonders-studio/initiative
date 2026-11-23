@@ -75,6 +75,7 @@ from app.services.marketplace.service_plugins import (
     _requests,
 )
 from app.services.safe_http import ResponseTooLargeError, request_public_target
+from app.services.tenant import plugin_config as plugin_config_service
 from app.services.tenant import plugin_connection_flows as flows
 from app.services.tenant.plugin_channels import PluginChannelError, load_install
 from app.services.tenant.plugin_config import (
@@ -90,6 +91,8 @@ from app.services.webhook_target_url import (
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "CheckNotRun",
+    "CheckRefusal",
     "Delivered",
     "action_change",
     "after_connect",
@@ -99,6 +102,7 @@ __all__ = [
     "request_refusal",
     "run_endpoint",
     "run_schedule",
+    "vendor_check",
 ]
 
 MAPPING_FAILED = "mapping-failed"
@@ -298,9 +302,15 @@ class _Run:
         credentials: Credentials,
         now: datetime,
         actor: str | None = None,
+        auth: Mapping[str, Any] | None = None,
+        any_host: bool = False,
     ) -> None:
-        auth = definition.get("auth") or {}
+        if auth is None:
+            auth = definition.get("auth") or {}
         self.hosts: list[str] = list(definition.get("hosts") or [])
+        #: A call a plug-in naming no hosts may make (its vendor check): any
+        #: https host, still public and on port 443.
+        self.any_host = any_host
         self.auth_header: str = auth.get("header", DEFAULT_AUTH_HEADER)
         self.auth_prefix: str = auth.get("prefix", DEFAULT_AUTH_PREFIX)
         #: The rules an answer is held to before the defaults; ``None`` holds
@@ -353,7 +363,7 @@ class _Run:
                 url.set(paging["per_page_param"], str(paging["per_page"]))
         if paging.get("kind") == "cursor" and paging.get("param") and page.number > 1:
             url.set(paging["param"], _text(page.cursor))
-        if not _on_host(url, self.hosts):
+        if not _on_host(url, self.hosts or ([url.host] if self.any_host else [])):
             raise _Outcome(
                 MAPPING_FAILED,
                 detail=(
@@ -783,6 +793,78 @@ async def health_state(
         return "unavailable"
 
 
+# --- a vendor check ----------------------------------------------------------
+
+
+class CheckNotRun(Exception):
+    """A vendor check that could not tell: the vendor was not reached, an
+    expression failed, or it answered outside 2xx with no row for that."""
+
+
+@dataclass(frozen=True)
+class CheckRefusal:
+    """The row of a vendor check that refused the vendor's answer."""
+
+    fields: list[str]
+    message: dict[str, str]
+    #: What the row's ``shows`` answered, when it answered a string.
+    shows: str | None
+
+
+async def vendor_check(
+    definition: Mapping[str, Any],
+    check: Mapping[str, Any],
+    *,
+    vendor: Mapping[str, str],
+    credential: str | None,
+    now: datetime | None = None,
+) -> CheckRefusal | None:
+    """A plug-in's vendor check: its request, and the first of its rows that
+    refuses the answer, as the SDK's contract reads ``vendor.check``.
+
+    Its expressions read ``vendor``, the non-secret values being saved, and
+    ``now``; a row's also read the answer as ``response``. ``credential``, the
+    JWT the caller signed, goes on the request as the check's ``auth`` says.
+    A plug-in that names no hosts may reach any https host. Answers ``None``
+    when no row refuses; raises :class:`CheckNotRun` when it cannot tell.
+    """
+    run = _Run(
+        definition,
+        None,
+        credentials={"": credential} if credential else {},
+        now=now or datetime.now(UTC),
+        auth=check.get("auth") or {},
+        any_host=not definition.get("hosts"),
+    )
+    document: dict[str, Any] = {"vendor": dict(vendor), "now": run.now}
+    try:
+        answer = await run.perform(check["request"], document, "vendor/check/request")
+        read = {**document, "response": answer.read()}
+        applied = False
+        for index, row in enumerate(check["expect"]):
+            if not _matches(row.get("status", "2xx"), answer.status):
+                continue
+            applied = True
+            where = f"vendor/check/expect/{index}"
+            if await run.holds(row["holds"], read, f"{where}/holds"):
+                continue
+            shows: str | None = None
+            if "shows" in row:
+                try:
+                    value = await run.value(row["shows"], read, f"{where}/shows")
+                except _Outcome:
+                    value = None
+                shows = value if isinstance(value, str) else None
+            return CheckRefusal(
+                fields=list(row["fields"]), message=dict(row["message"]), shows=shows
+            )
+    except (_Outcome, PluginDataError) as exc:
+        raise CheckNotRun(str(exc)) from exc
+    if not applied and not 200 <= answer.status <= 299:
+        raise CheckNotRun(f"the vendor answered {answer.status} and no row reads it")
+    return None
+
+
 # --- an action's change ------------------------------------------------------
 
 
@@ -790,8 +872,9 @@ async def action_change(
     write: str,
     *,
     item: Mapping[str, Any],
-    held: Mapping[str, Any],
-    installed: Mapping[str, Any],
+    held: Mapping[str, Any] | None = None,
+    installed: Mapping[str, Any] | None = None,
+    items: Mapping[str, Any] | None = None,
     result: Any = UNDEFINED,
     params: Mapping[str, Any] | None = None,
     element: str | None = None,
@@ -799,7 +882,10 @@ async def action_change(
 ) -> dict[str, Any] | None:
     """The change a declarative action's ``write`` answers, as the SDK's
     ``runAction`` reads it: the one Initiative makes to the plug-in's values
-    on the action's own item, or ``None`` when it answers nothing.
+    on the action's own item, or ``None`` when it answers nothing. A tool
+    plug-in's action is run the same way, its ``item`` the row it runs on and
+    ``items`` the item rows directly under it, by item key, and its change is
+    to their declared fields (``app.services.tenant.plugin_tool_rows``).
 
     ``write`` reads ``item`` (its ``kind``, ``id`` and ``title``), ``held``
     (the install's values on it, by key), ``result`` (the endpoint's mapped
@@ -816,11 +902,14 @@ async def action_change(
     millis, at = _clock(now or datetime.now(UTC))
     document: dict[str, Any] = {
         "item": dict(item),
-        "held": dict(held),
         "params": dict(params or {}),
-        **installed,
+        **(installed or {}),
         "now": at,
     }
+    if held is not None:
+        document["held"] = dict(held)
+    if items is not None:
+        document["items"] = dict(items)
     if result is not UNDEFINED:
         document["result"] = result
     if element is not None:
@@ -1012,9 +1101,11 @@ async def run_schedule(
     run = _Run(plugin.definition, None, credentials={}, now=now)
     steps = endpoint.get("steps") or [{"request": endpoint["request"]}]
     connection = without_tokens(
-        (plugin.config or {}).get(
-            _request_connection(steps[0]["request"], "installation") or ""
-        )
+        plugin_config_service.static_maps(
+            plugin,
+            _request_connection(steps[0]["request"], "installation") or "",
+            await plugin_config_service.platform_held(plugin),
+        )[0]
     )
     installed = install_settings(plugin)
     try:
@@ -1193,7 +1284,9 @@ async def _credentials(
                         connection_id=connection_id,
                         guild_id=guild_id,
                     )
-                    values = (install.config or {}).get(connection_id)
+                    values = plugin_config_service.static_maps(
+                        install, connection_id, registration.platform_connections
+                    )[0]
             except flows.ConnectionFlowError as exc:
                 raise refusal from exc
             if held is None:

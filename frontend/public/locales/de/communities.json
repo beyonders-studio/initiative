@@ -429,7 +429,10 @@
       "custom_status": "Deine Statuszeile wurde von einem Moderator geleert.",
       "decorations": "Deine Profildekorationen wurden von einem Moderator entfernt.",
       "other": "Ein Teil deines Profils wurde von einem Moderator entfernt."
-    }
+    },
+    "itemSent": "{{sender}} hat dir {{title}} geschickt.",
+    "itemSentUnnamed": "{{sender}} hat dir etwas geschickt, um dessen Zugriff du bitten kannst.",
+    "withNote": "{{line}} „{{note}}“"
   },
   "version": {
     "versionInformation": "Versionsinformationen",

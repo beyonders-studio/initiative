@@ -6,6 +6,8 @@ icon: lucide/store
 
 Whatever your group needs, some other group has needed exactly the same thing, built it, got tired of rebuilding it every spring, and shared it. The **marketplace** is where those live: ready-made dashboards, projects and plug-ins you add in a couple of clicks, without anybody writing code.
 
+Plug-ins are how Initiative grows. A tool that only some groups need comes as a plug-in, so each community has the tools it picked and none it would spend years scrolling past. [Counters](counters.md) is one: free, made by Initiative, and added from the marketplace by the groups that count things. What a plug-in can do widens with every release, so if you can picture one your group would use, [tell the team](help-and-feedback.md#send-feedback-to-the-team-that-makes-initiative).
+
 Everything on your marketplace either ships with Initiative or was put there on purpose (see [where listings come from](#where-listings-come-from)). Nothing you add can reach past what you allow it, and you can take any of it back out.
 
 There are two marketplaces, and the difference is who gets what you take:
@@ -51,9 +53,20 @@ You can add one wherever you can create projects.
 
 What you get is an ordinary project of your own. Rename the columns, delete the example tasks, take it apart completely; nothing you do reaches the listing or anybody else's copy.
 
+## What a plug-in can be { #kinds-of-plug-in }
+
+A **plug-in** adds something to the whole community. They come in four kinds:
+
+- **A tool**: a new kind of thing to keep in your initiatives, beside projects and files, that works like the built-in tools. Nothing runs anywhere for it; Initiative builds the tool from the plug-in's description. [Counters](counters.md) is one, and [Use a tool a plug-in added](#use-a-tool-a-plug-in-added) has the rest.
+- **A page**: a page of its own in the sidebar, which can be another site shown inside Initiative or a whole application.
+- **An integration**: a service your group already uses, brought in through an account you connect, with Initiative doing all the talking to it. [GitHub](github.md) is one.
+- **A service**: a program its publisher runs beside Initiative that does what its listing says, like widgets for dashboards, [fields and buttons on your items](#what-a-plug-in-puts-on-items) or steps an automation can take.
+
+You don't need to know which kind you're looking at. Each listing carries a tag saying how it shows up for the people using it (**New tool**, **Whole community**, **Own page**, **Connects an account** or **Adds to your tools**), and **What it adds**, under its description, names everything it brings.
+
 ## Add a plug-in to your community { #adding-a-plug-in }
 
-A **plug-in** adds something to the whole community: a page of its own, widgets for dashboards, [fields and buttons on your items](#what-a-plug-in-puts-on-items), or a link to a service your group already uses. Because it affects everyone, only your community's [superadmin](running-a-community.md#why-superadmin-is-separate) can add or remove one. Everybody else can browse, read the listing, and go ask them nicely.
+Because a plug-in affects everyone, only your community's [superadmin](running-a-community.md#why-superadmin-is-separate) can add or remove one. Everybody else can browse, read the listing, and go ask them nicely.
 
 1. In the community's sidebar, select **Add a plug-in** at the bottom of the **Plug-ins** section.
 2. Open a listing.
@@ -62,7 +75,7 @@ A **plug-in** adds something to the whole community: a page of its own, widgets 
 5. Answer the questions it asks (below).
 6. Select **Add to community**.
 
-It appears in the **Plug-ins** section of the sidebar, above your initiatives, and under the initiatives it works in if it has a page there. If it needs a credential or a setting before it can do anything, it's marked **Needs setup**; see [Managing plug-ins](managing-plugins.md).
+It appears in the **Plug-ins** section of the sidebar, above your initiatives, and under the initiatives it works in if it has a page or a tool there. If it needs a credential or a setting before it can do anything, it's marked **Needs setup**; see [Managing plug-ins](managing-plugins.md).
 
 The marketplace only offers plug-ins your server can run. Some need a program running alongside Initiative, so if you expected one and can't find it, ask whoever runs your server. Some listings also have a minimum age, shown as **Ages 16+** (or whatever it is where you are). The community can add it anyway; somebody under that age just can't open or use it.
 
@@ -76,7 +89,7 @@ Adding a plug-in asks up to four things, and every answer can be changed later f
 | Question | What it decides |
 |---|---|
 | **What it can reach** | What it may read, or read and change: projects, files, comments, tags, metadata, and so on. Everything it asks for starts ticked; untick what you'd rather it didn't have. A line marked **This server doesn't allow it** stays off whatever you tick. |
-| **Where it works** | **Every current initiative**, or **Only the initiatives I choose**. It reads and changes things only in the initiatives it works in, so the committee's private budget initiative stays out of reach unless you put it there. |
+| **Where it works** | **Every current initiative**, or **Only the initiatives I choose**. It reads and changes things only in the initiatives it works in, so the committee's private budget initiative stays out of reach unless you put it there. For a tool, this is where the tool appears. |
 | **Who can use it** | What the plug-in lets your community decide, like using it at all or seeing prices, and where each is changed: inside initiatives on each one's Roles screen, across the community on its Roles screen. Each says whether members start with it. Nothing to answer here. |
 | **Plug-ins that can use it** | Only when plug-ins you already have ask to use this one. Each starts ticked. |
 
@@ -126,7 +139,7 @@ You can change your mind any time: **Stop this** ends one you allowed. Nobody el
 
 ### What a plug-in puts on items { #what-a-plug-in-puts-on-items }
 
-Some plug-ins add to things you already work with: an invoice number on a task, a **Paid** tick on an event, a progress bar on a counter very nearly at its fundraising goal. They can appear on tasks, calendar events, counters and posts.
+Some plug-ins add to things you already work with: an invoice number on a task, a **Paid** tick on an event, a progress bar on the post announcing a fundraiser that's very nearly there. They can appear on tasks, calendar events and posts.
 
 | | What you see |
 |---|---|
@@ -137,6 +150,39 @@ Some plug-ins add to things you already work with: an invoice number on a task, 
 The plug-in keeps those values in Initiative, so they show and filter without waiting on it. They follow what the superadmin agreed to: a plug-in only marks items it may read, and only in the initiatives it works in, for the roles that use it there. A plug-in can keep some of its values and actions to a permission of their own, which each initiative gives to the roles it chooses.
 
 Whoever looks after the initiative's layouts can move a plug-in's fields and sections, or take them off, in [Edit layouts](layouts.md). One taken off stays off, updates included.
+
+## Use a tool a plug-in added { #use-a-tool-a-plug-in-added }
+
+A tool from a plug-in sits in each initiative it's placed in, beside the built-in ones: under the initiative in the sidebar, and as a tab on the initiative's page. In an initiative it isn't placed in, it isn't there at all. Placing it is the superadmin's job; see [Change where a plug-in works](managing-plugins.md#change-where-a-plug-in-works).
+
+Inside it, the tool works like a built-in one: the initiative's managers can [switch it off](tools.md#turn-a-tool-on-or-off-for-an-initiative) on the **Tools** card, and each role has **View** and **Create** for it on the [Roles screen](../sharing/initiative-roles.md#what-a-role-can-allow). Everyone starts able to open it, and making new things in it is up to the managers until a role is given **Create**. If there's no **New** button, that's why.
+
+### Make something in a plug-in's tool
+
+1. Open the initiative and select the tool's tab.
+2. Select **New** and the thing's name, like **New Counter group**. (On a phone, it's the **+** at the bottom of the screen.)
+3. Give it a name, and fill in whatever else you know.
+4. Select the button at the bottom of the dialog, which carries the same name.
+
+Each one has a page of its own, laid out the way the plug-in drew it. Each field saves as you change it. If the tool keeps things inside things (counters inside a counter group, say), they're listed on the page with a **New** button of their own.
+
+When the tool has more than one way to show a list, the **Views** switch at the top picks between them, and **Presets** sorts it. Both are yours alone and change nobody else's screen.
+
+### Run a plug-in's action
+
+A plug-in can give its things buttons that do more than one field's worth of work, like **Reset All** in Counters.
+
+1. Open the thing.
+2. Select **Actions** (the **⋯**).
+3. Pick the action. If it asks a question or wants a confirmation first, answer it and select the action's name again.
+
+The menu is only there for people who can change the thing.
+
+### What else a plug-in's tool does
+
+It lives by the same rules as everything else in the initiative. Its things can carry comments and links, turn up in the community's search, can be charted on a [dashboard](dashboards.md), and go into a backup of the initiative or the whole community. A plug-in can also say when one of its things counts as finished, so a task [blocked by one](mentions-and-links.md#see-whats-blocking-a-task) waits until it is: a task blocked by a counter waits until the count reaches its max.
+
+A plug-in's tool can also bring ready-made dashboards over its own things. Once the community has the plug-in, they're in the marketplace for each initiative to [add like any other](#adding-a-dashboard). Counters brings the **Counter board**: one counter as the headline, its progress toward the goal, and the rest of its group charted alongside. Like any dashboard, it shows each person only what they could already see.
 
 ## Report a listing or a plug-in
 

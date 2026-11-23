@@ -61,8 +61,8 @@ export interface PropertyValueCellProps {
    * value opens via a programmatic handler instead of nesting an `<a>` in an
    * `<a>`, and stops the click from also triggering the outer link. */
   nested?: boolean;
-  /** How a scale or a counter is drawn, as the layout showing it says; a
-   *  number without. */
+  /** How a scale or a counter is drawn, as the layout showing it says;
+   *  without, a scale as a number and a counter in its look. */
   display?: FieldDisplay | null;
   /** On one line, its chips past the end cut off: a card whose height is
    *  reserved without measuring it. */
@@ -473,13 +473,15 @@ export const PropertyValueCell = ({
       break;
     }
     case MetadataType.counter: {
+      // As the list's layout says, or else as the field's look.
+      const drawn = display ?? counterSettings(summary.counter).look;
       body = onStep ? (
-        <SteppedCounter summary={summary} display={display ?? "number"} onStep={onStep} />
+        <SteppedCounter summary={summary} display={drawn} onStep={onStep} />
       ) : (
         <CounterValue
           count={counterCount(summary.counter, value)}
           settings={summary.counter}
-          display={display ?? "number"}
+          display={drawn}
         />
       );
       break;
@@ -578,7 +580,15 @@ export const PropertyValueCell = ({
       >
         <Icon className="h-3 w-3 shrink-0" aria-hidden />
         <span className="truncate font-medium">{summary.name}:</span>
-        <span className="max-w-[14rem] truncate text-foreground">{body}</span>
+        {/* A counter's buttons and bar do not cut short: its name gives way. */}
+        <span
+          className={cn(
+            "max-w-[14rem] truncate text-foreground",
+            type === MetadataType.counter && "shrink-0"
+          )}
+        >
+          {body}
+        </span>
       </span>
     );
   }

@@ -6,10 +6,8 @@ way ``task_types_migration_test`` runs its revision."""
 
 from __future__ import annotations
 
-import importlib.util
 import json
 from collections.abc import AsyncIterator
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -30,14 +28,7 @@ from app.testing import (
     create_task,
     create_user,
 )
-
-_REVISION = (
-    Path(__file__).resolve().parents[2]
-    / "alembic"
-    / "versions"
-    / "20261027_0550_metadata_is_one_store.py"
-)
-
+from app.testing.later_revisions import load_revision
 
 #: The tables the revision changes in a community's schema, as they are
 #: named before it.
@@ -64,14 +55,6 @@ async def provisioner() -> AsyncIterator[AsyncEngine]:
         await engine.dispose()
 
 
-def _migration():
-    spec = importlib.util.spec_from_file_location(_REVISION.stem, _REVISION)
-    assert spec and spec.loader
-    migration = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(migration)
-    return migration
-
-
 def _apply(schema: str, forward: bool):
     """The revision one way on ``schema`` alone, on a connection."""
 
@@ -81,7 +64,7 @@ def _apply(schema: str, forward: bool):
             {"sp": f"{schema}, public"},
         )
         with Operations.context(MigrationContext.configure(bind)):
-            _migration()._apply(forward)
+            load_revision("20261027_0550_metadata_is_one_store")._apply(forward)
 
     return apply
 

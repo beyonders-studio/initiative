@@ -86,9 +86,7 @@ async def get_wiki_hydrated(
     if wiki is not None:
         await tags_service.annotate_tags(session, [wiki])
         await metadata_service.annotate_properties(session, [wiki])
-        await comments_service.annotate_comment_counts(
-            session, [wiki], column="wiki_id"
-        )
+        await comments_service.annotate_comment_counts(session, [wiki], kind="wiki")
     return wiki
 
 
@@ -580,7 +578,7 @@ async def linked_files(session: AsyncSession, wiki_id: int) -> list[Any]:
 async def _linked_file_ids(session: AsyncSession, wiki_id: int) -> list[int]:
     """The ids of the files somebody has put in this wiki, by the
     ``file part_of wiki`` edges (:func:`linked_files`)."""
-    from app.core.relationships import RelationshipType, decode_node_id, node_id
+    from app.core.relationships import RelationshipType, node_id
     from app.core.search import SearchEntityType
     from app.models.tenant.relationship import EntityRelationship
 
@@ -596,7 +594,5 @@ async def _linked_file_ids(session: AsyncSession, wiki_id: int) -> list[int]:
     ).all()
 
     return [
-        entity_id
-        for kind, entity_id in (decode_node_id(edge.source_node) for edge in edges)
-        if kind == SearchEntityType.file
+        edge.source_id for edge in edges if edge.source_type == SearchEntityType.file
     ]

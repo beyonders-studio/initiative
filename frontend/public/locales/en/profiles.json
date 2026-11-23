@@ -274,12 +274,40 @@
     "empty": "Say what you're up to",
     "edit": "Your status",
     "set": "Set status",
-    "help": "An emoji, a line, or both. Everyone who opens your profile sees it.",
+    "help": "An emoji, a line, or both. People see it beside your name.",
     "placeholder": "What are you up to?",
     "emojiPlaceholder": "Emoji",
-    "save": "Set status",
-    "clear": "Clear",
-    "failed": "That status could not be saved."
+    "save": "Save",
+    "clear": "Clear status",
+    "failed": "That status could not be saved.",
+    "erase": "Erase",
+    "until": "Until {{time}}",
+    "suggestions": "Suggestions",
+    "suggestion": {
+      "meeting": "In a meeting",
+      "commuting": "Commuting",
+      "sick": "Out sick",
+      "vacation": "On vacation",
+      "remote": "Working remotely"
+    },
+    "clearAfter": {
+      "label": "Clear after",
+      "never": "Don't clear",
+      "30m": "30 minutes",
+      "1h": "1 hour",
+      "4h": "4 hours",
+      "today": "Today",
+      "week": "This week",
+      "custom": "Choose a date and time"
+    },
+    "pause": {
+      "label": "Pause notifications",
+      "help": "Until your status clears. The bell keeps collecting, and you get one summary when it ends.",
+      "running": "Paused until {{time}}.",
+      "needsEnd": "Pick when your status clears to pause until then.",
+      "failed": "Notifications could not be paused.",
+      "tooLong": "A pause runs at most {{count}} days. Pick an earlier end to pause until then."
+    }
   },
   "communities": {
     "title": "Communities"

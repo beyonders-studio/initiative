@@ -147,7 +147,7 @@ async def build_query(
     SQL to store, and the columns to offer its slot pickers. Describing costs a
     plan and no rows, so asking on each click is affordable.
     """
-    sql = query_builder.build(_spec(payload))
+    sql = query_builder.build(_spec(payload), guild_context.tools)
     columns, statement = await query_service.describe(
         await query_plugins.with_rows(
             session, sql, initiative_id=payload.initiative_id, fetch=False

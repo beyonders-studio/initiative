@@ -3,8 +3,8 @@ one file PER CALENDAR.
 
 A calendar is the shareable container for its events, so each selected
 calendar renders its own file: ``ics`` is a single multi-event VCALENDAR
-(RRULE and ATTENDEE/PARTSTAT preserved), and ``json`` is one
-``initiative-calendar`` envelope holding the calendar plus every event.
+(RRULE and ATTENDEE/PARTSTAT preserved), and ``json`` is the envelope every
+tool writes, holding the calendar plus every event.
 
 Selector: an explicit ``calendar_ids`` selection, or ``initiative_id`` (all
 exportable calendars in that initiative), or neither — every calendar visible
@@ -28,22 +28,19 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict
 from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.tools import Tool, tool_envelope_type
+from app.core.tools import Tool
 from app.core.user_input_validators import resolve_zone
 from app.models.platform.user import User
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.calendar_event import CalendarEvent, RSVPStatus
-from app.schemas.tenant.tag import annotated_tags
 from app.services.export.adapters._common import (
     BuildContext,
     ToolExportAdapter,
-    envelope_key,
     export_stem,
     related_reach,
 )
 from app.services.export.contract import RenderItem
 from app.services.export.filters import narrow, parse_filters
-from app.services.export.property_values import exported_properties
 from app.services.tenant import calendar_occurrences as occurrences_service
 from app.services.tenant.ical_service import files_for_events
 
@@ -70,7 +67,6 @@ class _Events:
 
 class CalendarAdapter(ToolExportAdapter):
     tool = Tool.calendar
-    formats = ("ics", "json")
     content_filters: ClassVar[dict[str, type[BaseModel]]] = {"events": EventWindow}
 
     async def count(
@@ -207,14 +203,20 @@ class CalendarAdapter(ToolExportAdapter):
             (related for items in ctx.prepared.files.values() for related in items),
         )
 
+    def fields(self, calendar: Calendar, ctx: BuildContext, /) -> dict[str, Any]:
+        """Its events, as the iCalendar file writes them too, which says more
+        than the import reads back (their ids and timestamps)."""
+        return {"events": _event_dicts(calendar, ctx)}
+
     def item(self, calendar: Calendar, ctx: BuildContext, /) -> RenderItem:
-        return build_calendar_item(
-            calendar,
-            ctx.prepared.by_calendar[calendar.id],
-            ctx.format,
-            ctx.date,
-            ctx.prepared.files,
-            ctx.prepared.answers,
+        """The envelope, or an ``ics`` VCALENDAR of the same events."""
+        if ctx.format == "json":
+            return super().item(calendar, ctx)
+        stem = export_stem(calendar.name, ctx.date)
+        return RenderItem(
+            key=stem,
+            data={"layout": "ical", "events": _event_dicts(calendar, ctx)},
+            filename=f"{stem}.ics",
         )
 
 
@@ -224,48 +226,17 @@ def _is_selection(params: dict) -> bool:
     return bool(params.get("calendar_ids") or params.get("calendar_id"))
 
 
-def build_calendar_item(
-    calendar: Calendar,
-    events: list[CalendarEvent],
-    format: str,
-    date: str,
-    files: dict[int, list],
-    answers: dict[int, dict[int, RSVPStatus]],
-) -> RenderItem:
-    """One render item per calendar: an ``ics`` VCALENDAR or an importable
-    ``initiative-calendar`` JSON envelope, both carrying the events given."""
+def _event_dicts(calendar: Calendar, ctx: BuildContext) -> list[dict[str, Any]]:
+    """The calendar's events in the export, each as a file writes it."""
     from app.services.tenant.ical_service import event_export_dict
 
-    dicts = [
-        event_export_dict(event, files.get(event.id, []), answers.get(event.id))
-        for event in events
-    ]
-    if format == "json":
-        # The envelope is importable machine data — stays canonical, never
-        # localized (translating field keys / enum values breaks import).
-        return RenderItem(
-            key=envelope_key(Tool.calendar, calendar.name, date),
-            data=_envelope(calendar, dicts),
+    prepared: _Events = ctx.prepared
+    return [
+        event_export_dict(
+            event, prepared.files.get(event.id, []), prepared.answers.get(event.id)
         )
-    stem = export_stem(calendar.name, date)
-    return RenderItem(
-        key=stem,
-        data={"layout": "ical", "events": dicts},
-        filename=f"{stem}.ics",
-    )
-
-
-def _envelope(calendar: Calendar, event_dicts: list[dict]) -> dict[str, Any]:
-    return {
-        "type": tool_envelope_type(Tool.calendar),
-        "schema_version": 1,
-        "name": calendar.name,
-        "description": calendar.description,
-        "color": calendar.color,
-        "tags": sorted(tag.name for tag in annotated_tags(calendar)),
-        "properties": exported_properties(calendar),
-        "events": event_dicts,
-    }
+        for event in prepared.by_calendar[calendar.id]
+    ]
 
 
 def _window(filters: BaseModel | None, tz: str | None) -> list:

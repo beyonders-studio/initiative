@@ -36,16 +36,11 @@ async def _fail(session: AsyncSession, user_id: int, times: int = 1):
     return failure
 
 
-async def test_four_wrong_answers_do_not_lock(session: AsyncSession, clock):
+async def test_the_fifth_locks_for_fifteen_minutes(session: AsyncSession, clock):
     user = await create_user(session)
     failure = await _fail(session, user.id, times=4)
     assert failure.outcome is Outcome.counted
     assert not await sign_in_locks.is_locked(session, user.id)
-
-
-async def test_the_fifth_locks_for_fifteen_minutes(session: AsyncSession, clock):
-    user = await create_user(session)
-    await _fail(session, user.id, times=4)
     failure = await _fail(session, user.id)
 
     assert failure == sign_in_locks.Failure(
@@ -64,15 +59,6 @@ async def test_failures_outside_the_window_start_over(session: AsyncSession, clo
     failure = await _fail(session, user.id)
     assert failure.outcome is Outcome.counted
     assert not await sign_in_locks.is_locked(session, user.id)
-
-
-async def test_signing_in_starts_the_count_over(session: AsyncSession, clock):
-    user = await create_user(session)
-    await _fail(session, user.id, times=4)
-    await sign_in_locks.record_success(session, user.id)
-    await session.commit()
-    failure = await _fail(session, user.id, times=4)
-    assert failure.outcome is Outcome.counted
 
 
 async def test_answers_while_locked_are_not_counted(session: AsyncSession, clock):

@@ -79,6 +79,8 @@ export const FilePage = () => {
 
   // Network status for offline detection
   const { isOnline } = useNetworkStatus();
+  const isOnlineRef = useRef(isOnline);
+  isOnlineRef.current = isOnline;
 
   const fileQuery = useFile(fileId);
   const file = fileQuery.data;
@@ -99,9 +101,13 @@ export const FilePage = () => {
     socketPath: fileId !== null ? `${toolRouteSegment(Tool.file)}/${fileId}/collaborate` : null,
     enabled: joinsRoom && fileId !== null,
     onError: (error) => {
-      toast.error(t("detail.collaborationFailed"), {
-        description: error.message || t("detail.collaborationFailedDescription"),
-      });
+      const lostConnection = error instanceof CollaborationError && error.recoverable;
+      // Offline, the offline warning below already says the room is out of reach.
+      if (!(lostConnection && !isOnlineRef.current)) {
+        toast.error(t("detail.collaborationFailed"), {
+          description: error.message || t("detail.collaborationFailedDescription"),
+        });
+      }
       // Only a refusal ends the session. A lost connection leaves the provider
       // trying, and turning collaboration off here would tear down the socket
       // that is going to carry this tab's work back — anything typed during an
@@ -426,14 +432,17 @@ export const FilePage = () => {
       toast.dismiss(TOAST_ID);
       return;
     }
-    const message = collaboration.isCollaborating
+    // Whether the body works through a room, not whether its socket is up:
+    // going offline closes the socket a moment later, and edits made in a room
+    // meanwhile are kept in its document and handed over on reconnect.
+    const message = joinsRoom
       ? t("detail.offline.collaborative")
       : t("detail.offline.nonCollaborative");
     toast.warning(message, { id: TOAST_ID, duration: Infinity });
     return () => {
       toast.dismiss(TOAST_ID);
     };
-  }, [isOnline, collaboration.isCollaborating, t]);
+  }, [isOnline, joinsRoom, t]);
 
   // Every save the user asks for by hand — the Save button, Ctrl+S, a featured
   // image change — goes through here. While the editing room is live it is
@@ -544,7 +553,15 @@ export const FilePage = () => {
         canEdit={canEditFile}
         collaboration={collaboration}
         live={collaborationEnabled && collaboration.isReady}
-        settled={fileQuery.isFetchedAfterMount}
+        // The file as the server has it now: fetched since the page mounted,
+        // or by the route on the way here and still fresh, which is never
+        // fetched again on mount. Data restored from the offline cache is
+        // stale, and data carried over from another file is a placeholder;
+        // both wait for the refetch.
+        settled={
+          fileQuery.isFetchedAfterMount ||
+          (fileQuery.isSuccess && !fileQuery.isStale && !fileQuery.isPlaceholderData)
+        }
         title={title}
         className={cn(isFullscreen && "h-full max-h-none min-h-0 flex-1")}
         onChange={handleBodyChange}

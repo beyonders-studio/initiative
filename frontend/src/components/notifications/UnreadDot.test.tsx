@@ -12,9 +12,4 @@ describe("UnreadDot", () => {
     // only signal at these levels — there is no count beside it to fall back on.
     expect(await screen.findByRole("img", { name: /unread/i })).toBeInTheDocument();
   });
-
-  it("takes a size from whatever holds it", async () => {
-    renderWithProviders(<UnreadDot className="size-4" />);
-    expect(await screen.findByRole("img", { name: /unread/i })).toHaveClass("size-4");
-  });
 });

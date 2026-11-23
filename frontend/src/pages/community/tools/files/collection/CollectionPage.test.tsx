@@ -20,7 +20,7 @@ import path from "node:path";
 
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HttpResponse } from "msw";
+import { HttpResponse, type RequestHandler } from "msw";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -86,6 +86,42 @@ const renderCollection = () =>
     }
   );
 
+/** The collection, its files as one page, and its layouts, as the page reads
+ *  them; `more` is served ahead of them. */
+const serve = (collection: object, files: object[], layouts: object, ...more: RequestHandler[]) =>
+  server.use(
+    ...more,
+    communityHttp.get("/collections/:id", () => HttpResponse.json(collection)),
+    communityHttp.get("/collections/:id/files", () =>
+      HttpResponse.json({
+        items: files,
+        total_count: files.length,
+        page: 1,
+        page_size: 60,
+        has_next: false,
+        has_prev: false,
+      })
+    ),
+    communityHttp.get("/layouts/", () => HttpResponse.json(layouts)),
+    communityHttp.get("/relationships/", () => HttpResponse.json([]))
+  );
+
+/** Only the table, laid out with `columns`. */
+const tableOf = (columns: string[]) =>
+  buildToolLayoutSet({
+    tool: "collection",
+    hidden: ["masonry", "grid", "timeline"],
+    layouts: [
+      {
+        kind: "table",
+        is_default: true,
+        hidden: false,
+        definition: { columns },
+        updated_at: "2026-10-01T12:00:00.000Z",
+      },
+    ],
+  });
+
 const scroller = () => document.querySelector<HTMLElement>("[data-app-scroll]");
 
 /** How tall a table row is laid out. */
@@ -98,36 +134,16 @@ describe("a collection's page", () => {
   });
 
   it("offers the lists it shows, and takes files out of it", async () => {
-    const files = [
-      buildFileSummary({ id: 4, name: "Hero" }),
-      buildFileSummary({ id: 6, name: "Footer" }),
-    ];
     let removed: string[] | null = null;
-    server.use(
-      communityHttp.get("/collections/:id", () =>
-        HttpResponse.json(buildCollection({ id: 5, name: "Round 4", file_count: 2 }))
-      ),
-      communityHttp.get("/collections/:id/files", () =>
-        HttpResponse.json({
-          items: files,
-          total_count: files.length,
-          page: 1,
-          page_size: 60,
-          has_next: false,
-          has_prev: false,
-        })
-      ),
+    serve(
+      buildCollection({ id: 5, name: "Round 4", file_count: 2 }),
+      [buildFileSummary({ id: 4, name: "Hero" }), buildFileSummary({ id: 6, name: "Footer" })],
       // As a new collection is made: its grid and its table, opening on the grid.
-      communityHttp.get("/layouts/", () =>
-        HttpResponse.json(
-          buildToolLayoutSet({ tool: "collection", hidden: ["masonry", "timeline"] })
-        )
-      ),
+      buildToolLayoutSet({ tool: "collection", hidden: ["masonry", "timeline"] }),
       communityHttp.delete("/collections/:id/files", ({ request }) => {
         removed = new URL(request.url).searchParams.getAll("file_ids");
         return new HttpResponse(null, { status: 204 });
-      }),
-      communityHttp.get("/relationships/", () => HttpResponse.json([]))
+      })
     );
     const user = userEvent.setup();
     renderCollection();
@@ -158,55 +174,26 @@ describe("a collection's page", () => {
       currency: "EUR",
       collection_id: 5,
     });
-    const files = [
-      buildCollectionFile({
-        id: 4,
-        name: "Lamp",
-        file_size: 2048,
-        metadata: [
-          buildPropertySummary({
-            property_id: 22,
-            name: "Price",
-            type: MetadataType.currency,
-            currency: "EUR",
-            value: 12.5,
-          }),
-        ],
-      }),
-    ];
-    server.use(
-      communityHttp.get("/collections/:id", () =>
-        HttpResponse.json(buildCollection({ id: 5, metadata: [price] }))
-      ),
-      communityHttp.get("/collections/:id/files", () =>
-        HttpResponse.json({
-          items: files,
-          total_count: 1,
-          page: 1,
-          page_size: 60,
-          has_next: false,
-          has_prev: false,
-        })
-      ),
-      communityHttp.get("/layouts/", () =>
-        HttpResponse.json(
-          buildToolLayoutSet({
-            tool: "collection",
-            hidden: ["masonry", "grid", "timeline"],
-            layouts: [
-              {
-                kind: "table",
-                is_default: true,
-                hidden: false,
-                definition: { columns: ["name", "property:22", "size"] },
-                updated_at: "2026-10-01T12:00:00.000Z",
-              },
-            ],
-          })
-        )
-      ),
-      communityHttp.get("/property-definitions/", () => HttpResponse.json([])),
-      communityHttp.get("/relationships/", () => HttpResponse.json([]))
+    serve(
+      buildCollection({ id: 5, metadata: [price] }),
+      [
+        buildCollectionFile({
+          id: 4,
+          name: "Lamp",
+          file_size: 2048,
+          metadata: [
+            buildPropertySummary({
+              property_id: 22,
+              name: "Price",
+              type: MetadataType.currency,
+              currency: "EUR",
+              value: 12.5,
+            }),
+          ],
+        }),
+      ],
+      tableOf(["name", "property:22", "size"]),
+      communityHttp.get("/property-definitions/", () => HttpResponse.json([]))
     );
     renderCollection();
 
@@ -226,24 +213,10 @@ describe("a collection's page", () => {
     const files = Array.from({ length: 60 }, (_, index) =>
       buildFileSummary({ id: index + 1, name: `Scan ${index + 1}` })
     );
-    server.use(
-      communityHttp.get("/collections/:id", () => HttpResponse.json(buildCollection({ id: 5 }))),
-      communityHttp.get("/collections/:id/files", () =>
-        HttpResponse.json({
-          items: files,
-          total_count: files.length,
-          page: 1,
-          page_size: 60,
-          has_next: false,
-          has_prev: false,
-        })
-      ),
-      communityHttp.get("/layouts/", () =>
-        HttpResponse.json(
-          buildToolLayoutSet({ tool: "collection", hidden: ["masonry", "grid", "timeline"] })
-        )
-      ),
-      communityHttp.get("/relationships/", () => HttpResponse.json([]))
+    serve(
+      buildCollection({ id: 5 }),
+      files,
+      buildToolLayoutSet({ tool: "collection", hidden: ["masonry", "grid", "timeline"] })
     );
     // As in a browser, what the page holds moves up as it scrolls.
     vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
@@ -267,50 +240,20 @@ describe("a collection's page", () => {
   it("opens a file that is not a picture beside its table, with its values there", async () => {
     let propertiesServed = false;
     const caption = buildPropertyDefinition({ id: 21, name: "Caption", collection_id: 5 });
-    server.use(
-      communityHttp.get("/collections/:id", () =>
-        HttpResponse.json(buildCollection({ id: 5, metadata: [caption] }))
-      ),
-      communityHttp.get("/collections/:id/files", () =>
-        HttpResponse.json({
-          items: [
-            buildCollectionFile({
-              id: 4,
-              name: "Price list",
-              metadata: [
-                buildPropertySummary({ property_id: 21, name: "Caption", value: "Spring" }),
-              ],
-            }),
-          ],
-          total_count: 1,
-          page: 1,
-          page_size: 60,
-          has_next: false,
-          has_prev: false,
-        })
-      ),
-      communityHttp.get("/layouts/", () =>
-        HttpResponse.json(
-          buildToolLayoutSet({
-            tool: "collection",
-            hidden: ["masonry", "grid", "timeline"],
-            layouts: [
-              {
-                kind: "table",
-                is_default: true,
-                hidden: false,
-                definition: { columns: ["name", "property:21"] },
-                updated_at: "2026-10-01T12:00:00.000Z",
-              },
-            ],
-          })
-        )
-      ),
+    serve(
+      buildCollection({ id: 5, metadata: [caption] }),
+      [
+        buildCollectionFile({
+          id: 4,
+          name: "Price list",
+          metadata: [buildPropertySummary({ property_id: 21, name: "Caption", value: "Spring" })],
+        }),
+      ],
+      tableOf(["name", "property:21"]),
       communityHttp.get("/property-definitions/", () => {
         propertiesServed = true;
         return HttpResponse.json([]);
-      }),
-      communityHttp.get("/relationships/", () => HttpResponse.json([]))
+      })
     );
     const user = userEvent.setup();
     renderCollection();
@@ -327,24 +270,10 @@ describe("a collection's page", () => {
   });
 
   it("lists its layouts for whoever may lay it out, and leads into the editor", async () => {
-    server.use(
-      communityHttp.get("/collections/:id", () =>
-        HttpResponse.json(buildCollection({ id: 5, initiative_id: 1 }))
-      ),
-      communityHttp.get("/collections/:id/files", () =>
-        HttpResponse.json({
-          items: [buildCollectionFile({ id: 4 })],
-          total_count: 1,
-          page: 1,
-          page_size: 60,
-          has_next: false,
-          has_prev: false,
-        })
-      ),
-      communityHttp.get("/layouts/", () =>
-        HttpResponse.json(buildToolLayoutSet({ tool: "collection" }))
-      ),
-      communityHttp.get("/relationships/", () => HttpResponse.json([]))
+    serve(
+      buildCollection({ id: 5, initiative_id: 1 }),
+      [buildCollectionFile({ id: 4 })],
+      buildToolLayoutSet({ tool: "collection" })
     );
     const user = userEvent.setup();
     const { router } = renderCollection();
@@ -365,31 +294,15 @@ describe("a collection's page", () => {
   });
 
   it("offers to take an archived collection out of the archive when the reader may", async () => {
-    server.use(
-      communityHttp.get("/collections/:id", () =>
-        HttpResponse.json(
-          buildCollection({
-            id: 5,
-            name: "Round 4",
-            archived_at: "2026-02-01T00:00:00.000Z",
-            can: { edit: false, unarchive: true },
-          })
-        )
-      ),
-      communityHttp.get("/collections/:id/files", () =>
-        HttpResponse.json({
-          items: [],
-          total_count: 0,
-          page: 1,
-          page_size: 60,
-          has_next: false,
-          has_prev: false,
-        })
-      ),
-      communityHttp.get("/layouts/", () =>
-        HttpResponse.json(buildToolLayoutSet({ tool: "collection" }))
-      ),
-      communityHttp.get("/relationships/", () => HttpResponse.json([]))
+    serve(
+      buildCollection({
+        id: 5,
+        name: "Round 4",
+        archived_at: "2026-02-01T00:00:00.000Z",
+        can: { edit: false, unarchive: true },
+      }),
+      [],
+      buildToolLayoutSet({ tool: "collection" })
     );
     renderCollection();
 
@@ -399,10 +312,10 @@ describe("a collection's page", () => {
   it("jumps the timeline to a month the rail offers", async () => {
     const files = [{ ...buildFileSummary({ id: 4 }), added_at: "2026-03-20T12:00:00.000Z" }];
     const anchors: (string | null)[] = [];
-    server.use(
-      communityHttp.get("/collections/:id", () =>
-        HttpResponse.json(buildCollection({ id: 5, file_count: 2 }))
-      ),
+    serve(
+      buildCollection({ id: 5, file_count: 2 }),
+      files,
+      buildToolLayoutSet({ tool: "collection", hidden: ["masonry", "grid", "table"] }),
       communityHttp.get("/collections/:id/files/timeline", () =>
         HttpResponse.json({
           buckets: [
@@ -431,13 +344,7 @@ describe("a collection's page", () => {
           has_next: false,
           has_prev: false,
         });
-      }),
-      communityHttp.get("/layouts/", () =>
-        HttpResponse.json(
-          buildToolLayoutSet({ tool: "collection", hidden: ["masonry", "grid", "table"] })
-        )
-      ),
-      communityHttp.get("/relationships/", () => HttpResponse.json([]))
+      })
     );
     const user = userEvent.setup();
     renderCollection();

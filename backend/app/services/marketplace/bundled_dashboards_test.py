@@ -15,6 +15,8 @@ as installable in the next.
 import pytest
 from sqlmodel import select
 
+from app.core.tools import Tool
+from app.models.platform.guild import CommunityRole
 from app.models.platform.marketplace import MarketplaceListing
 from app.services.marketplace import catalog as service
 from app.services.marketplace.catalog import CatalogError
@@ -22,7 +24,14 @@ from app.services.marketplace.installs import (
     ListingInstallError,
     resolve_listing_install,
 )
-from app.testing import create_guild, create_guild_plugin, create_user
+from app.testing import (
+    COUNTERS_UID,
+    counters_tool_manifest,
+    create_guild,
+    create_guild_plugin,
+    create_user,
+    switch_tools,
+)
 from app.testing.schema_harness import route_session_to_guild
 
 PLUGIN_UID = "TYG4VVZKAWRMBZ"
@@ -109,16 +118,13 @@ class TestPublishing:
         # Inherited, because it *is* the plug-in's publish.
         assert dashboard.publisher == "Tests"
         assert dashboard.source == "operator"
+        # No artwork of its own: it previews by rendering its widgets against
+        # their sample data, which cannot go stale the way a picture would.
+        assert dashboard.avatar_url == service.DEFAULT_AVATAR_URL
+        assert dashboard.images == []
 
-    async def test_the_derived_row_is_an_ordinary_listing(self, session):
-        """Nothing downstream should be able to tell it was derived: a guild
-        installs it with the same call it installs any other dashboard with."""
-        await service.upsert_listing(
-            session, _plugin_manifest([_dashboard()]), source="operator"
-        )
-        await session.commit()
-
-        dashboard = await _by_uid(session, DASH_UID)
+        # Nothing downstream should be able to tell it was derived: a guild
+        # installs it with the same call it installs any other dashboard with.
         version = await service.get_listing_version(
             session, dashboard.latest_version_id
         )
@@ -181,18 +187,6 @@ class TestPublishing:
             await service.upsert_listing(
                 session, _plugin_manifest([entry]), source="operator"
             )
-
-    async def test_it_carries_no_artwork_of_its_own(self, session):
-        """A dashboard previews by rendering its widgets against their sample
-        data, which cannot go stale against the plug-in the way a picture would."""
-        await service.upsert_listing(
-            session, _plugin_manifest([_dashboard()]), source="operator"
-        )
-        await session.commit()
-
-        dashboard = await _by_uid(session, DASH_UID)
-        assert dashboard.avatar_url == service.DEFAULT_AVATAR_URL
-        assert dashboard.images == []
 
     async def test_a_plugin_with_no_dashboards_publishes_one_row(self, session):
         await service.upsert_listing(session, _plugin_manifest(), source="operator")
@@ -258,14 +252,6 @@ class TestItCannotTakeOverSomebodyElsesListing:
         )
         await session.commit()
 
-    async def test_it_cannot_adopt_a_standalone_dashboard(self, session):
-        await self._standalone(session)
-
-        with pytest.raises(CatalogError):
-            await service.upsert_listing(
-                session, _plugin_manifest([_dashboard()]), source="operator"
-            )
-
     async def test_the_standalone_listing_is_left_alone(self, session):
         await self._standalone(session)
 
@@ -317,26 +303,10 @@ class TestItCannotTakeOverSomebodyElsesListing:
                 source="operator",
             )
 
-    async def test_republishing_the_same_plugin_is_not_a_takeover(self, session):
-        """The case all of this has to stay out of the way of."""
-        await service.upsert_listing(
-            session,
-            _plugin_manifest([_dashboard()], version="1.0.0"),
-            source="operator",
-        )
-        await session.commit()
-        await service.upsert_listing(
-            session,
-            _plugin_manifest([_dashboard()], version="2.0.0"),
-            source="operator",
-        )
-        await session.commit()
-
-        assert (await _by_uid(session, DASH_UID)).bundled_with_uid == PLUGIN_UID
-
 
 class TestLifecycle:
     async def test_they_version_with_the_plugin(self, session):
+        """Republishing the same plug-in is not a takeover."""
         await service.upsert_listing(
             session,
             _plugin_manifest([_dashboard()], version="1.0.0"),
@@ -351,6 +321,7 @@ class TestLifecycle:
         await session.commit()
 
         dashboard = await _by_uid(session, DASH_UID)
+        assert dashboard.bundled_with_uid == PLUGIN_UID
         version = await service.get_listing_version(
             session, dashboard.latest_version_id
         )
@@ -415,17 +386,6 @@ class TestWhoIsOfferedOne:
         listings, _ = await service.list_listings(session, kind="dashboard")
         assert DASH_UID not in {listing.uid for listing in listings}
 
-    async def test_it_is_offered_where_the_plugin_is_installed(self, session):
-        await service.upsert_listing(
-            session, _plugin_manifest([_dashboard()]), source="operator"
-        )
-        await session.commit()
-
-        listings, _ = await service.list_listings(
-            session, kind="dashboard", bundled_with=[PLUGIN_UID]
-        )
-        assert DASH_UID in {listing.uid for listing in listings}
-
     async def test_a_standalone_dashboard_is_offered_either_way(self, session):
         await service.upsert_listing(
             session,
@@ -474,23 +434,8 @@ class TestWhoMayInstallOne:
         canvas = version.definition["definition"]
         assert canvas["widgets"][0]["binding"]["plugin_uid"] == PLUGIN_UID
 
-    async def test_a_guild_without_the_plugin_may_not(self, session):
-        """The case the browse filter cannot cover on its own. A uid read in a
-        guild that has the plug-in is otherwise just as installable here."""
-        user = await create_user(session)
-        guild = await create_guild(session, creator=user)
-        await service.upsert_listing(
-            session, _plugin_manifest([_dashboard()]), source="operator"
-        )
-        await session.commit()
-        await route_session_to_guild(session, guild.id)
-
-        with pytest.raises(ListingInstallError) as caught:
-            await resolve_listing_install(session, DASH_UID, kind="dashboard")
-        assert caught.value.code == "MARKETPLACE_LISTING_NEEDS_PLUGIN"
-        assert caught.value.status_code == 409
-
-    async def test_a_guild_that_switched_the_plugin_off_may_not(self, session):
+    @pytest.mark.parametrize("why", ["switched off", "older version"])
+    async def test_a_guild_without_the_plugin_it_came_with_may_not(self, session, why):
         user = await create_user(session)
         guild = await create_guild(session, creator=user)
         plugin = await create_guild_plugin(
@@ -503,10 +448,14 @@ class TestWhoMayInstallOne:
             },
             listing_uid=PLUGIN_UID,
         )
-        plugin.enabled = False
+        plugin.enabled = why != "switched off"
         session.add(plugin)
         await service.upsert_listing(
-            session, _plugin_manifest([_dashboard()]), source="operator"
+            session,
+            _plugin_manifest(
+                [_dashboard()], version="1.1.0" if why == "older version" else "1.0.0"
+            ),
+            source="operator",
         )
         await session.commit()
         await route_session_to_guild(session, guild.id)
@@ -514,27 +463,176 @@ class TestWhoMayInstallOne:
         with pytest.raises(ListingInstallError) as caught:
             await resolve_listing_install(session, DASH_UID, kind="dashboard")
         assert caught.value.code == "MARKETPLACE_LISTING_NEEDS_PLUGIN"
+        assert caught.value.status_code == 409
 
-    async def test_a_standalone_dashboard_needs_no_plugin(self, session):
-        """The other route, unchanged: somebody publishes a dashboard to share
-        and any guild installs it."""
-        user = await create_user(session)
-        guild = await create_guild(session, creator=user)
-        await service.upsert_listing(
-            session,
+
+# ---------------------------------------------------------------------------
+# A tool plug-in's dashboards: built-in widgets over its own tables
+# ---------------------------------------------------------------------------
+
+BOARD_UID = "8V57MMR212TEY5"
+GROUP = "counter_group.tsjvtcm0s7gv2x"
+COUNTER = "counter.tsjvtcm0s7gv2x"
+#: Counters' counter table, the one its board reads.
+COUNTERS_TABLE = "p_tsjvtcm0s7gv2x_counter"
+
+
+def _board(
+    sql: str = f"SELECT name, count FROM {COUNTERS_TABLE} ORDER BY name", **binding
+):
+    return {
+        "uid": BOARD_UID,
+        "public_id": "tests.counter-board",
+        "name": "Counter board",
+        "layout": {"columns": 12},
+        "widgets": [
             {
-                **_plugin_manifest(),
-                "uid": OTHER_DASH_UID,
-                "public_id": "tests.shared-board",
-                "kind": "dashboard",
-                "definition": {"widgets": []},
-            },
-            source="operator",
+                "id": "w1",
+                "type": "chart",
+                "title": "The whole group",
+                "grid": {"x": 0, "y": 0, "w": 12, "h": 4},
+                "options": {"mark": "bar"},
+                "binding": binding or {"source": "query", "sql": sql},
+            }
+        ],
+    }
+
+
+def _counters_manifest(board):
+    return {
+        "uid": COUNTERS_UID,
+        "public_id": "tests.counters",
+        "kind": "plugin",
+        "name": "Counters",
+        "publisher": "Tests",
+        "description": "Numbers that move.",
+        "version": "1.1.0",
+        "definition": {
+            **counters_tool_manifest(),
+            "features": ["dashboards", "tool"],
+            "dashboards": [board],
+        },
+    }
+
+
+class TestAToolPluginsDashboards:
+    async def test_its_tiles_are_published_as_the_queries_they_are(self, session):
+        await service.upsert_listing(
+            session, _counters_manifest(_board()), source="operator"
         )
         await session.commit()
-        await route_session_to_guild(session, guild.id)
 
-        listing, _ = await resolve_listing_install(
-            session, OTHER_DASH_UID, kind="dashboard"
+        board = await _by_uid(session, BOARD_UID)
+        assert board is not None and board.bundled_with_uid == COUNTERS_UID
+        version = await service.get_listing_version(session, board.latest_version_id)
+        (widget,) = version.definition["definition"]["widgets"]
+        assert widget["type"] == "chart"
+        assert widget["options"] == {"mark": "bar"}
+        assert widget["binding"] == {
+            "source": "query",
+            "sql": f"SELECT name, count FROM {COUNTERS_TABLE} ORDER BY name",
+        }
+
+        # Published again unchanged, it is the same version.
+        await service.upsert_listing(
+            session, _counters_manifest(_board()), source="operator"
         )
-        assert listing.bundled_with_uid is None
+
+    @pytest.mark.parametrize(
+        "sql",
+        [
+            "SELECT title FROM tasks",
+            f"SELECT c.name FROM {COUNTERS_TABLE} c JOIN projects p ON p.id = c.id",
+            "SELECT 1 AS n FROM members",
+        ],
+    )
+    async def test_a_query_naming_another_table_is_refused(self, session, sql):
+        with pytest.raises(CatalogError, match="reads only its own tables"):
+            await service.upsert_listing(
+                session, _counters_manifest(_board(sql)), source="operator"
+            )
+        assert await _by_uid(session, COUNTERS_UID) is None
+        assert await _by_uid(session, BOARD_UID) is None
+
+    async def test_an_endpoint_binding_is_refused(self, session):
+        board = _board(endpoint_id="plugin.tests.counters.read")
+        with pytest.raises(CatalogError, match="has no endpoints"):
+            await service.upsert_listing(
+                session, _counters_manifest(board), source="operator"
+            )
+        assert await _by_uid(session, COUNTERS_UID) is None
+
+    async def test_a_viewer_sees_only_the_counters_they_may_read(
+        self, client, session, acting_user
+    ):
+        """The board runs as whoever opens it: a counter in a group the
+        viewer may not read is not on it."""
+        member = await acting_user(guild_role=CommunityRole.member, initiative=True)
+        manager = await acting_user(
+            guild=member.guild,
+            guild_role=CommunityRole.admin,
+            initiative=member.initiative,
+        )
+        seat = await acting_user(
+            guild=member.guild, guild_role=CommunityRole.superadmin
+        )
+        await switch_tools(session, member.initiative, {Tool.dashboard: True})
+        await service.upsert_listing(
+            session, _counters_manifest(_board()), source="operator"
+        )
+        await session.commit()
+        installed = await client.post(
+            seat.g("/plugins/"),
+            headers=seat.headers,
+            json={"listing_uid": COUNTERS_UID, "placements": "all"},
+        )
+        assert installed.status_code == 201, installed.text
+
+        async def counter(actor, group_name: str, name: str) -> int:
+            group = await client.post(
+                actor.g(f"/plugin-tools/{GROUP}/"),
+                headers=actor.headers,
+                json={"initiative_id": member.initiative.id, "name": group_name},
+            )
+            assert group.status_code == 201, group.text
+            made = await client.post(
+                actor.g(f"/plugin-tools/{COUNTER}/"),
+                headers=actor.headers,
+                json={"parent_id": group.json()["id"], "name": name},
+            )
+            assert made.status_code == 201, made.text
+            return group.json()["id"]
+
+        await counter(member, "Mine", "Laps")
+        theirs = await counter(manager, "Theirs", "Secret")
+        # Kept to its owner: the initiative's members no longer read it.
+        kept = await client.put(
+            manager.g("/resource-grants/bulk"),
+            headers=manager.headers,
+            json={
+                "items": [{"resource_type": GROUP, "resource_id": theirs, "grants": []}]
+            },
+        )
+        assert kept.status_code == 200, kept.text
+        hidden = await client.get(
+            member.g(f"/plugin-tools/{GROUP}/{theirs}"), headers=member.headers
+        )
+        assert hidden.status_code == 404, hidden.text
+
+        added = await client.post(
+            member.g(f"/marketplace/listings/by-uid/{BOARD_UID}/install"),
+            json={"initiative_id": member.initiative.id, "start_from": "blank"},
+            headers=member.headers,
+        )
+        assert added.status_code == 201, added.text
+        dashboard_id = added.json()["result"]["entity_id"]
+
+        async def board_rows(actor) -> list:
+            data = await client.get(
+                actor.g(f"/dashboards/{dashboard_id}/data"), headers=actor.headers
+            )
+            assert data.status_code == 200, data.text
+            return data.json()["widgets"]["w1"]["result"]["rows"]
+
+        assert [row[0] for row in await board_rows(member)] == ["Laps"]
+        assert [row[0] for row in await board_rows(manager)] == ["Laps", "Secret"]

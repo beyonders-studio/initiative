@@ -419,6 +419,13 @@ async def _prepare_database() -> None:
     # It heals the logins the URLs connect as and stops with the exact GRANTs
     # when that does not take.
     await ensure_shared_table_grants()
+    # The kind codes the relationships node columns are packed from, from the
+    # kinds registry and the codes tool plug-ins' kinds were given, which are
+    # read on the system engine (app.db.kind_codes). Before the back-fill,
+    # whose relationships tables call the function.
+    from app.db.kind_codes import ensure_kind_codes
+
+    await ensure_kind_codes()
     await warn_if_search_operator_missing()
     backfill = await backfill_guild_schemas()
     if backfill.failed:

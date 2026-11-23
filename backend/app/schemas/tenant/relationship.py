@@ -13,23 +13,24 @@ from datetime import datetime
 from pydantic import ConfigDict, Field
 
 from app.core.references import REF_SEPARATOR
-from app.core.relationships import EndpointKind, RelationshipType
-from app.core.tools import Tool
+from app.core.relationships import RelationshipType
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.tenant.created_by import CreatedByRead
 
 
 class EndpointRef(SanitizedBaseModel):
-    """One end of an edge: what kind of thing, and which one."""
+    """One end of an edge: what kind of thing, and which one. The kind is a
+    built-in one, a person (``user``), or a kind of a tool plug-in the
+    community has installed."""
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    type: EndpointKind
+    type: str
     id: int
 
     @property
     def ref(self) -> str:
-        return f"{self.type.value}{REF_SEPARATOR}{self.id}"
+        return f"{self.type}{REF_SEPARATOR}{self.id}"
 
 
 class RelationshipCreate(SanitizedBaseModel):
@@ -51,7 +52,7 @@ class RelatedEnd(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    type: EndpointKind
+    type: str
     id: int
     title: str | None = None
     initiative_id: int | None = None
@@ -62,7 +63,7 @@ class RelatedEnd(SanitizedBaseModel):
     #: addressed in its project and an event in its calendar, so these are what
     #: an address is built from for the kinds that have no page of their own.
     #: The same pair a search hit carries, from the same declaration.
-    tool: Tool | None = None
+    tool: str | None = None
     tool_id: int | None = None
     #: What that tool is called. A list of links is a list of mixed things, and
     #: a name is often not enough to tell two of them apart — six projects run

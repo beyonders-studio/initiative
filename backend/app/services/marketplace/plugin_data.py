@@ -514,8 +514,10 @@ async def _resolve_connections(
     if not required and not own:
         return {}, {}
 
-    config = plugin.config or {}
-    secret_fields = plugin.secret_fields or {}
+    # A community connection the platform holds reads as the platform's.
+    platform = await plugin_config_service.platform_held(plugin)
+    config = plugin_config_service.effective_config(plugin, platform)
+    secret_fields = plugin_config_service.effective_secrets(plugin, platform)
     refs: dict[str, str] = {}
     #: The connections whose handle is a member's own.
     member_refs: set[str] = set()

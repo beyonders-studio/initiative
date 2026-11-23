@@ -1,17 +1,19 @@
 """One code path for tag assignment across every taggable surface.
 
-``TOOL_TAG_LINKS`` is the registry: **every** ``Tool`` is taggable, and the
-content-level extras (``TAGGABLE_EXTRAS``: tasks, calendar events, wiki pages,
-collections) are in ``EXTRA_TAG_LINKS``. Both derive from those names,
-finding each model by its table. Everything an assignment surface needs
-— validation, replace-all, copy, bulk add/remove, serialization — lives here,
-so per-entity endpoints are wiring only.
+:func:`tag_links` is the registry, read from a community's tool set:
+**every** tool is taggable, the content-level extras (``TAGGABLE_EXTRAS``:
+tasks, calendar events, wiki pages, collections) are, and so is every kind
+inside a tool plug-in's tool, as a task is. ``TAG_LINKS`` is the built-in
+tools' (``TOOL_TAG_LINKS`` by tool, ``EXTRA_TAG_LINKS`` the extras).
+Everything an assignment surface needs — validation, replace-all, copy, bulk
+add/remove, serialization — lives here, so per-entity endpoints are wiring
+only.
 
 A tag assignment is stored as one ``tagged_with`` edge in ``relationships``:
 the tagged thing is the source, the tag is the target. So a spec is no longer a
-junction class and a foreign key — it is the entity model and the endpoint kind
-that names it, and every query below is one query against one table whatever is
-being tagged.
+junction class and a foreign key — it is the kind's table and the kind that
+names it in an edge, and every query below is one query against one table
+whatever is being tagged.
 
 Validation runs under the session-wide soft-delete filter
 (``app.db.soft_delete_filter``): a trashed tag id is indistinguishable from a
@@ -23,37 +25,38 @@ and every count and filter here agrees on that.
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import lru_cache
 from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import (
+    Table,
     and_,
     exists,
 )
 from sqlalchemy import (
     delete as sa_delete,
 )
-from sqlalchemy import (
-    update as sa_update,
-)
 from sqlalchemy.sql import Select
 from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel import SQLModel, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-import app.db.base  # noqa: F401 — registers every model, so each is found by table
 from app.core.messages import TagMessages
 from app.core.relationships import (
     Provenance,
     RelationshipType,
     node_id,
+    node_of,
 )
 from app.core.search import SearchEntityType
-from app.core.tools import KINDS, TAGGABLE_EXTRAS, Tool
-from app.models.tenant._mixins import tool_models
+from app.core.tool_set import BUILTIN_TOOLS, KEPT_TOOL_SETS, ToolSet
+from app.core.tools import TAGGABLE_EXTRAS, Tool
+from app.db.base import MODELS_BY_TABLE
 from app.models.tenant.relationship import EntityRelationship
 from app.models.tenant.tag import Tag
 from app.schemas.tenant.tag import tag_summaries
+from app.services.tenant.lifecycle_tree import set_columns
 
 __all__ = [
     "EXTRA_TAG_LINKS",
@@ -70,6 +73,7 @@ __all__ = [
     "spec_for",
     "tag_counts_for",
     "tag_edge",
+    "tag_links",
     "tag_summaries",
     "tagged_entity_ids",
     "untagged_clause",
@@ -82,42 +86,55 @@ _TAGGED = RelationshipType.tagged_with
 
 @dataclass(frozen=True)
 class TagLinkSpec:
-    """How one taggable entity type binds to tags.
+    """How one taggable kind binds to tags.
 
-    Two facts, and everything else derives: the model, and the endpoint kind an
-    edge names it by. There is no junction to declare because there is no
-    junction — a tag assignment is a ``tagged_with`` edge like any other, and
-    what varies between a project's tags and a task's is one string.
+    Three facts, and everything else derives: the kind's table, the kind an
+    edge names it by, and that kind's code, which addresses its rows in an
+    edge. There is no junction to declare because there is no junction — a
+    tag assignment is a ``tagged_with`` edge like any other, and what varies
+    between a project's tags and a task's is one string.
     """
 
-    entity: type[SQLModel]
-    kind: SearchEntityType
+    table: Table
+    kind: str
+    code: int
+
+    @property
+    def entity(self) -> type[SQLModel]:
+        """The model of a built-in kind's table."""
+        return MODELS_BY_TABLE[self.table.name]
 
     def node_of(self, entity_id: int) -> int:
-        return node_id(self.kind, entity_id)
+        return node_of(self.code, entity_id)
 
 
-_MODELS = tool_models()
+@lru_cache(KEPT_TOOL_SETS)
+def tag_links(tools: ToolSet) -> dict[str, TagLinkSpec]:
+    """Every taggable kind of a community with ``tools``, by the name the
+    bulk endpoint's ``target_type`` takes: every tool, the content-level
+    extras (sub-resources of a built-in tool that also carry tags), and every
+    kind inside a tool plug-in's tool."""
+    tables = tools.kind_tables
+    kinds = (
+        *(tool.kind for tool in tools),
+        *TAGGABLE_EXTRAS,
+        *(child.value for tool in tools.installed for child in tool.children),
+    )
+    return {
+        kind: TagLinkSpec(tools.tables[tables[kind]], kind, tools.kind_codes[kind])
+        for kind in kinds
+    }
 
-# Every Tool is taggable: its model is the table named by its plural, and its
-# edges name it by its own kind.
-TOOL_TAG_LINKS: dict[Tool, TagLinkSpec] = {
-    tool: TagLinkSpec(_MODELS[tool.plural], SearchEntityType(tool.value))
-    for tool in Tool
-}
 
-# Content-level extras: sub-resources of a tool that also carry tags. These are
-# the only non-Tool tag surfaces; anything else new should be a Tool.
+#: :func:`tag_links` of the built-in tools.
+TAG_LINKS: dict[str, TagLinkSpec] = tag_links(BUILTIN_TOOLS)
+
+#: Every Tool's, by the tool.
+TOOL_TAG_LINKS: dict[Tool, TagLinkSpec] = {tool: TAG_LINKS[tool.value] for tool in Tool}
+
+#: The content-level extras'.
 EXTRA_TAG_LINKS: dict[str, TagLinkSpec] = {
-    name: TagLinkSpec(_MODELS[KINDS[name].table], SearchEntityType(name))
-    for name in TAGGABLE_EXTRAS
-}
-
-# Keyed by the wire name (`Tool.value` or the extra's key) — the bulk endpoint's
-# ``target_type`` and the drift tests both read this combined view.
-TAG_LINKS: dict[str, TagLinkSpec] = {
-    **{tool.value: spec for tool, spec in TOOL_TAG_LINKS.items()},
-    **EXTRA_TAG_LINKS,
+    name: TAG_LINKS[name] for name in TAGGABLE_EXTRAS
 }
 
 #: The same registry keyed by model, so a caller holding entities need not also
@@ -145,7 +162,7 @@ def _live_tag_edge(spec: TagLinkSpec) -> list[Any]:
     """What makes a row one of this kind's live tag assignments."""
     return [
         EntityRelationship.relationship_type == _TAGGED.value,
-        EntityRelationship.source_type == spec.kind.value,
+        EntityRelationship.source_type == spec.kind,
         EntityRelationship.target_type == SearchEntityType.tag.value,
         EntityRelationship.removed_at.is_(None),  # type: ignore[union-attr]
     ]
@@ -315,7 +332,7 @@ def _new_edge(spec: TagLinkSpec, entity_id: int, tag_id: int) -> EntityRelations
     edge describes the thing carrying it — which is why the tagged entity is
     always the source and no ordering question arises."""
     return EntityRelationship(
-        source_type=spec.kind.value,
+        source_type=spec.kind,
         source_id=entity_id,
         relationship_type=_TAGGED.value,
         target_type=SearchEntityType.tag.value,
@@ -419,7 +436,7 @@ async def bulk_edit_tags(
 
     The caller authorizes every entity and validates ``add_tag_ids`` first.
     Adds are idempotent (existing assignments are skipped); removes are a single
-    DELETE. Also bumps each entity's ``updated_at`` when the model has one.
+    DELETE. Also bumps each entity's ``updated_at`` when its table has one.
     Does not commit.
     """
     if not entity_ids:
@@ -447,9 +464,7 @@ async def bulk_edit_tags(
                 if (entity_id, tag_id) not in have
             ]
         )
-    if "updated_at" in spec.entity.model_fields:
-        await session.exec(
-            sa_update(spec.entity)
-            .where(spec.entity.id.in_(entity_ids))
-            .values(updated_at=datetime.now(UTC))
+    if "updated_at" in spec.table.c:
+        await set_columns(
+            session, spec.table, entity_ids, {"updated_at": datetime.now(UTC)}
         )

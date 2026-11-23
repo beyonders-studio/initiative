@@ -12,10 +12,11 @@
     "disabled": "Désactivé",
     "enable": "Activer",
     "disable": "Désactiver",
-    "rename": "Renommer",
     "remove": "Retirer",
     "removeTitle": "Retirer {{name}} ?",
     "removeBody": "Ce qu'il a créé part à la corbeille, d'où cela peut encore être restauré. Tous les identifiants qu'il détenait — ceux de la communauté et ceux de chaque membre — sont supprimés, et le plug-in est prié de cesser de s'en servir.",
+    "removeToolBody": "Son outil disparaît dès maintenant de toutes les initiatives. Dans 30 jours, tout ce qu'il contient est supprimé définitivement : ses éléments, ainsi que les commentaires, liens, étiquettes et partages qui les concernent. Ajoutez de nouveau le plug-in d'ici là pour tout récupérer.",
+    "removeTool": "Retirer et supprimer dans 30 jours",
     "removed": "{{name}} retiré.",
     "removeAndErase": "Retirer et effacer",
     "erase": "Effacer aussi ses données",
@@ -23,7 +24,6 @@
     "saved": "Enregistré.",
     "needsConfig": "Configuration à faire",
     "configInvalid": "Problème de configuration",
-    "provided": "Fourni avec Initiative",
     "unavailable": "Non configuré sur ce serveur",
     "readOnly": "Lecture seule",
     "configure": "Ouvrir les paramètres",
@@ -43,6 +43,13 @@
   "updates": {
     "wants": "La version {{version}} souhaite :",
     "newSurface": "Afficher « {{name}} » dans les initiatives",
+    "newTable": "Ajouter à son outil un nouveau type d'élément, « {{key}} »",
+    "newField": "Ajouter le champ « {{key}} »",
+    "newOption": "Ajouter le choix « {{key}} »",
+    "newAction": "Ajouter l'action « {{key}} »",
+    "dropsField": "Retirer le champ « {{key}} » et supprimer ce qu'il contient",
+    "dropsOption": "Ne plus proposer le choix « {{key}} » et le vider partout où il était choisi",
+    "acceptDropping": "Accepter, mettre à jour et supprimer ce qui est retiré",
     "accept": "Accepter et mettre à jour",
     "decline": "Refuser",
     "declined": "Vous avez refusé la version {{version}}. Le plug-in reste sur sa version actuelle.",
@@ -52,8 +59,9 @@
   },
   "install": {
     "title": "Ajouter {{name}}",
-    "description": "Cela ajoute quelque chose pour toute la communauté. Vous pourrez le renommer maintenant ou plus tard.",
-    "name": "Nom",
+    "description": "Cela ajoute quelque chose pour toute la communauté.",
+    "connectTitle": "Connecter {{name}}",
+    "connectDescription": "Connectez maintenant ce avec quoi il fonctionne, ou plus tard depuis Intégrations dans les paramètres de la communauté.",
     "action": "Ajouter à la communauté",
     "done": "{{name}} ajouté.",
     "adminOnly": "Demandez au superadmin de votre communauté d'ajouter ce plug-in.",
@@ -62,6 +70,7 @@
     "whereTitle": "Où il travaille",
     "whereDescription": "Il affiche sa page, et lit et modifie le contenu, uniquement dans les initiatives que vous choisissez.",
     "whereDescriptionNoPage": "Il lit et modifie le contenu uniquement dans les initiatives que vous choisissez.",
+    "whereDescriptionTool": "Son outil n'est présent que dans les initiatives que vous choisissez. Dans chacune, l'initiative l'active ou le désactive, et ses rôles décident qui l'utilise.",
     "whoTitle": "Qui peut l'utiliser",
     "callersTitle": "Plug-ins qui peuvent l'utiliser",
     "callersDescription": "Ces plug-ins de votre communauté demandent à utiliser {{name}}. Chacun que vous laissez coché le pourra.",
@@ -90,8 +99,6 @@
     "personalScope": "Votre compte",
     "set": "Renseigné",
     "notSet": "Non renseigné",
-    "accessHint": "Utilise {{api}} — {{scopes}}",
-    "noScopes": "aucune permission indiquée",
     "secretSet": "Déjà renseigné — saisissez pour le remplacer",
     "empty": "Non renseigné",
     "choose": "Choisissez",
@@ -100,6 +107,7 @@
     "cleared": "Identifiant effacé.",
     "memberSet": "Une administratrice ou un administrateur de la communauté l'a configuré.",
     "memberNotSet": "Une administratrice ou un administrateur de la communauté doit encore le configurer.",
+    "platformExplainer": "L'opérateur de ce serveur a connecté ceci pour toutes les communautés, c'est donc prêt à l'emploi ici. Lui seul peut le modifier ou le déconnecter.",
     "communityFlowExplainer": "Celle-ci s'accorde chez le fournisseur plutôt qu'en la saisissant. Se connecter ouvre sa page d'installation, où vous choisissez le compte et ce que ce plug-in peut voir.",
     "personalExplainer": "Celle-ci vous identifie en tant que vous, donc chaque membre connecte son propre compte. Personne d'autre ne voit le vôtre.",
     "connect": "Connecter",
@@ -188,8 +196,7 @@
   "settings": {
     "description": "Configurez la connexion de ce plug-in.",
     "open": "Paramètres de {{name}}",
-    "adminTitle": "Paramètres de la communauté",
-    "adminDescription": "Ce que la communauté gère pour ce plug-in. Visible uniquement par le superadmin."
+    "communitySettings": "Paramètres de la communauté pour ce plug-in"
   },
   "page": {
     "connecting": "Connexion…",
@@ -206,6 +213,7 @@
     "title": "Où ce plug-in travaille",
     "description": "Ce plug-in affiche sa page, et lit et modifie le contenu, uniquement dans les initiatives que vous choisissez.",
     "descriptionNoPage": "Ce plug-in lit et modifie le contenu uniquement dans les initiatives que vous choisissez.",
+    "descriptionTool": "L'outil de ce plug-in n'est présent que dans les initiatives que vous choisissez. Dans chacune, l'initiative l'active ou le désactive, et ses rôles décident qui l'utilise.",
     "all": "Toutes les initiatives actuelles",
     "some": "Uniquement les initiatives que je choisis",
     "none": "Aucune initiative choisie : ce plug-in n'atteint rien à l'intérieur des initiatives.",
@@ -222,7 +230,7 @@
     },
     "refused": {
       "title": "Non connecté",
-      "body": "L'autre service n'a pas terminé la connexion. Rien n'a changé ici — réessayez depuis les réglages du plug-in."
+      "body": "La connexion a été refusée : l'autre service n'a pas terminé la connexion, ou le compte n'est pas le vôtre (pour une organisation, vous devez en être l'un des propriétaires). Rien n'a changé ici — réessayez depuis les réglages du plug-in."
     },
     "expired": {
       "title": "Ce lien a expiré",
@@ -239,10 +247,6 @@
     "sign_in_required": {
       "title": "Connectez-vous pour terminer",
       "body": "Terminez la connexion dans le navigateur où vous êtes connecté à Initiative, en tant que la personne qui l'a commencée."
-    },
-    "taken": {
-      "title": "Déjà connectée ailleurs",
-      "body": "Cette organisation est déjà connectée à une autre communauté de ce serveur, rien n'a donc changé ici. Pour la connecter ici, déconnectez-la d'abord là-bas, ou retirez l'application de l'organisation chez l'autre service, puis reconnectez-la."
     },
     "closeTab": "Vous pouvez fermer cet onglet."
   },
@@ -273,10 +277,6 @@
       "files": {
         "read": "Lire les fichiers",
         "write": "Lire et modifier les fichiers"
-      },
-      "counter_groups": {
-        "read": "Lire les compteurs",
-        "write": "Lire et modifier les compteurs"
       },
       "calendars": {
         "read": "Lire les calendriers",
@@ -344,5 +344,58 @@
   "permissions": {
     "use": "Utiliser",
     "named": "{{plugin}} : {{permission}}"
+  },
+  "tool": {
+    "namePlaceholder": "Donnez-lui un nom",
+    "readOnly": "Vous pouvez lire ceci, mais pas le modifier.",
+    "byline": "Ajouté {{added}} · modifié {{changed}}",
+    "fields": {
+      "createdAt": "Ajouté",
+      "createdBy": "Ajouté par",
+      "updatedAt": "Dernière modification"
+    },
+    "create": "Créer : {{name}}",
+    "loadError": "Impossible de les charger.",
+    "installsLoadError": "Les outils de cette communauté n'ont pas pu être chargés.",
+    "empty": "Rien ici pour l'instant.",
+    "emptyBody": "Ajoutez le premier pour commencer.",
+    "createFirst": "Ajouter le premier",
+    "noMatches": "Rien ici ne correspond à vos filtres.",
+    "notFound": "Ce n'est pas ici",
+    "notFoundBody": "Il a peut-être été supprimé, ou l'outil auquel il appartient n'est pas installé dans cette communauté.",
+    "backToTool": "Retour à {{name}}",
+    "actions": "Actions",
+    "layout": {
+      "name": "Page {{name}}",
+      "help": "Comment chacun s'affiche quand on l'ouvre. Ce que la mise en page laisse de côté est masqué.",
+      "shipped": "C'est la mise en page fournie par son plug-in. La modifier la rend propre à cet endroit.",
+      "titleHelp": "Chacun affiche son nom.",
+      "hiddenHelp": "Chacun peut afficher ceci. Retiré, il est masqué, et Ajouter le remet.",
+      "parts": {
+        "byline": "Dates",
+        "notice": "Avis de lecture seule",
+        "actions": "Menu",
+        "relations": "Relations",
+        "comments": "Commentaires"
+      },
+      "partHelp": {
+        "byline": "Quand il a été ajouté et modifié pour la dernière fois.",
+        "notice": "Le signale à qui ne peut pas le modifier.",
+        "actions": "Ce qu'on peut encore en faire.",
+        "relations": "Ce à quoi il est lié.",
+        "comments": "Sa conversation."
+      },
+      "noItems": "Ajoutez-en un pour voir sa mise en page ici.",
+      "lists": {
+        "grid": "Chacun en carte, en rangées régulières.",
+        "masonry": "Chacun en carte, chacune aussi haute qu'elle l'est.",
+        "table": "Chacun en ligne, ses champs en colonnes."
+      }
+    },
+    "accessSettings": "Paramètres d'accès"
+  },
+  "filters": {
+    "searchLabel": "Nom ou texte",
+    "search": "Rechercher par nom ou texte"
   }
 }

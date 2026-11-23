@@ -20,21 +20,15 @@ describe("exportFilenameStem", () => {
 });
 
 describe("filenameFromDisposition", () => {
-  it("prefers the RFC 5987 form and decodes it", () => {
+  it("prefers the RFC 5987 form and decodes it, else the plain quoted form", () => {
     expect(
       filenameFromDisposition(
-        "attachment; filename=\"fallback.json\"; filename*=utf-8''party%20resources.initiative-counter-group.json"
+        "attachment; filename=\"fallback.json\"; filename*=utf-8''party%20resources.initiative-dashboard.json"
       )
-    ).toBe("party resources.initiative-counter-group.json");
-  });
-
-  it("reads the plain quoted form", () => {
+    ).toBe("party resources.initiative-dashboard.json");
     expect(filenameFromDisposition('attachment; filename="rotation.initiative-wiki.json"')).toBe(
       "rotation.initiative-wiki.json"
     );
-  });
-
-  it("returns null when absent", () => {
     expect(filenameFromDisposition(undefined)).toBeNull();
   });
 });

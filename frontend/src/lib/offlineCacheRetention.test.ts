@@ -39,27 +39,21 @@ beforeEach(() => {
 });
 
 describe("retainOnlyCommunities", () => {
-  it("drops a departed community's queries out of the client", async () => {
+  it("drops a departed community's queries out of the client, and nothing that names none", async () => {
     seed("/api/v1/c/3/tasks");
     seed("/api/v1/c/5/tasks");
+    seed("/api/v1/me");
+    seed("/api/v1/me/tasks");
+    queryClient.setQueryData(["dm", "unread"], { seeded: true });
 
     await retainOnlyCommunities([3], [3]);
 
     expect(held("/api/v1/c/3/tasks")).toBe(true);
+    // Nothing is left that a later save could write the shard back from.
     expect(held("/api/v1/c/5/tasks")).toBe(false);
-  });
-
-  it("leaves the departed community with nothing a later save could write back", async () => {
-    seed("/api/v1/c/5/tasks");
-    await retainOnlyCommunities([3], [3]);
-
-    // Whatever the persister is asked to write next, the queries that would
-    // have recreated the shard are no longer there to be dehydrated.
-    const remaining = queryClient
-      .getQueryCache()
-      .getAll()
-      .filter((query) => shouldPersistQuery(query));
-    expect(remaining.map((query) => query.queryKey[0])).not.toContain("/api/v1/c/5/tasks");
+    expect(held("/api/v1/me")).toBe(true);
+    expect(held("/api/v1/me/tasks")).toBe(true);
+    expect(queryClient.getQueryData(["dm", "unread"])).toBeDefined();
   });
 
   it("keeps a community reached by a live grant usable, while refusing it disk", async () => {
@@ -73,23 +67,5 @@ describe("retainOnlyCommunities", () => {
     // Still barred from disk by the grant exclusion, which the prune leaves be.
     const query = queryClient.getQueryCache().find({ queryKey: ["/api/v1/c/9/tasks"] });
     expect(query && shouldPersistQuery(query)).toBe(false);
-  });
-
-  it("leaves platform-level queries alone", async () => {
-    seed("/api/v1/me");
-    seed("/api/v1/me/tasks");
-
-    await retainOnlyCommunities([3], [3]);
-
-    expect(held("/api/v1/me")).toBe(true);
-    expect(held("/api/v1/me/tasks")).toBe(true);
-  });
-
-  it("leaves hand-written keys alone — they name no community", async () => {
-    queryClient.setQueryData(["dm", "unread"], { seeded: true });
-
-    await retainOnlyCommunities([3], [3]);
-
-    expect(queryClient.getQueryData(["dm", "unread"])).toBeDefined();
   });
 });

@@ -32,9 +32,11 @@ import logging
 from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
+import sqlalchemy as sa
 from fastapi import status
-from sqlalchemy import update
+from sqlalchemy import Table, update
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -45,14 +47,21 @@ from app.core.intake import IntakeStream
 from app.core.messages import HoldMessages
 from app.core.moderation import HoldReason, HoldRelease, HoldVia, LegalBasis
 from app.core.search import SearchEntityType
+from app.core.tool_set import ToolSet
 from app.core.tools import plural_of
 from app.db import cohorts, gucs
 from app.db.base import MODELS_BY_TABLE
 from app.db.guild_standing import GuildContext
 from app.db.query import ids_in
 from app.db.request_context import SystemGuild
-from app.db.session import raise_flag, routed_guild_id, set_rls_context
+from app.db.session import (
+    raise_flag,
+    routed_guild_id,
+    routed_tools,
+    set_rls_context,
+)
 from app.db.soft_delete_filter import select_including_deleted
+from app.db.tool_rows import Located, ToolRow, locate
 from app.models.tenant._mixins import HoldMixin, hold_models
 from app.models.tenant.content_hold import ContentHold
 from app.services import audit as audit_service
@@ -68,8 +77,13 @@ class HoldError(CodedError):
     """A hold that can't be placed or released, and why."""
 
 
-def model_for(target_type: str) -> type[HoldMixin]:
-    """The model a hold names by its ``SearchEntityType`` value."""
+def _source(tools: ToolSet, target_type: str) -> Located | type[HoldMixin]:
+    """Where the thing a hold names by its kind is kept, in a community with
+    ``tools``: a model a ``SearchEntityType`` value names, or the table of a
+    kind a tool plug-in brings."""
+    located = locate(tools, target_type)
+    if located is not None:
+        return located
     model = MODELS_BY_TABLE.get(plural_of(target_type))
     if target_type not in SearchEntityType.__members__ or not (
         model and issubclass(model, HoldMixin)
@@ -78,26 +92,53 @@ def model_for(target_type: str) -> type[HoldMixin]:
     return model
 
 
+async def _target(
+    session: AsyncSession,
+    source: Located | type[HoldMixin],
+    target_id: int,
+    *,
+    lock: bool = False,
+) -> Any:
+    """The row ``source`` keeps under ``target_id``, trashed or not, as
+    ``session`` reads it: a model's instance, or a tool plug-in's row
+    (``app.db.tool_rows.ToolRow``). None where it reads none."""
+    if isinstance(source, Located):
+        table = source.table
+        statement = sa.select(table).where(table.c.id == target_id)
+    else:
+        statement = select_including_deleted(source).where(source.id == target_id)
+    statement = statement.execution_options(populate_existing=True)
+    if lock:
+        statement = statement.with_for_update()
+    found = (await session.exec(statement)).first()
+    if found is None or not isinstance(source, Located):
+        return found
+    return ToolRow(source.table, {c.name: found._mapping[c] for c in source.table.c})
+
+
+async def _held_by(session: AsyncSession, tools: ToolSet, hold: ContentHold) -> Any:
+    """What ``hold`` names, as ``session`` reads it: None once it is gone, or
+    once its kind is none of the community's (a tool plug-in uninstalled)."""
+    try:
+        source = _source(tools, hold.target_type)
+    except HoldError:
+        return None
+    return await _target(session, source, hold.target_id)
+
+
 # -- Who may hold what ----------------------------------------------------------
 
 
 async def _seen_in(
-    session: AsyncSession, target_type: str, target_id: int
+    session: AsyncSession, source: Located | type[HoldMixin], request: HoldRequest
 ) -> tuple[bool, int | None]:
     """Whether the reader's own session sees the target, and its initiative.
     Read under the reader's row security, so what they can't see isn't
     there."""
     from sqlalchemy import func
 
-    model = model_for(target_type)
-    seen = (
-        await session.exec(
-            select_including_deleted(model)
-            .where(model.id == target_id)
-            .with_only_columns(model.id)
-        )
-    ).first()
-    if seen is None:
+    target_type, target_id = request.target_type, request.target_id
+    if await _target(session, source, target_id) is None:
         return False, None
     initiative_id = (
         await session.exec(select(func.entity_initiative(target_type, target_id)))
@@ -119,24 +160,36 @@ def _via(context: GuildContext, initiative_id: int | None) -> HoldVia:
 # -- What a hold covers ---------------------------------------------------------
 
 
-async def _covered(session: AsyncSession, target: HoldMixin) -> dict[type, list[int]]:
-    """The target and everything a hold on it covers, by model. A comment is
+async def _covered(
+    session: AsyncSession, target: HoldMixin, tools: ToolSet
+) -> dict[Table, list[int]]:
+    """The target and everything a hold on it covers, by table, in a
+    community with ``tools``: its tool plug-ins' tables too. A comment is
     held alone; anything else takes everything inside it."""
     from app.models.tenant.comment import Comment
-    from app.services.tenant.lifecycle_tree import subtree_levels
+    from app.services.tenant.lifecycle_tree import cascade_children, subtree_levels
 
     if isinstance(target, Comment):
-        return {Comment: [int(target.id)]}  # type: ignore[arg-type]
-    covered: dict[type, list[int]] = {}
-    for level in await subtree_levels(session, [target]):
-        for model, ids in level.items():
-            if issubclass(model, HoldMixin):
-                covered.setdefault(model, []).extend(ids)
+        return {Comment.__table__: [int(target.id)]}  # type: ignore[arg-type,dict-item]
+    covered: dict[Table, list[int]] = {}
+    tree = cascade_children(tools)
+    for level in await subtree_levels(session, [target], tree=tree):
+        for table, ids in level.items():
+            if "held_at" in table.c:
+                covered.setdefault(table, []).extend(ids)
     return covered
 
 
+def _held_tables(tools: ToolSet) -> tuple[Table, ...]:
+    """Every table a hold may cover in a community with ``tools``."""
+    return (
+        *(model.__table__ for model in hold_models()),  # type: ignore[attr-defined]
+        *(table for table in tools.installed_tables if "held_at" in table.c),
+    )
+
+
 async def _shown_uploads(
-    session: AsyncSession, covered: dict[type, list[int]]
+    session: AsyncSession, covered: dict[Table, list[int]]
 ) -> set[str]:
     """The stored names of the uploads anything ``covered`` shows."""
     from app.models.tenant.file import File, FileVersion
@@ -153,12 +206,12 @@ async def _shown_uploads(
     for model, column in _upload_columns():
         if model in parents:
             parent, key = parents[model]
-            ids = covered.get(parent)
+            ids = covered.get(parent.__table__)  # type: ignore[attr-defined]
             if not ids:
                 continue
             where = ids_in(getattr(model, key), ids)
         else:
-            ids = covered.get(model)
+            ids = covered.get(model.__table__)
             if not ids:
                 continue
             where = ids_in(model.id, ids)
@@ -172,20 +225,19 @@ async def _shown_uploads(
 
 async def _stamp(
     session: AsyncSession,
-    covered: dict[type, list[int]],
+    covered: dict[Table, list[int]],
     names: set[str],
     hold: ContentHold,
 ) -> None:
     from app.models.tenant.upload import Upload
 
     now = hold.placed_at
-    for model, ids in covered.items():
+    for table, ids in covered.items():
         await session.exec(
-            update(model)
-            .where(ids_in(model.id, ids))
-            .where(model.held_at.is_(None))
+            update(table)
+            .where(ids_in(table.c.id, ids))
+            .where(table.c.held_at.is_(None))
             .values(held_at=now, hold_id=hold.id)
-            .execution_options(synchronize_session=False)
         )
     if names:
         await session.exec(
@@ -197,17 +249,16 @@ async def _stamp(
         )
 
 
-async def _unstamp(session: AsyncSession, hold_id: int) -> None:
-    for model in hold_models():
+async def _unstamp(session: AsyncSession, hold_id: int, tools: ToolSet) -> None:
+    for table in _held_tables(tools):
         await session.exec(
-            update(model)
-            .where(model.hold_id == hold_id)
+            update(table)
+            .where(table.c.hold_id == hold_id)
             .values(held_at=None, hold_id=None)
-            .execution_options(synchronize_session=False)
         )
 
 
-async def _cover_again(session: AsyncSession, released_id: int) -> None:
+async def _cover_again(session: AsyncSession, released_id: int, tools: ToolSet) -> None:
     """Hold again, under the hold that covers it, whatever releasing
     ``released_id`` let go that another open hold still covers: a comment
     held on its own and then inside its task, or an upload two held things
@@ -221,17 +272,10 @@ async def _cover_again(session: AsyncSession, released_id: int) -> None:
         )
     ).all()
     for other in others:
-        model = model_for(other.target_type)
-        target = (
-            await session.exec(
-                select_including_deleted(model)
-                .where(model.id == other.target_id)
-                .execution_options(populate_existing=True)
-            )
-        ).first()
+        target = await _held_by(session, tools, other)
         if target is None:
             continue
-        covered = await _covered(session, target)
+        covered = await _covered(session, target, tools)
         await _stamp(session, covered, await _shown_uploads(session, covered), other)
 
 
@@ -366,23 +410,18 @@ async def place(
     report settled as held hands its reporters' words and files to one — and
     the hold is worked there rather than on a case of its own.
     """
-    model = model_for(request.target_type)
+    tools = context.tools
+    source = _source(tools, request.target_type)
     if request.reason is HoldReason.illegal_content and request.legal_basis is None:
         raise HoldError(HoldMessages.LEGAL_BASIS_REQUIRED)
-    seen, initiative_id = await _seen_in(
-        session, request.target_type, request.target_id
-    )
+    seen, initiative_id = await _seen_in(session, source, request)
     if not seen:
         raise HoldError(HoldMessages.TARGET_NOT_FOUND, status.HTTP_404_NOT_FOUND)
     via = _via(context, initiative_id)
 
     async with cohorts.system_session(guild_id) as system:
         await set_rls_context(system, SystemGuild(guild_id))
-        target = (
-            await system.exec(
-                select_including_deleted(model).where(model.id == request.target_id)
-            )
-        ).first()
+        target = await _target(system, source, request.target_id)
         if target is None:
             raise HoldError(HoldMessages.TARGET_NOT_FOUND, status.HTTP_404_NOT_FOUND)
         if target.held_at is not None:
@@ -439,13 +478,7 @@ async def place(
             # Writing the hold columns of archived or trashed rows is a write to
             # frozen content on purpose, as a purge's is (``gucs.PURGING``).
             await raise_flag(system, gucs.PURGING)
-            target = (
-                await system.exec(
-                    select_including_deleted(model)
-                    .where(model.id == request.target_id)
-                    .with_for_update()
-                )
-            ).one()
+            target = await _target(system, source, request.target_id, lock=True)
             if target.held_at is not None:
                 raise HoldError(HoldMessages.ALREADY_HELD, status.HTTP_409_CONFLICT)
             hold = ContentHold(
@@ -462,7 +495,7 @@ async def place(
             )
             system.add(hold)
             await system.flush()
-            covered = await _covered(system, target)
+            covered = await _covered(system, target, tools)
             names = await _shown_uploads(system, covered)
             await _stamp(system, covered, names, hold)
             await raise_flag(system, gucs.PURGING, False)
@@ -514,7 +547,7 @@ async def release(
 ) -> ContentHold:
     """End hold ``hold_id`` with ``outcome``. The platform's alone."""
     from app.services.tenant.attachments import delete_blobs
-    from app.services.tenant.soft_delete import hard_purge_entity
+    from app.services.tenant.soft_delete import hard_purge_entities
 
     if not context.pam_moderate:
         raise HoldError(HoldMessages.NOT_FOUND, status.HTTP_404_NOT_FOUND)
@@ -532,17 +565,11 @@ async def release(
             raise HoldError(HoldMessages.ALREADY_RELEASED, status.HTTP_409_CONFLICT)
         await _community_stays(system, guild_id)
         await raise_flag(system, gucs.PURGING)
-        await _unstamp(system, int(hold.id))
-        await _cover_again(system, int(hold.id))
+        tools = context.tools
+        await _unstamp(system, int(hold.id), tools)
+        await _cover_again(system, int(hold.id), tools)
         await raise_flag(system, gucs.PURGING, False)
-        model = model_for(hold.target_type)
-        target = (
-            await system.exec(
-                select_including_deleted(model)
-                .where(model.id == hold.target_id)
-                .execution_options(populate_existing=True)
-            )
-        ).first()
+        target = await _held_by(system, tools, hold)
         if (
             target is not None
             and outcome is not HoldRelease.restore
@@ -556,7 +583,7 @@ async def release(
                 system, context, hold, target, released_by=released_by
             )
         elif target is not None and outcome is HoldRelease.purge:
-            released = await hard_purge_entity(system, target)
+            released = await hard_purge_entities(system, [target], tools=tools)
         now = datetime.now(UTC)
         hold.released_at = now
         hold.released_by = released_by
@@ -692,22 +719,28 @@ def open_note(note: str | None) -> str | None:
 
 
 async def _label(session: AsyncSession, hold: ContentHold) -> str | None:
+    """What the held thing is called: a model's display field, a tool
+    plug-in's row its name."""
     try:
-        model = model_for(hold.target_type)
+        source = _source(routed_tools(session), hold.target_type)
     except HoldError:
         return None
-    display = getattr(model, "display_field", None)
-    column = display() if callable(display) else "name"
-    if column not in model.model_fields:
+    if isinstance(source, Located):
+        table, column = source.table, "name"
+    else:
+        display = getattr(source, "display_field", None)
+        table = source.__table__  # type: ignore[attr-defined]
+        column = display() if callable(display) else "name"
+    if column not in table.c:
         return None
     value = (
         await session.exec(
-            select_including_deleted(model)
-            .where(model.id == hold.target_id)
-            .with_only_columns(getattr(model, column))
+            sa.select(table.c[column])
+            .where(table.c.id == hold.target_id)
+            .execution_options(include_deleted=True)
         )
     ).first()
-    return str(value)[:200] if value else None
+    return str(value[0])[:200] if value and value[0] else None
 
 
 # -- The sweep ------------------------------------------------------------------

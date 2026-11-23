@@ -9,7 +9,7 @@ cross-database move.
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import (
     AliasChoices,
@@ -20,19 +20,24 @@ from pydantic import (
 )
 
 from app.core import recurrence
-from app.core.relationships import RelationshipType
 from app.core.tools import (
     DETAIL_LAYOUTS,
     LAYOUT_DEFAULT,
     LIST_LAYOUTS,
     TYPED_DETAILS,
     Tool,
+    tool_envelope_type,
 )
 from app.models.tenant.metadata import MetadataType
 from app.models.tenant.task import TaskPriority, TaskStatusCategory
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.recurrence import validate_task_recurrence
-from app.schemas.tenant.import_envelopes import EnvelopePropertyValue, _EnvelopeBase
+from app.schemas.tenant.import_envelopes import (
+    EnvelopeLink,
+    EnvelopePropertyValue,
+    _EnvelopeBase,
+    envelope_literal,
+)
 from app.schemas.tenant.property import CounterSettings
 from app.schemas.tenant.tool_layout import (
     DetailLayoutWrite,
@@ -43,6 +48,9 @@ from app.schemas.tenant.tool_layout import (
 #: Where a row's property values are read from. ``property_values`` is what
 #: project exports called them before every envelope said ``properties``.
 _PROPERTIES = AliasChoices("properties", "property_values")
+
+#: The project envelope's ``type``.
+ProjectEnvelopeType: Any = envelope_literal(Tool.project)
 
 
 class ProjectExportProject(SanitizedBaseModel):
@@ -147,19 +155,6 @@ class ProjectExportComment(SanitizedBaseModel):
     mention_handles: list[str] = []
 
 
-class ProjectExportTaskLink(SanitizedBaseModel):
-    """An edge this task asserts, named by the far end's ``external_ref``.
-
-    Refs rather than ids because the far end may not exist yet — it can be in
-    a later entry of the same backup, or in a different envelope entirely. The
-    job's deferred pass resolves every ref once the last entry has flushed
-    (``import_engine.links``), so the order entries apply in does not matter.
-    """
-
-    type: RelationshipType
-    target_external_ref: str
-
-
 class ProjectExportTask(SanitizedBaseModel):
     title: str
     description: str | None = None
@@ -210,7 +205,7 @@ class ProjectExportTask(SanitizedBaseModel):
     # Both default to empty: an envelope written before they existed is a
     # task with nothing said on it and nothing pointing anywhere, which is
     # exactly what an absent field means here.
-    links: list[ProjectExportTaskLink] = []
+    links: list[EnvelopeLink] = []
     comments: list[ProjectExportComment] = []
     # What the community called each assignee, beside ``assignee_handles``
     # (which an import matches on), for a reader of the file.
@@ -289,7 +284,7 @@ class ProjectExportEnvelope(_EnvelopeBase):
     """
 
     # Defaulted so files exported before the field existed still validate.
-    type: Literal["initiative-project"] = "initiative-project"
+    type: ProjectEnvelopeType = tool_envelope_type(Tool.project)
     app_version: str
     exported_at: datetime
     exported_by_handle: str | None = None

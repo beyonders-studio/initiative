@@ -1,8 +1,8 @@
 /**
  * Managing the community's plug-ins.
  *
- * The sidebar shows what is *on*; this is where an admin turns one off, renames
- * it, or removes it — so disabled plug-ins appear here and nowhere else, otherwise
+ * The sidebar shows what is *on*; this is where an admin turns one off or
+ * removes it — so disabled plug-ins appear here and nowhere else, otherwise
  * turning one off would hide the switch that turns it back on.
  *
  * Removing a plug-in trashes what it created rather than deleting it — and ends
@@ -11,14 +11,15 @@
  * collateral, and nobody should be surprised that access at the vendor stopped.
  *
  * Some plug-ins come with the platform rather than being chosen here. They appear
- * like any other — visible, configurable, renameable — with no switch and no
+ * like any other — visible, configurable — with no switch and no
  * remove button, because whether they exist is the operator's decision rather
  * than the community's. The affordances are absent instead of present-and-refusing.
  *
- * Expanding a row opens what that plug-in actually needs — its connections, grouped
- * — and, for an admin, who has connected to it. Both live behind the expander
- * rather than on the row, because most visits here are to rename or turn
- * something off.
+ * Expanding a row opens the plug-in's settings: where it works, what it can
+ * reach, who has connected to it and how it takes new versions. What it needs
+ * connected is not here but beside the plug-in, behind its gear in the sidebar;
+ * a row that still needs setup opens the same dialog from its badge, which is
+ * also how a plug-in that is turned off gets connected.
  *
  * That is also where a plug-in's update cadence lives. An install takes new
  * versions on its own unless a community admin turns that off here, after which the
@@ -33,22 +34,14 @@
  */
 
 import { Link, useSearch } from "@tanstack/react-router";
-import {
-  ArrowUpCircle,
-  Blocks,
-  ChevronDown,
-  ShieldCheck,
-  Store,
-  TriangleAlert,
-} from "lucide-react";
+import { ArrowUpCircle, Blocks, ChevronDown, Store, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ListingKind } from "@/api/generated/initiativeAPI.schemas";
-import { PluginConnectionsPanel } from "@/components/plugins/PluginConnectionsPanel";
-import { PluginMembersPanel } from "@/components/plugins/PluginMembersPanel";
-import { PluginPlacementPanel } from "@/components/plugins/PluginPlacementPanel";
-import { PluginSettingsPanel } from "@/components/plugins/PluginSettingsPanel";
+import { ListingTermsBadge } from "@/components/plugins/ListingTermsBadge";
+import { PluginPlanEnded } from "@/components/plugins/PluginOffer";
+import { PluginSettingsDialog } from "@/components/plugins/PluginSettingsDialog";
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useBillingPortal } from "@/hooks/useBillingPortal";
 import { useCommunities } from "@/hooks/useCommunities";
@@ -62,19 +55,22 @@ import {
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toast } from "@/lib/mascotToast";
 import { hasInitiativeSurfaces } from "@/lib/pluginSurfaces";
+import { resolveArtworkUrl } from "@/lib/uploadUrl";
 import { Alert, AlertDescription } from "@/ui/alert";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
-import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { formatDate } from "@/ui/lib/formatDate";
 import { cn } from "@/ui/lib/utils";
 import { Skeleton } from "@/ui/skeleton";
 
+import { PluginMembersPanel } from "./PluginMembersPanel";
+import { PluginPlacementPanel } from "./PluginPlacementPanel";
 import { PluginScopesPanel } from "./PluginScopesPanel";
+import { PluginSettingsPanel } from "./PluginSettingsPanel";
 import { PluginPendingUpdate, PluginUpdatesPanel } from "./PluginUpdatesPanel";
 
 export function PluginsPage() {
@@ -144,6 +140,8 @@ export function PluginsPage() {
 export interface PluginListItem {
   id: number;
   name: string;
+  /** The listing's artwork, as the sidebar shows it. */
+  avatar_url?: string | null;
   enabled: boolean;
   created_at: string;
   needs_config?: boolean;
@@ -157,6 +155,8 @@ export interface PluginListItem {
   read_only?: boolean;
   /** A version asking for more access, waiting for the seat's answer. */
   pending_version?: string | null;
+  /** A tool plug-in's (`tool`) removal deletes its tool's content later. */
+  plugin_kind?: string;
 }
 
 function PluginRow({
@@ -175,10 +175,10 @@ function PluginRow({
   initiallyOpen: boolean;
 }) {
   const { t, i18n } = useTranslation(["plugins", "common"]);
-  const [name, setName] = useState(plugin.name);
   const [confirming, setConfirming] = useState(false);
   const [erase, setErase] = useState(false);
   const [open, setOpen] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const row = useRef<HTMLDivElement>(null);
   // On arrival, and when a link names this row while the page is open.
   useEffect(() => {
@@ -189,15 +189,18 @@ function PluginRow({
   const update = useUpdateCommunityPlugin(plugin.id);
   const uninstall = useUninstallCommunityPlugin();
   const canChange = canManage && !closed;
+  // A tool plug-in's tool is the community's content: removing it consents to
+  // that content being deleted once the deletion window ends.
+  const isTool = plugin.plugin_kind === "tool";
 
-  const save = (patch: { name?: string; enabled?: boolean }) =>
+  const save = (patch: { enabled: boolean }) =>
     update.mutate(patch, {
       onSuccess: () => toast.success(t("plugins:manage.saved")),
     });
 
   const remove = () =>
     uninstall.mutate(
-      { pluginId: plugin.id, erase: canErase && erase },
+      { pluginId: plugin.id, erase: canErase && erase && !isTool, deleteContent: isTool },
       {
         onSuccess: () => {
           toast.success(t("plugins:manage.removed", { name: plugin.name }));
@@ -214,19 +217,19 @@ function PluginRow({
   return (
     <Collapsible ref={row} open={open} onOpenChange={setOpen} className="rounded-lg border">
       <div className="flex flex-wrap items-center gap-3 p-3">
-        <Blocks className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
+        {plugin.avatar_url ? (
+          <img
+            src={resolveArtworkUrl(plugin.avatar_url) ?? undefined}
+            alt=""
+            aria-hidden
+            className="h-8 w-8 shrink-0 rounded-md object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <Blocks className="h-8 w-8 shrink-0 p-1.5 text-muted-foreground" aria-hidden />
+        )}
         <div className="min-w-0 flex-1 space-y-1">
-          {canChange ? (
-            <Input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              onBlur={() => name.trim() && name !== plugin.name && save({ name: name.trim() })}
-              aria-label={t("plugins:manage.rename")}
-              className="h-8 max-w-xs"
-            />
-          ) : (
-            <p className="font-medium text-sm">{plugin.name}</p>
-          )}
+          <p className="font-medium text-sm">{plugin.name}</p>
           <p className="text-muted-foreground text-xs">
             {t("plugins:manage.installed", {
               date: formatDate(plugin.created_at),
@@ -243,24 +246,25 @@ function PluginRow({
             {t("plugins:manage.updateWaiting")}
           </Badge>
         )}
-        {plugin.needs_config && (
-          <Badge variant="outline" className="gap-1">
-            <TriangleAlert className="h-3 w-3" aria-hidden />
-            {t("plugins:manage.needsConfig")}
-          </Badge>
-        )}
+        {plugin.needs_config &&
+          (canChange ? (
+            <Button size="sm" variant="outline" onClick={() => setConnecting(true)}>
+              <TriangleAlert className="h-3.5 w-3.5" aria-hidden />
+              {t("plugins:manage.needsConfig")}
+            </Button>
+          ) : (
+            <Badge variant="outline" className="gap-1">
+              <TriangleAlert className="h-3 w-3" aria-hidden />
+              {t("plugins:manage.needsConfig")}
+            </Badge>
+          ))}
         {plugin.config_state === "invalid" && (
           <Badge variant="destructive">
             {plugin.config_state_detail ?? t("plugins:manage.configInvalid")}
           </Badge>
         )}
         {/* Visible, so nobody wonders what it is — just not removable. */}
-        {plugin.mandatory && (
-          <Badge variant="secondary" className="gap-1">
-            <ShieldCheck className="h-3 w-3" aria-hidden />
-            {t("plugins:manage.provided")}
-          </Badge>
-        )}
+        {plugin.mandatory && <ListingTermsBadge listing={{ included: true, paid: false }} />}
         {plugin.available === false && (
           <Badge variant="outline">{t("plugins:manage.unavailable")}</Badge>
         )}
@@ -302,19 +306,29 @@ function PluginRow({
         {open && <PluginDetailPanels pluginId={plugin.id} canManage={canManage} closed={closed} />}
       </CollapsibleContent>
 
+      {connecting && (
+        <PluginSettingsDialog pluginId={plugin.id} open onOpenChange={setConnecting} />
+      )}
+
       <ConfirmDialog
         open={confirming}
         onOpenChange={confirm}
         title={t("plugins:manage.removeTitle", { name: plugin.name })}
         description={
           <>
-            {t("plugins:manage.removeBody")}
+            {isTool ? t("plugins:manage.removeToolBody") : t("plugins:manage.removeBody")}
             {confirming && (
               <RemovalNotice pluginId={plugin.id} locale={i18n.resolvedLanguage ?? i18n.language} />
             )}
           </>
         }
-        confirmLabel={erase ? t("plugins:manage.removeAndErase") : t("plugins:manage.remove")}
+        confirmLabel={
+          isTool
+            ? t("plugins:manage.removeTool")
+            : erase
+              ? t("plugins:manage.removeAndErase")
+              : t("plugins:manage.remove")
+        }
         onConfirm={remove}
         isLoading={uninstall.isPending}
         destructive
@@ -322,7 +336,7 @@ function PluginRow({
         {/* Removing keeps what the plug-in calls the community and its members,
             so installing it again picks up where it left off. Erasing is the
             community admins' separate choice. */}
-        {canErase && (
+        {canErase && !isTool && (
           <div className="flex items-start gap-2">
             <Checkbox
               id={`erase-${plugin.id}`}
@@ -397,6 +411,8 @@ function PluginDetailPanels({
 
   return (
     <div className="space-y-6 border-t p-4">
+      <PluginPlanEnded plugin={detail.data} />
+
       {canManage && !closed && asks && (
         <PluginPendingUpdate
           pluginId={pluginId}
@@ -404,13 +420,6 @@ function PluginDetailPanels({
           pluginNames={detail.data.plugin_names}
         />
       )}
-
-      <PluginConnectionsPanel
-        pluginId={pluginId}
-        connections={detail.data.connections}
-        canManage={canManage}
-        closed={closed}
-      />
 
       {canManage && !closed && (
         <>

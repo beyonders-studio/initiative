@@ -5,7 +5,6 @@ import type {
   InitiativeMemberRead,
   InitiativeRead,
   InitiativeRoleRead,
-  PermissionKey,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
   DEFAULT_ENABLED_TOOLS,
@@ -17,11 +16,6 @@ import {
 import { buildUserSummary } from "./user.factory";
 
 let counter = 0;
-
-type InitiativeToolSwitches = Pick<
-  InitiativeRead,
-  Extract<keyof InitiativeRead, `${string}_enabled`>
->;
 
 export function resetCounter(): void {
   counter = 0;
@@ -58,8 +52,13 @@ export const initiativeCan = (overrides: Partial<InitiativeCan> = {}): Initiativ
   ...overrides,
 });
 
+/**
+ * An initiative as the API reads it. `tools` in `overrides` names only the
+ * switches a test cares about; the rest keep their defaults.
+ */
 export function buildInitiative(overrides: Partial<InitiativeRead> = {}): InitiativeRead {
   counter++;
+  const { tools, ...rest } = overrides;
   return {
     id: counter,
     community_id: 1,
@@ -77,13 +76,14 @@ export function buildInitiative(overrides: Partial<InitiativeRead> = {}): Initia
     member_count: 0,
     role_display_name: null,
     can: initiativeCan(),
-    // One `{plural}_enabled` master switch per tool, at the column defaults:
-    // projects and files on, the rest opt-in. Derived from the registry so
-    // a new tool arrives here without an edit.
-    ...(Object.fromEntries(
-      TOOLS.map((tool) => [toolViewPermission(tool), DEFAULT_ENABLED_TOOLS.has(tool)])
-    ) as InitiativeToolSwitches),
-    ...overrides,
+    // Every tool's switch at its default: projects and files on, the rest
+    // opt-in. Derived from the registry so a new tool arrives here without an
+    // edit.
+    tools: {
+      ...Object.fromEntries(TOOLS.map((tool) => [tool, DEFAULT_ENABLED_TOOLS.has(tool)])),
+      ...tools,
+    },
+    ...rest,
   };
 }
 
@@ -103,7 +103,7 @@ export function buildInitiativeRole(
       [toolViewPermission(tool), DEFAULT_ENABLED_TOOLS.has(tool)],
       [toolCreatePermission(tool), false],
     ])
-  ) as Record<PermissionKey, boolean>;
+  );
   const { permissions, ...rest } = overrides;
   return {
     id: counter,

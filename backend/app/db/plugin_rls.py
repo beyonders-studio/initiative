@@ -25,12 +25,11 @@ from enum import Enum
 from app.core.plugin_scopes import (
     READ_ONLY_RESOURCES,
     PluginScopeResource,
-    tool_resource,
 )
-from app.core.search import SearchEntityType
+from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.core.tools import Tool
 from app.db import gucs
-from app.db.initiative_rls import INITIATIVE_PATHS, governing_path
+from app.db.initiative_rls import governing_walk, paths_for
 from app.db.search_index import SEARCH_SOURCES
 from app.models.platform.guild import AdminSurface
 
@@ -49,7 +48,9 @@ class PluginTableKind(str, Enum):
 @dataclass(frozen=True)
 class PluginTableAccess:
     kind: PluginTableKind
-    resource: PluginScopeResource | None = None
+    #: The scope's resource: a ``PluginScopeResource``, or a tool plug-in's
+    #: kind, which names its tool's scopes.
+    resource: PluginScopeResource | str | None = None
 
     @property
     def writable(self) -> bool:
@@ -125,34 +126,41 @@ _NAMED: dict[str, PluginTableAccess] = {
 }
 
 
-def _derive() -> dict[str, PluginTableAccess]:
+def plugin_table_access(tools: ToolSet) -> dict[str, PluginTableAccess]:
+    """What an installed plug-in reaches of each table, in a community with
+    ``tools``: a table a tool governs takes that tool's scope, a tool
+    plug-in's its kind's (``<kind>:read``, ``<kind>:write``)."""
+    paths = paths_for(tools)
     access: dict[str, PluginTableAccess] = {}
-    for table in INITIATIVE_PATHS:
+    for table in paths:
         if table in _NOT_PLUGIN_SURFACE or table in _NAMED:
             continue
-        governed = governing_path(table)
+        governed = governing_walk(table, paths)
         if governed is not None:
+            tool = governed[0]
             access[table] = PluginTableAccess(
-                PluginTableKind.scoped, tool_resource(governed[0])
+                PluginTableKind.scoped,
+                tool.scope if tool.installed else PluginScopeResource(tool.scope),
             )
     access.update(_NAMED)
     return access
 
 
-PLUGIN_TABLE_ACCESS: dict[str, PluginTableAccess] = _derive()
+#: :func:`plugin_table_access` of the built-in tools.
+PLUGIN_TABLE_ACCESS: dict[str, PluginTableAccess] = plugin_table_access(BUILTIN_TOOLS)
 
 
-def _search_entry_read_scopes() -> dict[SearchEntityType, PluginScopeResource]:
+def _search_entry_read_scopes() -> dict[str, PluginScopeResource]:
     """Each kind the search index holds, and the read scope of the table it is
     indexed from. A kind whose table no plug-in reaches has no entry, and its
     entries are out of every plug-in's reach."""
-    scopes: dict[SearchEntityType, PluginScopeResource] = {}
+    scopes: dict[str, PluginScopeResource] = {}
     for table, source in SEARCH_SOURCES.items():
         access = PLUGIN_TABLE_ACCESS.get(table)
         if (
             access is not None
             and access.kind is PluginTableKind.scoped
-            and access.resource is not None
+            and isinstance(access.resource, PluginScopeResource)
         ):
             scopes[source.entity_type] = access.resource
     return scopes
@@ -163,9 +171,7 @@ def _search_entry_read_scopes() -> dict[SearchEntityType, PluginScopeResource]:
 #: ``projects`` and ``tag`` to ``tags``. An entry that names a governing tool
 #: also needs that tool's read scope (a comment on a task needs ``projects``
 #: beside ``comments``), which the index's policy reads off the row.
-SEARCH_ENTRY_READ_SCOPE: dict[SearchEntityType, PluginScopeResource] = (
-    _search_entry_read_scopes()
-)
+SEARCH_ENTRY_READ_SCOPE: dict[str, PluginScopeResource] = _search_entry_read_scopes()
 
 #: Tables no plug-in reaches, whose policies refuse an installed plug-in outright
 #: beside the grant it does not hold: a reaction is one person's gesture, a

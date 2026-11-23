@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 
 import {
-  EndpointKind,
+  ContentKind,
   type EndpointRef,
   type RelatedEnd,
   type RelationshipCreate,
@@ -37,6 +37,11 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import type { Direction } from "@/api/relationships";
 import type { SearchTarget } from "@/lib/searchResults";
+
+/** What a built-in link's end may be: a tool or a kind inside one, a tag, or
+ * a person. The API takes any kind its community has, as a string. */
+export const EndpointKind = { ...ContentKind, tag: "tag", user: "user" } as const;
+export type EndpointKind = (typeof EndpointKind)[keyof typeof EndpointKind];
 
 /** The groups a relations surface can show, each its own heading. */
 export type RelationGroupKey =
@@ -299,9 +304,8 @@ export type ItemEndKind = Exclude<EndpointKind, typeof EndpointKind.user>;
  * What reads a kind's tool, page, icon or state reads items only. A person has
  * none of those: they are drawn by their face and reached by their profile.
  */
-export const isItem = <T extends { type: EndpointKind }>(
-  end: T
-): end is T & { type: ItemEndKind } => end.type !== EndpointKind.user;
+export const isItem = <T extends { type: string }>(end: T): end is T & { type: ItemEndKind } =>
+  end.type !== EndpointKind.user;
 
 /**
  * A far end as the search helpers take it.

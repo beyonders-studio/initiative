@@ -16,7 +16,6 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import {
   type GetLayoutsParams,
-  type LayoutTarget,
   Tool,
   type ToolLayoutSetRead,
 } from "@/api/generated/initiativeAPI.schemas";
@@ -35,20 +34,17 @@ import { useCommunityMutation } from "@/hooks/useApiMutation";
 import type { MutationOpts } from "@/types/mutation";
 import type { LayoutChange } from "@/ui/layouts/layoutSet";
 
-/** The tools whose every instance lays out its own items: the backend's
- *  per-instance layout tools that draw a detail. */
-export const INSTANCE_LAYOUT_TOOLS: ReadonlySet<Tool> = new Set([Tool.project, Tool.counter_group]);
-
 /** The layouts one instance of a tool keeps as its own: a project's, or a
- *  collection's, which lays out its files as an instance does. */
-export const instanceTarget = (tool: LayoutTarget, id: number): GetLayoutsParams => ({
+ *  collection's, which lays out its files as an instance does, or a tool
+ *  plug-in's item table's under one row. */
+export const instanceTarget = (tool: string, id: number): GetLayoutsParams => ({
   tool,
   tool_id: id,
 });
 
-/** A tool the whole initiative shares (its calendar, its posts), whose
- *  layouts are the initiative's. */
-export const sharedTarget = (tool: Tool, initiativeId: number): GetLayoutsParams => ({
+/** A tool the whole initiative shares (its calendar, its posts), or a tool
+ *  plug-in's own rows, whose layouts are the initiative's. */
+export const sharedTarget = (tool: string, initiativeId: number): GetLayoutsParams => ({
   tool,
   initiative_id: initiativeId,
 });
@@ -69,7 +65,7 @@ export const useToolLayouts = (target: GetLayoutsParams | null) => {
 };
 
 /** One instance's own layouts, or nothing while `id` is not one. */
-export const useInstanceLayouts = (tool: LayoutTarget, id: number | null) =>
+export const useInstanceLayouts = (tool: string, id: number | null) =>
   useToolLayouts(id !== null && Number.isFinite(id) ? instanceTarget(tool, id) : null);
 
 /** Reads a target's layouts when asked, from the cache where they are held:

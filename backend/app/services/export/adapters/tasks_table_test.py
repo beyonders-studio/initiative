@@ -1,4 +1,5 @@
-"""Unit tests for tasks-table adapter helpers."""
+"""Tasks-table adapter helpers. Replies nesting under their parent is tested
+through the detailed PDF export."""
 
 from types import SimpleNamespace
 
@@ -7,14 +8,6 @@ from app.services.export.adapters.tasks_table import _thread_comments
 
 def _c(id: int, parent: int | None = None):
     return SimpleNamespace(id=id, parent_comment_id=parent)
-
-
-def test_thread_comments_nests_replies_under_parents():
-    # Chronological input: root A, root B, reply to A, reply to that reply.
-    a, b, a_reply, a_reply_reply = _c(1), _c(2), _c(3, 1), _c(4, 3)
-    ordered = _thread_comments([a, b, a_reply, a_reply_reply])
-    # A, then its reply subtree (depth 1, 2), then root B — not flat order.
-    assert [(c.id, d) for c, d in ordered] == [(1, 0), (3, 1), (4, 2), (2, 0)]
 
 
 def test_thread_comments_preserves_order_within_a_level():

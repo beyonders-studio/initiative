@@ -202,7 +202,7 @@ async def annotate_post_rows(
     """
     await tags_service.annotate_tags(session, rows)
     await metadata_service.annotate_properties(session, rows)
-    await comments_service.annotate_comment_counts(session, rows, column="post_id")
+    await comments_service.annotate_comment_counts(session, rows, kind="post")
     if user_id is None:
         return
     await posts_service.attach_reactions(session, *rows)

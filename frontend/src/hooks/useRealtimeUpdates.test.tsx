@@ -18,8 +18,7 @@ import { latestSocket, MockWebSocket } from "@/__tests__/helpers/mockWebSocket";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import { setAuthToken } from "@/api/client";
-import { getListCommentsQueryKey } from "@/api/generated/comments/comments";
-import type { CommentRead } from "@/api/generated/initiativeAPI.schemas";
+import type { CommentRead, ContentKind } from "@/api/generated/initiativeAPI.schemas";
 import { setInvalidationCommunity } from "@/api/query-keys";
 import { commentThreadQueryOptions } from "@/hooks/useComments";
 import { applyChanges, useRealtimeUpdates } from "@/hooks/useRealtimeUpdates";
@@ -49,18 +48,19 @@ const seed = (key: readonly unknown[]) => {
 /** A comment thread on one parent, as `useComments` keys and holds it; open
  *  (something on screen watching it) unless `open` is false. */
 const seedThread = (
-  param: string,
+  kind: ContentKind,
   id: number,
   { comments = [], open = true }: { comments?: CommentRead[]; open?: boolean } = {}
 ) => {
-  const key = getListCommentsQueryKey(COMMUNITY, { [param]: id });
+  const subject = { subject_type: kind, subject_id: id };
+  const key = commentThreadQueryOptions(COMMUNITY, subject).queryKey;
   queryClient.setQueryData(key, {
-    pages: [{ comments, next_cursor: null }],
+    pages: [{ comments, next_cursor: null, locked: false, can_moderate: false }],
     pageParams: [undefined],
   });
   if (open) {
     new InfiniteQueryObserver(queryClient, {
-      ...commentThreadQueryOptions(COMMUNITY, { [param]: id }),
+      ...commentThreadQueryOptions(COMMUNITY, subject),
       enabled: false,
     }).subscribe(() => {});
   }
@@ -99,21 +99,21 @@ const comment = (id: number, parents: { type: string; id: number }[]) => ({
   action: "created",
 });
 
+beforeEach(() => {
+  queryClient.clear();
+  setInvalidationCommunity(COMMUNITY);
+});
+
+afterEach(() => {
+  queryClient.clear();
+  setInvalidationCommunity(null);
+});
+
 describe("realtime comment frames", () => {
-  beforeEach(() => {
-    queryClient.clear();
-    setInvalidationCommunity(COMMUNITY);
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-    setInvalidationCommunity(null);
-  });
-
   it.each(TOOLS)("puts a new comment into a %s's thread and refreshes the entity", async (tool) => {
-    const thread = seedThread(`${tool}_id`, ENTITY_ID);
+    const thread = seedThread(tool, ENTITY_ID);
     const entity = seed([`/api/v1/c/${COMMUNITY}/${toolRouteSegment(tool)}/${ENTITY_ID}`]);
-    serveComments({ 1: buildComment({ id: 1, [`${tool}_id`]: ENTITY_ID }) });
+    serveComments({ 1: buildComment({ id: 1, subject_type: tool, subject_id: ENTITY_ID }) });
 
     applyChanges([comment(1, [{ type: toolPlural(tool), id: ENTITY_ID }])], COMMUNITY);
 
@@ -123,7 +123,7 @@ describe("realtime comment frames", () => {
   });
 
   it("updates the thread, refreshes the task and its project, and nothing further out", async () => {
-    const thread = seedThread("task_id", ENTITY_ID);
+    const thread = seedThread("task", ENTITY_ID);
     const task = seed([`/api/v1/c/${COMMUNITY}/tasks/${ENTITY_ID}`]);
     // A task list row carries its comment count.
     const taskList = seed([`/api/v1/c/${COMMUNITY}/tasks/`, { project_id: 7 }]);
@@ -134,7 +134,7 @@ describe("realtime comment frames", () => {
     const counts = seed([`/api/v1/c/${COMMUNITY}/tools/counts/by-initiative`]);
     const initiative = seed([`/api/v1/c/${COMMUNITY}/initiatives/3`]);
     const members = seed([`/api/v1/c/${COMMUNITY}/initiatives/3/members`]);
-    serveComments({ 1: buildComment({ id: 1, task_id: ENTITY_ID }) });
+    serveComments({ 1: buildComment({ id: 1, subject_type: "task", subject_id: ENTITY_ID }) });
 
     applyChanges(
       [
@@ -168,9 +168,11 @@ describe("realtime comment frames", () => {
   });
 
   it("leaves another entity's thread alone, and reads nothing for a thread not open", async () => {
-    const other = seedThread("post_id", 99);
-    const closed = seedThread("post_id", ENTITY_ID, { open: false });
-    const asked = serveComments({ 1: buildComment({ id: 1, post_id: ENTITY_ID }) });
+    const other = seedThread("post", 99);
+    const closed = seedThread("post", ENTITY_ID, { open: false });
+    const asked = serveComments({
+      1: buildComment({ id: 1, subject_type: "post", subject_id: ENTITY_ID }),
+    });
 
     applyChanges([comment(1, [{ type: "posts", id: ENTITY_ID }])], COMMUNITY);
 
@@ -183,9 +185,11 @@ describe("realtime comment frames", () => {
   });
 
   it("puts a wiki page's comment into that page's thread, which it names before its wiki", async () => {
-    const page = seedThread("wiki_page_id", 7);
-    const siblingPage = seedThread("wiki_page_id", 8);
-    const asked = serveComments({ 1: buildComment({ id: 1, wiki_page_id: 7 }) });
+    const page = seedThread("wiki_page", 7);
+    const siblingPage = seedThread("wiki_page", 8);
+    const asked = serveComments({
+      1: buildComment({ id: 1, subject_type: "wiki_page", subject_id: 7 }),
+    });
 
     applyChanges(
       [
@@ -204,11 +208,11 @@ describe("realtime comment frames", () => {
   });
 
   it("reads back each comment a batch names and brings the open pages up to date", async () => {
-    const onTask = { task_id: ENTITY_ID };
+    const onTask = { subject_type: "task", subject_id: ENTITY_ID } as const;
     const root = buildComment({ id: 1, ...onTask });
     const reply = buildComment({ id: 2, parent_comment_id: 1, ...onTask });
     const edited = buildComment({ id: 4, content: "Before", ...onTask });
-    const thread = seedThread("task_id", ENTITY_ID, { comments: [root, reply, edited] });
+    const thread = seedThread("task", ENTITY_ID, { comments: [root, reply, edited] });
     const parents = [{ type: "tasks", id: ENTITY_ID }];
     const asked = serveComments({
       // 1 was deleted; its reply stays, as somebody else's words.
@@ -232,19 +236,9 @@ describe("realtime comment frames", () => {
 });
 
 describe("realtime frames for a case's conversation", () => {
-  beforeEach(() => {
-    queryClient.clear();
-    setInvalidationCommunity(COMMUNITY);
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-    setInvalidationCommunity(null);
-  });
-
   it("keeps what is said with the requester out of the task's thread and reads the case again", async () => {
-    const onTask = { task_id: ENTITY_ID };
-    const thread = seedThread("task_id", ENTITY_ID);
+    const onTask = { subject_type: "task", subject_id: ENTITY_ID } as const;
+    const thread = seedThread("task", ENTITY_ID);
     const caseRead = seed([`/api/v1/c/${COMMUNITY}/tasks/${ENTITY_ID}/case`]);
     serveComments({
       1: buildComment({ id: 1, audience: "filer", ...onTask }),
@@ -265,16 +259,6 @@ describe("realtime frames for a case's conversation", () => {
 });
 
 describe("realtime resource frames", () => {
-  beforeEach(() => {
-    queryClient.clear();
-    setInvalidationCommunity(COMMUNITY);
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-    setInvalidationCommunity(null);
-  });
-
   it.each(TOOLS)("refreshes a %s that changed", (tool) => {
     const entity = seed([`/api/v1/c/${COMMUNITY}/${toolRouteSegment(tool)}/${ENTITY_ID}`]);
 
@@ -287,10 +271,10 @@ describe("realtime resource frames", () => {
   });
 
   it("moves the counts only when a row arrives, leaves or changes where it counts", () => {
-    const list = seed([`/api/v1/c/${COMMUNITY}/counter-groups/`, { page: 1 }]);
+    const list = seed([`/api/v1/c/${COMMUNITY}/wikis/`, { page: 1 }]);
     const counts = seed([`/api/v1/c/${COMMUNITY}/tools/counts/by-initiative`]);
     const group = (action: string, changed: string[]) => ({
-      resource: { type: "counter_groups", id: ENTITY_ID },
+      resource: { type: "wikis", id: ENTITY_ID },
       parents: [],
       action,
       changed,
@@ -341,7 +325,7 @@ describe("realtime resource frames", () => {
     // A renamed or recoloured column changes what a status chip says, and the
     // change names the project, not the tasks in it.
     const status = seed(chipKey(COMMUNITY, `task:${ENTITY_ID}:status`));
-    const counter = seed(chipKey(COMMUNITY, "counter:4:value"));
+    const event = seed(chipKey(COMMUNITY, "calendar_event:4:when"));
 
     applyChanges(
       [
@@ -356,7 +340,7 @@ describe("realtime resource frames", () => {
     );
 
     expect(status(), "a task's status chip").toBe(true);
-    expect(counter(), "a counter's chip").toBe(false);
+    expect(event(), "an event's chip").toBe(false);
   });
 
   it("refreshes every task, listed or open, when a project's types change", () => {
@@ -365,7 +349,7 @@ describe("realtime resource frames", () => {
     const list = seed([`/api/v1/c/${COMMUNITY}/tasks/`, { project_id: 7 }]);
     const page = seed([`/api/v1/c/${COMMUNITY}/tasks/${ENTITY_ID}`]);
     const chip = seed(chipKey(COMMUNITY, `task:${ENTITY_ID}:status`));
-    const counter = seed(chipKey(COMMUNITY, "counter:4:value"));
+    const event = seed(chipKey(COMMUNITY, "calendar_event:4:when"));
 
     applyChanges(
       [
@@ -382,7 +366,7 @@ describe("realtime resource frames", () => {
     expect(list(), "a list of tasks").toBe(true);
     expect(page(), "a task's page").toBe(true);
     expect(chip(), "a task's chip").toBe(true);
-    expect(counter(), "a counter's chip").toBe(false);
+    expect(event(), "an event's chip").toBe(false);
   });
 
   it("refreshes a project's layouts when they change, and not on any other update", () => {
@@ -423,11 +407,12 @@ describe("realtime resource frames", () => {
     expect(properties(), "properties").toBe(true);
   });
 
-  it("refreshes the plug-in list and an install's own reads", () => {
+  it("refreshes the plug-in list and an install's own reads, in this community only", () => {
     // Community-wide and parentless: nothing else on the client covers it.
     const list = seed([`/api/v1/c/${COMMUNITY}/plugins/`]);
     const detail = seed([`/api/v1/c/${COMMUNITY}/plugins/${ENTITY_ID}`]);
     const members = seed([`/api/v1/c/${COMMUNITY}/plugins/${ENTITY_ID}/members`, { page: 1 }]);
+    const other = seed([`/api/v1/c/${COMMUNITY + 1}/plugins/${ENTITY_ID}`]);
 
     applyChanges(
       [{ resource: { type: "plugins", id: ENTITY_ID }, parents: [], action: "updated" }],
@@ -437,6 +422,32 @@ describe("realtime resource frames", () => {
     expect(list(), "plug-in list").toBe(true);
     expect(detail(), "plug-in detail").toBe(true);
     expect(members(), "plug-in members").toBe(true);
+    expect(other(), "another community's install").toBe(false);
+  });
+
+  it("refreshes a tool plug-in's row, its own kind's reads and the rows over it", () => {
+    const counter = "counter.tsjvtcm0s7gv2x";
+    const group = "counter_group.tsjvtcm0s7gv2x";
+    const row = seed([`/api/v1/c/${COMMUNITY}/plugin-tools/${counter}/${ENTITY_ID}`]);
+    const items = seed([`/api/v1/c/${COMMUNITY}/plugin-tools/${counter}/`, { parent_id: 7 }]);
+    const groups = seed([`/api/v1/c/${COMMUNITY}/plugin-tools/${group}/`, { initiative_id: 1 }]);
+    const another = seed([`/api/v1/c/${COMMUNITY}/plugin-tools/board.abc/`, { initiative_id: 1 }]);
+
+    applyChanges(
+      [
+        {
+          resource: { type: counter, id: ENTITY_ID },
+          parents: [{ type: group, id: 7 }],
+          action: "updated",
+        },
+      ],
+      COMMUNITY
+    );
+
+    expect(row(), "the row").toBe(true);
+    expect(items(), "its siblings").toBe(true);
+    expect(groups(), "the rows previewing it").toBe(true);
+    expect(another(), "another tool's rows").toBe(false);
   });
 
   it("leaves another community's install reads alone", () => {
@@ -450,38 +461,26 @@ describe("realtime resource frames", () => {
     expect(other()).toBe(false);
   });
 
-  it("ignores a resource type it has no invalidation for", () => {
+  it("ignores an unknown resource or a malformed frame, still refreshing the parents named", () => {
     const untouched = seed([`/api/v1/c/${COMMUNITY}/tasks/${ENTITY_ID}`]);
+    const project = seed([`/api/v1/c/${COMMUNITY}/projects/7`]);
 
     expect(() =>
       applyChanges(
-        [{ resource: { type: "something_new", id: 1 }, parents: [], action: "created" }],
+        [
+          { resource: { type: "something_new", id: 1 }, parents: [], action: "created" },
+          {},
+          { resource: undefined, parents: undefined },
+          {
+            resource: { type: "mystery_items", id: 3 },
+            parents: [{ type: "projects", id: 7 }],
+            action: "updated",
+          },
+        ],
         COMMUNITY
       )
     ).not.toThrow();
     expect(untouched()).toBe(false);
-  });
-
-  it("ignores a malformed frame rather than throwing", () => {
-    expect(() =>
-      applyChanges([{}, { resource: undefined, parents: undefined }], COMMUNITY)
-    ).not.toThrow();
-  });
-
-  it("still refreshes the parents when the resource itself is unknown", () => {
-    const project = seed([`/api/v1/c/${COMMUNITY}/projects/7`]);
-
-    applyChanges(
-      [
-        {
-          resource: { type: "mystery_items", id: 3 },
-          parents: [{ type: "projects", id: 7 }],
-          action: "updated",
-        },
-      ],
-      COMMUNITY
-    );
-
     expect(project()).toBe(true);
   });
 });
@@ -506,8 +505,6 @@ describe("realtime socket lifecycle", () => {
     // puts it — the auth frame reads it as it writes.
     setAuthToken("test-token");
     MockWebSocket.instances = [];
-    queryClient.clear();
-    setInvalidationCommunity(COMMUNITY);
     vi.stubGlobal("WebSocket", MockWebSocket);
     vi.useFakeTimers();
     // Reconnects are jittered; pin the draw so each lands mid-window.
@@ -517,8 +514,6 @@ describe("realtime socket lifecycle", () => {
   afterEach(() => {
     setAuthToken(null);
     vi.useRealTimers();
-    queryClient.clear();
-    setInvalidationCommunity(null);
   });
 
   it("authenticates in the first frame and names no gap", () => {
@@ -621,30 +616,33 @@ describe("realtime frames and dashboards", () => {
     action: "updated",
   });
 
-  beforeEach(() => queryClient.clear());
-  afterEach(() => queryClient.clear());
-
-  it("refreshes a dashboard when something it reads changes in its initiative", () => {
-    const stale = seedCanvas(COMMUNITY, ["tasks"]);
-    applyChanges([task(INITIATIVE)], COMMUNITY);
-    expect(stale()).toBe(true);
-  });
-
-  it("leaves it alone when the change is to something it does not read", () => {
-    const stale = seedCanvas(COMMUNITY, ["projects"]);
-    applyChanges([task(INITIATIVE)], COMMUNITY);
-    expect(stale()).toBe(false);
-  });
-
-  it("leaves it alone when the change is in another initiative", () => {
-    const stale = seedCanvas(COMMUNITY, ["tasks"]);
-    applyChanges([task(INITIATIVE + 1)], COMMUNITY);
-    expect(stale()).toBe(false);
-  });
-
-  it("leaves another community's dashboard alone, whose initiative ids are its own", () => {
-    const stale = seedCanvas(COMMUNITY + 1, ["tasks"]);
-    applyChanges([task(INITIATIVE)], COMMUNITY);
-    expect(stale()).toBe(false);
+  it.each([
+    [
+      "refreshes a dashboard when something it reads changes in its initiative",
+      COMMUNITY,
+      ["tasks"],
+      INITIATIVE,
+      true,
+    ],
+    [
+      "leaves it alone when the change is to something it does not read",
+      COMMUNITY,
+      ["projects"],
+      INITIATIVE,
+      false,
+    ],
+    [
+      "leaves it alone when the change is in another initiative",
+      COMMUNITY,
+      ["tasks"],
+      INITIATIVE + 1,
+      false,
+    ],
+    // Another community's initiative ids are its own.
+    ["leaves another community's dashboard alone", COMMUNITY + 1, ["tasks"], INITIATIVE, false],
+  ])("%s", (_case, communityId, relations, initiative, refreshed) => {
+    const stale = seedCanvas(communityId, relations);
+    applyChanges([task(initiative)], COMMUNITY);
+    expect(stale()).toBe(refreshed);
   });
 });

@@ -69,8 +69,6 @@ _SAFE_WRITES = {
     "update_project",
     "create_file",
     "update_file",
-    "create_counter_group",
-    "update_counter_group",
     "create_calendar",
     "update_calendar",
     "create_dashboard",
@@ -81,16 +79,14 @@ _SAFE_WRITES = {
     "update_wiki",
     "create_contact",
     "update_contact",
-    # And what those tools hold: a project's tasks, a counter group's counters,
-    # a calendar's events, a wiki's pages, and the comments on any of them.
+    # And what those tools hold: a project's tasks, a calendar's events, a
+    # wiki's pages, and the comments on any of them.
     "create_task",
     "update_task",
     "move_task",
     # One checklist tick. The task update rewrites the list's lines but never
     # its done flags, so this is the only way to mark a piece of a task done.
     "toggle_checklist_item",
-    "add_counter",
-    "update_counter",
     "create_calendar_event",
     "update_calendar_event",
     # A page is authored and edited, not dragged: where it sits in the tree is
@@ -99,12 +95,17 @@ _SAFE_WRITES = {
     "update_wiki_page",
     "create_comment",
     "update_comment",
-    # A counter's count, which its update schema doesn't carry.
-    "set_counter_count",
-    "step_counter",
     # One edge between two of them. No ``update_`` pair: an edge has no fields
     # to edit, only ends and a type, which are what it is.
     "create_relationship",
+    # A row of a tool a plug-in brings, or of one of its items, by kind:
+    # authored and edited as a built-in tool's are. Its duplicate and its
+    # actions stay off, as a built-in tool's duplicate and resets do.
+    "create_plugin_tool_row",
+    "update_plugin_tool_row",
+    # Its counter fields' counts, which two updates landing together would
+    # lose one of, as a counter's step.
+    "step_plugin_tool_row",
 }
 
 
@@ -122,14 +123,13 @@ async def test_mcp_tools_are_curated():
         "initiative",
         "comment",
         # The things a tool holds, which the enum names only their parent of:
-        # a task belongs to a project, a counter to a counter group.
+        # a task belongs to a project.
         "task",
         # A task's checklist, ticked one item at a time.
         "checklist",
         # How full each of a project's status columns is, where a move into a
         # full one is refused.
         "column_limits",
-        "counter",
         # A collection in Files, read through the files tag.
         "collection",
         "backlink",
@@ -142,6 +142,8 @@ async def test_mcp_tools_are_curated():
         "tool_counts",
         # The caller's communities: where a session learns its community_id.
         "list_communities",
+        # Every tool a plug-in brings, and its rows, by kind.
+        "plugin_tool",
         *(tool.value for tool in Tool),
         *(tool.plural for tool in Tool),
     )
@@ -157,7 +159,7 @@ async def test_mcp_tools_are_curated():
             f"no MCP tool reads {tool.value}"
         )
     # And what those tools hold reads back by its own id.
-    assert {"read_counter", "read_wiki_page"} <= set(names)
+    assert {"read_calendar_event", "read_wiki_page"} <= set(names)
 
     # Join requests sit on the initiatives router and would otherwise ride in on
     # its tag, but they name who asked to be let in and quote their note — a
@@ -165,14 +167,15 @@ async def test_mcp_tools_are_curated():
     assert not [n for n in names if "join_request" in n]
 
 
-async def test_the_tool_reads_stop_short_of_these():
+async def test_the_reads_are_the_working_surface_and_no_more():
     """What riding in on a tag would have brought, and why each stays out.
 
     Opening a tool's tag exposes every GET it carries, and a few of those are
-    not the working surface the rest are. Named here so removing one is a
-    decision somebody makes rather than a line that quietly stops matching.
+    not the working surface the rest are. ``comments``, ``search`` and
+    ``relationships`` are deliberately not READ_TAGs: the reads they keep are
+    named by path shape, and the rest fall through the default-deny catch-all.
     """
-    names = [t.name.lower() for t in await build_mcp_server(app).list_tools()]
+    names = {t.name.lower() for t in await build_mcp_server(app).list_tools()}
 
     # Bytes rather than an answer: a file, one of its versions, a calendar
     # file. None is something a tool result carries usefully.
@@ -181,57 +184,20 @@ async def test_the_tool_reads_stop_short_of_these():
     assert not [n for n in names if "voter" in n or n.endswith("_reads")]
     # The dashboard editor's own vocabulary, not anything a dashboard shows.
     assert not [n for n in names if "widget_catalog" in n or "installed_listing" in n]
-
-    # The one that has to be present, because it is the whole point of reading
-    # a dashboard: what its tiles currently say.
+    # What a dashboard's tiles currently say is the whole point of reading one.
     assert any("load_dashboard_data" in n for n in names)
+    # A task is given a type by reading them.
+    assert "list_task_types" in names
 
-
-async def test_comment_reads_are_exposed():
-    """The two reads that pair with the comment write, and only those.
-
-    ``comments`` is deliberately not a READ_TAG: the router's other two GETs
-    (the guild-wide ``recent`` activity feed and the @-mention picker's search)
-    are matched by no RouteMap and fall through the default-deny catch-all.
-    """
-    names = {t.name.lower() for t in await build_mcp_server(app).list_tools()}
-
-    assert "list_comments" in names
-    assert "read_comment" in names
-    assert "recent_comments" not in names
-    assert "search_mentionables" not in names
-
-
-async def test_search_is_exposed_without_the_picker_routes():
-    """The general search, and only it, out of the search router's three GETs.
-
-    ``search`` is deliberately not a READ_TAG: ``recent`` and ``suggest`` both
-    describe a text field's behaviour — what to offer before anything is typed,
-    and titles to jump to while it is — rather than answering a question, so
-    they fall through the default-deny catch-all.
-    """
-    names = {t.name.lower() for t in await build_mcp_server(app).list_tools()}
-
+    # The two reads that pair with the comment write; not the guild-wide
+    # activity feed or the @-mention picker's search.
+    assert {"list_comments", "read_comment"} <= names
+    assert not {"recent_comments", "search_mentionables"} & names
+    # The general search; not what a text field offers before or while typing.
     assert "search_community" in names
-    assert "recent_community" not in names
-    assert "suggest_community" not in names
-
-
-async def test_relationship_tools_are_read_and_draw_one():
-    """List one thing's edges and draw one, and nothing that unwires them.
-
-    ``relationships`` is deliberately neither a READ_TAG nor a writable segment:
-    the router's four routes divide two and two, so each side is named by path
-    shape. Replacing a thing's links wholesale is bulk and removes what it
-    doesn't mention; deleting one is a delete. Both fall through the
-    default-deny catch-all.
-    """
-    names = {t.name.lower() for t in await build_mcp_server(app).list_tools()}
-
+    assert not {"recent_community", "suggest_community"} & names
+    # One thing's edges.
     assert "list_relationships" in names
-    assert "create_relationship" in names
-    assert "replace_relationship_slice" not in names
-    assert "remove_relationship" not in names
 
 
 async def test_mcp_write_tools_are_the_curated_safe_set():
@@ -250,44 +216,6 @@ async def test_mcp_write_tools_are_the_curated_safe_set():
     for tool in Tool:
         assert f"create_{tool.value}" in writes, f"no MCP tool creates {tool.value}"
         assert f"update_{tool.value}" in writes, f"no MCP tool edits {tool.value}"
-
-
-async def test_the_tool_writes_stop_short_of_these():
-    """What create-and-edit deliberately doesn't reach.
-
-    Named here so removing one is a decision somebody makes rather than a line
-    that quietly stops matching. The equality assertion above covers all of it;
-    these spell out the categories that were weighed.
-    """
-    names = [t.name.lower() for t in await build_mcp_server(app).list_tools()]
-    writes = {n for n in names if n.startswith(_WRITE_PREFIXES)}
-
-    # Nothing that removes or empties: delete, trash, archive, reset a counter,
-    # discard the done column.
-    assert not [w for w in writes if w.startswith(("delete_", "archive_", "reset_"))]
-    # Nothing that acts on a whole collection at once.
-    assert not [
-        w for w in writes if w.startswith(("reorder_", "batch_", "sort_", "duplicate_"))
-    ]
-    # Sharing is a decision about people, made in the app: no grants, no
-    # publishing a dashboard figure, no pinning a notice guild-wide.
-    assert not [w for w in writes if w.endswith("_grants")]
-    assert "set_published_view" not in writes
-    assert "set_post_pin" not in writes
-    # Speaking for somebody: voting in a poll, marking a notice read, RSVPing.
-    assert not [w for w in writes if w.startswith("vote_") or w.endswith("_rsvp")]
-    assert "mark_posts_read" not in writes
-    assert "set_attendees" not in writes
-    # Whole-set replacements and generated prose stay out, as they were.
-    assert not [w for w in writes if w.endswith(("_tags", "_properties"))]
-    assert not [w for w in writes if w.startswith("generate_")]
-    # A project's status columns are its shape, set up in the app; a task is
-    # placed into one by reading them.
-    assert "create_task_status" not in writes
-    assert "update_task_status" not in writes
-    # So are its task types; a task is given one by reading them.
-    assert "list_task_types" in names
-    assert not [w for w in writes if "task_type" in w]
 
 
 def test_free_form_keys_are_read_off_the_response_schema():

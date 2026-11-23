@@ -1,6 +1,7 @@
 /**
  * The desktop app's shell: what closing the window does, what a notification
- * click hands back, and what the computer is told about opening at sign-in.
+ * click hands back, what the computer is told about opening at sign-in, and
+ * when the page hears that the person is at the computer.
  */
 import type { EventEmitter } from "node:events";
 import { mkdtempSync, readFileSync } from "node:fs";
@@ -40,6 +41,8 @@ type FakeWindow = InstanceType<typeof FakeWindow>;
 const electron = vi.hoisted(() => ({
   windows: [] as unknown[],
   userData: "",
+  /** Seconds the computer has gone without input. */
+  idle: 0,
   app: null as unknown as EventEmitter & Record<string, ReturnType<typeof vi.fn>>,
 }));
 
@@ -52,6 +55,7 @@ vi.mock("./app.mjs", () => {
     isPackaged: false,
     getLoginItemSettings: vi.fn(() => ({ openAtLogin: false })),
     setLoginItemSettings: vi.fn(),
+    setUserTasks: vi.fn(),
     quit: vi.fn(),
   });
   electron.app = app as never;
@@ -60,6 +64,7 @@ vi.mock("./app.mjs", () => {
     BrowserWindow: { getAllWindows: () => electron.windows },
     Menu: { buildFromTemplate: (template: unknown) => template },
     Notification: FakeNotification,
+    powerMonitor: { getSystemIdleTime: () => electron.idle },
     nativeImage: {
       createFromPath: () => ({ resize: () => ({}) }),
       createFromDataURL: (url: string) => ({ url }),
@@ -99,6 +104,7 @@ beforeEach(() => {
   electron.userData = mkdtempSync(join(tmpdir(), "initiative-desktop-"));
   vi.stubEnv("XDG_CONFIG_HOME", mkdtempSync(join(tmpdir(), "initiative-xdg-")));
   FakeNotification.made = [];
+  vi.clearAllMocks();
 });
 
 afterEach(() => {
@@ -148,6 +154,40 @@ describe("closing the window", () => {
     const { window } = started();
     window.url = "file:///app/assets/splash.html";
 
+    expect(close(window)).toBe(false);
+  });
+});
+
+describe("the taskbar's Quit item", () => {
+  it("goes on the Windows taskbar button's menu, in the page's words", async () => {
+    onPlatform("win32");
+    const { desktop } = started();
+
+    await desktop.setTray({ open: "Open Initiative", quit: "Quit Initiative" });
+    expect(electron.app.setUserTasks).toHaveBeenCalledWith([
+      expect.objectContaining({ arguments: "--quit", title: "Quit Initiative" }),
+    ]);
+  });
+
+  it("is Windows' alone", async () => {
+    onPlatform("linux");
+    const { desktop } = started();
+
+    await desktop.setTray({ open: "Open", quit: "Quit" });
+    expect(electron.app.setUserTasks).not.toHaveBeenCalled();
+  });
+
+  it("quits the copy already running, past the tray", async () => {
+    onPlatform("win32");
+    const { desktop, window } = started();
+    await desktop.setTray({ open: "Open", quit: "Quit" });
+
+    electron.app.emit("second-instance", {}, [process.execPath, "--hidden"]);
+    expect(electron.app.quit).not.toHaveBeenCalled();
+
+    electron.app.emit("second-instance", {}, [process.execPath, "--quit"]);
+    expect(electron.app.quit).toHaveBeenCalled();
+    electron.app.emit("before-quit");
     expect(close(window)).toBe(false);
   });
 });
@@ -251,5 +291,26 @@ describe("opening at sign-in", () => {
       openAtLogin: true,
       args: ["--hidden"],
     });
+  });
+});
+
+describe("the person at the computer", () => {
+  it("is reported once the computer has shown it can tell", () => {
+    vi.useFakeTimers();
+    electron.idle = 0;
+    const { notifyListeners } = started();
+    // Nothing but zeroes is also what a computer that cannot tell says.
+    vi.advanceTimersByTime(60_000);
+    expect(notifyListeners).not.toHaveBeenCalledWith("computerActive");
+
+    electron.idle = 45;
+    vi.advanceTimersByTime(30_000);
+    expect(notifyListeners).not.toHaveBeenCalledWith("computerActive");
+
+    // Typing in another app since the last asking.
+    electron.idle = 4;
+    vi.advanceTimersByTime(30_000);
+    expect(notifyListeners).toHaveBeenCalledWith("computerActive");
+    vi.useRealTimers();
   });
 });

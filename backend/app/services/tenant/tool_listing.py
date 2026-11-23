@@ -35,6 +35,7 @@ from sqlalchemy import ColumnElement, func, or_
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tool_set import ToolRecord
 from app.core.tools import Tool
 from app.db.guild_standing import ActorContext
 from app.db.query import apply_pagination, clamp_page
@@ -88,15 +89,15 @@ def apply_tool_order(
 
 
 def initiative_switch_clause(
-    tool: Tool,
+    tool: Tool | ToolRecord,
     model,
     *,
     guild_level_rows: bool = False,
 ) -> ColumnElement[bool]:
     """Rows whose initiative has this tool switched on.
 
-    One spelling for every tool, from the initiative's switch column the tool
-    names (``Tool.view_permission``).
+    One spelling for every tool, from the initiative's switch the tool names
+    (``Tool.view_permission``).
     An initiative with the tool off has nothing to list, so the switch is a
     plain leg of the WHERE rather than a lookup the handler makes first: asking
     for that initiative by id and asking for the whole guild then answer the
@@ -114,7 +115,7 @@ def initiative_switch_clause(
 
 
 def base_conditions(
-    tool: Tool,
+    tool: Tool | ToolRecord,
     model,
     user_id: int | None,
     *,

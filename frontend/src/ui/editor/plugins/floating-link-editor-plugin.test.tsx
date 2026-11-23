@@ -83,22 +83,17 @@ const paste = (input: HTMLInputElement, text: string) =>
   fireEvent.paste(input, { clipboardData: { getData: () => text } });
 
 describe("the floating link field", () => {
-  it("replaces its https:// default with a pasted URL", async () => {
+  it.each([
+    ["at its end", "end", "https://example.com/page", "https://example.com/page"],
+    ["at its start, trimming the paste", "start", "  http://example.com\n", "http://example.com"],
+  ])("replaces its https:// default with a URL pasted %s", async (_where, caret, text, value) => {
     const input = await openLinkField();
-    input.setSelectionRange(input.value.length, input.value.length);
+    const at = caret === "end" ? input.value.length : 0;
+    input.setSelectionRange(at, at);
 
-    paste(input, "https://example.com/page");
+    paste(input, text);
 
-    expect(input.value).toBe("https://example.com/page");
-  });
-
-  it("replaces the default wherever the caret was", async () => {
-    const input = await openLinkField();
-    input.setSelectionRange(0, 0);
-
-    paste(input, "http://example.com");
-
-    expect(input.value).toBe("http://example.com");
+    expect(input.value).toBe(value);
   });
 
   it("keeps https:// in front of a pasted bare host", async () => {

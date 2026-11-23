@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { TagSummary } from "@/api/generated/initiativeAPI.schemas";
-import { PropertyTarget, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { ContentKind, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { TagPicker } from "@/components/tags";
 import { itemSaves } from "@/hooks/useFieldSave";
 import { propertySaves } from "@/hooks/useProperties";
@@ -190,7 +190,7 @@ export const DetailsPage = () => {
           </CardHeader>
           <CardContent>
             <PropertiesField
-              saves={itemSaves(propertySaves[PropertyTarget[tool]], entity.id)}
+              saves={itemSaves(propertySaves[ContentKind[tool]], entity.id)}
               env={propertyEnv}
               id={entity.id}
               properties={entity.properties ?? []}

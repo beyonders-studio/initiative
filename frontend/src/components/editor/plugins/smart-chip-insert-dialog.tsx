@@ -3,16 +3,11 @@ import { $insertNodes } from "lexical";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type {
-  SearchEntityType,
-  SearchSuggestion,
-  SmartChipKind,
-} from "@/api/generated/initiativeAPI.schemas";
+import type { SearchSuggestion, SmartChipKind } from "@/api/generated/initiativeAPI.schemas";
 import { $createSmartChipNode } from "@/components/editor/nodes/smart-chip-node";
 import { SMART_CHIP_MENU } from "@/components/editor/plugins/smart-chip-menu";
+import { useReferenceKinds } from "@/hooks/useReferenceKinds";
 import { useCommunityPickerSuggestions } from "@/hooks/useSearch";
-import { MENTIONABLE_TYPES } from "@/lib/mentions";
-import { hitIcon } from "@/lib/searchResults";
 import { CHIP_ENTITY_TYPES, chipEntityType, chipKindsFor } from "@/lib/smartChips";
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from "@/ui/command";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
@@ -51,7 +46,8 @@ export function SmartChipInsertDialog({
   activeEditor,
   onClose,
 }: SmartChipInsertDialogProps) {
-  const { t } = useTranslation(["editor", "search"]);
+  const { t } = useTranslation("editor");
+  const referenceKinds = useReferenceKinds();
   const searchRef = useRef<HTMLInputElement>(null);
   const factsRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
@@ -69,8 +65,8 @@ export function SmartChipInsertDialog({
     return () => cancelAnimationFrame(frame);
   }, [chosen]);
 
-  const types: SearchEntityType[] = embed
-    ? MENTIONABLE_TYPES
+  const types: string[] = embed
+    ? referenceKinds.mentionable
     : chipKind
       ? [chipEntityType(chipKind)]
       : CHIP_ENTITY_TYPES;
@@ -110,7 +106,7 @@ export function SmartChipInsertDialog({
   };
 
   if (chosen) {
-    const ChosenIcon = hitIcon(chosen);
+    const ChosenIcon = referenceKinds.icon(chosen.entity_type);
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-2 text-muted-foreground text-sm">
@@ -174,7 +170,7 @@ export function SmartChipInsertDialog({
           {shown.length ? (
             <CommandGroup heading={searched ? undefined : t("smartChips.recent")}>
               {shown.map((suggestion) => {
-                const Icon = hitIcon(suggestion);
+                const Icon = referenceKinds.icon(suggestion.entity_type);
                 return (
                   <CommandItem
                     key={`${suggestion.entity_type}:${suggestion.entity_id}`}
@@ -187,7 +183,7 @@ export function SmartChipInsertDialog({
                     <span className="truncate">{suggestion.title}</span>
                     {types.length > 1 && (
                       <span className="ml-auto shrink-0 text-muted-foreground text-xs">
-                        {t(`search:types.${suggestion.entity_type}` as never)}
+                        {referenceKinds.label(suggestion.entity_type)}
                       </span>
                     )}
                   </CommandItem>

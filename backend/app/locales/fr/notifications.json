@@ -319,12 +319,38 @@
         "title": "Vous pouvez le modifier",
         "body_one": "{{answerer}} vous a permis de modifier {{title}}",
         "body_other": "{{answerer}} vous a permis de modifier {{count}} fichiers"
+      },
+      "read_note": {
+        "title": "Vous pouvez le voir maintenant",
+        "body": "{{answerer}} vous permet de voir {{title}}: « {{note}} »"
+      },
+      "write_note": {
+        "title": "Vous pouvez le modifier maintenant",
+        "body": "{{answerer}} vous permet de modifier {{title}}: « {{note}} »"
       }
     },
     "declined": {
       "title": "Demande refusée",
       "body_one": "{{answerer}} a refusé votre demande",
       "body_other": "{{answerer}} a refusé votre demande pour {{count}} fichiers"
+    }
+  },
+  "item": {
+    "sent": {
+      "title": "Envoyé pour vous",
+      "body": "{{sender}} vous a envoyé {{title}}"
+    },
+    "sent_note": {
+      "title": "{{sender}} vous a envoyé {{title}}",
+      "body": "{{note}}"
+    },
+    "sent_unnamed": {
+      "title": "Envoyé pour vous",
+      "body": "{{sender}} vous a envoyé quelque chose dont vous pouvez demander l’accès"
+    },
+    "sent_unnamed_note": {
+      "title": "{{sender}} vous a envoyé quelque chose",
+      "body": "{{note}}"
     }
   }
 }

@@ -10,7 +10,7 @@ A reminder is on a task, and stays after it is sent, so the next task of a
 repeating series takes it on (:func:`move_reminders`).
 
 Who is subscribed to an item is worked out, not only kept (:func:`subscribers_of`):
-whoever made it or is named on it (an assignee, an attendee, :data:`NAMING`), and
+whoever made it or is named on it (an assignee, an attendee, :func:`naming`), and
 whoever subscribed to it or to its tool by hand, less whoever unsubscribed from
 it. The activity feed ranks by the same rule, and every notice about what
 happens on an item goes to it.
@@ -32,6 +32,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
+from functools import lru_cache
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -41,14 +42,16 @@ from weakref import WeakValueDictionary
 
 from sqlalchemy import Table, and_, func, or_, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlmodel import SQLModel, col, delete, select
+from sqlmodel import col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tool_set import KEPT_TOOL_SETS, ToolSet
 from app.core.tools import KINDS
-from app.db.initiative_rls import CONTENT_KIND_TABLES, NAMED_PEOPLE
+from app.db.initiative_rls import NAMED_PEOPLE
+from app.db.session import routed_tools, session_tools
 from app.models.tenant._mixins import ActorKind
 from app.models.tenant.calendar_event import RSVPStatus
-from app.models.tenant.personal_item import TOOL_KINDS, PersonalItem, ViewSource
+from app.models.tenant.personal_item import PersonalItem, ViewSource
 from app.services.tenant.change_log import RETENTION
 
 if TYPE_CHECKING:
@@ -391,7 +394,9 @@ async def list_marked(
         select(PersonalItem)
         .where(
             col(PersonalItem.user_id) == user_id,
-            col(PersonalItem.entity_type).in_(TOOL_KINDS),
+            col(PersonalItem.entity_type).in_(
+                [tool.kind for tool in routed_tools(session)]
+            ),
             column.is_not(None),
         )
         .order_by(column.desc())
@@ -446,18 +451,21 @@ class Subscriber:
 Ref = tuple[str, int]
 
 
-def _naming_tables() -> dict[str, list[tuple[Table, str, str, Tie]]]:
-    """Per content kind, the tables whose rows tie a person to one: ``(table,
-    column naming the item, column naming the person, tie)``. The item's own
-    ``created_by``, and the kept :data:`NAMED_PEOPLE` rows (an assignee, an
-    attendee) whose foreign key is the kind's. From the schema, so a new kind
+@lru_cache(KEPT_TOOL_SETS)
+def naming(tools: ToolSet) -> dict[str, list[tuple[Table, str, str, Tie]]]:
+    """Per content kind of a community with ``tools``, the tables whose rows
+    tie a person to one: ``(table, column naming the item, column naming the
+    person, tie)``. The item's own ``created_by``, and the kept
+    :data:`NAMED_PEOPLE` rows (an assignee, an attendee) whose foreign key is
+    the kind's. From the schema, so a new kind, a tool plug-in's among them,
     is asked the moment its table has either."""
-    kind_of = {table: kind for kind, table in CONTENT_KIND_TABLES.items()}
-    tables = SQLModel.metadata.tables
-    naming: dict[str, list[tuple[Table, str, str, Tie]]] = {}
-    for kind, name in CONTENT_KIND_TABLES.items():
+    kinds = tools.kind_tables
+    kind_of = {table: kind for kind, table in kinds.items()}
+    tables = tools.tables
+    found: dict[str, list[tuple[Table, str, str, Tie]]] = {}
+    for kind, name in kinds.items():
         if "created_by" in tables[name].c:
-            naming.setdefault(kind, []).append(
+            found.setdefault(kind, []).append(
                 (tables[name], "id", "created_by", Tie.made)
             )
     for named in NAMED_PEOPLE:
@@ -466,13 +474,10 @@ def _naming_tables() -> dict[str, list[tuple[Table, str, str, Tie]]]:
         for fk in tables[named.table].foreign_keys:
             kind = kind_of.get(fk.column.table.name)
             if kind is not None:
-                naming.setdefault(kind, []).append(
+                found.setdefault(kind, []).append(
                     (tables[named.table], fk.parent.name, named.column, Tie.named)
                 )
-    return naming
-
-
-NAMING = _naming_tables()
+    return found
 
 
 async def _declined(session: AsyncSession, event_ids: set[int]) -> set[tuple[int, int]]:
@@ -519,6 +524,7 @@ async def subscribers_of(
 
     if not items:
         return {}
+    tied_by = naming(await session_tools(session))
     refs = set(items) | {tool for tool in items.values() if tool is not None}
     by_kind: dict[str, set[int]] = {}
     for kind, entity_id in refs:
@@ -528,7 +534,7 @@ async def subscribers_of(
     unsubscribed: dict[Ref, set[int]] = {}
     async with as_system(session) as system:
         for kind, ids in by_kind.items():
-            for table, item_column, person_column, tie in NAMING.get(kind, ()):
+            for table, item_column, person_column, tie in tied_by.get(kind, ()):
                 statement = select(table.c[item_column], table.c[person_column]).where(
                     table.c[item_column].in_(ids), table.c[person_column].is_not(None)
                 )
@@ -612,7 +618,9 @@ async def is_subscribed(
 
     item = (kind, entity_id)
     # A kind in no one instance of its tool has no tool row to follow.
-    governed = None if KINDS[kind].standalone else await governing_of(session, item)
+    spec = KINDS.get(kind)
+    standalone = spec is not None and spec.standalone
+    governed = None if standalone else await governing_of(session, item)
     tool = None if governed is None else (governed[0].value, governed[1].id)
     found = await subscribers_of(session, {item: tool}, user_id=user_id)
     return user_id in found[item]
@@ -719,10 +727,10 @@ _EXPIRE = f"""
 _OLDEST_LET_GO = "SELECT min(ranked.viewed_at) FROM " + _RANKED + " WHERE " + _LETS_GO
 
 
-def _ranking(expiring: Expiring) -> dict:
+async def _ranking(session: AsyncSession, expiring: Expiring) -> dict:
     users = list(expiring.tab_limits)
     return {
-        "tabs": list(TOOL_KINDS),
+        "tabs": [tool.kind for tool in await session_tools(session)],
         "users": users,
         "limits": [expiring.tab_limits[user] for user in users],
         "default_limit": DEFAULT_RECENT_VIEWS,
@@ -733,14 +741,18 @@ async def expire(session: AsyncSession, expiring: Expiring) -> None:
     """Let go of each person's views past :data:`WINDOW`, except a tab among
     their newest ``recent_tabs_limit``."""
     await session.exec(
-        text(_EXPIRE).bindparams(cutoff=expiring.now - WINDOW, **_ranking(expiring))
+        text(_EXPIRE).bindparams(
+            cutoff=expiring.now - WINDOW, **await _ranking(session, expiring)
+        )
     )
 
 
 async def next_due(session: AsyncSession, expiring: Expiring) -> datetime | None:
     """When the next view :func:`expire` would let go passes the window."""
     oldest = (
-        await session.exec(text(_OLDEST_LET_GO).bindparams(**_ranking(expiring)))
+        await session.exec(
+            text(_OLDEST_LET_GO).bindparams(**await _ranking(session, expiring))
+        )
     ).scalar_one()
     return None if oldest is None else oldest + WINDOW
 

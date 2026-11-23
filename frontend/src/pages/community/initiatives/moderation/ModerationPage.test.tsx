@@ -114,8 +114,6 @@ const shared = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-vi.mock("@/hooks/useActiveCommunityId", () => ({ useActiveCommunityId: () => 3 }));
-
 import { ModerationPage } from "./ModerationPage";
 
 // The real route tree, so `<Link>` has a router and the initiative comes from
@@ -146,9 +144,12 @@ describe("ModerationPage", () => {
     state.hasNext = false;
   });
 
-  it("says so when nothing has been reported", async () => {
+  it("says so when nothing has been reported, beside what a moderator acts with", async () => {
     render();
     expect(await screen.findByText("Nothing has been reported.")).toBeInTheDocument();
+    for (const area of ["Reports", "Members", "Sharing", "Log"]) {
+      expect(screen.getByRole("tab", { name: area })).toBeInTheDocument();
+    }
   });
 
   it("sends a report to the platform with it left up", async () => {
@@ -229,7 +230,7 @@ describe("ModerationPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("offers every outcome, and each one closes the report", async () => {
+  it("offers every outcome, each one closes the report, and carries the moderator's note", async () => {
     state.items = [report()];
     render();
     const user = userEvent.setup();
@@ -239,22 +240,8 @@ describe("ModerationPage", () => {
       expect(within(card).getByRole("button", { name: label })).toBeInTheDocument();
     }
 
-    await user.click(within(card).getByRole("button", { name: "Dismiss" }));
-    expect(settleMutate).toHaveBeenCalledWith({
-      reportId: 1,
-      body: { outcome: "dismissed", note: null },
-    });
-  });
-
-  it("carries the moderator's note with the decision", async () => {
-    state.items = [report()];
-    render();
-    const user = userEvent.setup();
-
-    const card = await screen.findByRole("region", { name: "A comment" });
     await user.type(within(card).getByRole("textbox"), "Checked it.");
     await user.click(within(card).getByRole("button", { name: "Dismiss" }));
-
     expect(settleMutate).toHaveBeenCalledWith({
       reportId: 1,
       body: { outcome: "dismissed", note: "Checked it." },
@@ -356,6 +343,8 @@ describe("ModerationPage", () => {
     expect(within(card).getByText("Content removed")).toBeInTheDocument();
     expect(within(card).getByText("Removed it.")).toBeInTheDocument();
     expect(within(card).queryByRole("button", { name: "Dismiss" })).not.toBeInTheDocument();
+    // One page holds everything, so there is no paging.
+    expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
   });
 
   // A comment has no page of its own; it is read where it was written. The
@@ -413,13 +402,6 @@ describe("ModerationPage", () => {
     expect(state.page).toBe(2);
   });
 
-  it("offers no paging when one page holds everything", async () => {
-    state.items = [report()];
-    render();
-    await screen.findByRole("region", { name: "A comment" });
-    expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
-  });
-
   it("reads the initiative's roster a page at a time, each member with their role", async () => {
     server.use(
       communityHttp.get("/initiatives/:id/members", ({ request }) => {
@@ -453,14 +435,7 @@ describe("ModerationPage", () => {
     expect(screen.getByRole("button", { name: "Previous" })).toBeEnabled();
   });
 
-  it("gathers what a moderator acts with beside what they act on", async () => {
-    render();
-    for (const area of ["Reports", "Members", "Sharing", "Log"]) {
-      expect(await screen.findByRole("tab", { name: area })).toBeInTheDocument();
-    }
-  });
-
-  it("shows how widely each thing is reached, and links to it", async () => {
+  it("shows how widely each thing is reached, and links to it rather than changing it", async () => {
     state.sharing = [
       shared({ all_initiative_members: true, user_grant_count: 2, role_grant_count: 1 }),
     ];
@@ -473,12 +448,6 @@ describe("ModerationPage", () => {
       "href",
       expect.stringContaining("/go/project/4")
     );
-  });
-
-  it("offers no way to change sharing from here", async () => {
-    state.sharing = [shared()];
-    await openSharing();
-    await screen.findByText("Spring Play");
     // Changing it goes through the resource's own control, which is the one
     // editor for it.
     expect(screen.queryByRole("button", { name: /share|remove|add/i })).toBeNull();

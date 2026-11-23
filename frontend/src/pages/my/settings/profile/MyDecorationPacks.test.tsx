@@ -6,20 +6,15 @@
  * is the one place removal happens, and stays usable once there are more packs
  * than fit on a screen.
  */
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { HttpResponse, http } from "msw";
+import { describe, expect, it } from "vitest";
 
+import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 
 import { MyDecorationPacks } from "./MyDecorationPacks";
-
-const mocks = vi.hoisted(() => ({ packs: vi.fn(), remove: vi.fn() }));
-
-vi.mock("@/hooks/useUsers", () => ({
-  useDecorationPacks: () => mocks.packs(),
-  useRemoveDecorationPack: (options: unknown) => mocks.remove(options),
-}));
 
 const entry = (uid: string, installed: boolean, { name = "Tabletop", slug = "ttrpg" } = {}) => ({
   uid,
@@ -36,76 +31,61 @@ const entry = (uid: string, installed: boolean, { name = "Tabletop", slug = "ttr
   ],
 });
 
-const answerWith = (items: unknown[]) =>
-  mocks.packs.mockReturnValue({ data: { items }, isLoading: false });
-
-const removeMutate = vi.fn();
-
-beforeEach(() => {
-  vi.clearAllMocks();
-  mocks.remove.mockReturnValue({ mutate: removeMutate, isPending: false, variables: undefined });
-});
+/** Serves the packs, and records each one given back. */
+const answerWith = (items: unknown[]) => {
+  const removed: string[] = [];
+  server.use(
+    http.get("/api/v1/me/decoration-packs", () => HttpResponse.json({ items })),
+    http.delete("/api/v1/me/decoration-packs/:uid", ({ params }) => {
+      removed.push(String(params.uid));
+      return new HttpResponse(null, { status: 204 });
+    })
+  );
+  return removed;
+};
 
 describe("the packs you have", () => {
-  it("lists a downloaded pack and names its pieces", async () => {
-    answerWith([entry("PACKTABTP00001", true)]);
-    renderWithProviders(<MyDecorationPacks />);
-
-    expect(await screen.findByText("Tabletop")).toBeInTheDocument();
-    expect(screen.getByText("Dice tower")).toBeInTheDocument();
-    expect(screen.getByText("Natural 20")).toBeInTheDocument();
-    expect(screen.getByText("d20")).toBeInTheDocument();
-  });
-
-  it("leaves out a pack that has not been downloaded", async () => {
+  it("lists a downloaded pack and names its pieces, leaving out one not downloaded", async () => {
     answerWith([
       entry("PACKTABTP00001", true),
       entry("PACKBAND000001", false, { name: "Soundcheck", slug: "music" }),
     ]);
     renderWithProviders(<MyDecorationPacks />);
 
-    await screen.findByText("Tabletop");
+    expect(await screen.findByText("Tabletop")).toBeInTheDocument();
+    expect(screen.getByText("Dice tower")).toBeInTheDocument();
+    expect(screen.getByText("Natural 20")).toBeInTheDocument();
+    expect(screen.getByText("d20")).toBeInTheDocument();
     expect(screen.queryByText("Soundcheck")).not.toBeInTheDocument();
+    // A short list is scanned, not filtered.
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
   });
 
-  it("asks before removing a pack, and names it in the asking", async () => {
-    answerWith([entry("PACKTABTP00001", true)]);
+  it("asks before removing a pack, naming it, and keeps it when the asking is declined", async () => {
+    const user = userEvent.setup();
+    const removed = answerWith([entry("PACKTABTP00001", true)]);
     renderWithProviders(<MyDecorationPacks />);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Remove Tabletop" }));
+    await user.click(await screen.findByRole("button", { name: "Remove Tabletop" }));
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Cancel" })
+    );
+    expect(removed).toEqual([]);
 
+    await user.click(screen.getByRole("button", { name: "Remove Tabletop" }));
     const dialog = await screen.findByRole("alertdialog");
     expect(within(dialog).getByText(/Remove Tabletop\?/)).toBeInTheDocument();
-    expect(removeMutate).not.toHaveBeenCalled();
-
-    await userEvent.click(within(dialog).getByRole("button", { name: "Remove pack" }));
-    expect(removeMutate).toHaveBeenCalledWith("PACKTABTP00001");
+    await user.click(within(dialog).getByRole("button", { name: "Remove pack" }));
+    await waitFor(() => expect(removed).toEqual(["PACKTABTP00001"]));
   });
 
-  it("keeps the pack when the asking is declined", async () => {
-    answerWith([entry("PACKTABTP00001", true)]);
-    renderWithProviders(<MyDecorationPacks />);
-
-    await userEvent.click(await screen.findByRole("button", { name: "Remove Tabletop" }));
-    const dialog = await screen.findByRole("alertdialog");
-    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
-
-    expect(removeMutate).not.toHaveBeenCalled();
-  });
-
-  it("offers a filter only once there are more packs than can be scanned", async () => {
-    answerWith([entry("PACKTABTP00001", true)]);
-    const { rerender } = renderWithProviders(<MyDecorationPacks />);
-
-    await screen.findByText("Tabletop");
-    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
-
+  it("offers a filter once there are more packs than can be scanned", async () => {
     answerWith(
       Array.from({ length: 12 }, (_, i) =>
         entry(`PACK${String(i).padStart(10, "0")}`, true, { name: `Pack ${i}` })
       )
     );
-    rerender(<MyDecorationPacks />);
+    renderWithProviders(<MyDecorationPacks />);
 
     await userEvent.type(await screen.findByRole("searchbox"), "Pack 7");
     expect(screen.getByText("Pack 7")).toBeInTheDocument();

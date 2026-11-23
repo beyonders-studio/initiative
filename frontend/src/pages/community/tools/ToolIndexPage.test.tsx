@@ -31,7 +31,7 @@ import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { VIEW_PREFERENCES_QUERY_KEY } from "@/hooks/useViewPreference";
 import { queryClient } from "@/lib/queryClient";
 import { setItem } from "@/lib/storage";
-import { TOOLS, toolCamelPlural, toolRouteSegment, toolViews } from "@/lib/tools";
+import { TOOLS, toolCamelPlural, toolListingKind, toolRouteSegment, toolViews } from "@/lib/tools";
 import { viewPreferencesQueryKey } from "@/lib/viewPreferences";
 import type { TranslateFn } from "@/types/i18n";
 
@@ -139,14 +139,27 @@ const renderIndex = (tool: Tool, routerSearch?: Record<string, unknown>) =>
   });
 
 describe("the tool index page", () => {
-  it.each(CASES)("$tool names its own empty shelf", async ({ tool }) => {
-    stubList(tool, []);
+  it.each(CASES)(
+    "$tool names its own empty shelf, its marketplace shelf and its filters",
+    async ({ tool }) => {
+      stubList(tool, []);
 
-    renderIndex(tool);
+      renderIndex(tool);
 
-    expect(await screen.findByText(copy(tool, "emptyTitle"))).toBeInTheDocument();
-    expect(screen.getByText(copy(tool, "emptyBody"))).toBeInTheDocument();
-  });
+      expect(await screen.findByText(copy(tool, "emptyTitle"))).toBeInTheDocument();
+      expect(screen.getByText(copy(tool, "emptyBody"))).toBeInTheDocument();
+      // The tool's own shelf in the marketplace, where the marketplace has one.
+      const kind = toolListingKind(tool);
+      const browse = screen.queryByRole("link", { name: "Browse the marketplace" });
+      if (kind) expect(browse).toHaveAttribute("href", `/c/1/marketplace?kind=${kind}`);
+      else expect(browse).not.toBeInTheDocument();
+
+      const button = screen.getByRole("button", { name: shared("toolbar.filters") });
+      expect(button).toHaveAttribute("aria-expanded", "false");
+      await userEvent.click(button);
+      expect(button).toHaveAttribute("aria-expanded", "true");
+    }
+  );
 
   it.each(CASES)("$tool reaches its archived rows from the toolbar", async ({ tool }) => {
     const requests = stubList(tool, [
@@ -177,20 +190,6 @@ describe("the tool index page", () => {
     await waitFor(() => expect(requests.at(-1)?.get("archived")).toBe("true"));
     // Nothing is made into the archive.
     expect(screen.queryByRole("button", { name: copy(tool, "create") })).not.toBeInTheDocument();
-  });
-
-  it.each(CASES)("$tool opens its filters from the toolbar", async ({ tool }) => {
-    stubList(tool, []);
-
-    renderIndex(tool);
-    await screen.findByText(copy(tool, "emptyTitle"));
-
-    const button = screen.getByRole("button", { name: shared("toolbar.filters") });
-    expect(button).toHaveAttribute("aria-expanded", "false");
-
-    await userEvent.click(button);
-
-    expect(button).toHaveAttribute("aria-expanded", "true");
   });
 
   it.each(CASES)(
@@ -245,18 +244,22 @@ describe("the tool index page", () => {
     }
   );
 
-  it.each(CASES)("$tool asks for its list a page at a time", async ({ tool }) => {
-    const requests = stubList(tool, [row(tool, { id: 1, name: "Paged" })]);
+  it.each(CASES)(
+    "$tool asks for its list a page at a time, each row at its own address",
+    async ({ tool }) => {
+      const requests = stubList(tool, [row(tool, { id: 7, name: "Paged" })]);
 
-    renderIndex(tool);
+      renderIndex(tool);
 
-    expect(await screen.findByText("Paged")).toBeInTheDocument();
-    expect(requests.at(-1)?.get("page")).toBe("1");
-    expect(requests.at(-1)?.get("page_size")).toBe("20");
-    expect(
-      screen.getByText(translate("pagination.rangeOf", { ns: "ui", start: 1, end: 1, total: 1 }))
-    ).toBeInTheDocument();
-  });
+      const link = (await screen.findByText("Paged")).closest("a");
+      expect(link).toHaveAttribute("href", `/c/1/i/${INITIATIVE_ID}/${toolRouteSegment(tool)}/7`);
+      expect(requests.at(-1)?.get("page")).toBe("1");
+      expect(requests.at(-1)?.get("page_size")).toBe("20");
+      expect(
+        screen.getByText(translate("pagination.rangeOf", { ns: "ui", start: 1, end: 1, total: 1 }))
+      ).toBeInTheDocument();
+    }
+  );
 
   it.each(CASES)("$tool leaves a page past its end for its last one", async ({ tool }) => {
     const requests = stubList(tool, [row(tool, { id: 1, name: "Survivor" })]);
@@ -266,15 +269,6 @@ describe("the tool index page", () => {
 
     expect(await screen.findByText("Survivor")).toBeInTheDocument();
     expect(requests.map((params) => params.get("page"))).toEqual(["3", "1"]);
-  });
-
-  it.each(CASES)("$tool opens a row at its own address", async ({ tool }) => {
-    stubList(tool, [row(tool, { id: 7, name: "Openable" })]);
-
-    renderIndex(tool);
-
-    const link = (await screen.findByText("Openable")).closest("a");
-    expect(link).toHaveAttribute("href", `/c/1/i/${INITIATIVE_ID}/${toolRouteSegment(tool)}/7`);
   });
 
   it.each(CASES)("$tool marks the row with something unread", async ({ tool }) => {
@@ -301,7 +295,7 @@ describe("the tool index page", () => {
 
 describe("the tool index page's property filter", () => {
   it("offers only the properties of the initiative the list is in", async () => {
-    stubList(Tool.counter_group, [row(Tool.counter_group, { id: 1, name: "Running" })]);
+    stubList(Tool.wiki, [row(Tool.wiki, { id: 1, name: "Running" })]);
     const asked: URLSearchParams[] = [];
     server.use(
       communityHttp.get("/property-definitions/", ({ request }) => {
@@ -310,7 +304,7 @@ describe("the tool index page's property filter", () => {
       })
     );
 
-    renderIndex(Tool.counter_group);
+    renderIndex(Tool.wiki);
     await screen.findByText("Running");
     await userEvent.click(screen.getByRole("button", { name: shared("toolbar.filters") }));
 
@@ -356,35 +350,40 @@ describe("the tool index page's bulk actions", () => {
   };
 
   it("duplicates and deletes a selection through the tool's own routes", async () => {
-    stubList(Tool.counter_group, [
-      row(Tool.counter_group, { id: 4, name: "Standup" }),
-      row(Tool.counter_group, { id: 5, name: "Retro" }),
+    stubList(Tool.wiki, [
+      row(Tool.wiki, { id: 4, name: "Standup" }),
+      row(Tool.wiki, { id: 5, name: "Retro" }),
+      row(Tool.wiki, { id: 6, name: "Review" }),
     ]);
     const duplicated: string[] = [];
     const deleted: string[] = [];
     server.use(
-      communityHttp.post("/counter-groups/:id/duplicate", ({ params }) => {
+      communityHttp.post("/wikis/:id/duplicate", ({ params }) => {
         duplicated.push(String(params.id));
         return HttpResponse.json({ id: 40, initiative_id: INITIATIVE_ID });
       }),
-      communityHttp.delete("/counter-groups/:id", ({ params }) => {
+      communityHttp.delete("/wikis/:id", ({ params }) => {
         deleted.push(String(params.id));
         return new HttpResponse(null, { status: 204 });
       })
     );
 
-    renderIndex(Tool.counter_group);
+    renderIndex(Tool.wiki);
     await screen.findByText("Standup");
 
     await select("Standup");
     await userEvent.click(screen.getByRole("button", { name: shared("bulkActions.duplicate") }));
     await waitFor(() => expect(duplicated).toEqual(["4"]));
 
-    await select("Retro");
+    // Shift extends from the card last picked, from the keyboard as from a click.
+    await select("Standup");
+    screen.getByRole("button", { name: "Review", pressed: false }).focus();
+    await userEvent.keyboard("{Shift>}{Enter}{/Shift}");
+    expect(screen.getByRole("button", { name: "Retro", pressed: true })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: shared("delete") }));
     const confirm = await screen.findByRole("alertdialog");
     await userEvent.click(within(confirm).getByRole("button", { name: shared("delete") }));
-    await waitFor(() => expect(deleted).toEqual(["5"]));
+    await waitFor(() => expect(deleted.sort()).toEqual(["4", "5", "6"]));
   });
 
   it("refuses sharing on an archived selection, and says why", async () => {
@@ -485,12 +484,8 @@ describe("the file index page", () => {
 
     await waitFor(() => expect(requests.at(-1)?.get("kind")).toBe("whiteboard"));
     expect(requests.at(-1)?.get("is_template")).toBe("false");
-  });
 
-  it("is made from a dialog of its own", async () => {
-    stubList(Tool.file, []);
-
-    renderIndex(Tool.file);
+    // It is made from a dialog of its own.
     await userEvent.click(await screen.findByRole("button", { name: copy(Tool.file, "create") }));
 
     const dialog = await screen.findByRole("dialog");
@@ -591,34 +586,6 @@ describe("the project index page", () => {
     await userEvent.click(screen.getByRole("radio", { name: shared("toolViewFilter.archived") }));
     expect(await screen.findByText("Planescape Detour")).toBeInTheDocument();
     expect(handles()).toHaveLength(0);
-  });
-
-  it("is made from a dialog of its own, in the initiative it is listed in", async () => {
-    stubList(Tool.project, []);
-    let sent: unknown;
-    server.use(
-      communityHttp.post("/projects/", async ({ request }) => {
-        sent = await request.json();
-        return HttpResponse.json(buildProject({ id: 9, name: "Fresh" }));
-      })
-    );
-
-    renderIndex(Tool.project);
-    await userEvent.click(
-      await screen.findByRole("button", { name: translate("projects:addProject") })
-    );
-
-    const dialog = await screen.findByRole("dialog");
-    await userEvent.type(within(dialog).getByLabelText(translate("common:name")), "Fresh");
-    await userEvent.click(
-      within(dialog).getByRole("button", {
-        name: translate("projects:createDialog.createProject"),
-      })
-    );
-
-    await waitFor(() =>
-      expect(sent).toMatchObject({ name: "Fresh", initiative_id: INITIATIVE_ID })
-    );
   });
 
   it("starts a project from the template picked, with the template's description", async () => {

@@ -18,6 +18,7 @@ too large a vocabulary to read in one sitting:
 * ``widget_meta`` — the server-side reading of the rules the browser applies to
   a widget's own strings.
 * ``service_plugins`` — the ``plugin_kind: "service"`` manifest.
+* ``tool_plugins`` — the ``plugin_kind: "tool"`` manifest.
 
 Two rules span all of them. **Attribution is required**: a listing states who
 wrote it or it is not published. And **``core.*`` belongs to this repository**:
@@ -26,7 +27,9 @@ an id in that namespace is only ever claimed by a listing shipped in this build.
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Mapping
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any
 
 from app.core.tools import BULK_EXPORT_TOOLS, Tool
 from app.models.platform.publisher import FIRST_PARTY_PUBLISHER_PREFIX, publisher_prefix
@@ -50,11 +53,14 @@ from app.services.marketplace.tool_listings import (
     normalize_tool_example,
     normalize_tool_listing,
 )
+from app.services.marketplace.tool_plugins import normalize_tool_plugin_definition
+
+if TYPE_CHECKING:
+    from app.core.tool_set import ToolSet
 
 __all__ = [
     "GUILD_INSTALLABLE_PLUGIN_KINDS",
     "KIND_AUDIENCE",
-    "LISTING_AUDIENCES",
     "LISTING_KINDS",
     "LISTING_SOURCES",
     "LOCAL_SOURCE",
@@ -63,7 +69,6 @@ __all__ = [
     "RESERVED_PUBLIC_ID_PREFIX",
     "TOOL_LISTING_KINDS",
     "ListingDefinitionError",
-    "kinds_for_audience",
     "normalize_listing_definition",
     "normalize_listing_example",
     "normalize_publisher",
@@ -107,8 +112,6 @@ LISTING_KINDS: frozenset[str] = frozenset(
 #: The distinction is not cosmetic. It decides which marketplace offers a
 #: listing, who is allowed to install it, and what "installed" is even recorded
 #: against — so it is declared once, here, beside the kinds themselves.
-LISTING_AUDIENCES: frozenset[str] = frozenset({"guild", "user"})
-
 KIND_AUDIENCE: dict[str, str] = {
     "plugin": "guild",
     "auto": "guild",
@@ -116,13 +119,6 @@ KIND_AUDIENCE: dict[str, str] = {
     "home_layout": "user",
     **{kind: "guild" for kind in TOOL_LISTING_KINDS},
 }
-
-
-def kinds_for_audience(audience: str) -> frozenset[str]:
-    """The listing kinds a given marketplace offers."""
-    if audience not in LISTING_AUDIENCES:
-        raise ValueError(f"unknown listing audience {audience!r}")
-    return frozenset(kind for kind, who in KIND_AUDIENCE.items() if who == audience)
 
 
 #: How a listing reached this deployment. Not a trust ranking shown to a reader
@@ -147,12 +143,13 @@ LOCAL_SOURCE = "local"
 #: ``tool_instance`` mounts one of the plug-in's own tools at guild scope — the plug-in
 #: creates an ordinary row in an ordinary table and the existing UI renders it.
 #: ``service`` declares features a container the operator runs will
-#: serve.
-PLUGIN_KINDS: frozenset[str] = frozenset({"tool_instance", "service"})
+#: serve. ``tool`` declares a tool of its own, whose tables Initiative creates
+#: in each community that installs it.
+PLUGIN_KINDS: frozenset[str] = frozenset({"tool_instance", "service", "tool"})
 
 #: The plug-in kinds the guild install path can mount.
 #:
-#: All three, now that a ``service`` plug-in has somewhere to land: the deployment's
+#: Both, now that a ``service`` plug-in has somewhere to land: the deployment's
 #: registration supplies the address, the secret and the powers, and the install
 #: is the pinned definition plus whatever the guild configures against it. A
 #: service plug-in creates no local content, so installing one is the row and
@@ -161,14 +158,50 @@ PLUGIN_KINDS: frozenset[str] = frozenset({"tool_instance", "service"})
 #: The set is still separate from :data:`PLUGIN_KINDS` because the two answer
 #: different questions — what a listing may *declare* versus what this build can
 #: *mount* — and a kind added to the vocabulary ahead of its machinery is
-#: refused by name rather than half-mounted.
-GUILD_INSTALLABLE_PLUGIN_KINDS: frozenset[str] = frozenset({"tool_instance", "service"})
+#: refused by name rather than half-mounted. ``tool`` is one: it registers, and
+#: is not installed until this build creates a tool's tables in a community.
+GUILD_INSTALLABLE_PLUGIN_KINDS: frozenset[str] = frozenset(
+    {"tool_instance", "service", "tool"}
+)
 
 #: Tools a plug-in may mount at guild scope. A tool qualifies when its content is
 #: meaningful without an initiative — a calendar of the guild's own events is,
 #: and so is the guild's address book; a dashboard, which binds to one
 #: initiative's data, is not (and is not planned to be).
 MOUNTABLE_TOOLS: frozenset[str] = frozenset({"calendar", "contact"})
+
+
+class PluginTag(StrEnum):
+    """How a plug-in shows up for the people using it, in one word: what its
+    listing's tag says. Read off the definition, so no publisher states it."""
+
+    #: A tool of its own, used inside initiatives like a built-in one.
+    tool = "tool"
+    #: One of this build's tools, for the whole community.
+    community_tool = "community_tool"
+    #: A page of its own.
+    page = "page"
+    #: An account at another service to connect.
+    connection = "connection"
+    #: Things added to the tools a community already uses: fields, sections,
+    #: actions, widgets, dashboards.
+    add_on = "add_on"
+
+
+def plugin_tag(definition: Mapping[str, Any]) -> PluginTag:
+    """The tag for a plug-in definition. A service declaring several things
+    is tagged by the one a reader meets first: a page, then a connection."""
+    kind = definition.get("plugin_kind")
+    if kind == "tool":
+        return PluginTag.tool
+    if kind == "tool_instance":
+        return PluginTag.community_tool
+    if definition.get("pages"):
+        return PluginTag.page
+    if definition.get("connections"):
+        return PluginTag.connection
+    return PluginTag.add_on
+
 
 #: The namespace this repository's own listings publish under.
 RESERVED_PUBLIC_ID_PREFIX = "core."
@@ -250,6 +283,8 @@ def _normalize_plugin_definition(
 
     if plugin_kind == "service":
         return normalize_service_plugin_definition(definition, public_id=public_id)
+    if plugin_kind == "tool":
+        return normalize_tool_plugin_definition(definition)
 
     cleaned: dict[str, Any] = {"plugin_kind": plugin_kind}
     tool = definition.get("tool")
@@ -271,13 +306,19 @@ def _normalize_plugin_definition(
 
 
 def normalize_listing_definition(
-    kind: str, definition: Any, *, public_id: str | None = None
+    kind: str,
+    definition: Any,
+    *,
+    public_id: str | None = None,
+    tools: ToolSet | None = None,
 ) -> dict[str, Any]:
     """Validate and canonicalize a listing's definition for its kind.
 
     A tool's listing is that tool's export envelope, held to the tool's own
     importer (``tool_listings``); the other kinds each have their own shape.
     ``public_id`` is the listing's, which names a declarative plug-in.
+    ``tools`` are what a dashboard's queries may name: the built-in tools
+    unless a tool plug-in brings the dashboard.
     """
     if kind not in LISTING_KINDS:
         raise ListingDefinitionError(f"unknown listing kind {kind!r}")
@@ -291,7 +332,7 @@ def normalize_listing_definition(
         return normalize_profile_pack_definition(definition)
     if kind == "home_layout":
         return normalize_home_layout_definition(definition)
-    return normalize_tool_listing(TOOL_LISTING_KINDS[kind], definition)
+    return normalize_tool_listing(TOOL_LISTING_KINDS[kind], definition, tools=tools)
 
 
 def normalize_listing_example(

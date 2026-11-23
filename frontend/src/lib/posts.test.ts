@@ -31,15 +31,10 @@ const serverConstant = (source: string, name: string) => {
   return Number(match?.[1].replaceAll("_", ""));
 };
 
-describe("post length limit", () => {
-  it("matches the server's own ceiling", () => {
-    const source = fs.readFileSync(SCHEMA, "utf-8");
-    expect(serverConstant(source, "MAX_POST_TEXT_CHARS")).toBe(MAX_POST_TEXT_CHARS);
-  });
-});
-
-describe("poll limits", () => {
+describe("post and poll limits", () => {
   it("match the server's own bounds", () => {
+    const schema = fs.readFileSync(SCHEMA, "utf-8");
+    expect(serverConstant(schema, "MAX_POST_TEXT_CHARS")).toBe(MAX_POST_TEXT_CHARS);
     const source = fs.readFileSync(POLL_MODEL, "utf-8");
     expect(serverConstant(source, "MIN_POLL_OPTIONS")).toBe(MIN_POLL_OPTIONS);
     expect(serverConstant(source, "MAX_POLL_OPTIONS")).toBe(MAX_POLL_OPTIONS);
@@ -51,16 +46,10 @@ describe("hasBody", () => {
   // Lexical refuses an editor state whose root has no children, so `{}` — what
   // a headline-only notice stores, and what a notice that is only a headline
   // and a poll stores — is a crash rather than an empty document.
-  it("refuses the empty object a bodyless notice stores", () => {
+  it("refuses the empty object a bodyless notice stores, and nothing at all", () => {
     expect(hasBody({})).toBe(false);
-  });
-
-  it("refuses nothing at all", () => {
     expect(hasBody(null)).toBe(false);
     expect(hasBody(undefined)).toBe(false);
-  });
-
-  it("accepts a real editor state", () => {
     expect(hasBody({ root: { children: [] } })).toBe(true);
   });
 });
@@ -70,22 +59,14 @@ describe("postBoardTime", () => {
   const scheduled = "2026-02-01T00:00:00.000Z";
   const published = "2026-03-01T00:00:00.000Z";
 
-  it("dates a live notice by when it went up", () => {
-    expect(
-      postBoardTime({ published_at: published, scheduled_for: scheduled, created_at: created })
-    ).toBe(published);
-  });
-
-  it("dates a draft by when it is due, so it previews where it will land", () => {
-    expect(
-      postBoardTime({ published_at: null, scheduled_for: scheduled, created_at: created })
-    ).toBe(scheduled);
-  });
-
-  it("falls back to when it was written", () => {
-    expect(postBoardTime({ published_at: null, scheduled_for: null, created_at: created })).toBe(
-      created
-    );
+  // A live notice by when it went up, a draft by when it is due (so it
+  // previews where it will land), else when it was written.
+  it.each([
+    [published, scheduled, published],
+    [null, scheduled, scheduled],
+    [null, null, created],
+  ])("dates published %s, scheduled %s by %s", (published_at, scheduled_for, expected) => {
+    expect(postBoardTime({ published_at, scheduled_for, created_at: created })).toBe(expected);
   });
 
   // The timeline groups by this and the server orders by its own board_time().
@@ -107,19 +88,15 @@ describe("postBoardTime", () => {
 });
 
 describe("postPeriod", () => {
-  it("groups a notice by the month it falls in", () => {
+  it("groups a notice by the month it falls in, padded so periods sort as strings", () => {
     // Built from local parts so the expectation holds in any zone the suite
     // runs in — the same reason the helper reads local getters.
-    const local = new Date(2026, 2, 15, 9, 0);
-    expect(postPeriod({ published_at: local.toISOString(), created_at: local.toISOString() })).toBe(
-      "2026-03"
-    );
-  });
-
-  it("pads a single-digit month, so periods sort as strings", () => {
-    const local = new Date(2026, 0, 5, 9, 0);
-    expect(postPeriod({ published_at: local.toISOString(), created_at: local.toISOString() })).toBe(
-      "2026-01"
-    );
+    for (const [month, expected] of [
+      [2, "2026-03"],
+      [0, "2026-01"],
+    ] as const) {
+      const local = new Date(2026, month, 15, 9, 0).toISOString();
+      expect(postPeriod({ published_at: local, created_at: local })).toBe(expected);
+    }
   });
 });

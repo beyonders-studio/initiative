@@ -37,8 +37,8 @@ class RenderItem:
     ``format`` / ``template_id`` override the request's values for THIS item —
     the aggregate sources mix formats in one batch (a backup zips envelopes
     beside file blobs; an à-la-carte report zips a project PDF beside a
-    counter group CSV). ``None`` inherits the request value, so single-format sources are
-    untouched."""
+    contacts CSV). ``None`` inherits the request value, so single-format
+    sources are untouched."""
 
     key: str
     data: dict[str, Any]
@@ -88,9 +88,8 @@ class RenderBackend(Protocol):
     def render_stream(self, req: RenderRequest) -> AsyncIterator[RenderedArtifact]:
         """The same batch, one artifact at a time.
 
-        Optional: ``engine.render_artifacts`` falls back to ``render`` for a
-        backend that does not implement it. An aggregate export uses it so the
-        archive assembles on disk from one artifact at a time, which is what
-        lets a whole community's export exceed what fits in memory.
+        An aggregate export uses it so the archive assembles on disk from one
+        artifact at a time, which is what lets a whole community's export
+        exceed what fits in memory.
         """
         ...

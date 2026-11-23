@@ -2,15 +2,12 @@ import { useNavigate } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type {
-  InitiativeRoleRead,
-  InitiativeUpdate,
-  Tool,
-} from "@/api/generated/initiativeAPI.schemas";
+import type { InitiativeRoleRead } from "@/api/generated/initiativeAPI.schemas";
 import { ToolsSection } from "@/components/initiatives/ToolsToggles";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { type CommunityTool, useCommunityTools } from "@/hooks/useCommunityTools";
 import {
   useGrantToolToRoles,
   useInitiativeDefaults,
@@ -21,7 +18,6 @@ import { useUpdateInitiative } from "@/hooks/useInitiatives";
 import { useServerForm } from "@/hooks/useServerForm";
 import { DEFAULT_COLOR } from "@/lib/initiativeColors";
 import { toast } from "@/lib/mascotToast";
-import { isToolEnabled, TOOLS, toolCamelPlural, toolViewPermission } from "@/lib/tools";
 import { Button } from "@/ui/button";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import { Field } from "@/ui/field";
@@ -37,16 +33,19 @@ interface InitiativeSettingsDetailsTabProps {
   setDescription: (value: string) => void;
   color: string;
   setColor: (value: string) => void;
-  /** Master-switch value per toggleable tool. */
-  toolSwitches: Partial<Record<Tool, boolean>>;
-  onToggleTool: (tool: Tool, value: boolean) => void;
+  /** The initiative's tools: the built-in ones and the tool plug-ins placed
+   *  in it. */
+  tools: CommunityTool[];
+  /** Master-switch value per tool, by kind. */
+  toolSwitches: Partial<Record<string, boolean>>;
+  onToggleTool: (tool: string, value: boolean) => void;
   canManageMembers: boolean;
   isSaving: boolean;
   onSaveDetails: (event: FormEvent<HTMLFormElement>) => void;
   /** The initiative's roles, so each enabled tool can say who can see it. */
   roles?: InitiativeRoleRead[];
   /** Grant a tool's view permission to every non-manager role. */
-  onGrantToEveryone?: (tool: Tool) => void;
+  onGrantToEveryone?: (tool: string) => void;
   /** Send the reader to the roles screen. */
   onManageRoles?: () => void;
 }
@@ -58,6 +57,7 @@ const InitiativeSettingsDetailsTab = ({
   setDescription,
   color,
   setColor,
+  tools,
   toolSwitches,
   onToggleTool,
   canManageMembers,
@@ -114,6 +114,7 @@ const InitiativeSettingsDetailsTab = ({
       {/* Saves on change, unlike the details form above: each switch is a
           single setting, not a field waiting on a Save button. */}
       <ToolsSection
+        tools={tools}
         layout="card"
         canManage={canManageMembers}
         isSaving={isSaving}
@@ -141,10 +142,11 @@ export const DetailsPage = () => {
   const rolesQuery = useInitiativeRoles(initiativeId || null);
   const roles = rolesQuery.isSuccess ? rolesQuery.data : undefined;
   const grantToolToRoles = useGrantToolToRoles(initiativeId);
+  const tools = useCommunityTools(initiativeId);
 
   // The tool a confirmation dialog is currently open for, per direction.
-  const [toolToEnable, setToolToEnable] = useState<Tool | null>(null);
-  const [toolToDisable, setToolToDisable] = useState<Tool | null>(null);
+  const [toolToEnable, setToolToEnable] = useState<CommunityTool | null>(null);
+  const [toolToDisable, setToolToDisable] = useState<CommunityTool | null>(null);
 
   // All three wait for Save, so a refetch mid-sentence must not take the
   // sentence away.
@@ -198,16 +200,19 @@ export const DetailsPage = () => {
   // what left members staring at a sidebar the manager could see past. Both
   // directions go through a dialog — on to settle the audience, off to say
   // what it hides.
-  const handleToggleTool = (tool: Tool, value: boolean) => {
+  const toolOf = (kind: string) => tools.find((one) => one.kind === kind) ?? null;
+
+  const handleToggleTool = (kind: string, value: boolean) => {
+    const tool = toolOf(kind);
     if (value) setToolToEnable(tool);
     else setToolToDisable(tool);
   };
 
-  const setMasterSwitch = (tool: Tool, value: boolean, onSuccess?: () => void) =>
+  const setMasterSwitch = (tool: CommunityTool, value: boolean, onSuccess?: () => void) =>
     updateInitiative.mutate(
       {
         initiativeId,
-        data: { [toolViewPermission(tool)]: value } as InitiativeUpdate,
+        data: { tools: { [tool.kind]: value } },
       },
       onSuccess ? { onSuccess } : undefined
     );
@@ -215,27 +220,25 @@ export const DetailsPage = () => {
   // Granting always reports both ways. A grant that failed quietly would leave
   // exactly the state this whole screen exists to make visible: a tool that is
   // on and that nobody but a manager can see.
-  const grantToEveryone = (tool: Tool) =>
+  const grantToEveryone = (kind: string) =>
     grantToolToRoles.mutate(
-      { tool },
+      { tool: kind },
       {
         onSuccess: () =>
           toast.success(
-            t("initiatives:settings.toolAudience.granted", {
-              tool: t(`initiatives:${toolCamelPlural(tool)}Feature` as never),
-            })
+            t("initiatives:settings.toolAudience.granted", { tool: toolOf(kind)?.name ?? kind })
           ),
       }
     );
 
-  const handleConfirmEnable = (tool: Tool, audience: ToolAudience) => {
+  const handleConfirmEnable = (tool: CommunityTool, audience: ToolAudience) => {
     setToolToEnable(null);
     setMasterSwitch(tool, true, () => {
-      if (audience === "everyone") grantToEveryone(tool);
+      if (audience === "everyone") grantToEveryone(tool.kind);
     });
   };
 
-  const handleConfirmDisable = (tool: Tool) => {
+  const handleConfirmDisable = (tool: CommunityTool) => {
     setToolToDisable(null);
     setMasterSwitch(tool, false);
   };
@@ -259,9 +262,8 @@ export const DetailsPage = () => {
         setDescription={setDescription}
         color={color}
         setColor={setColor}
-        toolSwitches={Object.fromEntries(
-          TOOLS.map((tool) => [tool, Boolean(isToolEnabled(tool, initiative))])
-        )}
+        tools={tools}
+        toolSwitches={initiative.tools}
         onToggleTool={handleToggleTool}
         canManageMembers={canManageMembers}
         isSaving={isSaving}
