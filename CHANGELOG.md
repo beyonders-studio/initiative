@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.80.0] - 2026-11-22
+
 ### Added
 
 - **Initiative grows through plug-ins.** Tools few communities use move out of Initiative's core into plug-ins, Counters first, so a server no longer carries tables for a tool its communities don't use. The plug-in registry has been here for a while, but it was unstable while we spent months building robust tool features; it is now reaching stability, and what you can add to a community will keep growing. Tell us what you'd like to see with **Send feedback** in your account menu.
