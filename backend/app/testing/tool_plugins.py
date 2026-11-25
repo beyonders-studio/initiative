@@ -1,5 +1,5 @@
 """Counters, the tool plug-in an upgrade installs from the version frozen
-beside the revision that converts it, as a manifest a test registers, and the
+beside the revision that converts it, as the registry lists it, and the
 helpers that list and install it."""
 
 from __future__ import annotations
@@ -60,15 +60,20 @@ def counters_tool_manifest() -> dict[str, Any]:
     return copy.deepcopy(_frozen()["definition"])
 
 
-def counters_listing() -> dict[str, Any]:
-    """Counters' listing file, as a server's owner uploads it where no
-    registry brings it: the frozen version, under the plug-in's uid."""
+def counters_listing(
+    definition: dict[str, Any] | None = None, *, version: str | None = None
+) -> dict[str, Any]:
+    """Counters' listing as the registry publishes it: under its uid and this
+    project's publisher, at the version the conversion froze unless
+    ``version`` says otherwise, declaring ``definition`` (the frozen one
+    unless given)."""
     from app.models.platform.publisher import (
         FIRST_PARTY_PUBLISHER_NAME,
         FIRST_PARTY_PUBLISHER_PREFIX,
     )
 
-    definition = counters_tool_manifest()
+    if definition is None:
+        definition = counters_tool_manifest()
     return {
         "uid": COUNTERS_UID,
         "public_id": f"{FIRST_PARTY_PUBLISHER_PREFIX}.counters",
@@ -78,17 +83,24 @@ def counters_listing() -> dict[str, Any]:
         "description": (
             "Numbers that move: tallies, totals, scores, seats left, hit points."
         ),
-        "version": _frozen()["version"],
+        "version": version or _frozen()["version"],
         "definition": definition,
     }
 
 
-async def list_counters(session: AsyncSession) -> MarketplaceListing:
-    """List Counters on ``session``, a system session, as an owner's upload
-    of :func:`counters_listing` does. Flushed, not committed."""
-    from app.services.marketplace.local_listings import upload_listing
+async def list_counters(
+    session: AsyncSession,
+    definition: dict[str, Any] | None = None,
+    *,
+    version: str | None = None,
+) -> MarketplaceListing:
+    """List Counters (:func:`counters_listing`) on ``session``, a system
+    session, as a registry refresh writes it. Flushed, not committed."""
+    from app.services.marketplace.catalog import REGISTRY_SOURCE, upsert_listing
 
-    return await upload_listing(session, counters_listing())
+    return await upsert_listing(
+        session, counters_listing(definition, version=version), source=REGISTRY_SOURCE
+    )
 
 
 def counters_tool_set(
@@ -127,25 +139,31 @@ async def install_tool_plugin(
     definition: dict[str, Any] | None = None,
     placements: str | list[int] = "all",
 ) -> dict[str, Any]:
-    """List a tool plug-in (Counters unless ``definition`` says otherwise),
-    which gives its kinds their codes, and install it as ``seat``, the
-    community's seat, placed in ``placements`` (every initiative there is, as
-    the install dialog offers first). Returns the install as the API reads it.
-    ``session`` is committed first, so it holds nothing the provisioning of
-    the tool's tables waits on."""
+    """List a tool plug-in, which gives its kinds their codes, and install it
+    as ``seat``, the community's seat, placed in ``placements`` (every
+    initiative there is, as the install dialog offers first). Counters, under
+    its uid, is listed as the registry brings it (:func:`list_counters`),
+    declaring ``definition`` where one is given; under another uid, a test's
+    own plug-in declaring ``definition`` (Counters' unless given). Returns the
+    install as the API reads it. ``session`` is committed first, so it holds
+    nothing the provisioning of the tool's tables waits on."""
     from app.db import post_commit
     from app.services.marketplace.tool_plugins import normalize_tool_plugin_definition
     from app.testing.factories import create_marketplace_listing
 
     declared = normalize_tool_plugin_definition(definition or counters_tool_manifest())
-    await create_marketplace_listing(
-        session,
-        uid=uid,
-        public_id=f"test.{uid.lower()}",
-        kind="plugin",
-        name=declared["default_name"],
-        definition=declared,
-    )
+    if uid == COUNTERS_UID:
+        await list_counters(session, declared)
+        await session.commit()
+    else:
+        await create_marketplace_listing(
+            session,
+            uid=uid,
+            public_id=f"test.{uid.lower()}",
+            kind="plugin",
+            name=declared["default_name"],
+            definition=declared,
+        )
     await post_commit.settle(session)
     response = await client.post(
         seat.g("/plugins/"),
@@ -159,18 +177,23 @@ async def install_tool_plugin(
 async def install_counters(
     session: AsyncSession, guild_id: int, installer_id: int, placements: set[int]
 ) -> ToolSet:
-    """List Counters (:func:`list_counters`) and install it in ``guild_id``
-    as ``installer_id``, its seat, through the service the
-    marketplace's install calls, placed in ``placements``; then make its
-    tables and switch it on in every initiative, as the install route does
-    once the install commits. Returns the community's tools. Committed."""
+    """List Counters (:func:`list_counters`) where the server does not list
+    it yet, and install it in ``guild_id`` as ``installer_id``, its seat,
+    through the service the marketplace's install calls, placed in
+    ``placements``; then make its tables and switch it on in every
+    initiative, as the install route does once the install commits. A
+    database a release's own seed filled may list it already, and a registry
+    publish does not replace another source's listing. Returns the
+    community's tools. Committed."""
     from app.db.schema_provisioning import provision_community_tools
+    from app.services.marketplace.catalog import get_listing_by_uid
     from app.services.marketplace.installs import resolve_listing_install
     from app.services.tenant import guild_plugins as guild_plugins_service
     from app.services.tenant.initiative_tools import write_installed_tools
     from app.testing.schema_harness import route_session_to_guild
 
-    await list_counters(session)
+    if await get_listing_by_uid(session, COUNTERS_UID) is None:
+        await list_counters(session)
     await route_session_to_guild(session, guild_id)
     listing, version = await resolve_listing_install(
         session, COUNTERS_UID, kind="plugin"

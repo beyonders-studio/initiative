@@ -116,9 +116,10 @@ BOOT_SECONDS = 600
 #: as an air-gapped install has none.
 IMAGE_UID = "1999"
 
-#: Where ``--image`` looks for the marketplace registry: nowhere it can reach,
+#: Where every boot looks for the marketplace registry: nowhere it can reach,
 #: as on an air-gapped install that has no mirror. Its refresh still runs, and
-#: fails without leaving the host.
+#: fails without leaving the host, so what the live registry publishes today
+#: never lands in the database the seeds write to.
 OFFLINE_REGISTRY = "http://127.0.0.1:9/"
 
 #: What the explicit-logins deployment runs beside the image.
@@ -910,14 +911,9 @@ def _boot(
 ) -> None:
     """Start ``image`` as a deployment does, wait until it answers, check what
     it serves when it is this tree's (``setup``), and stop it."""
-    given = {"APP_URL": APP_URL}
+    given = {"APP_URL": APP_URL, "MARKETPLACE_REGISTRY_URL": OFFLINE_REGISTRY}
     if setup is not None:
-        given |= {
-            "PUID": IMAGE_UID,
-            "PGID": IMAGE_UID,
-            "MARKETPLACE_REGISTRY_URL": OFFLINE_REGISTRY,
-            **setup.settings,
-        }
+        given |= {"PUID": IMAGE_UID, "PGID": IMAGE_UID, **setup.settings}
     env = {**env, **given}
     image_env = (
         "SECRET_KEY",

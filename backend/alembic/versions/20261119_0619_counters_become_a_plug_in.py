@@ -43,6 +43,14 @@ Counters is switched on in an initiative:
 Elsewhere, and in ``guild_template``, the rules and rows naming a counter kind
 are deleted and the two tables dropped.
 
+A community that installed the plug-in from the registry while Counters was
+still built in keeps that install. Where the built-in tool was switched on
+but holds no counter group, there is nothing to move: the install is placed
+in each initiative where the built-in tool was on, and the community is
+treated as one without counters. Built-in counter groups beside the install
+are two sets of counters this cannot make one, so the upgrade stops there and
+says so.
+
 Every write runs with the table's row security unforced and its user
 triggers held, both restored in the same transaction. The CHECKs that list
 the kinds are dropped first; a start renders them for the community's tools.
@@ -357,20 +365,33 @@ def _upgrade_schema(converted: list[int]) -> None:
                 " false) ORDER BY i.id"
             )
         ]
-        in_use = guild_id is not None and (
-            bool(on_in) or bool(_scalar("SELECT EXISTS (SELECT 1 FROM counter_groups)"))
+        groups = bool(_scalar("SELECT EXISTS (SELECT 1 FROM counter_groups)"))
+        in_use = guild_id is not None and (bool(on_in) or groups)
+        installed = _scalar(
+            "SELECT id FROM guild_plugins WHERE listing_uid = :u", u=UID
         )
-        installed = bool(
-            _scalar(
-                "SELECT EXISTS (SELECT 1 FROM guild_plugins WHERE listing_uid = :u)",
-                u=UID,
+    if in_use and installed is not None:
+        if groups:
+            raise RuntimeError(
+                f"{schema} has the Counters plug-in installed beside built-in counters"
+                " with counter groups; uninstall the plug-in there before upgrading"
             )
-        )
-    if in_use and installed:
-        raise RuntimeError(
-            f"{schema} has the Counters plug-in installed beside built-in counters;"
-            " uninstall the plug-in there before upgrading"
-        )
+        # Installed from the registry while the built-in tool was switched on
+        # and held nothing: there is nothing to move, so the install stays the
+        # community's Counters, placed wherever the built-in tool was on.
+        with _held("plugin_placements"):
+            for initiative_id in on_in:
+                _bind().execute(
+                    sa.text(
+                        "INSERT INTO plugin_placements"
+                        " (install_id, initiative_id, created_at, updated_at)"
+                        " SELECT :p, :i, now(), now() WHERE NOT EXISTS ("
+                        " SELECT 1 FROM plugin_placements"
+                        " WHERE install_id = :p AND initiative_id = :i)"
+                    ),
+                    {"p": installed, "i": initiative_id},
+                )
+        in_use = False
 
     kind_columns = _kind_columns(schema)
     kind_tables = [table for table, _ in kind_columns]

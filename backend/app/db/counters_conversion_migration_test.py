@@ -22,9 +22,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.relationships import Provenance, RelationshipType
 from app.core.tools import Tool
+from app.db.plugin_tools import provisioned_tools
 from app.db.schema_provisioning import guild_schema_name
 from app.models.platform.guild import CommunityRole
 from app.services.tenant import relationships
+from app.services.tenant.initiative_tools import write_installed_tools
 from app.testing import (
     create_comment,
     create_initiative,
@@ -421,6 +423,178 @@ async def test_a_converted_community_needs_no_listing(
         json={"initiative_id": admin.initiative.id, "name": "After"},
     )
     assert made.status_code == 201, made.text
+
+
+async def _from_the_registry(
+    session: AsyncSession, guild_id: int, installer: int, placed: list[int]
+) -> int:
+    """Counters installed from the registry before it was built in no more,
+    beside the built-in tool's tables, as a release before the conversion
+    left it: its install, placed in ``placed``, and the rule CHECK that
+    release rendered, which knew the built-in tool's keys and not the
+    plug-in's. Returns the install's id."""
+    s = f'"{guild_schema_name(guild_id)}"'
+    conn = await session.connection()
+    # Written as that release wrote them: its triggers are not this one's.
+    await conn.execute(sa.text("SET LOCAL session_replication_role = replica"))
+    check = await conn.scalar(
+        sa.text(
+            "SELECT pg_get_constraintdef(oid) FROM pg_constraint"
+            " WHERE conname = 'ck_initiative_rules_key'"
+            " AND connamespace = CAST(:s AS regnamespace)"
+        ),
+        {"s": guild_schema_name(guild_id)},
+    )
+    assert check is not None and check.startswith("CHECK ")
+    await conn.execute(
+        sa.text(
+            f"ALTER TABLE {s}.initiative_rules DROP CONSTRAINT ck_initiative_rules_key"
+        )
+    )
+    await conn.execute(
+        sa.text(
+            f"ALTER TABLE {s}.initiative_rules ADD CONSTRAINT ck_initiative_rules_key"
+            f" CHECK ({check.removeprefix('CHECK ')} OR (install_id IS NULL AND key IN"
+            " ('counter_groups_enabled', 'create_counter_groups')))"
+        )
+    )
+    frozen = counters_conversion()._FROZEN
+    install_id = await conn.scalar(
+        sa.text(
+            f"INSERT INTO {s}.guild_plugins (listing_uid, listing_version,"
+            " plugin_kind, name, definition, created_by, created_by_kind,"
+            " created_at, updated_at) VALUES (:uid, '0.6.1', 'tool', :name,"
+            " CAST(:definition AS jsonb), :installer, 'member', now(), now())"
+            " RETURNING id"
+        ),
+        {
+            "uid": COUNTERS_UID,
+            "name": frozen["definition"]["default_name"],
+            "definition": json.dumps(frozen["definition"]),
+            "installer": installer,
+        },
+    )
+    for initiative_id in placed:
+        await conn.execute(
+            sa.text(
+                f"INSERT INTO {s}.plugin_placements"
+                " (install_id, initiative_id, created_at, updated_at)"
+                " VALUES (:p, :i, now(), now())"
+            ),
+            {"p": install_id, "i": initiative_id},
+        )
+    assert install_id is not None
+    return install_id
+
+
+async def _switch_built_in_counters_on(
+    session: AsyncSession, guild_id: int, initiatives: list[int]
+) -> None:
+    await (await session.connection()).execute(
+        sa.text(
+            f'INSERT INTO "{guild_schema_name(guild_id)}".initiative_rules'
+            " (initiative_id, initiative_role_id, key, enabled)"
+            " SELECT i, NULL, 'counter_groups_enabled', true FROM unnest(CAST(:on AS integer[])) AS i"
+            " ON CONFLICT ON CONSTRAINT uq_initiative_rules_subject"
+            " DO UPDATE SET enabled = true"
+        ),
+        {"on": initiatives},
+    )
+
+
+async def test_counters_from_the_registry_beside_unused_built_in_counters_stays(
+    session: AsyncSession, acting_user: Callable[..., Any], client: AsyncClient
+) -> None:
+    """A community that installed Counters from the registry while Counters
+    was still built in, with the built-in tool switched on in an initiative
+    but no counter group, keeps its install: the conversion has nothing to
+    move, the install is placed where the built-in tool was on, and the
+    follow-up leaves its switches to the start."""
+    admin, _ = await _community(acting_user, client, session)
+    guild_id = admin.guild.id
+    schema = guild_schema_name(guild_id)
+    s = f'"{schema}"'
+    # A: placed and switched on. B: switched on, not placed. C: neither.
+    initiative_a = admin.initiative.id
+    initiative_b = (await create_initiative(session, admin.guild, admin.user)).id
+    initiative_c = (await create_initiative(session, admin.guild, admin.user)).id
+    installed: list[int] = []
+
+    async def registry_install(session: AsyncSession) -> None:
+        await _as_released(session, schema)
+        installed.append(
+            await _from_the_registry(
+                session, guild_id, admin.user.id, placed=[initiative_a]
+            )
+        )
+        await _switch_built_in_counters_on(
+            session, guild_id, [initiative_a, initiative_b]
+        )
+
+    install_id = await convert_counters(session, guild_id, between=registry_install)
+    assert install_id == installed[0]
+    await _rendered_again(session, schema)
+    assert await _rows(
+        session,
+        "SELECT to_regclass(:g), to_regclass(:c)",
+        g=f"{schema}.counter_groups",
+        c=f"{schema}.counters",
+    ) == [(None, None)]
+    assert await _rows(
+        session,
+        f"SELECT initiative_id FROM {s}.plugin_placements WHERE install_id = :p"
+        " ORDER BY initiative_id",
+        p=install_id,
+    ) == [(initiative_a,), (initiative_b,)]
+    assert await _rows(
+        session,
+        f"SELECT count(*) FROM {s}.initiative_rules"
+        " WHERE key IN ('counter_groups_enabled', 'create_counter_groups')",
+    ) == [(0,)]
+    # The follow-up wrote no switch: a start writes them, as it does for an
+    # install whose tools its stamp does not name, on in every initiative as
+    # an install made today has them (where it is not placed it is off,
+    # whatever the switch says), against the rule CHECK rendered anew.
+    assert await _rows(
+        session,
+        f"SELECT count(*) FROM {s}.initiative_rules WHERE key = :k",
+        k=f"{GROUP}:enabled",
+    ) == [(0,)]
+    await write_installed_tools(session, await provisioned_tools(guild_id))
+    await session.commit()
+    await route_session_to_guild(session, guild_id)
+    assert await _rows(
+        session,
+        f"SELECT initiative_id, enabled FROM {s}.initiative_rules"
+        " WHERE key = :k AND initiative_role_id IS NULL AND install_id IS NULL"
+        " ORDER BY initiative_id",
+        k=f"{GROUP}:enabled",
+    ) == [(initiative_a, True), (initiative_b, True), (initiative_c, True)]
+
+
+async def test_counters_from_the_registry_beside_built_in_groups_is_refused(
+    session: AsyncSession, acting_user: Callable[..., Any], client: AsyncClient
+) -> None:
+    """Built-in counter groups beside an install from the registry are two
+    sets of counters the conversion cannot make one: it stops and says so."""
+    admin, _ = await _community(acting_user, client, session)
+    guild_id = admin.guild.id
+    schema = guild_schema_name(guild_id)
+
+    async def both(session: AsyncSession) -> None:
+        await _as_released(session, schema)
+        await _from_the_registry(session, guild_id, admin.user.id, placed=[])
+        await (await session.connection()).execute(
+            sa.text(
+                f'INSERT INTO "{schema}".counter_groups (initiative_id, name,'
+                " created_by, created_by_kind, created_at, updated_at)"
+                " VALUES (:i, 'Built in', :u, 'member', now(), now())"
+            ),
+            {"i": admin.initiative.id, "u": admin.user.id},
+        )
+
+    with pytest.raises(Exception, match="beside built-in counters"):
+        await convert_counters(session, guild_id, between=both)
 
 
 @pytest.mark.parametrize(
