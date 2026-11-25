@@ -1,9 +1,9 @@
 """Gzip for the responses it shrinks: text-like ones.
 
-Starlette's ``GZipMiddleware`` compresses every response but an event stream.
-Most of what this app serves by size is already compressed (pictures, video,
-audio, Office and zip files), and compressing it again costs CPU for nothing,
-so here only a text-like type is compressed: JSON, text, SVG, scripts. A
+Starlette's ``GZipMiddleware`` compresses every response but a short list of
+types. Most of what this app serves by size is already compressed (pictures,
+video, audio, Office and zip files), and compressing it again costs CPU for
+nothing, so here only a text-like type is compressed: JSON, text, SVG, scripts. A
 partial response (``206``) is never compressed, since its ``Content-Range``
 counts the bytes as stored.
 """
@@ -62,12 +62,15 @@ def takes_gzip(accept_encoding: str) -> bool:
 
 class _TextResponder(GZipResponder):
     async def send_with_compression(self, message: Message) -> None:
+        if message["type"] == "http.response.start" and (
+            message["status"] == 206
+            or not compressible(Headers(raw=message["headers"]).get("content-type", ""))
+        ):
+            # Sent as it came, as the parent sends a type it excludes.
+            self.content_type_is_excluded = True
+            await self.send(message)
+            return
         await super().send_with_compression(message)
-        if message["type"] == "http.response.start":
-            headers = Headers(raw=message["headers"])
-            self.content_type_is_excluded = message[
-                "status"
-            ] == 206 or not compressible(headers.get("content-type", ""))
 
 
 class TextCompressionMiddleware(GZipMiddleware):
