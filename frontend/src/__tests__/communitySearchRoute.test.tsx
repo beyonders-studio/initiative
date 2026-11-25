@@ -17,22 +17,18 @@ import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { CommandCenter } from "@/components/search/CommandCenter";
 import { routeTree } from "@/routeTree.gen";
 
-import { buildSearchHit, buildSearchResults, buildSearchSuggestion } from "./factories";
+import { buildSearchHit, buildSearchResults } from "./factories";
 import { buildRouterContext, renderPage } from "./helpers/render";
 
 const SEARCH_ROUTE_ID = "/_serverRequired/_authenticated/c/$communityId/search";
 
-const mocks = vi.hoisted(() => ({ search: vi.fn(), suggest: vi.fn(), members: vi.fn() }));
+const mocks = vi.hoisted(() => ({ search: vi.fn(), members: vi.fn() }));
 vi.mock("@/hooks/useUsers", () => ({
   useUserSearch: (options: unknown) => mocks.members(options),
 }));
 vi.mock("@/hooks/useSearch", () => ({
   useCommunitySearch: (params: unknown, options: unknown) => mocks.search(params, options),
-  useCommunitySearchSuggest: (query: string, options: unknown) => mocks.suggest(query, options),
 }));
-
-/** The mocked module, for asserting how the palette scoped its question. */
-const useSearchModule = { useCommunitySearchSuggest: mocks.suggest };
 
 type SearchParams = { types?: string[]; page?: number; page_size?: number };
 
@@ -139,7 +135,6 @@ const tag = () =>
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.suggest.mockReturnValue({ data: [], isLoading: false, isFetched: true, isSuccess: true });
   mocks.members.mockReturnValue({
     data: { items: [], total_count: 0, page: 1, page_size: 20, has_next: false, has_prev: false },
     isLoading: false,
@@ -322,7 +317,6 @@ describe("the community search page", () => {
 
 describe("the command palette", () => {
   it("carries the same three slices, and narrows to the one it is on", async () => {
-    mocks.suggest.mockReturnValue({ data: [], isLoading: false, isFetched: true, isSuccess: true });
     renderPage(CommandCenter, {
       initialRoute: "/g/$communityId",
       routeParams: { communityId: "1" },
@@ -348,8 +342,8 @@ describe("the command palette", () => {
     await waitFor(() =>
       expect(screen.getByRole("tab", { name: "Members" })).toHaveAttribute("aria-selected", "true")
     );
-    expect(useSearchModule.useCommunitySearchSuggest).toHaveBeenLastCalledWith(
-      expect.any(String),
+    expect(mocks.search).toHaveBeenLastCalledWith(
+      expect.anything(),
       expect.objectContaining({ enabled: false })
     );
 
@@ -357,9 +351,9 @@ describe("the command palette", () => {
     await waitFor(() =>
       expect(screen.getByRole("tab", { name: "Comments" })).toHaveAttribute("aria-selected", "true")
     );
-    expect(useSearchModule.useCommunitySearchSuggest).toHaveBeenLastCalledWith(
-      expect.any(String),
-      expect.objectContaining({ types: ["comment"] })
+    expect(mocks.search).toHaveBeenLastCalledWith(
+      expect.objectContaining({ types: ["comment"] }),
+      expect.anything()
     );
 
     // Shift+Tab is left alone, so focus can still walk out of the input and
@@ -370,18 +364,28 @@ describe("the command palette", () => {
   });
 
   it("answers from the index once there is a query, and offers the whole page", async () => {
-    mocks.suggest.mockReturnValue({
-      data: [
-        buildSearchSuggestion({
+    withHits(
+      [
+        buildSearchHit({
           entity_type: "calendar_event",
           entity_id: 8,
           title: "Riverside read-through",
+          // A title match: the body's opening says nothing about why.
+          snippet: "Bring the printed scripts",
           tool: Tool.calendar,
           tool_id: 2,
         }),
+        buildSearchHit({
+          entity_type: "wiki_page",
+          entity_id: 9,
+          title: "Venue notes",
+          snippet: "the <riverside> stage holds forty",
+          tool: Tool.wiki,
+          tool_id: 3,
+        }),
       ],
-      isLoading: false,
-    });
+      []
+    );
 
     const { router: pageRouter } = renderPage(CommandCenter, {
       initialRoute: "/c/$communityId",
@@ -400,10 +404,42 @@ describe("the command palette", () => {
     expect(
       await screen.findByText("Riverside read-through", undefined, { timeout: 2000 })
     ).toBeInTheDocument();
+    // Found by what is written inside it, so it shows the words that matched.
+    expect(screen.getByText("Venue notes")).toBeInTheDocument();
+    expect(screen.getByText("riverside", { selector: "mark" })).toBeInTheDocument();
+    expect(screen.queryByText("Bring the printed scripts")).not.toBeInTheDocument();
+    expect(mocks.search).toHaveBeenLastCalledWith(
+      expect.objectContaining({ search: "riverside" }),
+      expect.objectContaining({ enabled: true })
+    );
 
     await userEvent.click(await screen.findByText(/See all results/));
     expect(pageRouter.state.location.pathname).toBe("/c/1/search");
     expect(pageRouter.state.location.searchStr).toContain("q=riverside");
+  });
+
+  it("keeps the way to the whole page while the query grows", async () => {
+    withHits([project()], []);
+    renderPage(CommandCenter, {
+      initialRoute: "/c/$communityId",
+      routeParams: { communityId: "1" },
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    fireEvent.keyDown(document, { key: "k", metaKey: true });
+    const input = await screen.findByRole("combobox");
+
+    await userEvent.type(input, "ri");
+    expect(
+      await screen.findByText("See all results for “ri”", undefined, { timeout: 2000 })
+    ).toBeInTheDocument();
+
+    await userEvent.type(input, "verside");
+    expect(
+      await screen.findByText("See all results for “riverside”", undefined, { timeout: 2000 })
+    ).toBeInTheDocument();
+    expect(screen.getByText("Riverside kickoff")).toBeInTheDocument();
   });
 
   it("shows only the slice being read, and says when it holds nothing", async () => {
@@ -411,16 +447,8 @@ describe("the command palette", () => {
     // slice switches the other question off — and a switched-off question keeps
     // the answer it was last given. Only the slice being read may put rows on
     // screen, and a slice that matched nobody says so.
-    mocks.suggest.mockReturnValue({
-      data: [
-        buildSearchSuggestion({
-          entity_type: "comment",
-          entity_id: 31,
-          title: "the riverside stage is booked",
-          tool: Tool.project,
-          tool_id: 7,
-        }),
-      ],
+    mocks.search.mockReturnValue({
+      data: buildSearchResults([comment()]),
       isLoading: false,
       isFetched: true,
       isSuccess: true,
@@ -503,7 +531,6 @@ describe("the command palette", () => {
       isFetched: true,
       isSuccess: true,
     });
-    mocks.suggest.mockReturnValue({ data: [], isFetched: true, isSuccess: true });
 
     renderPage(CommandCenter, {
       initialRoute: "/g/$communityId",

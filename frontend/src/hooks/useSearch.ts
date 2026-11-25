@@ -80,10 +80,11 @@ const splitFilters = <TData>(
 
 /**
  * Titles to jump to. Matches a partial last word, so it answers while the
- * reader is still typing.
+ * reader is still typing, and the title alone, because a picker names a thing.
+ * The command palette searches, with `useCommunitySearch`.
  *
- * This is the ONE lookup behind every picker in the app — the command palette,
- * a mention, a wikilink, a link, a template. They differ only in what
+ * This is the ONE lookup behind every picker in the app — a mention, a
+ * wikilink, a link, a template. They differ only in what
  * they narrow to: `types` for what kind of thing, `initiative_id` for where,
  * and `is_template` for whether it is a blueprint. A picker built on this gets
  * ranking, prefix matching and every access gate without asking for them.
@@ -91,7 +92,7 @@ const splitFilters = <TData>(
  * It answers only the half of a picker's job that starts with typed words;
  * `useCommunityPickerSuggestions` is what a picker asks, and calls this in turn.
  */
-export const useCommunitySearchSuggest = (
+const useCommunitySearchSuggest = (
   query: string,
   options?: QueryOpts<SearchSuggestion[]> & SuggestFilters
 ) => {
