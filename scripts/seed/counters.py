@@ -1,7 +1,7 @@
 """Counter groups: hit points, clocks and tallies, kept in the Counters tool
-plug-in, which the server lists as one with no registry does and the
-community installs from the marketplace and places in the initiatives that
-keep them. Its rows are written as the plug-in's routes write them."""
+plug-in, which the server lists as the registry brings it and the community
+installs from the marketplace and places in the initiatives that keep them.
+Its rows are written as the plug-in's routes write them."""
 
 from __future__ import annotations
 
@@ -143,9 +143,8 @@ COUNTER_GROUPS: dict[str, list[dict]] = {
 
 
 async def list_plugin(session: AsyncSession) -> None:
-    """List Counters on the marketplace as a server's owner does where no
-    registry brings it: an upload of its listing file, the version the
-    upgrade installs."""
+    """List Counters on the marketplace as the registry brings it, at the
+    version the upgrade installs."""
     await list_counters(session)
     await session.commit()
 

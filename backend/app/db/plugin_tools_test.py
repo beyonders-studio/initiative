@@ -58,9 +58,9 @@ from app.testing import (
     COUNTERS_UID,
     counters_tool_manifest,
     counters_tool_set,
-    create_marketplace_listing,
     create_reaction,
     install_tool_plugin,
+    list_counters,
     route_as,
     route_session_to_guild,
 )
@@ -553,18 +553,12 @@ async def _index_row(session: AsyncSession, guild_id: int, install_id: int):
 
 
 async def _publish(session: AsyncSession, version: str, change) -> None:
-    """Publish ``version`` of Counters, its tool as ``change`` leaves it."""
+    """Publish ``version`` of Counters, its tool as ``change`` leaves it, as
+    the registry does."""
     manifest = counters_tool_manifest()
     change(manifest["tool"])
-    await create_marketplace_listing(
-        session,
-        uid=COUNTERS_UID,
-        public_id=f"test.{COUNTERS_UID.lower()}",
-        kind="plugin",
-        name="Counters",
-        version=version,
-        definition=manifest,
-    )
+    await list_counters(session, manifest, version=version)
+    await session.commit()
 
 
 async def test_an_install_that_fails_once_rendered_leaves_nothing(

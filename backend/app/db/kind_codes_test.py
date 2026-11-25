@@ -20,6 +20,7 @@ from app.testing import (
     COUNTERS_UID,
     counters_tool_manifest,
     create_marketplace_listing,
+    list_counters,
     marketplace_uid,
 )
 
@@ -29,18 +30,10 @@ COUNTER = f"counter.{COUNTERS_UID.lower()}"
 A, B, C = (f"{key}.{COUNTERS_UID.lower()}" for key in "abc")
 
 
-async def _register(
-    session, *, uid=COUNTERS_UID, public_id="beyonders.counters", version="1.0.0"
-):
-    await create_marketplace_listing(
-        session,
-        uid=uid,
-        public_id=public_id,
-        kind="plugin",
-        name="Counters",
-        version=version,
-        definition=counters_tool_manifest(),
-    )
+async def _register(session, *, version="1.0.0"):
+    """Counters at ``version``, as the registry lists it."""
+    await list_counters(session, version=version)
+    await session.commit()
     await post_commit.settle(session)
 
 
@@ -72,7 +65,15 @@ async def test_a_kind_keeps_its_code_and_a_new_one_takes_the_next(session):
     assert await _code(session, COUNTER) == 3
 
     other = marketplace_uid("othercounters")
-    await _register(session, uid=other, public_id="others.counters")
+    await create_marketplace_listing(
+        session,
+        uid=other,
+        public_id="others.counters",
+        kind="plugin",
+        name="Counters",
+        definition=counters_tool_manifest(),
+    )
+    await post_commit.settle(session)
     assert await _codes(session) == {
         **adopted,
         f"counter_group.{other.lower()}": FIRST_PLUGIN_KIND_CODE,
