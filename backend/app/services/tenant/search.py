@@ -146,7 +146,7 @@ def search_match_clause(tsquery: ColumnElement) -> ColumnElement[bool]:
 
 #: Widest page a caller may ask for.
 MAX_PAGE_SIZE = 100
-#: Jump-to results for the palette. Small on purpose: it is a way to reach one
+#: Jump-to results for a picker. Small on purpose: it is a way to reach one
 #: thing, not a way to read a result set.
 SUGGEST_LIMIT = 10
 
@@ -632,7 +632,7 @@ async def suggest(
         return []
     # The stored vector carries title AND body, so it narrows through the index
     # but would also offer a row whose title shows nothing of what was typed.
-    # Rechecking the title alone keeps the palette's answers legible; it runs on
+    # Rechecking the title alone keeps a picker's answers legible; it runs on
     # what the index already narrowed to.
     title_match = func.to_tsvector("simple", SearchEntry.title).op(
         "@@", is_comparison=True

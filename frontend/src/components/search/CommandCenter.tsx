@@ -21,7 +21,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { type SearchSuggestion, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { type SearchHit, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { openHelp } from "@/components/help/helpStore";
 import { InitiativeMark } from "@/components/icons/InitiativeMark";
 import { getOpenCreateTaskWizard } from "@/components/tasks/CreateTaskWizard";
@@ -35,11 +35,10 @@ import { useHeldSurfaces } from "@/hooks/useCustomRoles";
 import { useDirectMessagesEnabled } from "@/hooks/useDirectMessages";
 import { useGlobalCreateAccess } from "@/hooks/useInitiativeAccess";
 import { useRecents } from "@/hooks/usePersonalItems";
-import { useCommunitySearchSuggest } from "@/hooks/useSearch";
+import { useCommunitySearch } from "@/hooks/useSearch";
 import { useTasks } from "@/hooks/useTasks";
 import { useHasFiledTickets } from "@/hooks/useTickets";
 import { useUserSearch } from "@/hooks/useUsers";
-import { USER_MENTION_PATTERN } from "@/lib/commentReferences";
 import { communityPath, useCommunityPath } from "@/lib/communityUrl";
 import { canAccessOperatorDashboard, canManagePlatformConfig } from "@/lib/permissions";
 import { renderRecentIcon } from "@/lib/recentIcon";
@@ -53,6 +52,7 @@ import {
   SEARCH_CATEGORIES,
   type SearchCategory,
   searchHitPath,
+  TOOL_ENTITY_TYPES,
 } from "@/lib/searchResults";
 import { PALETTE_TOOLS, TOOL_PALETTE } from "@/lib/toolPalette";
 import { entityRefRoute, TOOL_ICONS } from "@/lib/tools";
@@ -76,6 +76,7 @@ import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { Tabs } from "@/ui/tabs";
 
 import { SearchCategoryTabs } from "./SearchCategoryTabs";
+import { SearchSnippet, snippetMatches } from "./SearchSnippet";
 
 // Module-level callback so other components can open the command center
 let openCommandCenter: (() => void) | null = null;
@@ -86,6 +87,20 @@ export function getOpenCommandCenter() {
 /** How many people the palette offers at once — it is a way to reach one,
  *  not a roster. */
 const PALETTE_MEMBER_LIMIT = 5;
+
+/** How many results the palette shows before "See all results". */
+const PALETTE_RESULT_LIMIT = 10;
+
+/** The value of every row the search answered with. */
+const RESULT_VALUE = "result-";
+
+/**
+ * Rows the search answered with always match: the server has already decided
+ * they do, so they are shown in its order. Everything else is matched here,
+ * against the words as typed.
+ */
+const paletteFilter = (value: string, search: string, keywords?: string[]): number =>
+  value.startsWith(RESULT_VALUE) ? 1 : commandFilter(value, search, keywords);
 
 export function CommandCenter() {
   const [open, setOpen] = useState(false);
@@ -100,7 +115,7 @@ export function CommandCenter() {
   const globalCreate = useGlobalCreateAccess();
   const getCommunityPath = useCommunityPath();
 
-  // Switch into "community-wide title search" mode once the debounced query is at
+  // Switch into "community-wide search" mode once the debounced query is at
   // least 2 characters. Single-character queries fire too noisily and rarely
   // narrow enough to be useful. If the raw input is already empty (e.g.
   // immediately after dialog close) treat the debounced value as empty too,
@@ -178,18 +193,22 @@ export function CommandCenter() {
 
   // Data hooks — all use existing cached data except tasks which fetches when dialog opens
   const recentQuery = useRecents({ staleTime: 30_000 });
-  // Searching asks the community index one question and gets every kind of thing
-  // back — tasks, files, events, tags — ranked together.
+  // Searching asks the community index the question the search page asks, and
+  // gets every kind of thing back — tasks, files, events, tags — ranked
+  // together, by title and by what is written inside.
   // `null` for Members, who are not in the index: identity is shared across
   // communities while the index is per-community, so they are read from the
   // roster — the same split the results page makes.
   const scopeTypes = categoryEntityTypes(scope);
   const isMemberScope = scopeTypes === null;
-  const suggestQuery = useCommunitySearchSuggest(effectiveSearch, {
-    enabled: open && !!user && isSearching && !isMemberScope,
-    types: scopeTypes ?? undefined,
-    staleTime: 30_000,
-  });
+  const resultsQuery = useCommunitySearch(
+    {
+      search: effectiveSearch,
+      types: scopeTypes ?? TOOL_ENTITY_TYPES,
+      page_size: PALETTE_RESULT_LIMIT,
+    },
+    { enabled: open && !!user && isSearching && !isMemberScope, staleTime: 30_000 }
+  );
   const membersQuery = useUserSearch({
     search: effectiveSearch,
     pageSize: PALETTE_MEMBER_LIMIT,
@@ -199,7 +218,7 @@ export function CommandCenter() {
   // switched-off question keeps the answer it was last given, which belongs to
   // the tab before this one. Only the scope being read may put rows on screen
   // or say there are none.
-  const scopeQuery = isMemberScope ? membersQuery : suggestQuery;
+  const scopeQuery = isMemberScope ? membersQuery : resultsQuery;
   // Browsing (palette just opened): the user's own not-done tasks, most
   // recently updated — surfacing what they're actively working on. Fired once
   // on open, so the full list row is fine.
@@ -238,15 +257,16 @@ export function CommandCenter() {
 
   // Only what has somewhere to go: an entry that cannot navigate is worse than
   // one that isn't offered.
-  const suggestions = useMemo(
+  const hits = useMemo(
     () =>
       isMemberScope
         ? []
-        : (suggestQuery.data ?? [])
+        : (resultsQuery.data?.items ?? [])
             .map((hit) => ({ hit, path: searchHitPath(hit) }))
-            .filter((row): row is { hit: SearchSuggestion; path: string } => row.path !== null),
-    [suggestQuery.data, isMemberScope]
+            .filter((row): row is { hit: SearchHit; path: string } => row.path !== null),
+    [resultsQuery.data, isMemberScope]
   );
+  const closeMatches = !isMemberScope && hits.length > 0 && resultsQuery.data?.fuzzy === true;
 
   const members = isMemberScope ? (membersQuery.data?.items ?? []) : [];
   // Nothing is here, and that is this scope's own answer rather than a gap
@@ -256,7 +276,7 @@ export function CommandCenter() {
   // has been read from.
   const scopeIsEmpty =
     members.length === 0 &&
-    suggestions.length === 0 &&
+    hits.length === 0 &&
     scopeQuery.isSuccess &&
     !scopeQuery.isPlaceholderData;
 
@@ -332,7 +352,7 @@ export function CommandCenter() {
   };
 
   return (
-    <CommandDialog open={open} onOpenChange={setOpen} filter={commandFilter}>
+    <CommandDialog open={open} onOpenChange={setOpen} filter={paletteFilter}>
       <CommandInput
         value={searchQuery}
         onValueChange={setSearchQuery}
@@ -359,18 +379,24 @@ export function CommandCenter() {
         <CommandEmpty>{t("noResults")}</CommandEmpty>
 
         {/* What the community index found — first, so the top hit is what Enter
-            opens. The server has already decided these match, so they are
-            keyed on the query itself rather than re-filtered here. A comment
-            is found by its opening words, which can mention people. */}
+            opens. The server has already decided these match, so their values
+            start with RESULT_VALUE and paletteFilter never hides them. A hit
+            found by what is written inside it shows the words that matched;
+            a title match shows its title alone. A comment is found by its
+            opening words, which can mention people. */}
         {isSearching && (
           <CommandGroup heading={t("groups.results")}>
+            {closeMatches && (
+              <div className="px-2 py-1.5 text-muted-foreground text-xs">
+                {t("search:closeMatches", { query: effectiveSearch })}
+              </div>
+            )}
             {members.map((member) => (
               // A profile belongs to the person rather than to the community
               // the search ran in, so this leaves the community tree.
               <CommandItem
                 key={`member-${member.id}`}
-                value={`member-${member.id}`}
-                keywords={[effectiveSearch, getUserDisplayName(member)]}
+                value={`${RESULT_VALUE}member-${member.id}`}
                 onSelect={() => handleSelect(`/u/${getUrlHandle(member)}`)}
               >
                 <Avatar className="size-4">
@@ -380,13 +406,12 @@ export function CommandCenter() {
                 <span>{getUserDisplayName(member)}</span>
               </CommandItem>
             ))}
-            {suggestions.map(({ hit, path }) => {
+            {hits.map(({ hit, path }) => {
               const Icon = hitIcon(hit);
               return (
                 <CommandItem
                   key={`result-${hit.entity_type}-${hit.entity_id}`}
-                  value={`result-${hit.entity_type}-${hit.entity_id}`}
-                  keywords={[effectiveSearch, hit.title.replace(USER_MENTION_PATTERN, " ")]}
+                  value={`${RESULT_VALUE}${hit.entity_type}-${hit.entity_id}`}
                   onSelect={() =>
                     handleSelect(
                       activeCommunityId ? communityPath(activeCommunityId, path) : path,
@@ -394,10 +419,15 @@ export function CommandCenter() {
                     )
                   }
                 >
-                  <Icon className="text-muted-foreground" />
-                  <span>
-                    <MentionText text={hit.title} disableLink />
-                  </span>
+                  <Icon className="mt-0.5 self-start text-muted-foreground" />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate">
+                      <MentionText text={hit.title} disableLink />
+                    </div>
+                    {hit.snippet && snippetMatches(hit.snippet) && (
+                      <SearchSnippet snippet={hit.snippet} className="line-clamp-1 text-xs" />
+                    )}
+                  </div>
                 </CommandItem>
               );
             })}
@@ -408,8 +438,7 @@ export function CommandCenter() {
             )}
             {activeCommunityId !== null && (
               <CommandItem
-                value="result-see-all"
-                keywords={[effectiveSearch]}
+                value={`${RESULT_VALUE}see-all`}
                 onSelect={() =>
                   handleSelect(
                     `${getCommunityPath("/search")}?q=${encodeURIComponent(effectiveSearch)}` +

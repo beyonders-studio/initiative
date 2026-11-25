@@ -151,10 +151,12 @@ async def suggest_community(
     subject: str | None = Query(default=None, description=_SUBJECT_DESCRIPTION),
     limit: int = Query(default=search_service.SUGGEST_LIMIT, ge=1),
 ) -> list[SearchSuggestion]:
-    """Titles for the command palette — a way to reach one thing quickly.
+    """Titles for a picker — a way to name one thing quickly. Matches the
+    title alone: a picker names a thing, and the search finds what is written
+    inside it.
 
-    Takes the same ``types`` as the search itself, so the palette and the
-    results page can be narrowed to the same slice of the guild.
+    Takes the same ``types`` as the search itself, so a picker can be narrowed
+    to the same slice of the guild as the results page.
 
     An installed plug-in is answered the kinds among ``types`` (the default scope
     when omitted) whose read scope it holds, in the initiatives it is placed
