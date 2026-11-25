@@ -17,7 +17,10 @@ that left behind:
   initiative has none. Each initiative with no switch of its own is given the
   built-in answer here, off, before any start runs. A database that started
   after 0619 already has the start's rows, and cannot tell them from a switch
-  someone turned on since, so they are left as they are.
+  someone turned on since, so they are left as they are. A community that
+  installed the plug-in from the registry, and so was not converted, holds
+  none of the plug-in's keys yet: it is left to the start, which switches
+  an installed tool on.
 
 The downgrade names the subscriptions' events the built-in way again. The
 switches stay: 0619's downgrade renames them, and off is the built-in tool's
@@ -51,6 +54,8 @@ UID = "TSJVTCM0S7GV2X"
 _CODE = UID.lower()
 #: The plug-in's switch key, as 0619 renamed the built-in tool's.
 SWITCH = f"counter_group.{_CODE}:enabled"
+#: The plug-in's create key, as 0619 renamed the built-in tool's.
+CREATE = f"counter_group.{_CODE}:create"
 
 #: An event name and its spelling the other way: the built-in table's name is
 #: its kind's plural.
@@ -118,16 +123,24 @@ def _subscriptions(bind: Connection, forward: bool) -> None:
 
 
 def _switches(bind: Connection) -> None:
-    """An off switch for each initiative with no Counters switch of its own."""
+    """An off switch for each initiative with no Counters switch of its own,
+    in a community 0619 converted: one holding the plug-in's keys with no
+    install, as 0619 renamed the built-in tool's. An install from the
+    registry was not converted and holds none; the start writes its
+    switches, as it does for any installed tool, and its rule CHECK, rendered
+    before the plug-in's keys were a built-in tool's, would refuse them
+    here."""
     with _held(bind, "initiatives", "initiative_rules"):
         bind.execute(
             text(
                 "INSERT INTO initiative_rules"
                 " (initiative_id, initiative_role_id, key, enabled)"
                 " SELECT i.id, NULL, :k, false FROM initiatives i"
+                " WHERE EXISTS (SELECT 1 FROM initiative_rules r"
+                "  WHERE r.install_id IS NULL AND r.key IN (:k, :c))"
                 " ON CONFLICT ON CONSTRAINT uq_initiative_rules_subject DO NOTHING"
             ),
-            {"k": SWITCH},
+            {"k": SWITCH, "c": CREATE},
         )
 
 
