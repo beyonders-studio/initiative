@@ -5,7 +5,7 @@ description = "FastAPI backend for Initiative project management app"
 authors = [{ name = "Jordan", email = "jordan@morels.me" }]
 requires-python = ">=3.14"
 dependencies = [
-    "fastapi>=0.136.1,<0.163",
+    "fastapi>=0.136.1,<0.166",
     "uvicorn[standard]>=0.41.0,<0.55",
     "sqlmodel>=0.0.38,<0.0.51",
     "sqlalchemy>=2.1,<3",
