@@ -11431,7 +11431,7 @@ export interface SearchResults {
 }
 
 /**
- * A jump-to target for the command palette: enough to render and route.
+ * A jump-to target for a picker: enough to render and route.
  */
 export interface SearchSuggestion {
   entity_type: string;

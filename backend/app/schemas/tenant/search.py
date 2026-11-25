@@ -36,7 +36,7 @@ class SearchResults(PageMeta):
 
 
 class SearchSuggestion(BaseModel):
-    """A jump-to target for the command palette: enough to render and route."""
+    """A jump-to target for a picker: enough to render and route."""
 
     model_config = ConfigDict(from_attributes=True)
 

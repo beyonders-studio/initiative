@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Ctrl+K finds what is written inside things.** It searches like the search page, titles and text alike, and under a result found by its text shows the words that matched. **See all results** no longer drops out of the list as you keep typing.
+
 ## [0.80.0] - 2026-11-22
 
 ### Added
