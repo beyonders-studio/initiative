@@ -4,7 +4,9 @@ import { useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
 
 import { useAuth } from "@/hooks/useAuth";
+import { useConnectFlow } from "@/hooks/useConnectFlow";
 import { useResumeAfterSignIn } from "@/hooks/useResumeAfterSignIn";
+import { isConnectHandback } from "@/lib/appConnect";
 import { redeemNativeSignIn, takePendingSignIn } from "@/lib/nativeSignIn";
 import { takeBrowserAnswer } from "@/lib/passkeys";
 
@@ -16,7 +18,8 @@ const isSignInCallback = (url: URL) =>
 
 /**
  * Take the links the system browser hands back to the app: a passkey prompt's
- * answer, and a sign-in the app began there.
+ * answer, a sign-in the app began there, and a plug-in connection it began
+ * (`useConnectFlow`).
  *
  * Handles the link whether it wakes the running app or starts it: the phone
  * often closes the app while the browser is in front. Only a callback for a
@@ -27,6 +30,7 @@ export function useDeepLinks() {
   const { isNativePlatform, getServerOrigin } = useServer();
   const { completeOidcLogin, applySignIn } = useAuth();
   const resumeAfterSignIn = useResumeAfterSignIn();
+  const { finish: finishConnect } = useConnectFlow();
 
   useEffect(() => {
     if (!isNativePlatform) return;
@@ -44,6 +48,11 @@ export function useDeepLinks() {
       if (signedIn) {
         await applySignIn(signedIn.token);
         await resumeAfterSignIn(signedIn.next);
+        return;
+      }
+      if (isConnectHandback(url)) {
+        await Browser.close().catch(() => undefined);
+        await finishConnect(url);
         return;
       }
       if (!isSignInCallback(url)) return;
@@ -87,5 +96,6 @@ export function useDeepLinks() {
     applySignIn,
     router,
     resumeAfterSignIn,
+    finishConnect,
   ]);
 }

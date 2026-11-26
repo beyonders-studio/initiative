@@ -10,6 +10,7 @@ export {
   net,
   powerMonitor,
   session,
+  shell,
   Tray,
   WebContentsView,
 } from "electron";

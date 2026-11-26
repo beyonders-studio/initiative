@@ -43,6 +43,7 @@ const window = (theme: "light" | "dark") => {
     getContentSize: () => made.size,
     setBackgroundColor: vi.fn(),
     isDestroyed: () => false,
+    getParentWindow: () => null,
     contentView: { addChildView: vi.fn(), removeChildView: vi.fn() },
     webContents: {
       getURL: () => "capacitor://studio.beyonders.initiative/",

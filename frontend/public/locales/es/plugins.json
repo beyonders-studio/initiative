@@ -246,7 +246,12 @@
     },
     "sign_in_required": {
       "title": "Inicia sesión para terminar",
-      "body": "Termina de conectar en el navegador donde has iniciado sesión en Initiative, como la persona que lo empezó."
+      "body": "Termina de conectar en el navegador donde has iniciado sesión en Initiative, como la persona que lo empezó.",
+      "app": "El navegador que se abrió tiene iniciada la sesión de Initiative como otra persona, así que no se conectó nada. Cierra allí la sesión de Initiative y vuelve a conectar desde la app."
+    },
+    "app_only": {
+      "title": "Termina en la app",
+      "body": "Esta conexión se empezó en la app de Initiative, así que solo la app puede terminarla. Vuelve a conectar desde la app."
     },
     "closeTab": "Puedes cerrar esta pestaña."
   },

@@ -36,8 +36,8 @@ import {
   useDisconnectPlugin,
   useUpdatePluginConfig,
 } from "@/hooks/useCommunityPluginDetail";
+import { useConnectFlow } from "@/hooks/useConnectFlow";
 import { toast } from "@/lib/mascotToast";
-import { openExternal } from "@/lib/openExternal";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Field } from "@/ui/field";
@@ -152,6 +152,7 @@ function CommunityConnection({
   const save = useUpdatePluginConfig(pluginId);
   const clear = useDisconnectPlugin(pluginId);
   const connect = useConnectPlugin(pluginId);
+  const flow = useConnectFlow();
 
   // Only what was touched. A secret already stored renders empty, so sending
   // untouched keys would clear the values the admin came here to keep.
@@ -183,8 +184,7 @@ function CommunityConnection({
         // they were. The address is the server's to build — see
         // PersonalConnection.
         if (started.connect_url) {
-          openExternal(started.connect_url);
-          toast.success(t("plugins:connections.connectOpened"));
+          void flow.open(started.connect_url);
           return;
         }
         toast.error(t("plugins:connections.connectUnavailable"));
@@ -398,16 +398,16 @@ function PersonalConnection({
   const { t } = useTranslation(["plugins", "common"]);
   const connect = useConnectPlugin(pluginId);
   const disconnect = useDisconnectPlugin(pluginId);
+  const flow = useConnectFlow();
 
   const start = () =>
     connect.mutate(connection.id, {
       onSuccess: (started) => {
         // The server builds the vendor's address; the client never does. A
         // new tab rather than a redirect, so the member comes back to where
-        // they were.
+        // they were; in the app, a window or the browser (useConnectFlow).
         if (started.connect_url) {
-          openExternal(started.connect_url);
-          toast.success(t("plugins:connections.connectOpened"));
+          void flow.open(started.connect_url);
           return;
         }
         toast.error(t("plugins:connections.connectUnavailable"));

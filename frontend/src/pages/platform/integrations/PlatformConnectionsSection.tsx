@@ -6,10 +6,12 @@ import type {
   PluginServiceRegistrationRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { SettingsSection } from "@/components/settings/SettingsSection";
+import { useConnectFlow } from "@/hooks/useConnectFlow";
 import {
   useConnectForEveryCommunity,
   useDisconnectForEveryCommunity,
 } from "@/hooks/usePluginServices";
+import { connectingApp } from "@/lib/appConnect";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
@@ -30,8 +32,12 @@ export const PlatformConnectionsSection = ({
   plain,
 }: PlatformConnectionsSectionProps) => {
   const { t, i18n } = useTranslation("settings");
+  const flow = useConnectFlow();
   const connect = useConnectForEveryCommunity({
-    onSuccess: ({ connect_url }) => window.location.assign(connect_url),
+    // The browser goes to the vendor and comes back here; the app has no
+    // session in a browser, so it sees the flow to its end (useConnectFlow).
+    onSuccess: ({ connect_url }) =>
+      connectingApp() ? void flow.open(connect_url) : window.location.assign(connect_url),
   });
   const disconnect = useDisconnectForEveryCommunity({
     onSuccess: () => setEnding(null),

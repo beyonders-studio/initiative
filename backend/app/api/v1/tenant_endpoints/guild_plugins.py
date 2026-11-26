@@ -139,6 +139,7 @@ from app.services.tenant import plugin_handoff as handoff_service
 from app.services.tenant import plugin_member_consents as consents_service
 from app.services.tenant import plugin_schedules as plugin_schedules_service
 from app.services.tenant import plugin_updates as plugin_updates_service
+from app.services.tenant.connection_flow_state import ConnectingApp
 from app.services.tenant.plugin_age import AgeViewer
 
 logger = logging.getLogger(__name__)
@@ -1385,6 +1386,8 @@ async def connect_community_plugin(
     current_user: CurrentUser,
     guild_context: GuildContextDep,
     viewer: AgeViewerDep,
+    app: Annotated[ConnectingApp | None, Query()] = None,
+    code_challenge: Annotated[str | None, Query(max_length=128)] = None,
 ) -> CommunityPluginConnectStart:
     """Start the vendor flow behind one connection.
 
@@ -1463,6 +1466,8 @@ async def connect_community_plugin(
         started_by=current_user.id,
         public_id=registration.public_id,
         fields=plugin_config_service.without_tokens(stored_config),
+        app=app,
+        app_challenge=code_challenge,
     )
     return CommunityPluginConnectStart(
         connection_id=connection_id,

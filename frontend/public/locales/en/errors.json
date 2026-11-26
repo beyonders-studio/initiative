@@ -315,6 +315,7 @@
   "OPERATOR_CANNOT_ASSIGN_HIGHER_ROLE": "You can't assign a role higher than your own.",
   "NATIVE_OTA_BUNDLE_NOT_AVAILABLE": "This server build has no over-the-air update bundle available",
   "NATIVE_APP_UPDATE_REQUIRED": "This version of the app can't sign in any more. Update the app, then try again.",
+  "NATIVE_APP_CHALLENGE_INVALID": "This version of the app can't connect plug-ins. Update the app, then try again.",
   "SETTINGS_STORAGE_BACKFILL_RUNNING": "A backfill is already running.",
   "SETTINGS_STORAGE_BACKFILL_NOT_CONFIGURED": "Save S3 as the storage backend before running the backfill.",
   "SETTINGS_STORAGE_BACKFILL_FAILED": "The backfill stopped on an error. Check the server logs for details.",

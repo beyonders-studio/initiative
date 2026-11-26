@@ -46,7 +46,7 @@ const page = () => {
   const contents = Object.assign(new EventEmitter(), {
     getURL: () => "capacitor://studio.beyonders.initiative/",
   });
-  paths.windows = [{ webContents: contents }];
+  paths.windows = [{ webContents: contents, getParentWindow: () => null }];
   return contents;
 };
 

@@ -19,6 +19,13 @@ export interface DesktopPlugin {
   setOpenAtLogin(options: { enabled: boolean }): Promise<void>;
   /** Colour the window's own buttons at the end of the title bar (Windows, Linux). */
   setTitleBarColors(options: { color: string; symbolColor: string }): Promise<void>;
+  /** Open a plug-in connection's vendor page in a window of its own, until its
+   *  flow comes back to `returnPath`: that address, or null when the person
+   *  closed the window. */
+  openVendorPage(options: {
+    url: string;
+    returnPath: string;
+  }): Promise<{ returned: string | null }>;
   addListener(
     eventName: "notificationClicked",
     listener: (event: { tag: string }) => void
