@@ -52,7 +52,7 @@ import type {
   Token,
 } from "@/api/generated/initiativeAPI.schemas";
 import { pkcePair } from "@/lib/nativeSignIn";
-import { getStoredServerUrl } from "@/lib/serverStorage";
+import { getStoredServerUrl, storedServerOrigin } from "@/lib/serverStorage";
 import { getItem, removeItem, setItem } from "@/lib/storage";
 
 /** Set when the app could not act for a server, which then goes straight to
@@ -102,12 +102,6 @@ const refusals = (): Record<string, number> => {
   }
 };
 
-/** The address of the server the app is on, which every prompt is for. */
-const serverOrigin = (): string => {
-  const server = getStoredServerUrl();
-  return server ? new URL(server).origin : "";
-};
-
 /** Refusals that mean this server's prompts belong in the browser. The
  *  Android plug-in reports its own codes; the desktop plug-in passes on the
  *  browser's names for how a prompt ended. */
@@ -141,7 +135,7 @@ class NeedsBrowser extends Error {}
 const viaApp = async (kind: PromptKind, options: unknown): Promise<unknown> => {
   const asked =
     Capacitor.getPlatform() === "electron"
-      ? { ...(options as object), origin: serverOrigin() }
+      ? { ...(options as object), origin: storedServerOrigin() }
       : options;
   try {
     return kind === "get"
@@ -189,7 +183,7 @@ const viaBrowser = async (
   options: unknown,
   signIn?: SignInToFinish
 ): Promise<unknown> => {
-  const origin = serverOrigin();
+  const origin = storedServerOrigin();
   if (!origin) throw promptEnded("NotSupportedError");
   waiting?.settle(promptEnded("AbortError"));
   const prompt = crypto.randomUUID();
@@ -258,7 +252,7 @@ export const takeBrowserAnswer = async (
   const credential = url.searchParams.get("credential");
   if (!kept || !credential) return null;
   const signIn = JSON.parse(kept) as SignInToFinish & { prompt: string; origin: string };
-  return signIn.prompt === prompt && signIn.origin === serverOrigin()
+  return signIn.prompt === prompt && signIn.origin === storedServerOrigin()
     ? { token: await finishSignIn(JSON.parse(credential), signIn), next: signIn.next }
     : null;
 };

@@ -722,6 +722,10 @@ class TestAppFlow:
         assert location.startswith(
             f"{settings.APP_URL.rstrip('/')}{plugin_connection_flows.HANDBACK_PATH}?"
         )
+        # Named by the app's challenge, for the app to find its verifier.
+        assert parse_qs(urlparse(location).query)["challenge"] == [
+            code_challenge(verifier)
+        ]
         assert vendor.token_requests == []
         answer = {"code": _handback_code(location), "code_verifier": verifier}
         finished = await client.post(FINISH_ROUTE, json=answer, headers=a.headers)

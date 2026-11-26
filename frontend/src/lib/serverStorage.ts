@@ -11,6 +11,12 @@ export function getStoredServerUrl(): string | null {
   return getItem(SERVER_URL_KEY);
 }
 
+/** The origin of the server the app talks to, or "" before it has one. */
+export function storedServerOrigin(): string {
+  const server = getStoredServerUrl();
+  return server ? new URL(server).origin : "";
+}
+
 /**
  * The server the app talks to: the one it was given, or, on a fresh install,
  * Initiative Cloud once it is open. Kept, so everything keyed on the stored

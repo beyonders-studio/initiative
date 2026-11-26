@@ -14,7 +14,8 @@ import { type ConnectingApp, PluginConnectionOutcome } from "@/api/generated/ini
 import { finishPluginConnection } from "@/api/generated/plugin-platform/plugin-platform";
 import { pkcePair } from "@/lib/nativeSignIn";
 import { openExternal } from "@/lib/openExternal";
-import { CREDENTIAL_KEYS, getItem, removeItem, setItem } from "@/lib/storage";
+import { storedServerOrigin } from "@/lib/serverStorage";
+import { CREDENTIAL_KEYS, getItem, setItem } from "@/lib/storage";
 import Desktop from "@/plugins/desktop";
 import { BLOCKED_URL, sanitizeUrl } from "@/ui/lib/safeUrl";
 
@@ -25,10 +26,27 @@ export const HANDBACK_PATH = "/api/v1/plugin-connections/handback";
 /** As long as the server's own flow state lives. */
 const PENDING_TTL_MS = 10 * 60 * 1000;
 
+/** A connection this app began, kept under its challenge, which the handback
+ *  names: several can be under way at once. */
 interface PendingConnect {
   verifier: string;
+  /** The server it began against, the only one its handback is sent to. */
+  origin: string;
   startedAt: number;
 }
+
+const isFresh = (pending: PendingConnect) => Date.now() - pending.startedAt < PENDING_TTL_MS;
+
+const readPending = (): Record<string, PendingConnect> => {
+  try {
+    return JSON.parse(getItem(CREDENTIAL_KEYS.pendingConnect) ?? "{}");
+  } catch {
+    return {};
+  }
+};
+
+const writePending = (pending: Record<string, PendingConnect>) =>
+  setItem(CREDENTIAL_KEYS.pendingConnect, JSON.stringify(pending));
 
 /** Which app this is, which says how a flow is handed back to it; null in a browser. */
 export const connectingApp = (): ConnectingApp | null => {
@@ -49,8 +67,11 @@ export const beginConnect = async (): Promise<
   const app = connectingApp();
   if (!app) return undefined;
   const { verifier, challenge } = await pkcePair();
-  const pending: PendingConnect = { verifier, startedAt: Date.now() };
-  await setItem(CREDENTIAL_KEYS.pendingConnect, JSON.stringify(pending));
+  const pending = Object.fromEntries(
+    Object.entries(readPending()).filter(([, kept]) => isFresh(kept))
+  );
+  pending[challenge] = { verifier, origin: storedServerOrigin(), startedAt: Date.now() };
+  await writePending(pending);
   return { app, code_challenge: challenge };
 };
 
@@ -79,26 +100,24 @@ export const openVendorPage = async (url: string): Promise<URL | null> => {
 const isOutcome = (value: string | null): value is PluginConnectionOutcome =>
   Object.values<string | null>(PluginConnectionOutcome).includes(value);
 
-/** The connection this app began, taken so it is answered once. */
-const takePending = (): PendingConnect | null => {
-  const raw = getItem(CREDENTIAL_KEYS.pendingConnect);
-  void removeItem(CREDENTIAL_KEYS.pendingConnect);
-  if (!raw) return null;
-  try {
-    const pending = JSON.parse(raw) as PendingConnect;
-    return Date.now() - pending.startedAt < PENDING_TTL_MS ? pending : null;
-  } catch {
-    return null;
-  }
+/** The connection the handback names, taken so it is answered once, and only
+ *  while the app is still on the server it began against. */
+const takePending = (challenge: string | null): PendingConnect | null => {
+  const all = readPending();
+  const pending = challenge ? all[challenge] : undefined;
+  if (!challenge || !pending) return null;
+  delete all[challenge];
+  void writePending(all);
+  return isFresh(pending) && pending.origin === storedServerOrigin() ? pending : null;
 };
 
 /**
  * Finish a connection handed back to this app, and answer how it ended: null
- * when this app began none. A handback that carries no code is an ending the
+ * when this app did not begin it, or began it on another server. A handback that carries no code is an ending the
  * server reached on its own, such as an install waiting on an owner.
  */
 export const finishConnect = async (url: URL): Promise<PluginConnectionOutcome | null> => {
-  const pending = takePending();
+  const pending = takePending(url.searchParams.get("challenge"));
   if (!pending) return null;
   const code = url.searchParams.get("code");
   if (!code) {

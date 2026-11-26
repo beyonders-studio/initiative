@@ -339,12 +339,14 @@ def app_handback(app: str | None, challenge: str | None) -> tuple[str, str]:
 
 
 def _handback_url(state: ConnectionFlowState, params: list[tuple[str, str]]) -> str:
+    """The handback address, naming the flow by the app's challenge so an app
+    with several connections under way finishes each with its own verifier."""
     base = (
         f"{_app_url()}{HANDBACK_PATH}"
         if state.handback == "https"
         else APP_HANDBACK_URI
     )
-    return f"{base}?{urlencode(params)}"
+    return f"{base}?{urlencode([*params, ('challenge', state.app_challenge)])}"
 
 
 def _ending(state: ConnectionFlowState, outcome: str) -> str:

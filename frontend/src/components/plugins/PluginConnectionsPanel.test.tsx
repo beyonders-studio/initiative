@@ -194,11 +194,12 @@ describe("in the desktop app", () => {
         return HttpResponse.json({ outcome: "connected" });
       })
     );
-    vi.mocked(Desktop.openVendorPage).mockResolvedValue({
-      returned: `https://server.test${HANDBACK_PATH}?code=h`,
-    });
+    let challenge: string | undefined;
+    vi.mocked(Desktop.openVendorPage).mockImplementation(async () => ({
+      returned: `https://server.test${HANDBACK_PATH}?code=h&challenge=${challenge}`,
+    }));
     connect.mockImplementation(async (_id, options) => {
-      await beginConnect();
+      challenge = (await beginConnect())?.code_challenge;
       options.onSuccess({ connect_url: "https://github-app.test/install/github?x=1" });
     });
     render(vendorFlow);

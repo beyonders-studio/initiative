@@ -7,6 +7,7 @@ import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { server } from "@/__tests__/helpers/msw-server";
+import { clearStoredServerUrl, setStoredServerUrl } from "@/lib/serverStorage";
 import { CREDENTIAL_KEYS, removeItem } from "@/lib/storage";
 
 import { beginConnect, finishConnect, isConnectHandback } from "./appConnect";
@@ -19,6 +20,7 @@ let finished: unknown[] = [];
 beforeEach(async () => {
   finished = [];
   await removeItem(CREDENTIAL_KEYS.pendingConnect);
+  clearStoredServerUrl();
   server.use(
     http.post("*/plugin-connections/finish", async ({ request }) => {
       finished.push(await request.json());
@@ -58,10 +60,17 @@ describe("a connection handed back", () => {
     }
   });
 
+  /** Start a connection, and answer its handback address with `params`. */
+  const started = async (params: string) => {
+    const begun = await beginConnect();
+    return new URL(
+      `https://server.test/api/v1/plugin-connections/handback?${params}&challenge=${begun?.code_challenge}`
+    );
+  };
+
   it("is finished once, with the verifier kept when it began", async () => {
     onPlatform("electron");
-    await beginConnect();
-    const handback = new URL("https://server.test/api/v1/plugin-connections/handback?code=h");
+    const handback = await started("code=h");
 
     expect(await finishConnect(handback)).toBe("connected");
     expect(finished).toEqual([
@@ -72,17 +81,41 @@ describe("a connection handed back", () => {
     expect(finished).toHaveLength(1);
   });
 
+  it("finds its own verifier while another connection is under way", async () => {
+    onPlatform("android");
+    const first = await started("code=one");
+    const second = await started("code=two");
+
+    await finishConnect(second);
+    await finishConnect(first);
+
+    const [two, one] = finished as { code: string; code_verifier: string }[];
+    expect([two.code, one.code]).toEqual(["two", "one"]);
+    expect(two.code_verifier).not.toBe(one.code_verifier);
+  });
+
+  it("is not sent to a server the app moved to after it began", async () => {
+    onPlatform("android");
+    setStoredServerUrl("https://one.example/api/v1");
+    const handback = await started("code=h");
+
+    setStoredServerUrl("https://two.example/api/v1");
+
+    expect(await finishConnect(handback)).toBeNull();
+    expect(finished).toEqual([]);
+  });
+
   it("reads an ending that carries no code, and nothing for a connection this app never began", async () => {
-    const waiting = new URL("initiative://plugins/connected?outcome=awaiting_approval");
-    expect(await finishConnect(waiting)).toBeNull();
+    const stranger = new URL(
+      "initiative://plugins/connected?outcome=awaiting_approval&challenge=unknown"
+    );
+    expect(await finishConnect(stranger)).toBeNull();
 
     onPlatform("android");
-    await beginConnect();
-    expect(await finishConnect(waiting)).toBe("awaiting_approval");
-    await beginConnect();
-    expect(await finishConnect(new URL("initiative://plugins/connected?outcome=edited"))).toBe(
-      "expired"
+    expect(await finishConnect(await started("outcome=awaiting_approval"))).toBe(
+      "awaiting_approval"
     );
+    expect(await finishConnect(await started("outcome=edited"))).toBe("expired");
     expect(finished).toEqual([]);
   });
 });
