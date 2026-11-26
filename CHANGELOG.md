@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The privilege-drift warning's fix no longer stops the next start.** On a database whose provisioning login held TEMPORARY only through PUBLIC, running the warning's one-line `REVOKE` left a server that refused to start. The warning now prints the grant the provisioning login needs first, in the order the bootstrap applies them.
+
 ## [0.80.1] - 2026-11-25
 
 ### Fixed
