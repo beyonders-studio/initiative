@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.80.1] - 2026-11-25
+
 ### Fixed
 
 - **Upgrading to 0.80 with Counters already installed from the marketplace.** A community that had added the Counters plug-in while Counters was still built in, with the built-in tool switched on but no counter groups, stopped the upgrade and the server never started. The upgrade now keeps that install, turns it on wherever the built-in tool was on, and starts. A community with built-in counter groups beside the plug-in still stops the upgrade and says which community to look at.
