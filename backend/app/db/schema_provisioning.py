@@ -1917,9 +1917,20 @@ async def verify_engine_identities() -> None:
 def temporary_drift_sql(database: str, provisioner: str) -> str:
     """The statements that take TEMPORARY from PUBLIC by hand, as the
     bootstrap does: the provisioning login is granted it first, since it may
-    have held it only through PUBLIC."""
+    have held it only through PUBLIC.
+
+    One transaction, so the revoke never runs without the grant: psql carries
+    on past a failed statement, and a revoke alone stops the next start. The
+    names are quoted identifiers, as the bootstrap quotes them, since a
+    deployment may name its logins anything (``app-provisioner``,
+    ``AppProvisioner``).
+    """
+    db = '"' + database.replace('"', '""') + '"'
+    login = '"' + provisioner.replace('"', '""') + '"'
     return (
+        "  BEGIN;\n"
         f"  GRANT {', '.join(bootstrap.PROVISIONER_DATABASE_PRIVILEGES)}"
-        f" ON DATABASE {database} TO {provisioner};\n"
-        f"  REVOKE TEMPORARY ON DATABASE {database} FROM PUBLIC;\n"
+        f" ON DATABASE {db} TO {login};\n"
+        f"  REVOKE TEMPORARY ON DATABASE {db} FROM PUBLIC;\n"
+        "  COMMIT;\n"
     )
