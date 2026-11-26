@@ -112,6 +112,10 @@ class ChallengePurpose(str, Enum):
     #: the vendor will send them back with a code. The row names the operator;
     #: the answer is the registration the setup is for.
     plugin_vendor_setup = "plugin_vendor_setup"
+    #: A plug-in connection an app began is back from the vendor, waiting for
+    #: that app. The row names who started it; the value is the sealed code the
+    #: app is handed, and the answer is the app's S256 challenge.
+    plugin_connection_handback = "plugin_connection_handback"
 
 
 @dataclass(frozen=True)

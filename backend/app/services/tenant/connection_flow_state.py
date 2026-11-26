@@ -13,6 +13,11 @@ the path to send the person back to, and the phase: ``install`` while a person i
 page, ``authorize`` once the authorization request is sent. An
 installation-style flow's second leg carries the installation id the vendor's
 setup address returned.
+
+A flow an app began also carries the app's S256 challenge and how the flow is
+handed back to it (:data:`HANDBACKS`): the app holds no session in the browser
+the vendor returns to, so the flow ends in the app, which redeems it with the
+verifier behind that challenge and its own session.
 """
 
 from __future__ import annotations
@@ -22,6 +27,7 @@ import hashlib
 import json
 import secrets
 from dataclasses import dataclass, replace
+from enum import StrEnum
 
 from cryptography.fernet import InvalidToken
 
@@ -32,10 +38,13 @@ from app.core.encryption import (
 )
 
 __all__ = [
+    "HANDBACKS",
     "PHASES",
     "STATE_MAX_AGE_SECONDS",
+    "ConnectingApp",
     "ConnectionFlowState",
     "FlowStateError",
+    "PluginConnectionOutcome",
     "code_challenge",
     "decode_state",
     "encode_state",
@@ -49,11 +58,40 @@ STATE_MAX_AGE_SECONDS = 600
 #: authorization endpoint.
 PHASES: frozenset[str] = frozenset({"install", "authorize"})
 
+#: How a flow an app began is handed back to it: ``https`` — this deployment's
+#: own handback address, which the app catches before any browser loads it;
+#: ``scheme`` — ``initiative://``, which the system hands the app.
+HANDBACKS: frozenset[str] = frozenset({"https", "scheme"})
+
 #: 64 random bytes: an 86-character verifier, within RFC 7636's 43..128.
 _VERIFIER_BYTES = 64
 
 #: The widest installation id a vendor's setup address may hand back.
 MAX_INSTALLATION_ID_LENGTH = 64
+
+
+class ConnectingApp(StrEnum):
+    """The app starting a flow, which says how it can be handed back
+    (``plugin_connection_flows.app_handback``)."""
+
+    #: Opens the vendor in a window of its own, and catches the handback there.
+    desktop = "desktop"
+    #: Opens the vendor in the system's browser, and is handed a link.
+    phone = "phone"
+
+
+class PluginConnectionOutcome(StrEnum):
+    """How a flow ended, as the landing page and the app read it."""
+
+    connected = "connected"
+    refused = "refused"
+    expired = "expired"
+    not_recorded = "not_recorded"
+    awaiting_approval = "awaiting_approval"
+    sign_in_required = "sign_in_required"
+    #: A browser loaded the handback of a flow an app began, which only that
+    #: app finishes.
+    app_only = "app_only"
 
 
 class FlowStateError(Exception):
@@ -82,6 +120,11 @@ class ConnectionFlowState:
     #: The registration whose connection the platform makes for every
     #: community; ``None`` for a community's.
     public_id: str | None = None
+    #: The S256 challenge of the app that began the flow, and how the flow is
+    #: handed back to it (one of :data:`HANDBACKS`). Both empty for a flow a
+    #: browser began.
+    app_challenge: str = ""
+    handback: str = ""
 
     @property
     def for_platform(self) -> bool:
@@ -109,6 +152,8 @@ def new_state(
     pkce: bool,
     phase: str,
     public_id: str | None = None,
+    app_challenge: str = "",
+    handback: str = "",
 ) -> ConnectionFlowState:
     return ConnectionFlowState(
         guild_id=guild_id,
@@ -120,6 +165,8 @@ def new_state(
         return_path=return_path,
         phase=phase,
         public_id=public_id,
+        app_challenge=app_challenge,
+        handback=handback,
     )
 
 
@@ -136,6 +183,8 @@ def encode_state(state: ConnectionFlowState) -> str:
             "p": state.phase,
             "x": state.installation_id,
             "s": state.public_id,
+            "a": state.app_challenge,
+            "h": state.handback,
         },
         separators=(",", ":"),
     )
@@ -167,6 +216,8 @@ def decode_state(
             phase=str(data["p"]),
             installation_id=None if data.get("x") is None else str(data["x"]),
             public_id=None if data.get("s") is None else str(data["s"]),
+            app_challenge=str(data.get("a") or ""),
+            handback=str(data.get("h") or ""),
         )
     except (ValueError, KeyError, TypeError) as exc:
         raise FlowStateError("malformed state") from exc
@@ -175,6 +226,11 @@ def decode_state(
     # A community's flow names its install; the platform's names neither.
     if (state.guild_id is None) != state.for_platform or (
         (state.install_id is None) != state.for_platform
+    ):
+        raise FlowStateError("malformed state")
+    # An app's flow says how it goes back to the app; a browser's says nothing.
+    if (state.handback or state.app_challenge) and (
+        state.handback not in HANDBACKS or not state.app_challenge
     ):
         raise FlowStateError("malformed state")
     return state

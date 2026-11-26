@@ -246,7 +246,12 @@
     },
     "sign_in_required": {
       "title": "Zum Abschließen anmelden",
-      "body": "Schließe die Verbindung in dem Browser ab, in dem du bei Initiative angemeldet bist, als die Person, die sie begonnen hat."
+      "body": "Schließe die Verbindung in dem Browser ab, in dem du bei Initiative angemeldet bist, als die Person, die sie begonnen hat.",
+      "app": "Der geöffnete Browser ist bei Initiative als jemand anderes angemeldet, deshalb wurde nichts verbunden. Melde dich dort bei Initiative ab und verbinde dann erneut aus der App."
+    },
+    "app_only": {
+      "title": "In der App abschließen",
+      "body": "Diese Verbindung wurde in der Initiative-App begonnen, deshalb kann nur die App sie abschließen. Verbinde erneut aus der App."
     },
     "closeTab": "Du kannst diesen Tab schließen."
   },

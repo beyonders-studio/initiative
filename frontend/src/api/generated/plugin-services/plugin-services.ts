@@ -21,6 +21,7 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  ConnectPluginServiceForEveryCommunityParams,
   HTTPValidationError,
   ListPluginServicesParams,
   PluginPlatformConnectStart,
@@ -1019,6 +1020,7 @@ export const useCompletePluginServiceVendorSetup = <
 export const connectPluginServiceForEveryCommunity = (
   registrationId: number,
   connectionId: string,
+  params?: ConnectPluginServiceForEveryCommunityParams,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
@@ -1026,6 +1028,7 @@ export const connectPluginServiceForEveryCommunity = (
     {
       url: `/api/v1/plugin-services/${registrationId}/connections/${connectionId}/connect`,
       method: "POST",
+      params,
       signal,
     },
     options
@@ -1063,9 +1066,14 @@ export const getConnectPluginServiceForEveryCommunityMutationOptions = <
     Awaited<ReturnType<typeof connectPluginServiceForEveryCommunity>>,
     ConnectPluginServiceForEveryCommunityMutationVariables
   > = (props) => {
-    const { registrationId, connectionId } = props ?? {};
+    const { registrationId, connectionId, params } = props ?? {};
 
-    return connectPluginServiceForEveryCommunity(registrationId, connectionId, requestOptions);
+    return connectPluginServiceForEveryCommunity(
+      registrationId,
+      connectionId,
+      params,
+      requestOptions
+    );
   };
 
   return { mutationFn, ...mutationOptions };
@@ -1079,6 +1087,7 @@ export type ConnectPluginServiceForEveryCommunityMutationError = ErrorType<HTTPV
 export type ConnectPluginServiceForEveryCommunityMutationVariables = {
   registrationId: number;
   connectionId: string;
+  params?: ConnectPluginServiceForEveryCommunityParams;
 };
 
 /**

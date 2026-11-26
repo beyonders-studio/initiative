@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Connecting a plug-in in the desktop and phone apps.** **Connect** ended at *Sign in to finish* in your browser, and nothing was connected. The desktop app now opens the other service in a window of its own, where you sign in to it, and the phone app finishes the connection when you come back from the browser.
+
 ## [0.80.1] - 2026-11-25
 
 ### Fixed

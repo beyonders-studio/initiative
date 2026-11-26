@@ -15,6 +15,10 @@ describe("ConnectedPage", () => {
       "sign_in_required",
       "Finish connecting in the browser where you're signed in to Initiative, as the person who started it.",
     ],
+    [
+      "app_only",
+      "This connection was started in the Initiative app, so only the app can finish it. Connect again from the app.",
+    ],
     // An ending it does not know reads as expired.
     ["whatever", "That link has expired"],
   ])("says what the %s ending means", async (outcome, text) => {

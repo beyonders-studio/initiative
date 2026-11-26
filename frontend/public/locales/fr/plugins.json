@@ -246,7 +246,12 @@
     },
     "sign_in_required": {
       "title": "Connectez-vous pour terminer",
-      "body": "Terminez la connexion dans le navigateur où vous êtes connecté à Initiative, en tant que la personne qui l'a commencée."
+      "body": "Terminez la connexion dans le navigateur où vous êtes connecté à Initiative, en tant que la personne qui l'a commencée.",
+      "app": "Le navigateur qui s'est ouvert est connecté à Initiative sous le compte de quelqu'un d'autre : rien n'a été connecté. Déconnectez-vous d'Initiative dans ce navigateur, puis reconnectez depuis l'application."
+    },
+    "app_only": {
+      "title": "Terminez dans l'application",
+      "body": "Cette connexion a été commencée dans l'application Initiative : seule l'application peut la terminer. Reconnectez depuis l'application."
     },
     "closeTab": "Vous pouvez fermer cet onglet."
   },

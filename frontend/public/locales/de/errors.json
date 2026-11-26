@@ -312,6 +312,7 @@
   "OPERATOR_CANNOT_ASSIGN_HIGHER_ROLE": "Du kannst keine Rolle zuweisen, die höher als deine eigene ist.",
   "NATIVE_OTA_BUNDLE_NOT_AVAILABLE": "Dieser Server-Build hat kein Over-the-Air-Update-Bundle verfügbar",
   "NATIVE_APP_UPDATE_REQUIRED": "Mit dieser Version der App ist keine Anmeldung mehr möglich. Aktualisiere die App und versuche es erneut.",
+  "NATIVE_APP_CHALLENGE_INVALID": "Mit dieser Version der App lassen sich keine Plug-ins verbinden. Aktualisiere die App und versuche es erneut.",
   "SETTINGS_STORAGE_BACKFILL_RUNNING": "Ein Backfill läuft bereits.",
   "SETTINGS_STORAGE_BACKFILL_NOT_CONFIGURED": "Speichere S3 als Speicher-Backend, bevor du die Übertragung startest.",
   "SETTINGS_STORAGE_BACKFILL_FAILED": "Der Backfill wurde wegen eines Fehlers abgebrochen. Details stehen im Serverprotokoll.",
