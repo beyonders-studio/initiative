@@ -842,10 +842,10 @@ class TestAppFlow:
 
         _, location = await _handed_back(client, a, plugin, vendor, browser=other)
 
-        assert _landing(location) == {
-            "outcome": "sign_in_required",
-            "_path": plugin_connection_flows.HANDBACK_PATH,
-        }
+        handback = _landing(location)
+        assert handback["outcome"] == "sign_in_required"
+        assert handback["_path"] == plugin_connection_flows.HANDBACK_PATH
+        assert "code" not in handback
 
     async def test_only_the_persons_own_session_finishes_it(
         self, client: AsyncClient, acting_user
@@ -914,10 +914,10 @@ class TestAppFlow:
         )
 
         assert urlparse(onward.headers["location"]).path == "/login/oauth/authorize"
-        assert _landing(waiting.headers["location"]) == {
-            "outcome": "awaiting_approval",
-            "_path": plugin_connection_flows.HANDBACK_PATH,
-        }
+        handback = _landing(waiting.headers["location"])
+        assert handback["outcome"] == "awaiting_approval"
+        assert handback["_path"] == plugin_connection_flows.HANDBACK_PATH
+        assert handback["challenge"] == params["code_challenge"]
 
 
 class TestInstallationStyleFlow:
