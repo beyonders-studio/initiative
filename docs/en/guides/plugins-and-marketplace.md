@@ -125,6 +125,8 @@ Some plug-ins work with another service on your behalf, so each member signs in 
 3. Sign in to the other service in the tab that opens.
 4. Close that tab when it says **Connected**.
 
+In the desktop app the other service opens in a window of its own, which closes by itself when you're connected. The phone app opens it in your browser and finishes when you come back.
+
 The settings then say **Connected as** and your account there. **Disconnect** takes it back, and **Reconnect** fixes a connection that's **Expired**. Your community's superadmin can see who has connected and disconnect anybody, and if it says **A community admin has stopped you connecting this**, that's what happened.
 
 ### Let a plug-in act as you
