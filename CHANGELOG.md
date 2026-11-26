@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Tool plug-ins from the marketplace are offered again.** A tool plug-in, such as Counters, registers with no address and no signing keys, because Initiative serves its tool itself. The rule for a live registration still asked for both, so its registration showed **Not live** and the marketplace didn't offer it to any community. A tool plug-in's registration is now live without them, as a declarative plug-in's is.
+
 ## [0.80.1] - 2026-11-25
 
 ### Fixed

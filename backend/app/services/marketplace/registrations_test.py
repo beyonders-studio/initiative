@@ -683,6 +683,10 @@ async def test_a_tool_plugin_registers_as_a_tool_with_no_location(session):
         None,
         [],
     )
+    # It can never take an address or keys, so it is live without them: a
+    # registration that is not live is not offered in the marketplace, and a
+    # tool plug-in's was never live (Counters, 26 Nov 2026).
+    assert (await load_registrations(force=True))["acme.widgets"].live is True
     with pytest.raises(HTTPException) as refused:
         await service.update_registration(session, row.id, base_url=BASE_URL)
     assert refused.value.detail == PluginServiceMessages.DECLARATIVE_NOT_PLACED
