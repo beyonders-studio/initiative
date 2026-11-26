@@ -26,6 +26,7 @@ import {
 } from "@/api/generated/plugin-services/plugin-services";
 import { invalidate, q } from "@/api/query-keys";
 import { useApiMutation } from "@/hooks/useApiMutation";
+import { beginConnect } from "@/lib/appConnect";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
 
@@ -171,8 +172,8 @@ export const useConnectForEveryCommunity = (
 ) =>
   useApiMutation<PluginPlatformConnectStart, PlatformConnectionVariables>(
     {
-      mutationFn: ({ registrationId, connectionId }) =>
-        connectPluginServiceForEveryCommunity(registrationId, connectionId),
+      mutationFn: async ({ registrationId, connectionId }) =>
+        connectPluginServiceForEveryCommunity(registrationId, connectionId, await beginConnect()),
       errorKey: "settings:pluginServices.platformConnections.connectError",
     },
     options

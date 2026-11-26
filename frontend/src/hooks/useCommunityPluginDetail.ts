@@ -39,6 +39,7 @@ import {
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
+import { beginConnect } from "@/lib/appConnect";
 
 /** An install whose entitlement is inactive is read again whenever this tab
  *  comes back, however fresh: the way to get it back is the billing portal,
@@ -118,8 +119,8 @@ export const useDeclinePluginUpgrade = (pluginId: number) => {
 
 export const useConnectPlugin = (pluginId: number) =>
   useCommunityMutation<CommunityPluginConnectStart, string>({
-    mutationFn: (communityId, connectionId) =>
-      connectCommunityPlugin(communityId, pluginId, connectionId),
+    mutationFn: async (communityId, connectionId) =>
+      connectCommunityPlugin(communityId, pluginId, connectionId, await beginConnect()),
     invalidate: () => invalidate(q.plugins()),
     errorKey: "plugins:error",
   });

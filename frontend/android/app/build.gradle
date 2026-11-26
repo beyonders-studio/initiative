@@ -10,6 +10,10 @@ if (versionParts.size() < 3) {
 }
 def appVersionCode = versionParts[0].toInteger() * 10000 + versionParts[1].toInteger() * 100 + versionParts[2].toInteger()
 
+// Initiative Cloud's host, from the CLOUD_ORIGIN file at project root: the one
+// server whose own links the app claims (AndroidManifest.xml).
+def cloudHost = new URI(file("../../../CLOUD_ORIGIN").text.trim()).host
+
 // Release signing values arrive as Gradle properties. Each name is a plain
 // identifier, so the same value can be supplied as an
 // ORG_GRADLE_PROJECT_<name> environment variable.
@@ -47,7 +51,7 @@ android {
     defaultConfig {
         applicationId "studio.beyonders.initiative" + appIdSuffix
         // Plain-HTTP servers only in a debug build, for testing against a server on the LAN.
-        manifestPlaceholders = [appLabel: appLabel, usesCleartextTraffic: "false"]
+        manifestPlaceholders = [appLabel: appLabel, usesCleartextTraffic: "false", cloudHost: cloudHost]
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode appVersionCode
