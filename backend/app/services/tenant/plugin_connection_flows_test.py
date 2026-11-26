@@ -14,6 +14,7 @@ import asyncio
 import base64
 import hashlib
 import hmac
+import secrets
 import time
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -35,7 +36,9 @@ from app.core.config import settings
 from app.core.encryption import SALT_PLUGIN_CONFIG, decrypt_field, encrypt_field
 from app.core.messages import (
     AccessGrantMessages,
+    AuthMessages,
     GuildPluginMessages,
+    NativeMessages,
     PluginChannelMessages,
     PluginDataMessages,
     PluginServiceMessages,
@@ -77,6 +80,7 @@ from app.services.tenant import (
     plugin_revocation,
     plugin_schedules,
 )
+from app.services.tenant.connection_flow_state import code_challenge
 from app.services.tenant.plugin_connections import load_connection_secrets
 from app.testing import (
     create_access_grant,
@@ -318,11 +322,13 @@ async def _reload(session: AsyncSession, guild_id: int, plugin_id: int) -> Guild
 
 
 async def _start(
-    client: AsyncClient, actor, plugin: GuildPlugin, connection: str
+    client: AsyncClient, actor, plugin: GuildPlugin, connection: str, **params
 ) -> dict:
+    """Start a flow; ``params`` are what an app sends with it."""
     response = await client.post(
         actor.g(f"/plugins/{plugin.id}/connections/{connection}/connect"),
         headers=actor.headers,
+        params=params,
     )
     assert response.status_code == 200, response.text
     url = urlparse(response.json()["connect_url"])
@@ -662,6 +668,252 @@ class TestMemberFlow:
         )
         assert vendor.token_requests == []
         assert await _member_row(session, a.guild.id, plugin.id) is None
+
+
+FINISH_ROUTE = "/api/v1/plugin-connections/finish"
+
+
+def _app(app: str = "desktop") -> tuple[str, dict[str, str]]:
+    """An app's verifier, and what the app sends with the connect request."""
+    verifier = secrets.token_urlsafe(48)
+    return verifier, {"app": app, "code_challenge": code_challenge(verifier)}
+
+
+async def _handed_back(
+    client: AsyncClient,
+    actor,
+    plugin: GuildPlugin,
+    vendor: FakeVendor,
+    *,
+    app: str = "desktop",
+    browser=None,
+) -> tuple[str, str]:
+    """A flow an app began, through the vendor and back to the callback in a
+    browser signed in as ``browser`` (nobody, by default). Answers the app's
+    verifier and where the callback sent the browser."""
+    verifier, params = _app(app)
+    start = await _start(client, actor, plugin, "account", **params)
+    code = vendor.authorize(start["code_challenge"])
+    response = await client.get(
+        "/api/v1/plugin-connections/callback",
+        params={"state": start["state"], "code": code},
+        headers=_cookie(browser) if browser is not None else {},
+    )
+    assert response.status_code == 303, response.text
+    return verifier, response.headers["location"]
+
+
+def _handback_code(location: str) -> str:
+    return parse_qs(urlparse(location).query)["code"][0]
+
+
+class TestAppFlow:
+    async def test_the_app_finishes_it_in_its_own_session(
+        self, client: AsyncClient, acting_user, session, vendor, registration
+    ):
+        """The vendor returns to a browser nobody is signed in to, so the flow
+        is handed back to the app rather than finished there. The app finishes
+        it, signed in as its starter and with its verifier, once."""
+        a = await acting_user(guild_role=CommunityRole.member)
+        plugin = await _install(session, a)
+
+        verifier, location = await _handed_back(client, a, plugin, vendor)
+
+        assert location.startswith(
+            f"{settings.APP_URL.rstrip('/')}{plugin_connection_flows.HANDBACK_PATH}?"
+        )
+        assert vendor.token_requests == []
+        answer = {"code": _handback_code(location), "code_verifier": verifier}
+        finished = await client.post(FINISH_ROUTE, json=answer, headers=a.headers)
+        assert finished.status_code == 200, finished.text
+        assert finished.json() == {"outcome": "connected"}
+        row = await _member_row(session, a.guild.id, plugin.id)
+        assert row is not None
+        assert row.status == "connected"
+
+        again = await client.post(FINISH_ROUTE, json=answer, headers=a.headers)
+        assert again.json() == {"outcome": "expired"}
+        assert len(vendor.token_requests) == 1
+
+    @pytest.mark.parametrize(
+        ("app", "cloud", "handed_to"),
+        [
+            ("desktop", False, "https"),
+            ("phone", True, "https"),
+            ("phone", False, "scheme"),
+        ],
+    )
+    async def test_where_each_app_is_handed_back(
+        self,
+        client: AsyncClient,
+        acting_user,
+        session,
+        vendor,
+        registration,
+        monkeypatch,
+        app,
+        cloud,
+        handed_to,
+    ):
+        """The desktop app catches this deployment's own address in its
+        window. The phone is handed a link: on Initiative Cloud that address,
+        which the project's app claims, and elsewhere ``initiative://``."""
+        monkeypatch.setattr(plugin_connection_flows, "is_cloud", lambda: cloud)
+        a = await acting_user(guild_role=CommunityRole.member)
+        plugin = await _install(session, a)
+
+        _, location = await _handed_back(client, a, plugin, vendor, app=app)
+
+        assert location.startswith(
+            f"{settings.APP_URL.rstrip('/')}{plugin_connection_flows.HANDBACK_PATH}?"
+            if handed_to == "https"
+            else f"{plugin_connection_flows.APP_HANDBACK_URI}?"
+        )
+
+    async def test_a_handback_answers_only_its_app_and_its_starter(
+        self, client: AsyncClient, acting_user, session, vendor, registration
+    ):
+        """Somebody else's session, or a verifier that is not the app's,
+        finishes nothing, and any answer spends the handback."""
+        a = await acting_user(guild_role=CommunityRole.member)
+        other = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
+        plugin = await _install(session, a)
+
+        verifier, location = await _handed_back(client, a, plugin, vendor)
+        answer = {"code": _handback_code(location), "code_verifier": verifier}
+        by_other = await client.post(FINISH_ROUTE, json=answer, headers=other.headers)
+        then_starter = await client.post(FINISH_ROUTE, json=answer, headers=a.headers)
+
+        verifier, location = await _handed_back(client, a, plugin, vendor)
+        code = _handback_code(location)
+        wrong = await client.post(
+            FINISH_ROUTE,
+            json={"code": code, "code_verifier": secrets.token_urlsafe(48)},
+            headers=a.headers,
+        )
+        then_right = await client.post(
+            FINISH_ROUTE,
+            json={"code": code, "code_verifier": verifier},
+            headers=a.headers,
+        )
+
+        for response in (by_other, then_starter, wrong, then_right):
+            assert response.json() == {"outcome": "expired"}
+        assert vendor.token_requests == []
+        assert await _member_row(session, a.guild.id, plugin.id) is None
+
+    async def test_a_browser_that_loads_the_handback_spends_it(
+        self, client: AsyncClient, acting_user, session, vendor, registration
+    ):
+        """A browser that loads the handback address spends the handback and
+        is told the flow finishes in the app."""
+        a = await acting_user(guild_role=CommunityRole.member)
+        plugin = await _install(session, a)
+        verifier, location = await _handed_back(client, a, plugin, vendor)
+        code = _handback_code(location)
+
+        loaded = await client.get(
+            plugin_connection_flows.HANDBACK_PATH, params={"code": code}
+        )
+
+        assert loaded.status_code == 303
+        assert _landing(loaded.headers["location"]) == {
+            "outcome": "app_only",
+            "_path": "/plugins/connected",
+        }
+        finished = await client.post(
+            FINISH_ROUTE,
+            json={"code": code, "code_verifier": verifier},
+            headers=a.headers,
+        )
+        assert finished.json() == {"outcome": "expired"}
+        assert vendor.token_requests == []
+
+    async def test_a_browser_signed_in_as_somebody_else_stops_it(
+        self, client: AsyncClient, acting_user, session, vendor, registration
+    ):
+        a = await acting_user(guild_role=CommunityRole.member)
+        other = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
+        plugin = await _install(session, a)
+
+        _, location = await _handed_back(client, a, plugin, vendor, browser=other)
+
+        assert _landing(location) == {
+            "outcome": "sign_in_required",
+            "_path": plugin_connection_flows.HANDBACK_PATH,
+        }
+
+    async def test_only_the_persons_own_session_finishes_it(
+        self, client: AsyncClient, acting_user
+    ):
+        """A personal API key reaches what the person reaches, but is not them
+        signing in."""
+        a = await acting_user(guild_role=CommunityRole.member)
+        created = await client.post(
+            "/api/v1/me/api-keys",
+            headers=a.headers,
+            json={"name": "Script", "community_id": a.guild.id},
+        )
+        assert created.status_code == 201, created.text
+
+        response = await client.post(
+            FINISH_ROUTE,
+            json={"code": "handback", "code_verifier": secrets.token_urlsafe(48)},
+            headers={"Authorization": f"Bearer {created.json()['secret']}"},
+        )
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == AuthMessages.SESSION_REQUIRED
+
+    @pytest.mark.parametrize(
+        "params",
+        [
+            {"app": "desktop"},
+            {"code_challenge": code_challenge("a" * 43)},
+            {"app": "desktop", "code_challenge": "not-a-challenge"},
+        ],
+    )
+    async def test_an_app_without_a_challenge_is_refused(
+        self, client: AsyncClient, acting_user, session, vendor, registration, params
+    ):
+        a = await acting_user(guild_role=CommunityRole.member)
+        plugin = await _install(session, a)
+
+        response = await client.post(
+            a.g(f"/plugins/{plugin.id}/connections/account/connect"),
+            headers=a.headers,
+            params=params,
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == NativeMessages.APP_CHALLENGE_INVALID
+
+    async def test_an_install_page_flow_goes_on_without_a_browser_session(
+        self, client: AsyncClient, acting_user, session, vendor, registration
+    ):
+        """The setup address forwards an app's flow to the authorization
+        without a session in the browser, and an install waiting on an owner
+        is handed back to the app."""
+        a = await acting_user(guild_role=CommunityRole.superadmin)
+        plugin = await _install(session, a)
+        _, params = _app()
+
+        start = await _start(client, a, plugin, "workspace", **params)
+        onward = await client.get(
+            "/api/v1/plugin-connections/setup",
+            params={"state": start["state"], "installation_id": "42"},
+        )
+        start = await _start(client, a, plugin, "workspace", **params)
+        waiting = await client.get(
+            "/api/v1/plugin-connections/setup",
+            params={"state": start["state"], "setup_action": "request"},
+        )
+
+        assert urlparse(onward.headers["location"]).path == "/login/oauth/authorize"
+        assert _landing(waiting.headers["location"]) == {
+            "outcome": "awaiting_approval",
+            "_path": plugin_connection_flows.HANDBACK_PATH,
+        }
 
 
 class TestInstallationStyleFlow:

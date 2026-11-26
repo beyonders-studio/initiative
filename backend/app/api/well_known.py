@@ -42,8 +42,9 @@ async def android_asset_links() -> JSONResponse:
     """The Android apps that may sign in to this deployment with a passkey.
 
     ``get_login_creds`` is the relation Google's Credential Manager reads;
-    ``handle_all_urls`` is the one Bitwarden reads instead. Naming it opens no
-    links in the app, which verifies no https host of its own.
+    ``handle_all_urls`` is the one Bitwarden reads instead. The app verifies
+    one https link of its own against it, on Initiative Cloud alone: where a
+    plug-in connection it began is handed back (``AndroidManifest.xml``).
     """
     if passkey_service.site_refusal() is not None:
         raise HTTPException(status_code=404)
