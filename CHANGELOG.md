@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Plug-ins the registry gives a new code arrive in the marketplace.** When the registry corrects a plug-in published under another plug-in's code, giving the code back and the moved plug-in a code of its own, a refresh now takes both at once instead of skipping them on every refresh, and the installs communities already have stay as they are. If a community still runs the plug-in that moved, the registry status says so, and the change waits until it is removed there.
+
 ## [0.80.1] - 2026-11-25
 
 ### Fixed

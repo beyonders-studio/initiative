@@ -473,6 +473,7 @@
   "MARKETPLACE_REGISTRY_SOURCE_CONFLICT": "A listing with the same code is already on this server from somewhere else, so the registry's copy was skipped.",
   "MARKETPLACE_REGISTRY_PUBLISHER_CONFLICT": "You added a publisher with the same name here, so the registry's listings under that name were skipped.",
   "MARKETPLACE_REGISTRY_IDENTITY_CONFLICT": "Its code or name already belongs to a different listing from the registry, so it was skipped.",
+  "MARKETPLACE_REGISTRY_LISTING_REHOMED": "The registry moved the listing that used this code to a new code, and some communities still run that old listing. It has to be removed from those communities first, so this one was skipped.",
   "MARKETPLACE_REGISTRY_VERSION_REUSED": "This version is already on this server with different content. A published version can't change, so its publisher has to publish the change as a new version.",
   "MARKETPLACE_REGISTRY_RESERVED_NAMESPACE": "That listing uses a publisher name reserved for built-in listings, so it was skipped.",
   "MARKETPLACE_REGISTRY_LISTING_REJECTED": "That listing was refused because its contents are not valid.",

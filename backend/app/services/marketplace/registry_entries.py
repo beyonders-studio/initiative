@@ -14,7 +14,9 @@ that the files are the ones the entry names, and turns the entry into rows:
   ``marketplace_listing_versions``), ``source='registry'``, through the same
   ``upsert_listing`` and validator every other source uses. A uid or name
   another source already published is refused, never taken over. Pictures are
-  kept in ``marketplace_media`` by digest.
+  kept in ``marketplace_media`` by digest. A uid the registry moved from one of
+  its listings to another of the same publisher's is re-homed first
+  (:mod:`app.services.marketplace.listing_rehome`).
 * **for a plug-in, its registration's plug-in facts** (``plugin_service_registrations``,
   ``source='registry'``), from the entry's ``registration`` block, through the
   same ``upsert_listing`` as every other source's listing. The block is the
@@ -64,7 +66,7 @@ from app.models.platform.publisher import (
     publisher_prefix,
 )
 from app.services import audit as audit_service
-from app.services.marketplace import media, plugin_installs
+from app.services.marketplace import listing_rehome, media, plugin_installs
 from app.services.marketplace import publishers as publishers_service
 from app.services.marketplace import registrations as registrations_service
 from app.services.marketplace.catalog import (
@@ -72,6 +74,7 @@ from app.services.marketplace.catalog import (
     REGISTRY_SOURCE,
     CatalogError,
     CatalogIdentityConflict,
+    CatalogListingRehomed,
     CatalogReservedName,
     CatalogSourceConflict,
     CatalogVersionReused,
@@ -140,6 +143,7 @@ class RegistryError(Exception):
 #: refusal not listed is the listing's contents being invalid.
 _CATALOG_CODES: tuple[tuple[type[CatalogError], str], ...] = (
     (CatalogSourceConflict, Codes.SOURCE_CONFLICT),
+    (CatalogListingRehomed, Codes.LISTING_REHOMED),
     (CatalogIdentityConflict, Codes.IDENTITY_CONFLICT),
     (CatalogReservedName, Codes.RESERVED_NAMESPACE),
     (CatalogVersionReused, Codes.VERSION_REUSED),
@@ -467,9 +471,12 @@ async def _manifest(
 # --- one entry ------------------------------------------------------------------------
 
 
-async def apply_entry(session: AsyncSession, path: str, context: EntryContext) -> None:
-    """Apply the entry at ``path``. Raises ``RegistryError`` to refuse it and
-    ``UnsupportedEntry`` for a kind this build does not carry."""
+async def apply_entry(session: AsyncSession, path: str, context: EntryContext) -> bool:
+    """Apply the entry at ``path``. Returns whether it re-homed its uid
+    (:mod:`app.services.marketplace.listing_rehome`), which frees the name
+    the uid held for a listing refused earlier in the same refresh. Raises
+    ``RegistryError`` to refuse it and ``UnsupportedEntry`` for a kind this
+    build does not carry."""
     parsed = parse_listing_path(path)
     if parsed is None:
         raise _invalid(f"{path} is not a listing path")
@@ -477,7 +484,7 @@ async def apply_entry(session: AsyncSession, path: str, context: EntryContext) -
 
     entry = _json_object(await context.fetch(path, MAX_ENTRY_BYTES), what=path)
     try:
-        await _apply_read_entry(
+        return await _apply_read_entry(
             session, entry, path=path, prefix=prefix, uid=uid, context=context
         )
     except RegistryError as exc:
@@ -508,8 +515,9 @@ async def _apply_read_entry(
     prefix: str,
     uid: str,
     context: EntryContext,
-) -> None:
-    """Apply an entry already read from ``path``."""
+) -> bool:
+    """Apply an entry already read from ``path``. Returns whether its uid was
+    re-homed."""
     directory = f"publishers/{prefix}/{uid}/"
     if entry.get("schema") != ENTRY_SCHEMA:
         raise _invalid(f"{path} is not entry schema {ENTRY_SCHEMA}")
@@ -550,6 +558,15 @@ async def _apply_read_entry(
         )
         if kept is not None:
             images.append(kept)
+
+    # The registry moved the listing this uid held to another uid: the uid
+    # is freed for this one before its versions are read against it.
+    try:
+        rehomed = await listing_rehome.rehome_registry_uid(
+            session, uid=uid, public_id=public_id, publisher=publisher
+        )
+    except CatalogError as exc:
+        raise RegistryError(catalog_code(exc), str(exc)) from exc
 
     held = {
         row
@@ -616,6 +633,11 @@ async def _apply_read_entry(
         .values(publisher_id=publisher.id, publisher_verified=publisher.verified)
     )
     await session.flush()
+    if rehomed:
+        # The uid's installs answer to another registration now: billing and
+        # each community's plug-in are told where they stand.
+        await plugin_installs.suspension_moved(session, uid)
+    return rehomed
 
 
 # --- withdrawal -------------------------------------------------------------------------

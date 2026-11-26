@@ -1469,6 +1469,10 @@ class MarketplaceRegistryMessages:
     #: The listing's uid or name is held by a different registry listing here,
     #: or it moved into or out of a plug-in it was published as part of.
     IDENTITY_CONFLICT = "MARKETPLACE_REGISTRY_IDENTITY_CONFLICT"
+    #: The registry moved the listing that held this uid to another uid and
+    #: gave this one to a new listing, and a community still runs a version
+    #: of the old listing under it. It has to be removed there first.
+    LISTING_REHOMED = "MARKETPLACE_REGISTRY_LISTING_REHOMED"
     #: A version this deployment already holds came back with different
     #: content. A published version is immutable: the publisher has to publish
     #: the change as a new version.

@@ -71,6 +71,7 @@ __all__ = [
     "REGISTRY_SOURCE",
     "CatalogError",
     "CatalogIdentityConflict",
+    "CatalogListingRehomed",
     "CatalogReservedName",
     "CatalogSourceConflict",
     "CatalogVersionReused",
@@ -110,6 +111,13 @@ class CatalogSourceConflict(CatalogError):
 class CatalogIdentityConflict(CatalogError):
     """The listing's uid or name is held by another listing from the same
     source, or it is published as part of a different plug-in than before."""
+
+
+class CatalogListingRehomed(CatalogError):
+    """The registry gave the listing's uid to it after moving the listing
+    that held the uid to another, and a community still runs one of that
+    listing's versions under the uid. The uid is not re-homed until it is
+    removed there (:mod:`app.services.marketplace.listing_rehome`)."""
 
 
 class CatalogReservedName(CatalogError):
@@ -456,7 +464,9 @@ async def upsert_listing(
     and leaves the version rows alone. Both identities are unique and neither is
     reassignable — a uid already held by a different ``public_id`` is refused,
     and vice versa, so a uid keeps meaning the listing it was first published
-    for.
+    for. The registry, which issues uids, may correct one it gave the wrong
+    listing; that is done before its publish reaches here
+    (:mod:`app.services.marketplace.listing_rehome`).
 
     ``bundled_with`` names the plug-in this listing is published as part of, and is
     a third thing that cannot be reassigned. It is set only by

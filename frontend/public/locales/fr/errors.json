@@ -470,6 +470,7 @@
   "MARKETPLACE_REGISTRY_SOURCE_CONFLICT": "Une fiche portant le même code est déjà sur ce serveur depuis une autre source : la copie du registre a été ignorée.",
   "MARKETPLACE_REGISTRY_PUBLISHER_CONFLICT": "Vous avez ajouté ici un éditeur du même nom : les fiches du registre sous ce nom ont été ignorées.",
   "MARKETPLACE_REGISTRY_IDENTITY_CONFLICT": "Son code ou son nom appartient déjà à une autre fiche du registre : elle a été ignorée.",
+  "MARKETPLACE_REGISTRY_LISTING_REHOMED": "Le registre a déplacé la fiche qui utilisait ce code vers un nouveau code, et certaines communautés utilisent encore cette ancienne fiche. Elle doit d'abord être retirée de ces communautés : celle-ci a donc été ignorée.",
   "MARKETPLACE_REGISTRY_VERSION_REUSED": "Cette version est déjà sur ce serveur avec un autre contenu. Une version publiée ne peut pas changer : son éditeur doit publier la modification comme nouvelle version.",
   "MARKETPLACE_REGISTRY_RESERVED_NAMESPACE": "Cette fiche utilise un nom d'éditeur réservé aux fiches fournies avec l'application : elle a été ignorée.",
   "MARKETPLACE_REGISTRY_LISTING_REJECTED": "Cette fiche a été refusée car son contenu n'est pas valide.",

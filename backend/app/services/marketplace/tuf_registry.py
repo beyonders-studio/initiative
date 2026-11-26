@@ -25,7 +25,10 @@ and nothing it serves is used until the metadata chain above it verifies.
    before it is read.
 4. Apply each listing in its own savepoint
    (:mod:`app.services.marketplace.registry_entries`), withdraw what the
-   repository no longer lists, and store the metadata the client verified.
+   repository no longer lists, and store the metadata the client verified. A
+   listing refused over a uid or name another listing holds is tried once
+   more after the others when one of them re-homed a uid
+   (:mod:`app.services.marketplace.listing_rehome`).
 5. Under the root shipped in the image, read the terms the ``package`` role
    signs for each listing (:mod:`app.services.marketplace.package_terms`) and
    write them onto the listings. Under any other root every listing holds none.
@@ -870,6 +873,10 @@ class RefreshResult:
         return self.ran and self.code is None
 
 
+#: The refusals of a listing whose uid or name another listing holds: what a
+#: uid re-homed later in the same pass may clear.
+_HELD_NAME_CODES = frozenset({Codes.SOURCE_CONFLICT, Codes.IDENTITY_CONFLICT})
+
 #: One refresh at a time in this process; the advisory lock covers replicas.
 _refresh_lock = asyncio.Lock()
 
@@ -946,7 +953,43 @@ async def _apply(
             publisher_record=publisher_record,
             now=now,
         )
+
+        async def skip(path: str, uid: str, exc: RegistryError) -> None:
+            logger.warning(
+                "marketplace registry: skipping %s (%s): %s",
+                path,
+                exc.code,
+                exc.detail,
+            )
+            result.skipped.append(
+                SkippedEntry(
+                    name=path,
+                    code=exc.code,
+                    listing_name=exc.listing_name
+                    or await _stored_listing_name(session, uid),
+                )
+            )
+
+        async def apply(path: str) -> bool:
+            """Apply one entry in its own savepoint; returns whether it
+            re-homed its uid."""
+            try:
+                async with session.begin_nested():
+                    moved = await registry_entries.apply_entry(session, path, context)
+            except registry_entries.UnsupportedEntry as exc:
+                logger.info("marketplace registry: not carried here: %s", exc)
+                return False
+            result.upserted += 1
+            return moved
+
         present: set[str] = set()
+        # A listing refused because its uid or name is held may be refused
+        # over a name an entry later in this pass frees, by re-homing the uid
+        # that held it. Those are tried once more after the pass, so a
+        # registry correction lands in one refresh whatever order its two
+        # entries are read in.
+        held_back: list[tuple[str, str, RegistryError]] = []
+        rehomed = False
         for path in paths:
             parsed = registry_entries.parse_listing_path(path)
             if parsed is None:  # pragma: no cover - filtered by listing_paths
@@ -959,26 +1002,20 @@ async def _apply(
             # it this time.
             present.add(parsed.uid)
             try:
-                async with session.begin_nested():
-                    await registry_entries.apply_entry(session, path, context)
-                result.upserted += 1
-            except registry_entries.UnsupportedEntry as exc:
-                logger.info("marketplace registry: not carried here: %s", exc)
+                rehomed = await apply(path) or rehomed
             except RegistryError as exc:
-                logger.warning(
-                    "marketplace registry: skipping %s (%s): %s",
-                    path,
-                    exc.code,
-                    exc.detail,
-                )
-                result.skipped.append(
-                    SkippedEntry(
-                        name=path,
-                        code=exc.code,
-                        listing_name=exc.listing_name
-                        or await _stored_listing_name(session, parsed.uid),
-                    )
-                )
+                if exc.code in _HELD_NAME_CODES:
+                    held_back.append((path, parsed.uid, exc))
+                else:
+                    await skip(path, parsed.uid, exc)
+        for path, uid, refused in held_back:
+            if not rehomed:
+                await skip(path, uid, refused)
+                continue
+            try:
+                await apply(path)
+            except RegistryError as exc:
+                await skip(path, uid, exc)
 
         result.withdrawn = await registry_entries.withdraw_missing(
             session, present=present, uncertain=repo.uncertain, now=now

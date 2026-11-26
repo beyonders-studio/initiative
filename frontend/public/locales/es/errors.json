@@ -470,6 +470,7 @@
   "MARKETPLACE_REGISTRY_SOURCE_CONFLICT": "Ya hay en este servidor una ficha con el mismo código de otra fuente, así que se omitió la copia del registro.",
   "MARKETPLACE_REGISTRY_PUBLISHER_CONFLICT": "Añadiste aquí un editor con el mismo nombre, así que se omitieron las fichas del registro con ese nombre.",
   "MARKETPLACE_REGISTRY_IDENTITY_CONFLICT": "Su código o nombre ya pertenece a otra ficha del registro, así que se omitió.",
+  "MARKETPLACE_REGISTRY_LISTING_REHOMED": "El registro movió la ficha que usaba este código a un código nuevo, y algunas comunidades todavía usan esa ficha antigua. Primero hay que quitarla de esas comunidades, así que se omitió esta.",
   "MARKETPLACE_REGISTRY_VERSION_REUSED": "Esta versión ya está en este servidor con otro contenido. Una versión publicada no puede cambiar, así que su editor tiene que publicar el cambio como una versión nueva.",
   "MARKETPLACE_REGISTRY_RESERVED_NAMESPACE": "Ese elemento usa un nombre de editor reservado para los elementos incluidos de serie, así que se ha omitido.",
   "MARKETPLACE_REGISTRY_LISTING_REJECTED": "Ese elemento se ha rechazado porque su contenido no es válido.",

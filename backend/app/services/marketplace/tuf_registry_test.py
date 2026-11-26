@@ -13,7 +13,8 @@ Grouped by what they defend:
 * what a refusal leaves behind: an expired or unverifiable repository keeps
   the last verified catalog, and a file that fails verification costs its own
   listing only;
-* withdrawal, the switch, the root, and the offline bundle.
+* withdrawal, the switch, the root, and the offline bundle;
+* a uid the registry moves from one of a publisher's listings to another.
 """
 
 from __future__ import annotations
@@ -41,15 +42,21 @@ from app.models.platform.marketplace_registry import (
 )
 from app.models.platform.plugin_service_registration import PluginServiceRegistration
 from app.models.platform.publisher import Publisher
+from app.models.tenant.guild_plugin import GuildPlugin
 from app.services.marketplace import registrations as registrations_service
 from app.services.marketplace import tuf_registry
 from app.services.marketplace.catalog import upsert_listing
 from app.services.platform import rules
 from app.testing import (
+    create_guild,
+    create_guild_plugin,
     create_plugin_service_registration,
     create_publisher,
+    create_user,
+    route_session_to_guild,
     sample_plugin_jwks,
 )
+from app.testing.tool_plugins import counters_tool_manifest
 from app.testing.tuf_repository import (
     BASE_URL,
     TufRepository,
@@ -701,6 +708,223 @@ class TestRefusals:
             ("Copy", Codes.IDENTITY_CONFLICT)
         ]
         assert await _listing(session, OTHER_UID) is None
+
+
+# ---------------------------------------------------------------------------
+# A uid the registry moves
+# ---------------------------------------------------------------------------
+
+#: The versions the listing first published under the uid had.
+MISPLACED_VERSIONS = ("0.3.0", "0.4.0", "0.4.1", "0.4.3", "0.6.0", "0.6.1")
+#: What it publishes under its own uid: its next version alone, so the first
+#: version read carries its registration.
+MOVED_VERSIONS = ("0.8.0",)
+
+
+async def _versions(session: AsyncSession, uid: str) -> set[str]:
+    session.expire_all()
+    return set(
+        (
+            await session.exec(
+                select(MarketplaceListingVersion.version)
+                .join(
+                    MarketplaceListing,
+                    MarketplaceListing.id == MarketplaceListingVersion.listing_id,
+                )
+                .where(MarketplaceListing.uid == uid)
+            )
+        ).all()
+    )
+
+
+async def _installed(session: AsyncSession, uid: str, version: str) -> tuple:
+    """A community with the uid's tool plug-in installed at ``version``,
+    written straight into its schema rather than from the catalog."""
+    user = await create_user(session)
+    guild = await create_guild(session, creator=user)
+    plugin = await create_guild_plugin(
+        session,
+        guild,
+        user,
+        definition=counters_tool_manifest(),
+        listing_uid=uid,
+        listing_version=version,
+        name="Counters",
+    )
+    return guild.id, plugin.id
+
+
+async def _install_row(session: AsyncSession, guild_id: int, plugin_id: int):
+    session.expunge_all()
+    await route_session_to_guild(session, guild_id)
+    return (
+        await session.exec(select(GuildPlugin).where(GuildPlugin.id == plugin_id))
+    ).one()
+
+
+class TestRehoming:
+    """The registry published a listing under another listing's uid, then
+    corrected it: the uid goes back to the listing it was issued for, and
+    the misplaced one gets a uid of its own. Both are the same publisher's."""
+
+    @pytest.fixture(
+        params=[
+            ("ACMT0000000001", "ACMS0000000001"),
+            ("ACMS0000000001", "ACMT0000000001"),
+        ],
+        ids=["new uid read first", "new uid read last"],
+    )
+    def uids(self, request) -> tuple[str, str]:
+        """The uid that moves, and the misplaced listing's new one."""
+        return request.param
+
+    async def _misplaced(self, session, repo, uid: str) -> PluginServiceRegistration:
+        """The misplaced listing, published under ``uid`` with its
+        registration, as an earlier refresh left it."""
+        repo.add_listing(
+            "acme", uid, slug="demo", name="Demo", versions=MISPLACED_VERSIONS
+        )
+        repo.publish()
+        result, _ = await _refresh(session, repo)
+        assert result.ok and result.skipped == [], result
+        registration = await _registration(session, "acme.demo")
+        assert registration is not None and registration.listing_uid == uid
+        return registration
+
+    def _corrected(
+        self, repo, uid: str, new_uid: str, versions: tuple[str, ...] = MOVED_VERSIONS
+    ) -> None:
+        repo.remove_listing("acme", uid)
+        repo.add_listing("acme", uid, slug="counters", name="Counters")
+        repo.add_listing("acme", new_uid, slug="demo", name="Demo", versions=versions)
+        repo.publish()
+
+    @pytest.mark.parametrize(
+        "moved_versions",
+        [MOVED_VERSIONS, (*MISPLACED_VERSIONS, *MOVED_VERSIONS)],
+        # Refused first by its registration, or by its name.
+        ids=["one version", "its history too"],
+    )
+    async def test_the_uid_moves_in_one_refresh_and_installs_stay(
+        self, session, repo, trusted, uids, moved_versions
+    ):
+        uid, new_uid = uids
+        registration = await self._misplaced(session, repo, uid)
+        # Communities that run the uid at a version the misplaced listing
+        # never published: the registry's mapping is the one they run.
+        installs = [await _installed(session, uid, "1.0.0") for _ in range(2)]
+        self._corrected(repo, uid, new_uid, moved_versions)
+
+        result, _ = await _refresh(session, repo)
+
+        assert result.ok, result
+        assert result.skipped == []
+        moved = await _listing(session, uid)
+        assert moved is not None
+        assert (moved.public_id, moved.name, moved.available) == (
+            "acme.counters",
+            "Counters",
+            True,
+        )
+        latest = await session.get(MarketplaceListingVersion, moved.latest_version_id)
+        assert latest is not None and latest.version == "1.0.0"
+        assert await _versions(session, uid) == {"1.0.0"}
+        demo = await _listing(session, new_uid)
+        assert demo is not None and demo.public_id == "acme.demo"
+        assert await _versions(session, new_uid) == set(moved_versions)
+        # The misplaced listing's registration follows it, deployment facts
+        # and all; the new listing's is its own.
+        followed = await _registration(session, "acme.demo")
+        assert followed is not None and followed.id == registration.id
+        assert followed.listing_uid == new_uid
+        counters = await _registration(session, "acme.counters")
+        assert counters is not None and counters.listing_uid == uid
+        for guild_id, plugin_id in installs:
+            row = await _install_row(session, guild_id, plugin_id)
+            assert (row.listing_uid, row.listing_version, row.plugin_kind) == (
+                uid,
+                "1.0.0",
+                "tool",
+            )
+
+        # Settled: the next refresh has nothing left to move or refuse.
+        repo.publish()
+        result, _ = await _refresh(session, repo, force=True)
+        assert result.ok and result.skipped == [], result
+
+    async def test_a_community_on_the_old_listing_keeps_the_uid_where_it_is(
+        self, session, repo, trusted, uids, caplog
+    ):
+        uid, new_uid = uids
+        await self._misplaced(session, repo, uid)
+        await _installed(session, uid, "1.0.0")
+        guild_id, plugin_id = await _installed(session, uid, "0.6.1")
+        self._corrected(repo, uid, new_uid)
+
+        result, _ = await _refresh(session, repo)
+
+        assert {(item.name, item.code) for item in result.skipped} == {
+            (f"publishers/acme/{uid}/listing.json", Codes.LISTING_REHOMED),
+            (f"publishers/acme/{new_uid}/listing.json", Codes.SOURCE_CONFLICT),
+        }
+        # The misplaced listing under its new uid is refused by its
+        # registration, which the uid still holds.
+        assert "registration: acme.demo is registered for listing" in caplog.text
+        held = await _listing(session, uid)
+        assert held is not None and held.public_id == "acme.demo"
+        assert await _versions(session, uid) == set(MISPLACED_VERSIONS)
+        assert await _listing(session, new_uid) is None
+        registration = await _registration(session, "acme.demo")
+        assert registration is not None and registration.listing_uid == uid
+        row = await _install_row(session, guild_id, plugin_id)
+        assert (row.listing_uid, row.listing_version) == (uid, "0.6.1")
+
+    async def test_another_publisher_is_refused_the_uid(
+        self, session, repo, trusted, uids
+    ):
+        uid, _ = uids
+        await self._misplaced(session, repo, uid)
+        repo.remove_listing("acme", uid)
+        repo.add_publisher("other", name="Other")
+        repo.add_listing("other", uid, slug="counters", name="Counters")
+        repo.publish()
+
+        result, _ = await _refresh(session, repo)
+
+        assert [item.code for item in result.skipped] == [Codes.IDENTITY_CONFLICT]
+        held = await _listing(session, uid)
+        assert held is not None and held.public_id == "acme.demo"
+        assert await _versions(session, uid) == set(MISPLACED_VERSIONS)
+
+    async def test_another_sources_listing_keeps_its_uid(
+        self, session, repo, trusted, uids
+    ):
+        uid, _ = uids
+        await upsert_listing(
+            session,
+            {
+                "uid": uid,
+                "public_id": "acme.demo",
+                "kind": "dashboard",
+                "name": "Our own board",
+                "publisher": "Acme Corp",
+                "description": "Uploaded here.",
+                "version": "0.6.1",
+                "definition": dashboard_definition(),
+            },
+            source="local",
+        )
+        await session.commit()
+        repo.add_listing("acme", uid, slug="counters", kind="dashboard")
+        repo.publish()
+
+        result, _ = await _refresh(session, repo)
+
+        assert [item.code for item in result.skipped] == [Codes.SOURCE_CONFLICT]
+        held = await _listing(session, uid)
+        assert held is not None
+        assert (held.source, held.public_id) == ("local", "acme.demo")
+        assert await _versions(session, uid) == {"0.6.1"}
 
 
 # ---------------------------------------------------------------------------
