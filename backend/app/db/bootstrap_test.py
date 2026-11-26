@@ -649,3 +649,86 @@ async def test_a_shared_role_the_provisioner_administers_is_left_alone():
                 await held.rollback()
     finally:
         await engine.dispose()
+
+
+#: Who holds ``set_config`` by a direct grant, read off its ACL: unlike
+#: has_function_privilege, it does not count what PUBLIC holds, which the test
+#: database leaves open.
+_SET_CONFIG_GRANTEES = (
+    "SELECT r.rolname FROM pg_proc p "
+    "CROSS JOIN LATERAL aclexplode(p.proacl) a "
+    "JOIN pg_roles r ON r.oid = a.grantee "
+    "WHERE p.oid = 'pg_catalog.set_config(text, text, boolean)'::regprocedure"
+)
+
+
+@pytest.mark.parametrize("delegated", [True, False])
+async def test_a_delegated_provisioner_keeps_the_set_config_grants(delegated):
+    """A deployment that keeps the owner away from the app gives the
+    provisioning login ``set_config`` WITH GRANT OPTION, once. From then on the
+    provisioning login gives it to every holder, and takes it back from one it
+    gave it to that no longer is, on every start; a role it never named, such
+    as the query surface's, gets nothing. Without the grant option it does
+    nothing. Everything here is rolled back: the function's ACL is the
+    database's, shared with every other test."""
+    from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy.pool import NullPool
+
+    from app.db.bootstrap import SET_CONFIG_FUNCTION, grant_set_config_as_delegate
+    from conftest import RUN_ID, TEST_DATABASE_URL
+
+    delegate, floor, former, query = (
+        f"test_{RUN_ID}_sc_{name}" for name in ("delegate", "floor", "former", "q")
+    )
+    engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
+    try:
+        async with engine.connect() as conn:
+            outer = await conn.begin()
+            try:
+                for name in (delegate, floor, former, query):
+                    await conn.execute(text(f'CREATE ROLE "{name}" NOLOGIN'))
+                if delegated:
+                    await conn.execute(
+                        text(
+                            f"GRANT EXECUTE ON FUNCTION {SET_CONFIG_FUNCTION}"
+                            f' TO "{delegate}" WITH GRANT OPTION'
+                        )
+                    )
+                    # A floor the delegate gave it to before a migration
+                    # retired it.
+                    await conn.execute(text(f'SET ROLE "{delegate}"'))
+                    await conn.execute(
+                        text(
+                            f"GRANT EXECUTE ON FUNCTION {SET_CONFIG_FUNCTION}"
+                            f' TO "{former}"'
+                        )
+                    )
+                await conn.execute(text(f'SET ROLE "{delegate}"'))
+
+                acted = await grant_set_config_as_delegate(conn, (delegate, floor))
+
+                await conn.execute(text("RESET ROLE"))
+                held = set((await conn.scalars(text(_SET_CONFIG_GRANTEES))).all())
+                assert acted is delegated
+                assert (floor in held) is delegated
+                assert former not in held
+                assert query not in held
+                assert "public" not in held
+            finally:
+                await outer.rollback()
+    finally:
+        await engine.dispose()
+
+
+def test_the_printed_delegation_keeps_every_holder_through_the_revoke():
+    """Run on a live database, the delegation must not take ``set_config``
+    from the roles the running app uses before the provisioning login hands it
+    back on the next start: the holders are granted first, PUBLIC revoked
+    last."""
+    from app.db.bootstrap import set_config_delegation_sql, set_config_sql
+
+    grant, delegate, revoke = set_config_delegation_sql()
+    assert (grant, revoke) == set_config_sql()
+    assert delegate.endswith(f'TO "{login_roles()[0].name}" WITH GRANT OPTION')
+    assert "PUBLIC" in revoke and "PUBLIC" not in grant + delegate
