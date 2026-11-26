@@ -1899,14 +1899,27 @@ async def verify_engine_identities() -> None:
             "%r. The request path creates no temporary objects, so this grant\n"
             "is unused; the bootstrap revokes it from PUBLIC. Deployments\n"
             "created before that still carry it. To align, run as the database\n"
-            "owner:\n"
-            "  REVOKE TEMPORARY ON DATABASE %s FROM PUBLIC;\n"
+            "owner, both statements and in this order: migrations run as the\n"
+            "provisioning login with TEMPORARY, and where it held TEMPORARY\n"
+            "only through PUBLIC, the revoke alone stops the next start.\n"
+            "%s"
             "or set DATABASE_URL_BOOTSTRAP and restart, which does this and\n"
             "verifies it took effect.\n"
             "%s",
             bar,
             app_login,
             app_db,
-            app_db,
+            temporary_drift_sql(app_db, prov_login),
             bar,
         )
+
+
+def temporary_drift_sql(database: str, provisioner: str) -> str:
+    """The statements that take TEMPORARY from PUBLIC by hand, as the
+    bootstrap does: the provisioning login is granted it first, since it may
+    have held it only through PUBLIC."""
+    return (
+        f"  GRANT {', '.join(bootstrap.PROVISIONER_DATABASE_PRIVILEGES)}"
+        f" ON DATABASE {database} TO {provisioner};\n"
+        f"  REVOKE TEMPORARY ON DATABASE {database} FROM PUBLIC;\n"
+    )

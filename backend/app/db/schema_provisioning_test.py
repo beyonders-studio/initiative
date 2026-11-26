@@ -1504,6 +1504,18 @@ async def test_engine_identities_flag_an_unused_temporary_grant(caplog):
         assert "REVOKE TEMPORARY ON DATABASE" not in joined
 
 
+def test_the_temporary_fix_keeps_it_for_the_provisioning_login():
+    """Run as printed, the fix leaves a database the app still starts on: the
+    provisioning login is granted TEMPORARY before PUBLIC loses it. A database
+    whose provisioning login held it only through PUBLIC refused to start
+    after the revoke alone (demo, 26 Nov 2026)."""
+    sql = schema_provisioning.temporary_drift_sql("initiative", "app_provisioner")
+    assert sql.splitlines() == [
+        "  GRANT CREATE, CONNECT, TEMPORARY ON DATABASE initiative TO app_provisioner;",
+        "  REVOKE TEMPORARY ON DATABASE initiative FROM PUBLIC;",
+    ]
+
+
 # --- reject_privileged_database_url (T67) ------------------------------------
 #
 # The role attributes are faked rather than created. Whether the harness login
