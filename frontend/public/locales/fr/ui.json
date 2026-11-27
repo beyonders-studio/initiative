@@ -17,6 +17,11 @@
     "copied": "Copié !",
     "unavailable": "Copie impossible — copiez-le à la main"
   },
+  "secret": {
+    "saved": "Enregistré",
+    "replace": "Remplacer",
+    "keep": "Garder la valeur enregistrée"
+  },
   "dateRange": {
     "any": "Toutes les dates",
     "fromOnly": "À partir du {{date}}",

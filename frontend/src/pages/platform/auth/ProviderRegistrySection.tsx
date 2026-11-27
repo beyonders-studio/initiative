@@ -30,6 +30,7 @@ import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { RowActionsMenu } from "@/ui/row-actions-menu";
+import { SecretInput } from "@/ui/secret-input";
 import { Switch } from "@/ui/switch";
 
 import { ConnectProviderWizard, ProbeReport } from "./ConnectProviderWizard";
@@ -362,17 +363,11 @@ const ProviderEditForm = ({
           />
         </Field>
         <Field label={t("authProviders.clientSecretLabel")}>
-          <Input
-            type="password"
+          <SecretInput
+            saved={provider.secret_set}
             value={form.client_secret}
-            onChange={(event) =>
-              setForm((prev) => ({ ...prev, client_secret: event.target.value }))
-            }
-            placeholder={
-              provider.secret_set
-                ? t("authProviders.secretKeepPlaceholder")
-                : t("authProviders.secretPlaceholder")
-            }
+            onValueChange={(client_secret) => setForm((prev) => ({ ...prev, client_secret }))}
+            placeholder={t("authProviders.secretPlaceholder")}
             disabled={clearSecret}
           />
           {provider.secret_set && (

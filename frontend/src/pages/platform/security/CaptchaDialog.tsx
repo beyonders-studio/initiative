@@ -18,6 +18,7 @@ import {
 } from "@/ui/dialog";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
+import { SecretInput } from "@/ui/secret-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 import type { RuleDialogProps } from "./ruleDialog";
@@ -111,12 +112,10 @@ export const CaptchaDialog = ({
             />
           </Field>
           <Field label={t("captcha.secretKeyLabel")} hint={t("captcha.secretKeyHelp")}>
-            <Input
-              type="password"
-              autoComplete="off"
+            <SecretInput
+              saved={saved.has_secret_key}
               value={form.values.secret}
-              onChange={(event) => form.set({ secret: event.target.value })}
-              placeholder={saved.has_secret_key ? t("captcha.secretKeySet") : ""}
+              onValueChange={(secret) => form.set({ secret })}
             />
           </Field>
           {!saved.enforcing && form.values.provider !== NO_CAPTCHA && (

@@ -17,6 +17,11 @@
     "copied": "¡Copiado!",
     "unavailable": "No se pudo copiar: cópialo a mano"
   },
+  "secret": {
+    "saved": "Guardado",
+    "replace": "Reemplazar",
+    "keep": "Mantener el guardado"
+  },
   "dateRange": {
     "any": "Cualquier fecha",
     "fromOnly": "Desde el {{date}}",

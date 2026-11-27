@@ -484,18 +484,24 @@ describe("PluginServicePage", () => {
 
       const clientId = screen.getByLabelText(/Client id/);
       expect(clientId).toHaveValue("gh-app");
-      // A stored secret is never sent back, only that it is set.
+      // A stored secret is never sent back: it reads as saved, and its label
+      // opens an empty field for a new one.
+      expect(screen.getByText("Saved")).toBeInTheDocument();
+      await user.click(screen.getByLabelText(/Secret/));
       const secret = screen.getByLabelText(/Secret/);
+      expect(secret).toHaveFocus();
       expect(secret).toHaveValue("");
-      expect(secret).toHaveAttribute("placeholder", "Set. Type to replace it.");
+      // One typed and taken back stays out of the save, where an empty value
+      // would clear what is stored.
+      await user.type(secret, "half a secret");
+      await user.click(screen.getByRole("button", { name: "Keep the saved one" }));
+      expect(screen.getByText("Saved")).toBeInTheDocument();
 
       await user.clear(clientId);
       await user.type(clientId, "gh-app-2");
       await user.click(screen.getByRole("button", { name: "Save" }));
 
-      expect(updateMutate.mock.calls[0][0].data).toMatchObject({
-        vendor_values: { client_id: "gh-app-2" },
-      });
+      expect(updateMutate.mock.calls[0][0].data.vendor_values).toEqual({ client_id: "gh-app-2" });
     });
 
     it("asks a declarative plug-in for its vendor values and nothing about where it runs", async () => {

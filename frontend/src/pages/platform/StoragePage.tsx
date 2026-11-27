@@ -20,6 +20,7 @@ import { Button } from "@/ui/button";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { SecretInput } from "@/ui/secret-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { StatusMessage } from "@/ui/status-message";
 import { Switch } from "@/ui/switch";
@@ -204,12 +205,7 @@ export const StoragePage = () => {
                 />
               </Field>
               <Field label={t("storage.secretKeyLabel")} hint={t("storage.secretKeyHelp")}>
-                <Input
-                  type="password"
-                  value={secret}
-                  onChange={(event) => setSecret(event.target.value)}
-                  placeholder={hasSecret ? t("storage.secretKeySet") : ""}
-                />
+                <SecretInput saved={hasSecret} value={secret} onValueChange={setSecret} />
               </Field>
             </div>
 

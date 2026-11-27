@@ -16,7 +16,7 @@ import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { localized } from "@/ui/lib/localized";
 import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
-import { Textarea } from "@/ui/textarea";
+import { SecretInput } from "@/ui/secret-input";
 
 /** A save the plug-in's vendor check refused: the fields it blames, what to
  *  say, and what the vendor holds instead when the check says. */
@@ -30,7 +30,10 @@ export interface VendorClientSectionProps {
   registration: PluginServiceRegistrationRead;
   /** The values typed so far, by key; a key left out keeps what is stored. */
   values: Record<string, string>;
-  onValueChange: (key: string, value: string) => void;
+  /** `undefined` takes the key out again, keeping what is stored: an empty
+   *  secret field means the saved secret stays, where sending it empty would
+   *  clear it. */
+  onValueChange: (key: string, value: string | undefined) => void;
   plain?: boolean;
   refusal?: VendorRefusal | null;
 }
@@ -148,18 +151,14 @@ export const VendorClientSection = ({
                   {field.required && <span aria-hidden> *</span>}
                 </Label>
                 {isSecret ? (
-                  <Textarea
+                  <SecretInput
+                    multiline
                     id={id}
                     aria-invalid={blamed.has(field.key) || undefined}
+                    saved={isSet}
                     value={value}
-                    onChange={(event) => onValueChange(field.key, event.target.value)}
-                    rows={3}
-                    className="font-mono text-xs"
-                    placeholder={
-                      isSet ? t("pluginServices.vendorSecretSet") : t("pluginServices.vendorEmpty")
-                    }
-                    autoComplete="off"
-                    spellCheck={false}
+                    onValueChange={(next) => onValueChange(field.key, next || undefined)}
+                    placeholder={t("pluginServices.vendorEmpty")}
                   />
                 ) : (
                   <Input

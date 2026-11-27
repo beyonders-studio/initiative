@@ -45,10 +45,8 @@ describe("StoragePage", () => {
     renderPage();
     const bucket = (await screen.findByLabelText("Bucket")) as HTMLInputElement;
     expect(bucket.value).toBe("existing-bucket");
-    // The secret field is write-only: blank with a "set" placeholder, never the value.
-    const secret = screen.getByLabelText("Secret access key") as HTMLInputElement;
-    expect(secret.value).toBe("");
-    expect(secret.placeholder).toMatch(/unchanged/i);
+    // The secret is write-only: it reads as saved, never as its value.
+    expect(screen.getByText("Saved")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(updateMutate).toHaveBeenCalledTimes(1);
@@ -60,7 +58,9 @@ describe("StoragePage", () => {
 
   it("includes the secret in the payload once typed", async () => {
     renderPage();
-    fireEvent.change(await screen.findByLabelText("Secret access key"), {
+    // Its label opens the field for a new one.
+    fireEvent.click(await screen.findByLabelText("Secret access key"));
+    fireEvent.change(screen.getByLabelText("Secret access key"), {
       target: { value: "brand-new-secret" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));

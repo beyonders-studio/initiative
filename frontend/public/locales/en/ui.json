@@ -17,6 +17,11 @@
     "copied": "Copied!",
     "unavailable": "Could not copy — copy it by hand"
   },
+  "secret": {
+    "saved": "Saved",
+    "replace": "Replace",
+    "keep": "Keep the saved one"
+  },
   "dateRange": {
     "any": "Any date",
     "fromOnly": "From {{date}}",

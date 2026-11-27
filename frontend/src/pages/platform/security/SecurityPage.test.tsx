@@ -298,6 +298,8 @@ describe("captcha", () => {
     renderPage();
     change("Captcha");
 
+    // A saved secret's label opens its field for a new one.
+    fireEvent.click(screen.getByLabelText(field));
     fireEvent.change(screen.getByLabelText(field), { target: { value } });
     fireEvent.click(save());
 
