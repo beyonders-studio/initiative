@@ -1899,14 +1899,38 @@ async def verify_engine_identities() -> None:
             "%r. The request path creates no temporary objects, so this grant\n"
             "is unused; the bootstrap revokes it from PUBLIC. Deployments\n"
             "created before that still carry it. To align, run as the database\n"
-            "owner:\n"
-            "  REVOKE TEMPORARY ON DATABASE %s FROM PUBLIC;\n"
+            "owner, both statements and in this order: migrations run as the\n"
+            "provisioning login with TEMPORARY, and where it held TEMPORARY\n"
+            "only through PUBLIC, the revoke alone stops the next start.\n"
+            "%s"
             "or set DATABASE_URL_BOOTSTRAP and restart, which does this and\n"
             "verifies it took effect.\n"
             "%s",
             bar,
             app_login,
             app_db,
-            app_db,
+            temporary_drift_sql(app_db, prov_login),
             bar,
         )
+
+
+def temporary_drift_sql(database: str, provisioner: str) -> str:
+    """The statements that take TEMPORARY from PUBLIC by hand, as the
+    bootstrap does: the provisioning login is granted it first, since it may
+    have held it only through PUBLIC.
+
+    One transaction, so the revoke never runs without the grant: psql carries
+    on past a failed statement, and a revoke alone stops the next start. The
+    names are quoted identifiers, as the bootstrap quotes them, since a
+    deployment may name its logins anything (``app-provisioner``,
+    ``AppProvisioner``).
+    """
+    db = '"' + database.replace('"', '""') + '"'
+    login = '"' + provisioner.replace('"', '""') + '"'
+    return (
+        "  BEGIN;\n"
+        f"  GRANT {', '.join(bootstrap.PROVISIONER_DATABASE_PRIVILEGES)}"
+        f" ON DATABASE {db} TO {login};\n"
+        f"  REVOKE TEMPORARY ON DATABASE {db} FROM PUBLIC;\n"
+        "  COMMIT;\n"
+    )

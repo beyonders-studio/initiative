@@ -1504,6 +1504,40 @@ async def test_engine_identities_flag_an_unused_temporary_grant(caplog):
         assert "REVOKE TEMPORARY ON DATABASE" not in joined
 
 
+def test_the_temporary_fix_keeps_it_for_the_provisioning_login():
+    """Run as printed, the fix leaves a database the app still starts on: the
+    provisioning login is granted TEMPORARY before PUBLIC loses it. A database
+    whose provisioning login held it only through PUBLIC refused to start
+    after the revoke alone (demo, 26 Nov 2026)."""
+    sql = schema_provisioning.temporary_drift_sql("initiative", "app_provisioner")
+    assert sql.splitlines() == [
+        "  BEGIN;",
+        (
+            '  GRANT CREATE, CONNECT, TEMPORARY ON DATABASE "initiative"'
+            ' TO "app_provisioner";'
+        ),
+        '  REVOKE TEMPORARY ON DATABASE "initiative" FROM PUBLIC;',
+        "  COMMIT;",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("login", "quoted"),
+    [
+        ("app-provisioner", '"app-provisioner"'),
+        ("AppProvisioner", '"AppProvisioner"'),
+        ('odd"name', '"odd""name"'),
+    ],
+)
+def test_the_temporary_fix_names_a_custom_login_exactly(login, quoted):
+    """A deployment may name its logins anything. Unquoted, ``app-provisioner``
+    is a syntax error and ``AppProvisioner`` folds to a different role, and
+    either way the grant is lost while the revoke runs."""
+    sql = schema_provisioning.temporary_drift_sql("my-db", login)
+    assert f'ON DATABASE "my-db" TO {quoted};' in sql
+    assert 'REVOKE TEMPORARY ON DATABASE "my-db" FROM PUBLIC;' in sql
+
+
 # --- reject_privileged_database_url (T67) ------------------------------------
 #
 # The role attributes are faked rather than created. Whether the harness login
