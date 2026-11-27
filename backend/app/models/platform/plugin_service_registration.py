@@ -222,7 +222,9 @@ def registration_live_sql(
 
     A container's registration lacks both until the operator gives them: its
     listing names the plug-in, and the operator says where it runs and which keys
-    it signs with. A declarative plug-in runs nowhere and signs nothing.
+    it signs with. A declarative plug-in runs nowhere and signs nothing, and
+    neither does a tool plug-in, whose tool Initiative serves as its own: their
+    registrations take no location or keys, so they are live without them.
     """
     reach = (
         ""
@@ -240,7 +242,8 @@ def registration_live_sql(
     return (
         f"({registration}.suspended_at IS NULL AND {publisher}.enabled"
         f" AND {registration}.vendor_ready"
-        f" AND ({registration}.kind = '{RegistrationKind.DECLARATIVE}'"
+        f" AND ({registration}.kind IN ('{RegistrationKind.DECLARATIVE}',"
+        f" '{RegistrationKind.TOOL}')"
         f" OR ({registration}.base_url IS NOT NULL"
         f" AND ({registration}.jwks_uri IS NOT NULL"
         f" OR {registration}.jwks -> 'keys' -> 0 IS NOT NULL))){reach})"

@@ -56,6 +56,7 @@ from app.services.marketplace import vendor_check as vendor_check_service
 from app.services.marketplace import vendor_setup as vendor_setup_service
 from app.services.marketplace import vendor_values as vendor_values_service
 from app.services.tenant import plugin_connection_flows as flows_service
+from app.services.tenant.connection_flow_state import ConnectingApp
 
 router = APIRouter()
 publishers_router = APIRouter()
@@ -352,6 +353,8 @@ async def connect_plugin_service_for_every_community(
     connection_id: str,
     session: SystemSessionDep,
     owner: PluginsManageDep,
+    app: Annotated[ConnectingApp | None, Query()] = None,
+    code_challenge: Annotated[str | None, Query(max_length=128)] = None,
 ) -> PluginPlatformConnectStart:
     """Start connecting one of the plug-in's community connections for every
     community: the vendor's address to send the operator to. Nothing is
@@ -360,7 +363,11 @@ async def connect_plugin_service_for_every_community(
     row = await registrations_service.get_registration(session, registration_id)
     return PluginPlatformConnectStart(
         connect_url=await flows_service.start_platform_url(
-            public_id=row.public_id, connection_id=connection_id, started_by=owner.id
+            public_id=row.public_id,
+            connection_id=connection_id,
+            started_by=owner.id,
+            app=app,
+            app_challenge=code_challenge,
         )
     )
 

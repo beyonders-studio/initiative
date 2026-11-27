@@ -28,6 +28,17 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="initiative" />
             </intent-filter>
+            <!-- A plug-in connection handed back on Initiative Cloud, whose
+                 assetlinks.json names this app: verified, so only this app
+                 opens it (plugin_connection_flows.HANDBACK_PATH). -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="${cloudHost}" />
+                <data android:path="/api/v1/plugin-connections/handback" />
+            </intent-filter>
             <!-- The system share sheet: text and links, pictures, and the other
                  files an upload takes (attachments.py ALLOWED_FILE_MIME_TYPES). -->
             <intent-filter>

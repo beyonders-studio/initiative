@@ -14,6 +14,7 @@ export const CREDENTIAL_KEYS = {
   refreshToken: "initiative-refresh-token",
   offlineSession: "initiative-offline-session",
   pendingSignIn: "initiative-pending-sign-in",
+  pendingConnect: "initiative-pending-connect",
 } as const;
 
 const DEFAULT_GROUP = "CapacitorStorage";

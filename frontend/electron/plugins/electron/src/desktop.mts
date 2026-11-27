@@ -2,7 +2,17 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { app, BrowserWindow, Menu, Notification, nativeImage, powerMonitor, Tray } from "./app.mjs";
+import {
+  app,
+  BrowserWindow,
+  Menu,
+  Notification,
+  nativeImage,
+  powerMonitor,
+  session,
+  shell,
+  Tray,
+} from "./app.mjs";
 
 /** What the platform hands a plugin: the way to tell the page something. */
 interface Context {
@@ -28,6 +38,18 @@ const QUIT = "--quit";
  */
 const COMPUTER_POLL_MS = 30_000;
 
+/** The session vendor pages open in: apart from the app's own, and kept, so the
+ *  person stays signed in at the vendor from one connection to the next. */
+const VENDOR_PARTITION = "persist:vendor-pages";
+
+/** A vendor page open now, where its flow comes back to, and the address it
+ *  came back with. */
+interface VendorPage {
+  window: InstanceType<typeof BrowserWindow>;
+  returnPath: string;
+  returned: string | null;
+}
+
 /** The tray menu's words, in the person's language; the page sends them. */
 interface TrayMenu {
   open: string;
@@ -39,7 +61,8 @@ interface TrayMenu {
  * staying in the tray when the window closes. Windows and Linux keep running
  * in the tray while the person wants them to; a Mac keeps running in the dock,
  * as Mac apps do. It also tells the page when the person is at the computer,
- * which a browser tab can only tell from input to itself.
+ * which a browser tab can only tell from input to itself, and opens a plug-in
+ * connection's vendor page in a window of its own (`openVendorPage`).
  */
 export class Desktop {
   static __capacitorElectronPlugin = {
@@ -52,6 +75,7 @@ export class Desktop {
       "setKeepRunning",
       "setOpenAtLogin",
       "setTitleBarColors",
+      "openVendorPage",
     ],
   };
 
@@ -63,6 +87,7 @@ export class Desktop {
   private tooltip = "Initiative";
   /** Shown notifications, held until they are clicked or dismissed. */
   private readonly shown = new Set<InstanceType<typeof Notification>>();
+  private vendorPage: VendorPage | null = null;
 
   constructor(private readonly context: Context) {}
 
@@ -96,6 +121,18 @@ export class Desktop {
       });
     });
     this.watchComputer();
+    // A vendor page's flow comes back to the server's own address, which is
+    // taken here rather than loaded (`openVendorPage`).
+    session.fromPartition(VENDOR_PARTITION).webRequest.onBeforeRequest((details, callback) => {
+      const page = this.vendorPage;
+      if (page && details.resourceType === "mainFrame" && pathOf(details.url) === page.returnPath) {
+        page.returned = details.url;
+        callback({ cancel: true });
+        page.window.close();
+        return;
+      }
+      callback({});
+    });
   }
 
   /** Show one notification. Clicking it brings the window back and hands the page `tag`. */
@@ -198,6 +235,52 @@ export class Desktop {
   }
 
   /**
+   * Open a plug-in connection's vendor page in a window over the app's, in a
+   * session of its own, until its flow comes back to `returnPath`: that
+   * address is taken rather than loaded, the window closes, and it is
+   * answered. Closing the window answers null. One at a time; a new one
+   * closes the last. Links the vendor opens in a new window go to the
+   * browser.
+   */
+  async openVendorPage({
+    url,
+    returnPath,
+  }: {
+    url: string;
+    returnPath: string;
+  }): Promise<{ returned: string | null }> {
+    const parent = mainWindow();
+    if (!parent || !isWebAddress(url) || !returnPath.startsWith("/")) {
+      return { returned: null };
+    }
+    this.vendorPage?.window.close();
+    const window = new BrowserWindow({
+      parent,
+      width: 960,
+      height: 760,
+      autoHideMenuBar: true,
+      webPreferences: { partition: VENDOR_PARTITION, sandbox: true },
+    });
+    const page: VendorPage = { window, returnPath, returned: null };
+    this.vendorPage = page;
+    window.webContents.setWindowOpenHandler(({ url: target }) => {
+      if (isWebAddress(target)) {
+        void shell.openExternal(target);
+      }
+      return { action: "deny" };
+    });
+    return new Promise((resolve) => {
+      window.on("closed", () => {
+        if (this.vendorPage === page) {
+          this.vendorPage = null;
+        }
+        resolve({ returned: page.returned });
+      });
+      window.loadURL(url).catch(() => undefined);
+    });
+  }
+
+  /**
    * Say "computerActive" whenever the computer saw input since it was last
    * asked. A computer that cannot tell reports no time without input at all,
    * which would read as someone always there, so its readings count only once
@@ -263,9 +346,27 @@ export class Desktop {
 
 const hasTray = () => process.platform === "win32" || process.platform === "linux";
 
-/** The app's own window, as opposed to the splash screen, which is a file. */
+/** The app's own window, as opposed to the splash screen, which is a file, and
+ *  the vendor pages it opens over itself. */
 const isMainWindow = (window: InstanceType<typeof BrowserWindow>) =>
-  !window.webContents.getURL().startsWith("file:");
+  !window.getParentWindow() && !window.webContents.getURL().startsWith("file:");
+
+const isWebAddress = (address: string) => {
+  try {
+    const { protocol } = new URL(address);
+    return protocol === "https:" || protocol === "http:";
+  } catch {
+    return false;
+  }
+};
+
+const pathOf = (address: string) => {
+  try {
+    return new URL(address).pathname;
+  } catch {
+    return null;
+  }
+};
 
 export const mainWindow = () => BrowserWindow.getAllWindows().find(isMainWindow) ?? null;
 

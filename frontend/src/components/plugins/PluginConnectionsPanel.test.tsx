@@ -9,11 +9,17 @@
  * to "Set", because an admin who just chose an account needs to be able to see
  * which one they chose.
  */
+import { Capacitor } from "@capacitor/core";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { CommunityPluginConnectionRead } from "@/api/generated/initiativeAPI.schemas";
+import { beginConnect, HANDBACK_PATH } from "@/lib/appConnect";
+import { toast } from "@/lib/mascotToast";
+import Desktop from "@/plugins/desktop";
 
 import { PluginConnectionsPanel } from "./PluginConnectionsPanel";
 
@@ -29,6 +35,8 @@ vi.mock("@/hooks/useCommunityPluginDetail", async (importOriginal) => ({
 }));
 
 const opened = vi.fn();
+
+vi.mock("@/plugins/desktop", () => ({ default: { openVendorPage: vi.fn() } }));
 
 const base: CommunityPluginConnectionRead = {
   id: "workspace",
@@ -172,5 +180,41 @@ describe("a member's own account", () => {
     render({ ...personal, status: "connected", account_label: "@alice" });
 
     expect(await screen.findByText(/@alice/)).toBeInTheDocument();
+  });
+});
+
+describe("in the desktop app", () => {
+  it("opens the vendor in a window of the app's own and finishes what it hands back", async () => {
+    vi.spyOn(Capacitor, "getPlatform").mockReturnValue("electron");
+    const connected = vi.spyOn(toast, "success");
+    const finished: unknown[] = [];
+    server.use(
+      http.post("*/plugin-connections/finish", async ({ request }) => {
+        finished.push(await request.json());
+        return HttpResponse.json({ outcome: "connected" });
+      })
+    );
+    let challenge: string | undefined;
+    vi.mocked(Desktop.openVendorPage).mockImplementation(async () => ({
+      returned: `https://server.test${HANDBACK_PATH}?code=h&challenge=${challenge}`,
+    }));
+    connect.mockImplementation(async (_id, options) => {
+      challenge = (await beginConnect())?.code_challenge;
+      options.onSuccess({ connect_url: "https://github-app.test/install/github?x=1" });
+    });
+    render(vendorFlow);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Connect" }));
+
+    await waitFor(() => expect(finished).toHaveLength(1));
+    expect(Desktop.openVendorPage).toHaveBeenCalledWith({
+      url: "https://github-app.test/install/github?x=1",
+      returnPath: HANDBACK_PATH,
+    });
+    expect(finished[0]).toMatchObject({ code: "h" });
+    expect(opened).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(connected).toHaveBeenCalledWith("Connected", expect.objectContaining({}))
+    );
   });
 });

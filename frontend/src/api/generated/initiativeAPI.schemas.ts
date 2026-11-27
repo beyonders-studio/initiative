@@ -4855,6 +4855,17 @@ export interface ConnectableProviderRead {
 }
 
 /**
+ * The app starting a flow, which says how it can be handed back
+ * (``plugin_connection_flows.app_handback``).
+ */
+export type ConnectingApp = (typeof ConnectingApp)[keyof typeof ConnectingApp];
+
+export const ConnectingApp = {
+  desktop: "desktop",
+  phone: "phone",
+} as const;
+
+/**
  * A connection is addressed by handle, never by id.
  *
  * One shape whatever the target's policy, and the shape the app-wide people
@@ -9759,6 +9770,43 @@ export interface PluginBetaCommunityRead {
 }
 
 /**
+ * A connection an app began, handed back to it: the handback it was
+ * given, and the PKCE verifier behind the challenge it began with.
+ */
+export interface PluginConnectionFinish {
+  /** @maxLength 4096 */
+  code: string;
+  /**
+   * @minLength 43
+   * @maxLength 128
+   */
+  code_verifier: string;
+}
+
+/**
+ * How a flow ended, as the landing page and the app read it.
+ */
+export type PluginConnectionOutcome =
+  (typeof PluginConnectionOutcome)[keyof typeof PluginConnectionOutcome];
+
+export const PluginConnectionOutcome = {
+  connected: "connected",
+  refused: "refused",
+  expired: "expired",
+  not_recorded: "not_recorded",
+  awaiting_approval: "awaiting_approval",
+  sign_in_required: "sign_in_required",
+  app_only: "app_only",
+} as const;
+
+/**
+ * How a connection an app began ended.
+ */
+export interface PluginConnectionFinished {
+  outcome: PluginConnectionOutcome;
+}
+
+/**
  * A plug-in asking one member to let it act as them, for one purpose.
  */
 export interface PluginConsentRequestCreate {
@@ -13653,6 +13701,11 @@ export type ListPluginServicesParams = {
   page_size?: number;
 };
 
+export type ConnectPluginServiceForEveryCommunityParams = {
+  app?: ConnectingApp | null;
+  code_challenge?: string | null;
+};
+
 export type ReadPluginPlatformJwks200 = { [key: string]: unknown };
 
 export type IssuePluginAccessTokenBodyGrantType =
@@ -14469,6 +14522,11 @@ export type ReadUninstallNoticeParams = {
    * @pattern ^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$
    */
   locale?: string;
+};
+
+export type ConnectCommunityPluginParams = {
+  app?: ConnectingApp | null;
+  code_challenge?: string | null;
 };
 
 export type ListCommunityPluginMembersParams = {

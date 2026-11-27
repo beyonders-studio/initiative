@@ -25,6 +25,8 @@ import type {
   IssuePluginAccessTokenBody,
   ListPluginInstallationsParams,
   PluginAccessTokenResponse,
+  PluginConnectionFinish,
+  PluginConnectionFinished,
   PluginConsentRequestCreate,
   PluginConsentRequestRead,
   PluginInstallationRead,
@@ -886,4 +888,98 @@ export const useRequestMemberConsent = <
   TContext
 > => {
   return useMutation(getRequestMemberConsentMutationOptions(options), queryClient);
+};
+/**
+ * Finish a connection the app began, from the handback the vendor's return
+ * was turned into. Only the person who started it, in their own session,
+ * with the verifier behind the app's challenge, finishes it; any answer spends
+ * the handback.
+ * @summary Finish Plugin Connection
+ */
+export const finishPluginConnection = (
+  pluginConnectionFinish: BodyType<PluginConnectionFinish>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<PluginConnectionFinished>(
+    {
+      url: `/api/v1/plugin-connections/finish`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: pluginConnectionFinish,
+      signal,
+    },
+    options
+  );
+};
+
+export const getFinishPluginConnectionMutationKey = () => ["finishPluginConnection"] as const;
+
+export const getFinishPluginConnectionMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof finishPluginConnection>>,
+    TError,
+    FinishPluginConnectionMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof finishPluginConnection>>,
+  TError,
+  FinishPluginConnectionMutationVariables,
+  TContext
+> => {
+  const mutationKey = getFinishPluginConnectionMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof finishPluginConnection>>,
+    FinishPluginConnectionMutationVariables
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return finishPluginConnection(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type FinishPluginConnectionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof finishPluginConnection>>
+>;
+export type FinishPluginConnectionMutationBody = BodyType<PluginConnectionFinish>;
+export type FinishPluginConnectionMutationError = ErrorType<HTTPValidationError>;
+export type FinishPluginConnectionMutationVariables = { data: BodyType<PluginConnectionFinish> };
+
+/**
+ * @summary Finish Plugin Connection
+ */
+export const useFinishPluginConnection = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof finishPluginConnection>>,
+      TError,
+      FinishPluginConnectionMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof finishPluginConnection>>,
+  TError,
+  FinishPluginConnectionMutationVariables,
+  TContext
+> => {
+  return useMutation(getFinishPluginConnectionMutationOptions(options), queryClient);
 };

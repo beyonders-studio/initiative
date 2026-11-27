@@ -23,6 +23,7 @@ def _client() -> TestClient:
         routes=[
             Route("/json", answer("application/json")),
             Route("/picture", answer("image/png")),
+            Route("/document", answer("application/pdf")),
             Route("/part", answer("text/csv", 206)),
             Route("/small", lambda _r: Response(b"{}", media_type="application/json")),
         ]
@@ -33,11 +34,18 @@ def _client() -> TestClient:
 
 @pytest.mark.parametrize(
     ("path", "gzipped"),
-    [("/json", True), ("/picture", False), ("/part", False), ("/small", False)],
+    [
+        ("/json", True),
+        ("/picture", False),
+        ("/document", False),
+        ("/part", False),
+        ("/small", False),
+    ],
 )
 def test_only_text_worth_shrinking_is_gzipped(path, gzipped):
     response = _client().get(path, headers={"Accept-Encoding": "gzip"})
 
+    assert response.status_code == (206 if path == "/part" else 200)
     assert (response.headers.get("content-encoding") == "gzip") is gzipped
     if path != "/small":
         assert response.content == _BODY

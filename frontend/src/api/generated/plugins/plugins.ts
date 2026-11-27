@@ -37,6 +37,7 @@ import type {
   CommunityPluginUninstallNotice,
   CommunityPluginUpdate,
   CommunityPluginUpgrade,
+  ConnectCommunityPluginParams,
   HTTPValidationError,
   ListCommunityPluginMembersParams,
   PluginActionResult,
@@ -2425,6 +2426,7 @@ export const connectCommunityPlugin = (
   communityId: number,
   pluginId: number,
   connectionId: string,
+  params?: ConnectCommunityPluginParams,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
@@ -2432,6 +2434,7 @@ export const connectCommunityPlugin = (
     {
       url: `/api/v1/c/${communityId}/plugins/${pluginId}/connections/${connectionId}/connect`,
       method: "POST",
+      params,
       signal,
     },
     options
@@ -2468,9 +2471,9 @@ export const getConnectCommunityPluginMutationOptions = <
     Awaited<ReturnType<typeof connectCommunityPlugin>>,
     ConnectCommunityPluginMutationVariables
   > = (props) => {
-    const { communityId, pluginId, connectionId } = props ?? {};
+    const { communityId, pluginId, connectionId, params } = props ?? {};
 
-    return connectCommunityPlugin(communityId, pluginId, connectionId, requestOptions);
+    return connectCommunityPlugin(communityId, pluginId, connectionId, params, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -2485,6 +2488,7 @@ export type ConnectCommunityPluginMutationVariables = {
   communityId: number;
   pluginId: number;
   connectionId: string;
+  params?: ConnectCommunityPluginParams;
 };
 
 /**

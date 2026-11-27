@@ -8,6 +8,16 @@ every plug-in on this deployment:
 * ``GET /plugin-connections/setup`` — an installation-style vendor's return from
   its install page: ``state``, ``installation_id`` and ``setup_action``.
 
+Two more finish a flow an app began, which the callback hands back to the app
+rather than finishing in a browser the app holds no session in:
+
+* ``POST /plugin-connections/finish`` — the app redeems its handback, signed in
+  as the person who started the flow, with the PKCE verifier behind the
+  challenge it began with.
+* ``GET /plugin-connections/handback`` — the handback address itself. The app
+  catches it before any browser loads it, so a browser that does load it spends
+  the handback.
+
 What they act on is named by ``state``, which Initiative sealed when the flow
 started (:mod:`app.services.tenant.connection_flow_state`). Each also reads the
 person from Initiative's own session cookie, checked as every signed-in request
@@ -17,7 +27,8 @@ hold its seat. The work runs on the system engine routed into the community the
 state names. Each answers with a redirect: onward to the vendor, or to the
 landing page with how the flow ended.
 
-Not part of the OpenAPI document: only a vendor sends a browser here.
+Only ``finish`` is part of the OpenAPI document: a vendor or a browser sends
+the rest.
 """
 
 from __future__ import annotations
@@ -29,15 +40,23 @@ from fastapi.responses import RedirectResponse
 
 from app.api.deps import (
     CREDENTIAL_SESSION,
+    CurrentUser,
     SessionDep,
     get_current_active_user,
     get_current_user,
+    require_first_party_session,
 )
 from app.core.identify import presented_credential
 from app.core.rate_limit import limiter
+from app.schemas.platform.plugin_service import (
+    PluginConnectionFinish,
+    PluginConnectionFinished,
+)
 from app.services.tenant import plugin_connection_flows as flows_service
 
 router = APIRouter(include_in_schema=False)
+#: The app's own call, which is part of the API.
+app_router = APIRouter()
 
 
 async def signed_in_person(request: Request, session: SessionDep) -> int | None:
@@ -104,5 +123,41 @@ async def connection_callback(
     return _redirect(
         await flows_service.complete_callback(
             state_token=state, code=code, error=error, signed_in=signed_in
+        )
+    )
+
+
+@router.get("/handback")
+@limiter.limit("30/minute")
+async def connection_handback(
+    request: Request,
+    code: str | None = Query(default=None, max_length=4096),
+    outcome: str | None = Query(default=None, max_length=32),
+) -> RedirectResponse:
+    """A browser loaded the handback of a flow an app began: spend it, and say
+    the flow finishes only in the app."""
+    return _redirect(await flows_service.spend_handback(code=code, outcome=outcome))
+
+
+@app_router.post(
+    "/finish",
+    response_model=PluginConnectionFinished,
+)
+@limiter.limit("30/minute")
+async def finish_plugin_connection(
+    request: Request,
+    payload: PluginConnectionFinish,
+    current_user: CurrentUser,
+    _first_party: Annotated[str, Depends(require_first_party_session)],
+) -> PluginConnectionFinished:
+    """Finish a connection the app began, from the handback the vendor's return
+    was turned into. Only the person who started it, in their own session,
+    with the verifier behind the app's challenge, finishes it; any answer spends
+    the handback."""
+    return PluginConnectionFinished(
+        outcome=await flows_service.finish_in_app(
+            code=payload.code,
+            code_verifier=payload.code_verifier,
+            user_id=current_user.id,
         )
     )
