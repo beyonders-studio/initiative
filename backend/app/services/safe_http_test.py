@@ -59,6 +59,7 @@ async def test_send_connects_to_pinned_ip():
         seen["path"] = request.url.raw_path
         seen["host_header"] = request.headers.get("host")
         seen["sni"] = request.extensions.get("sni_hostname")
+        seen["user_agent"] = request.headers.get("user-agent")
         return httpx2.Response(200, json={"ok": True})
 
     with _resolves_to("93.184.216.34"):
@@ -73,13 +74,26 @@ async def test_send_connects_to_pinned_ip():
 
     assert response.status_code == 200
     # The connection targets the resolved address; the hostname is kept for
-    # the Host header and TLS, and the path and query are preserved.
+    # the Host header and TLS, and the path and query are preserved. A
+    # request that names no User-Agent gets Initiative's.
     assert seen == {
         "host": "93.184.216.34",
         "path": b"/deliver?x=1",
         "host_header": "hooks.example.com",
         "sni": "hooks.example.com",
+        "user_agent": "Initiative",
     }
+
+    # One the caller names is kept.
+    with _resolves_to("93.184.216.34"):
+        await request_public_target(
+            "GET",
+            "https://hooks.example.com/",
+            headers={"user-agent": "initiative-webhooks/1"},
+            timeout=5.0,
+            transport=httpx2.MockTransport(handler),
+        )
+    assert seen["user_agent"] == "initiative-webhooks/1"
 
 
 async def test_redirects_are_not_followed():
