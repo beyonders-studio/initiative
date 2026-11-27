@@ -142,6 +142,11 @@ ALLOWED_DYNAMIC_SQL: dict[str, str] = {
         "startup on the owner connection: role names read from pg_roles, "
         "quoted; the function signature is a module constant"
     ),
+    "app/db/bootstrap.py::grant_set_config_as_delegate": (
+        "startup on the provisioning connection: role names are the app's own "
+        "holders or read from pg_roles, quoted; the function signature is a "
+        "module constant"
+    ),
     "app/services/storage_backfill.py::_persist": (
         "SET clause joined from literal 'col = :bind' fragments; all values bound"
     ),

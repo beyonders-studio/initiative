@@ -1057,13 +1057,71 @@ async def _revoke_former_set_config_holders(conn) -> None:
         )
 
 
+#: Whether the connecting role may hand ``set_config`` on.
+_GRANTS_SET_CONFIG = text(
+    "SELECT has_function_privilege(current_user, CAST(:function AS text),"
+    " 'EXECUTE WITH GRANT OPTION')"
+).bindparams(function=SET_CONFIG_FUNCTION)
+
+#: The roles the connecting role itself gave ``set_config`` that are no longer
+#: holders. A grantor can take back only what it granted.
+_OWN_FORMER_SET_CONFIG_GRANTS = text(
+    "SELECT r.rolname FROM pg_proc p "
+    "CROSS JOIN LATERAL aclexplode(p.proacl) a "
+    "JOIN pg_roles r ON r.oid = a.grantee "
+    "WHERE p.oid = CAST(:function AS regprocedure) "
+    "AND a.grantor = (SELECT oid FROM pg_roles WHERE rolname = current_user) "
+    "AND a.grantee <> a.grantor AND r.rolname <> ALL(:holders)"
+).bindparams(function=SET_CONFIG_FUNCTION)
+
+
+async def grant_set_config_as_delegate(conn, holders: tuple[str, ...]) -> bool:
+    """Give ``set_config`` to ``holders`` as a role that holds it WITH GRANT
+    OPTION, and take it back from any role this one gave it to that is no
+    longer a holder. Returns whether it acted.
+
+    A deployment that names its own logins keeps the owner away from the app:
+    its database's owner, once, takes ``set_config`` from ``PUBLIC``, gives it
+    to the request and system logins, and gives it to the provisioning login
+    WITH GRANT OPTION. The provisioning login creates every shared floor in
+    its migrations, so from then on it keeps their grants current itself, on
+    every start, with no owner connection. It never grants to ``PUBLIC``:
+    whether ``PUBLIC`` is shut is read back afterwards
+    (:func:`set_config_narrowed`), never assumed.
+    """
+    if not await conn.scalar(_GRANTS_SET_CONFIG):
+        return False
+    if await conn.scalar(_ROLES_PRESENT, {"names": list(holders)}) != len(holders):
+        return False
+    me = await conn.scalar(text("SELECT current_user"))
+    grantees = ", ".join(
+        '"' + name.replace('"', '""') + '"' for name in holders if name != me
+    )
+    if grantees:
+        await conn.execute(
+            text(f"GRANT EXECUTE ON FUNCTION {SET_CONFIG_FUNCTION} TO {grantees}")
+        )
+    former = await conn.scalars(
+        _OWN_FORMER_SET_CONFIG_GRANTS, {"holders": list(holders)}
+    )
+    for name in former.all():
+        quoted = '"' + name.replace('"', '""') + '"'
+        await conn.execute(
+            text(f"REVOKE EXECUTE ON FUNCTION {SET_CONFIG_FUNCTION} FROM {quoted}")
+        )
+    return True
+
+
 async def ensure_set_config_narrowed(bootstrap_url: str | None = None) -> bool:
     """Take ``set_config`` from ``PUBLIC`` once every holder exists.
 
     Called after migrations, which create the shared floors. Only the
     function's owner can change who may call it, so it is applied from the
-    owner connection when that connection is a superuser, and otherwise said,
-    with the SQL, for the operator to run. Returns whether it is in place.
+    owner connection when that connection is a superuser. Without one, a
+    provisioning login the owner gave ``set_config`` WITH GRANT OPTION keeps
+    the holders' grants itself (:func:`grant_set_config_as_delegate`).
+    Otherwise it is said, with the SQL, for the operator to run. Returns
+    whether ``PUBLIC`` no longer holds it.
     """
     url = bootstrap_url or settings.DATABASE_URL_BOOTSTRAP
     holders = set_config_holders()
@@ -1084,7 +1142,9 @@ async def ensure_set_config_narrowed(bootstrap_url: str | None = None) -> bool:
     else:
         from app.db import session as db_session
 
-        async with db_session.provisioning_engine.connect() as conn:
+        async with db_session.provisioning_engine.begin() as conn:
+            await advisory_lock(conn, LockNamespace.DATABASE_BOOTSTRAP)
+            await grant_set_config_as_delegate(conn, holders)
             narrowed = await set_config_narrowed(conn)
     if not narrowed:
         logger.warning(
@@ -1092,13 +1152,32 @@ async def ensure_set_config_narrowed(bootstrap_url: str | None = None) -> bool:
             "Any database role may still call set_config on this database.\n"
             "The app takes it from the query surface's role once %s is a\n"
             "superuser connection. To apply it by hand instead, as a superuser:\n"
-            "\n  %s;\n  %s;\n%s",
+            "\n  %s;\n  %s;\n"
+            "\nor, to have the provisioning login keep the grants itself from\n"
+            "then on:\n"
+            "\n  BEGIN;\n  %s;\n  %s;\n  %s;\n  COMMIT;\n%s",
             "=" * 70,
             owner_setting(),
             *set_config_sql(),
+            *set_config_delegation_sql(),
             "=" * 70,
         )
     return narrowed
+
+
+def set_config_delegation_sql() -> tuple[str, str, str]:
+    """What the database's owner runs once so the provisioning login keeps the
+    ``set_config`` grants itself: every holder keeps it, the provisioning login
+    may hand it on, and ``PUBLIC`` no longer holds it. The holders are granted
+    in the same transaction as the revoke, so the running app never loses it.
+    """
+    grant, revoke = set_config_sql()
+    provisioner = login_roles()[0].name
+    quoted = '"' + provisioner.replace('"', '""') + '"'
+    delegate = (
+        f"GRANT EXECUTE ON FUNCTION {SET_CONFIG_FUNCTION} TO {quoted} WITH GRANT OPTION"
+    )
+    return grant, delegate, revoke
 
 
 async def _main() -> int:

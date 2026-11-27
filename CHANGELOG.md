@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Who may set the request's session variables stays current without the database owner.** A deployment that keeps the database's owner away from Initiative can now give its provisioning login `set_config` with grant option, once. From then on, Initiative grants it to the roles its upgrades create, and takes it back from roles they retire, on every start. Until now, such a deployment had to run the grant by hand after any upgrade that changed those roles, and the warning that asks for it now prints this option too.
+
 - **Tool plug-ins from the marketplace are offered again.** A tool plug-in, such as Counters, registers with no address and no signing keys, because Initiative serves its tool itself. The rule for a live registration still asked for both, so its registration showed **Not live** and the marketplace didn't offer it to any community. A tool plug-in's registration is now live without them, as a declarative plug-in's is.
 - **Connecting a plug-in in the desktop and phone apps.** **Connect** ended at *Sign in to finish* in your browser, and nothing was connected. The desktop app now opens the other service in a window of its own, where you sign in to it, and the phone app finishes the connection when you come back from the browser.
 
