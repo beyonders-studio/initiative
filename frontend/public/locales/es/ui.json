@@ -20,7 +20,9 @@
   "secret": {
     "saved": "Guardado",
     "replace": "Reemplazar",
-    "keep": "Mantener el guardado"
+    "cancel": "Cancelar",
+    "show": "Mostrar el secreto",
+    "hide": "Ocultar el secreto"
   },
   "dateRange": {
     "any": "Cualquier fecha",

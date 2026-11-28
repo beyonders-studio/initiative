@@ -15,6 +15,7 @@ let storageData: Record<string, unknown> = {
   s3_endpoint_url: "https://s3.example.com",
   s3_access_key_id: "AKIA",
   has_secret_access_key: true,
+  secret_access_key_hint: "••••••••Xk2Q",
   s3_use_path_style: true,
   s3_local_fallback: false,
 };
@@ -45,7 +46,8 @@ describe("StoragePage", () => {
     renderPage();
     const bucket = (await screen.findByLabelText("Bucket")) as HTMLInputElement;
     expect(bucket.value).toBe("existing-bucket");
-    // The secret is write-only: it reads as saved, never as its value.
+    // The secret is write-only: it reads as saved, by its last characters.
+    expect(screen.getByText("••••••••Xk2Q")).toBeInTheDocument();
     expect(screen.getByText("Saved")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 

@@ -205,7 +205,12 @@ export const StoragePage = () => {
                 />
               </Field>
               <Field label={t("storage.secretKeyLabel")} hint={t("storage.secretKeyHelp")}>
-                <SecretInput saved={hasSecret} value={secret} onValueChange={setSecret} />
+                <SecretInput
+                  saved={hasSecret}
+                  hint={storageQuery.data?.secret_access_key_hint}
+                  value={secret}
+                  onValueChange={setSecret}
+                />
               </Field>
             </div>
 

@@ -114,6 +114,7 @@ export const CaptchaDialog = ({
           <Field label={t("captcha.secretKeyLabel")} hint={t("captcha.secretKeyHelp")}>
             <SecretInput
               saved={saved.has_secret_key}
+              hint={saved.secret_key_hint}
               value={form.values.secret}
               onValueChange={(secret) => form.set({ secret })}
             />

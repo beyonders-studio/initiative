@@ -71,6 +71,7 @@ const baseCaptcha: CaptchaSettingsResponse = {
   provider: "turnstile",
   site_key: "site-key",
   has_secret_key: true,
+  secret_key_hint: "••••••••c0de",
   enforcing: true,
 };
 

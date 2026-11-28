@@ -2,14 +2,16 @@
  * A secret the server keeps and never sends back: a client secret, a key, a
  * password for a service.
  *
- * Once one is saved it reads as saved, with Replace beside it, rather than as
- * an empty box that looks like nothing was ever set. Replace opens the field
- * for a new one, and Keep the saved one closes it again. Whatever is typed is
- * the new secret; an empty field means the saved one stays, so a caller sends
- * nothing for it.
+ * A saved one is shown the way a vendor lists the credentials it issued: what
+ * the server will say of it (a private key's fingerprint, or the last few
+ * characters of anything else, as `hint`), marked saved, with Replace beside
+ * it. Replace opens an empty field, and Cancel closes it again, keeping it.
+ * Whatever is typed is the new secret; an empty field means the saved one
+ * stays, so a caller sends nothing for it. A one-line secret can be shown
+ * while it is typed.
  */
 
-import { Check } from "lucide-react";
+import { Check, Eye, EyeOff, KeyRound } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -22,6 +24,8 @@ import { Textarea } from "@/ui/textarea";
 export interface SecretInputProps {
   /** Whether the server holds one. */
   saved: boolean;
+  /** What the server shows of the saved one, when it shows anything. */
+  hint?: string | null;
   /** What has been typed: the new secret, or empty to keep the saved one. */
   value: string;
   onValueChange: (value: string) => void;
@@ -37,6 +41,7 @@ export interface SecretInputProps {
 
 export function SecretInput({
   saved,
+  hint,
   value,
   onValueChange,
   multiline = false,
@@ -49,6 +54,7 @@ export function SecretInput({
   const { t } = useTranslation("ui");
   const control = useFieldControl({ id, ...aria });
   const [replacing, setReplacing] = useState(false);
+  const [shown, setShown] = useState(false);
   const focusNext = useRef(false);
   // What was last typed here. A value that empties without being typed away
   // was cleared by the caller (a save went through), so the saved one shows
@@ -56,7 +62,10 @@ export function SecretInput({
   const typed = useRef(value);
 
   useEffect(() => {
-    if (value === "" && typed.current !== "") setReplacing(false);
+    if (value === "" && typed.current !== "") {
+      setReplacing(false);
+      setShown(false);
+    }
     typed.current = value;
   }, [value]);
 
@@ -69,21 +78,31 @@ export function SecretInput({
     return (
       <div
         className={cn(
-          "flex min-h-9 items-center gap-2 rounded-md border border-input px-3 py-1 text-sm",
+          "flex min-h-9 items-center gap-3 rounded-md border border-input px-3 py-1.5",
           className
         )}
       >
-        <Check className="h-4 w-4 shrink-0 text-success" aria-hidden />
-        <span className="font-medium">{t("secret.saved")}</span>
+        <KeyRound className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+        <div className="min-w-0 flex-1 space-y-0.5">
+          {hint && <p className="break-all font-mono text-xs">{hint}</p>}
+          <p
+            className={cn(
+              "flex items-center gap-1",
+              hint ? "text-muted-foreground text-xs" : "font-medium text-sm"
+            )}
+          >
+            <Check className="h-3.5 w-3.5 shrink-0 text-success" aria-hidden />
+            {t("secret.saved")}
+          </p>
+        </div>
         {/* The field's label points here, so clicking it opens the field; the
             button is still called what it says. */}
         <Button
           {...control}
           aria-label={t("secret.replace")}
           type="button"
-          variant="ghost"
+          variant="outline"
           size="sm"
-          className="ml-auto"
           disabled={disabled}
           onClick={() => {
             focusNext.current = true;
@@ -119,31 +138,45 @@ export function SecretInput({
       onChange={(event) => change(event.target.value)}
     />
   ) : (
-    <Input
-      {...shared}
-      ref={focusOnOpen}
-      type="password"
-      className={className}
-      onChange={(event) => change(event.target.value)}
-    />
+    <div className="relative">
+      <Input
+        {...shared}
+        ref={focusOnOpen}
+        type={shown ? "text" : "password"}
+        className={cn("pr-10", className)}
+        onChange={(event) => change(event.target.value)}
+      />
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        className="absolute top-1/2 right-0.5 -translate-y-1/2"
+        aria-label={shown ? t("secret.hide") : t("secret.show")}
+        aria-pressed={shown}
+        disabled={disabled}
+        onClick={() => setShown((now) => !now)}
+      >
+        {shown ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
+      </Button>
+    </div>
   );
 
   if (!saved) return field;
+  // Replacing a saved one: Cancel keeps it.
   return (
-    <div className="space-y-1">
-      {field}
+    <div className="flex items-start gap-2">
+      <div className="min-w-0 flex-1">{field}</div>
       <Button
         type="button"
-        variant="link"
-        size="sm"
-        className="h-auto px-0"
+        variant="outline"
         disabled={disabled}
         onClick={() => {
           change("");
           setReplacing(false);
+          setShown(false);
         }}
       >
-        {t("secret.keep")}
+        {t("secret.cancel")}
       </Button>
     </div>
   );

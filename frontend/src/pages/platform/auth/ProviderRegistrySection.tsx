@@ -365,6 +365,7 @@ const ProviderEditForm = ({
         <Field label={t("authProviders.clientSecretLabel")}>
           <SecretInput
             saved={provider.secret_set}
+            hint={provider.secret_hint}
             value={form.client_secret}
             onValueChange={(client_secret) => setForm((prev) => ({ ...prev, client_secret }))}
             placeholder={t("authProviders.secretPlaceholder")}

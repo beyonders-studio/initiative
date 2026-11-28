@@ -156,6 +156,7 @@ export const VendorClientSection = ({
                     id={id}
                     aria-invalid={blamed.has(field.key) || undefined}
                     saved={isSet}
+                    hint={registration.vendor_hints[field.key]}
                     value={value}
                     onValueChange={(next) => onValueChange(field.key, next || undefined)}
                     placeholder={t("pluginServices.vendorEmpty")}

@@ -42,6 +42,7 @@ const platformRow: AuthProviderOwnerRead = {
   icon: null,
   button_style: null,
   secret_set: true,
+  secret_hint: "••••••••9f3a",
   callback_url: "https://app.example.com/api/v1/auth/oidc/callback",
 };
 
@@ -51,6 +52,7 @@ const corpRow: AuthProviderOwnerRead = {
   slug: "corp",
   display_name: "Corp SSO",
   secret_set: true,
+  secret_hint: "••••••••9f3a",
   callback_url: "https://app.example.com/api/v1/auth/corp/callback",
 };
 

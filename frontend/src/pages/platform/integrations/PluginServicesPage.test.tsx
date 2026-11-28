@@ -40,6 +40,7 @@ const buildRegistration = (
   vendor_fields: [],
   vendor_values: {},
   vendor_set: [],
+  vendor_hints: {},
   vendor_ready: true,
   vendor_setup: null,
   vendor_check: null,
@@ -467,6 +468,7 @@ describe("PluginServicePage", () => {
           ],
           vendor_values: { client_id: "gh-app" },
           vendor_set: ["client_id", "client_secret"],
+          vendor_hints: { client_secret: "••••••••5d25" },
         }),
       ];
       await renderPluginPage();
@@ -484,8 +486,9 @@ describe("PluginServicePage", () => {
 
       const clientId = screen.getByLabelText(/Client id/);
       expect(clientId).toHaveValue("gh-app");
-      // A stored secret is never sent back: it reads as saved, and its label
-      // opens an empty field for a new one.
+      // A stored secret is never sent back: it reads as saved, by its last
+      // characters, and its label opens an empty field for a new one.
+      expect(screen.getByText("••••••••5d25")).toBeInTheDocument();
       expect(screen.getByText("Saved")).toBeInTheDocument();
       await user.click(screen.getByLabelText(/Secret/));
       const secret = screen.getByLabelText(/Secret/);
@@ -494,7 +497,7 @@ describe("PluginServicePage", () => {
       // One typed and taken back stays out of the save, where an empty value
       // would clear what is stored.
       await user.type(secret, "half a secret");
-      await user.click(screen.getByRole("button", { name: "Keep the saved one" }));
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
       expect(screen.getByText("Saved")).toBeInTheDocument();
 
       await user.clear(clientId);
