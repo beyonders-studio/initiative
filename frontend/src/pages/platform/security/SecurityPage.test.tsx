@@ -71,6 +71,7 @@ const baseCaptcha: CaptchaSettingsResponse = {
   provider: "turnstile",
   site_key: "site-key",
   has_secret_key: true,
+  secret_key_hint: "••••••••c0de",
   enforcing: true,
 };
 
@@ -298,6 +299,8 @@ describe("captcha", () => {
     renderPage();
     change("Captcha");
 
+    // A saved secret's label opens its field for a new one.
+    fireEvent.click(screen.getByLabelText(field));
     fireEvent.change(screen.getByLabelText(field), { target: { value } });
     fireEvent.click(save());
 

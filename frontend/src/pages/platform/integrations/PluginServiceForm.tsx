@@ -413,7 +413,13 @@ export const PluginServiceForm = ({
           registration={editing}
           values={form.vendorValues}
           onValueChange={(key, value) =>
-            setForm((prev) => ({ ...prev, vendorValues: { ...prev.vendorValues, [key]: value } }))
+            setForm((prev) => {
+              const { [key]: _, ...rest } = prev.vendorValues;
+              return {
+                ...prev,
+                vendorValues: value === undefined ? rest : { ...rest, [key]: value },
+              };
+            })
           }
           refusal={vendorRefusal}
         />

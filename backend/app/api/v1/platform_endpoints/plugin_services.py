@@ -112,6 +112,7 @@ def _to_read(
         vendor_fields=[PluginVendorFieldRead(**field) for field in vendor.fields],
         vendor_values=vendor.values,
         vendor_set=vendor.set_keys,
+        vendor_hints=vendor.hints,
         vendor_ready=bool(row.vendor_ready),
         vendor_setup=vendor_setup_service.setup_kind(definition),
         connection_callback_url=flows_service.callback_url(),

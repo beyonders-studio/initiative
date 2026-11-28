@@ -114,9 +114,13 @@ def _pin_request(
     extensions: Mapping[str, Any] | None = None,
 ) -> httpx2.Request:
     """Build a request aimed at ``ip`` while keeping ``hostname`` for TLS
-    SNI, certificate verification, and the ``Host`` header."""
+    SNI, certificate verification, and the ``Host`` header. A request that
+    names no ``User-Agent`` says ``Initiative``, with no version: some APIs
+    (GitHub's) refuse a request without one."""
     merged = {k: v for k, v in (headers or {}).items() if k.lower() != "host"}
     merged["Host"] = _authority(original)
+    if not any(name.lower() == "user-agent" for name in merged):
+        merged["User-Agent"] = "Initiative"
     return httpx2.Request(
         method,
         original.copy_with(host=ip),

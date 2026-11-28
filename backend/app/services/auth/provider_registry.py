@@ -6,7 +6,8 @@ provider; it owns a connection to one (see
 here and one set of slugs.
 
 The client secret is write-only: encrypted into the ``auth_provider_secrets``
-companion and never returned; reads carry ``secret_set`` instead. Every caller
+companion and never returned; reads carry ``secret_set`` and its
+``secret_hint`` instead. Every caller
 runs on the system engine — neither table carries request-path grants.
 """
 
@@ -22,6 +23,7 @@ from app.core.config import API_V1_STR
 from app.core.config import settings as app_config
 from app.core.encryption import SALT_OIDC_CLIENT_SECRET, encrypt_field
 from app.core.messages import AuthProviderMessages
+from app.core.secret_hint import sealed_hint
 from app.db.errors import (
     STILL_REFERENCED_SQLSTATES,
     UNIQUE_VIOLATION_SQLSTATE,
@@ -79,7 +81,10 @@ def frontend_callback_url() -> str:
     return f"{app_config.APP_URL.rstrip('/')}/oidc/callback"
 
 
-def owner_read(row: AuthProvider, *, secret_set: bool) -> AuthProviderOwnerRead:
+def owner_read(
+    row: AuthProvider, *, sealed_secret: str | None
+) -> AuthProviderOwnerRead:
+    """``sealed_secret`` is the stored client secret, still encrypted."""
     return AuthProviderOwnerRead(
         id=row.id,
         slug=row.slug,
@@ -94,14 +99,20 @@ def owner_read(row: AuthProvider, *, secret_set: bool) -> AuthProviderOwnerRead:
         asserts_second_factor=row.asserts_second_factor,
         icon=row.icon,
         button_style=row.button_style,
-        secret_set=secret_set,
+        secret_set=bool(sealed_secret),
+        secret_hint=sealed_hint(sealed_secret, SALT_OIDC_CLIENT_SECRET),
         callback_url=provider_callback_url(row.slug),
     )
 
 
-async def secret_is_set(session: AsyncSession, provider_id: int) -> bool:
+async def sealed_secret(session: AsyncSession, provider_id: int) -> str | None:
+    """The provider's stored client secret, still encrypted."""
     secret = await session.get(AuthProviderSecret, provider_id)
-    return bool(secret and secret.client_secret_encrypted)
+    return secret.client_secret_encrypted if secret else None
+
+
+async def secret_is_set(session: AsyncSession, provider_id: int) -> bool:
+    return bool(await sealed_secret(session, provider_id))
 
 
 async def set_provider_secret(
@@ -143,19 +154,22 @@ async def list_providers(session: AsyncSession) -> list[AuthProviderOwnerRead]:
         await session.exec(select(AuthProvider).order_by(AuthProvider.display_name))
     ).all()
     row_ids = [row.id for row in rows]
-    with_secret: set[int] = set()
+    sealed: dict[int, str] = {}
     if row_ids:
-        with_secret = set(
+        sealed = dict(
             (
                 await session.exec(
-                    select(AuthProviderSecret.provider_id).where(
+                    select(
+                        AuthProviderSecret.provider_id,
+                        AuthProviderSecret.client_secret_encrypted,
+                    ).where(
                         AuthProviderSecret.provider_id.in_(row_ids),
                         AuthProviderSecret.client_secret_encrypted.is_not(None),
                     )
                 )
             ).all()
         )
-    return [owner_read(row, secret_set=row.id in with_secret) for row in rows]
+    return [owner_read(row, sealed_secret=sealed.get(row.id)) for row in rows]
 
 
 async def create_provider(
@@ -210,7 +224,7 @@ async def create_provider(
     await session.commit()
     await session.refresh(row)
     logger.info("auth provider %s (%s) created", row.slug, row.id)
-    return owner_read(row, secret_set=bool(provider_in.client_secret))
+    return owner_read(row, sealed_secret=await sealed_secret(session, row.id))
 
 
 async def update_provider(
@@ -247,7 +261,7 @@ async def update_provider(
         )
     await session.commit()
     await session.refresh(row)
-    return owner_read(row, secret_set=await secret_is_set(session, row.id))
+    return owner_read(row, sealed_secret=await sealed_secret(session, row.id))
 
 
 async def _release_in_each_guild(
