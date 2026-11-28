@@ -40,6 +40,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.encryption import SALT_PLUGIN_VENDOR, decrypt_field, encrypt_field
 from app.core.messages import PluginServiceMessages
+from app.core.secret_hint import sealed_hint
 from app.db import session as db_session
 from app.models.platform.marketplace import (
     MarketplaceListing,
@@ -297,6 +298,9 @@ class VendorView:
     values: dict[str, str]
     #: Every declared key that holds a value, secret or not.
     set_keys: list[str]
+    #: How each secret that holds a value is shown (:func:`secret_hint`),
+    #: where it can be shown at all.
+    hints: dict[str, str]
 
 
 def vendor_view(
@@ -322,6 +326,11 @@ def vendor_view(
         ],
         values=_decrypt_all(plain, public_id=row.public_id),
         set_keys=sorted(key for key in stored if any(f["key"] == key for f in fields)),
+        hints={
+            key: hint
+            for key in secret
+            if (hint := sealed_hint(stored.get(key), SALT_PLUGIN_VENDOR)) is not None
+        },
     )
 
 

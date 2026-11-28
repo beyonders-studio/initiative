@@ -39,6 +39,9 @@ class AuthProviderOwnerRead(SanitizedBaseModel):
     # Whether a client secret is stored (write-only; its value is never read
     # back on any request path).
     secret_set: bool = False
+    #: How the stored client secret is shown: its last characters behind a
+    #: mask (``app.core.secret_hint``), when it is long enough to spare them.
+    secret_hint: str | None = None
     #: Where this provider sends the browser back. Shown so an operator can
     #: register it with their IdP; it remains fixed for the provider's lifetime
     #: because the slug is immutable.
@@ -809,6 +812,8 @@ class StorageSettingsResponse(SanitizedBaseModel):
     s3_endpoint_url: str | None = None
     s3_access_key_id: str | None = None
     has_secret_access_key: bool = False
+    #: How the stored secret access key is shown (``app.core.secret_hint``).
+    secret_access_key_hint: str | None = None
     s3_use_path_style: bool = False
     s3_local_fallback: bool = False
 
@@ -836,6 +841,8 @@ class CaptchaSettingsResponse(SanitizedBaseModel):
     provider: CaptchaProvider | None = None
     site_key: str | None = None
     has_secret_key: bool = False
+    #: How the stored secret key is shown (``app.core.secret_hint``).
+    secret_key_hint: str | None = None
     #: Whether enforcement is actually on — all three of provider, site key and
     #: secret. Shown rather than inferred in the client, because the client
     #: cannot see the third one.

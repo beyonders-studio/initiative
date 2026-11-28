@@ -1051,6 +1051,7 @@ export interface AuthProviderOwnerRead {
   icon: string | null;
   button_style: string | null;
   secret_set: boolean;
+  secret_hint: string | null;
   callback_url: string;
 }
 
@@ -2388,6 +2389,7 @@ export interface CaptchaSettingsResponse {
   provider: CaptchaProvider | null;
   site_key: string | null;
   has_secret_key: boolean;
+  secret_key_hint: string | null;
   enforcing: boolean;
 }
 
@@ -10070,6 +10072,8 @@ export type PluginServiceRegistrationReadJwks = { [key: string]: unknown } | nul
 
 export type PluginServiceRegistrationReadVendorValues = { [key: string]: string };
 
+export type PluginServiceRegistrationReadVendorHints = { [key: string]: string };
+
 /**
  * A registration as the owner's settings see it.
  */
@@ -10104,6 +10108,7 @@ export interface PluginServiceRegistrationRead {
   vendor_fields: PluginVendorFieldRead[];
   vendor_values: PluginServiceRegistrationReadVendorValues;
   vendor_set: string[];
+  vendor_hints: PluginServiceRegistrationReadVendorHints;
   vendor_ready: boolean;
   vendor_setup: string | null;
   vendor_check: PluginServiceRegistrationReadVendorCheck;
@@ -11827,6 +11832,7 @@ export interface StorageSettingsResponse {
   s3_endpoint_url: string | null;
   s3_access_key_id: string | null;
   has_secret_access_key: boolean;
+  secret_access_key_hint: string | null;
   s3_use_path_style: boolean;
   s3_local_fallback: boolean;
 }

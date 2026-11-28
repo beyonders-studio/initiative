@@ -32,6 +32,7 @@ from app.core.capabilities import Capability, user_has_capability
 from app.core.clock import utcnow
 from app.core.config import DEFAULT_OIDC_SCOPES
 from app.core.config import settings as app_config
+from app.core.encryption import SALT_CAPTCHA_SECRET_KEY, SALT_S3_SECRET_KEY
 from app.core.intake import IntakeStream
 from app.core.login_methods import (
     FACTOR_METHODS,
@@ -53,6 +54,7 @@ from app.core.rules import (
     SURFACE_CUSTOM_ROLES,
     SURFACE_PLUGINS,
 )
+from app.core.secret_hint import sealed_hint
 from app.core.security import (
     BillingSupportHandoffNotConfiguredError,
     HandoffSigningNotConfiguredError,
@@ -598,6 +600,9 @@ def _storage_settings_payload(
         s3_endpoint_url=settings_obj.s3_endpoint_url,
         s3_access_key_id=settings_obj.s3_access_key_id,
         has_secret_access_key=bool(secrets.s3_secret_access_key_encrypted),
+        secret_access_key_hint=sealed_hint(
+            secrets.s3_secret_access_key_encrypted, SALT_S3_SECRET_KEY
+        ),
         s3_use_path_style=settings_obj.s3_use_path_style,
         s3_local_fallback=settings_obj.s3_local_fallback,
     )
@@ -733,6 +738,9 @@ def _captcha_payload(
         provider=provider,
         site_key=settings_obj.captcha_site_key,
         has_secret_key=has_secret,
+        secret_key_hint=sealed_hint(
+            secrets.captcha_secret_key_encrypted, SALT_CAPTCHA_SECRET_KEY
+        ),
         # The client cannot see the secret, so it cannot work out whether
         # enforcement is on. Answered here, by the same predicate the verifier
         # uses, so the page and the register endpoint agree.

@@ -171,6 +171,9 @@ class PluginServiceRegistrationRead(SanitizedBaseModel):
     vendor_values: dict[str, str] = {}
     #: Every vendor field that holds a value, secret or not.
     vendor_set: list[str] = []
+    #: How each saved secret is shown, never the secret: a private key's
+    #: fingerprint as the vendor lists it, or the last characters of another.
+    vendor_hints: dict[str, str] = {}
     #: Whether every required vendor value is set.
     vendor_ready: bool = True
     #: The flow at the vendor that can create its client and fill in the
