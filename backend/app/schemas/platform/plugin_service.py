@@ -18,7 +18,9 @@ from app.models.platform.plugin_service_registration import (
     PluginAvailability,
 )
 from app.schemas.base import RawTextStr, SanitizedBaseModel
+from app.schemas.platform.passkey import AppVerifier
 from app.schemas.query import PageMeta
+from app.services.tenant.connection_flow_state import PluginConnectionOutcome
 
 __all__ = [
     "PluginBetaCommunityRead",
@@ -80,6 +82,22 @@ class PluginPlatformConnectStart(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     connect_url: str
+
+
+class PluginConnectionFinish(SanitizedBaseModel):
+    """A connection an app began, handed back to it: the handback it was
+    given, and the PKCE verifier behind the challenge it began with."""
+
+    code: str = Field(max_length=4096)
+    code_verifier: AppVerifier = Field(min_length=43, max_length=128)
+
+
+class PluginConnectionFinished(SanitizedBaseModel):
+    """How a connection an app began ended."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    outcome: PluginConnectionOutcome
 
 
 class PluginServiceRegistrationRead(SanitizedBaseModel):
@@ -153,6 +171,9 @@ class PluginServiceRegistrationRead(SanitizedBaseModel):
     vendor_values: dict[str, str] = {}
     #: Every vendor field that holds a value, secret or not.
     vendor_set: list[str] = []
+    #: How each saved secret is shown, never the secret: a private key's
+    #: fingerprint as the vendor lists it, or the last characters of another.
+    vendor_hints: dict[str, str] = {}
     #: Whether every required vendor value is set.
     vendor_ready: bool = True
     #: The flow at the vendor that can create its client and fill in the

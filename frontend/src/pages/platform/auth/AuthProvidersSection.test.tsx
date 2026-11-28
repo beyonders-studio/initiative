@@ -42,6 +42,7 @@ const platformRow: AuthProviderOwnerRead = {
   icon: null,
   button_style: null,
   secret_set: true,
+  secret_hint: "••••••••9f3a",
   callback_url: "https://app.example.com/api/v1/auth/oidc/callback",
 };
 
@@ -51,6 +52,7 @@ const corpRow: AuthProviderOwnerRead = {
   slug: "corp",
   display_name: "Corp SSO",
   secret_set: true,
+  secret_hint: "••••••••9f3a",
   callback_url: "https://app.example.com/api/v1/auth/corp/callback",
 };
 
@@ -289,9 +291,8 @@ describe("AuthProvidersSection", () => {
     expect(await screen.findByText("Reachable")).toBeInTheDocument();
     expect(updateMutate).not.toHaveBeenCalled();
 
-    const secret = (await screen.findByLabelText("Client secret")) as HTMLInputElement;
-    expect(secret.value).toBe("");
-    expect(secret.placeholder).toMatch(/keep the current secret/i);
+    // The stored secret reads as saved, never as its value.
+    expect(await screen.findByText("Saved")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Display name"), {
       target: { value: "Corp Renamed" },
     });

@@ -99,7 +99,6 @@
     "personalScope": "Your account",
     "set": "Set",
     "notSet": "Not set",
-    "secretSet": "Already set — type to replace",
     "empty": "Not set",
     "choose": "Choose one",
     "saved": "Saved.",
@@ -246,7 +245,12 @@
     },
     "sign_in_required": {
       "title": "Sign in to finish",
-      "body": "Finish connecting in the browser where you're signed in to Initiative, as the person who started it."
+      "body": "Finish connecting in the browser where you're signed in to Initiative, as the person who started it.",
+      "app": "The browser that opened is signed in to Initiative as somebody else, so nothing was connected. Sign out of Initiative there, then connect again from the app."
+    },
+    "app_only": {
+      "title": "Finish in the app",
+      "body": "This connection was started in the Initiative app, so only the app can finish it. Connect again from the app."
     },
     "closeTab": "You can close this tab."
   },

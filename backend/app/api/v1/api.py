@@ -235,9 +235,14 @@ api_router.include_router(
 )
 # Where a vendor returns a person during a plug-in connection's flow. The two
 # addresses an operator registers with each vendor client; they act on the
-# flow's sealed state alone.
+# flow's sealed state alone. Beside them, where an app finishes a flow it began.
 api_router.include_router(
     plugin_connection_callbacks.router,
+    prefix="/plugin-connections",
+    tags=["plugin-platform"],
+)
+api_router.include_router(
+    plugin_connection_callbacks.app_router,
     prefix="/plugin-connections",
     tags=["plugin-platform"],
 )

@@ -36,14 +36,15 @@ import {
   useDisconnectPlugin,
   useUpdatePluginConfig,
 } from "@/hooks/useCommunityPluginDetail";
+import { useConnectFlow } from "@/hooks/useConnectFlow";
 import { toast } from "@/lib/mascotToast";
-import { openExternal } from "@/lib/openExternal";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { localized } from "@/ui/lib/localized";
+import { SecretInput } from "@/ui/secret-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Switch } from "@/ui/switch";
 
@@ -152,6 +153,7 @@ function CommunityConnection({
   const save = useUpdatePluginConfig(pluginId);
   const clear = useDisconnectPlugin(pluginId);
   const connect = useConnectPlugin(pluginId);
+  const flow = useConnectFlow();
 
   // Only what was touched. A secret already stored renders empty, so sending
   // untouched keys would clear the values the admin came here to keep.
@@ -183,8 +185,7 @@ function CommunityConnection({
         // they were. The address is the server's to build — see
         // PersonalConnection.
         if (started.connect_url) {
-          openExternal(started.connect_url);
-          toast.success(t("plugins:connections.connectOpened"));
+          void flow.open(started.connect_url);
           return;
         }
         toast.error(t("plugins:connections.connectUnavailable"));
@@ -247,7 +248,11 @@ function CommunityConnection({
                   field={field}
                   connection={connection}
                   value={draft[field.key]}
-                  onChange={(value) => setDraft((prev) => ({ ...prev, [field.key]: value }))}
+                  onChange={(value) =>
+                    setDraft(({ [field.key]: _, ...rest }) =>
+                      value === undefined ? rest : { ...rest, [field.key]: value }
+                    )
+                  }
                 />
               ))}
             </div>
@@ -309,7 +314,8 @@ function ConnectionFieldInput({
   field: PluginConnectionField;
   connection: CommunityPluginConnectionRead;
   value: PluginConfigValue;
-  onChange: (value: PluginConfigValue) => void;
+  /** `undefined` leaves the field out of the save, keeping what is stored. */
+  onChange: (value: PluginConfigValue | undefined) => void;
 }) {
   const { t, i18n } = useTranslation(["plugins"]);
   const label = localized(field.label, i18n.language) ?? field.key;
@@ -347,31 +353,44 @@ function ConnectionFieldInput({
     );
   }
 
-  const isSecret = field.type === "secret";
+  const heading = (
+    <Label htmlFor={id}>
+      {label}
+      {field.required && <span aria-hidden> *</span>}
+    </Label>
+  );
+
+  // A stored secret is never sent back: it reads as saved, typing replaces
+  // it, and an empty field keeps it.
+  if (field.type === "secret") {
+    return (
+      <div className="space-y-1.5">
+        {heading}
+        <SecretInput
+          id={id}
+          saved={isSet}
+          value={typeof value === "string" ? value : ""}
+          onValueChange={(next) => onChange(next || undefined)}
+          placeholder={t("plugins:connections.empty")}
+        />
+      </div>
+    );
+  }
+
   const current =
     typeof value === "string" || typeof value === "number"
       ? String(value)
-      : isSecret
-        ? ""
-        : ((stored as string | number | undefined) ?? "");
+      : ((stored as string | number | undefined) ?? "");
 
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={id}>
-        {label}
-        {field.required && <span aria-hidden> *</span>}
-      </Label>
+      {heading}
       <Input
         id={id}
-        // A stored secret is never sent back, so the field starts empty and
-        // says it is already set instead. Typing replaces it; leaving it alone
-        // keeps it.
-        type={isSecret ? "password" : field.type === "int" ? "number" : "text"}
-        autoComplete={isSecret ? "new-password" : "off"}
-        placeholder={
-          isSecret && isSet ? t("plugins:connections.secretSet") : t("plugins:connections.empty")
-        }
-        value={String(current)}
+        type={field.type === "int" ? "number" : "text"}
+        autoComplete="off"
+        placeholder={t("plugins:connections.empty")}
+        value={current}
         onChange={(event) =>
           onChange(
             field.type === "int"
@@ -398,16 +417,16 @@ function PersonalConnection({
   const { t } = useTranslation(["plugins", "common"]);
   const connect = useConnectPlugin(pluginId);
   const disconnect = useDisconnectPlugin(pluginId);
+  const flow = useConnectFlow();
 
   const start = () =>
     connect.mutate(connection.id, {
       onSuccess: (started) => {
         // The server builds the vendor's address; the client never does. A
         // new tab rather than a redirect, so the member comes back to where
-        // they were.
+        // they were; in the app, a window or the browser (useConnectFlow).
         if (started.connect_url) {
-          openExternal(started.connect_url);
-          toast.success(t("plugins:connections.connectOpened"));
+          void flow.open(started.connect_url);
           return;
         }
         toast.error(t("plugins:connections.connectUnavailable"));

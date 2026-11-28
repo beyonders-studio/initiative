@@ -797,16 +797,23 @@ async def test_a_secret_is_written_and_shown_only_as_set(
     response = await client.patch(
         f"{BASE}{row.id}",
         headers=headers,
-        json={"vendor_values": {"client_id": "widget-app", "client_secret": "s3cr3t"}},
+        json={
+            "vendor_values": {
+                "client_id": "widget-app",
+                "client_secret": "s3cr3t-0123456789abcd",
+            }
+        },
     )
 
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["vendor_values"] == {"client_id": "widget-app"}
     assert body["vendor_set"] == ["client_id", "client_secret"]
+    # Shown by its last characters alone.
+    assert body["vendor_hints"] == {"client_secret": "••••••••abcd"}
     assert body["vendor_ready"] is True
     assert body["live"] is True
-    assert "s3cr3t" not in response.text
+    assert "s3cr3t-0123456789abcd" not in response.text
 
     # Left out, a secret is kept; sent empty, it is cleared.
     kept = await client.patch(
@@ -821,6 +828,7 @@ async def test_a_secret_is_written_and_shown_only_as_set(
         json={"vendor_values": {"client_secret": ""}},
     )
     assert cleared.json()["vendor_set"] == ["client_id"]
+    assert cleared.json()["vendor_hints"] == {}
 
 
 async def test_a_registration_is_not_live_until_its_required_values_are_set(

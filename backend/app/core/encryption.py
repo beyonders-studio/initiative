@@ -64,6 +64,9 @@ SALT_PLUGIN_INSTALLS_CURSOR = b"app-installs-cursor"  # stored value, do not cha
 # A sign-in finished in the phone's browser, on its way back to the app that
 # began it. Transient: it lives two minutes and is spent once.
 SALT_NATIVE_HANDOFF = b"native-handoff"
+# A plug-in connection an app began, back from the vendor and on its way to that
+# app. Transient: it lives two minutes and is spent once.
+SALT_PLUGIN_CONNECTION_HANDBACK = b"plugin-connection-handback"
 # The state a plug-in vendor's own setup carries through the vendor and back.
 # Transient: it lives an hour and is spent once.
 SALT_PLUGIN_VENDOR_SETUP = b"app-vendor-setup"  # stored value, do not change

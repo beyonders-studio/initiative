@@ -504,6 +504,7 @@ async def test_storage_settings_round_trip_never_returns_secret(
     assert body["s3_use_path_style"] is True
     assert body["s3_local_fallback"] is True
     assert body["has_secret_access_key"] is True
+    assert body["secret_access_key_hint"] == "••••••••alue"
     # The plaintext secret must never appear in any response.
     assert "super-secret-value" not in put.text
     assert "s3_secret_access_key" not in body

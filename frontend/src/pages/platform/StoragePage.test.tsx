@@ -15,6 +15,7 @@ let storageData: Record<string, unknown> = {
   s3_endpoint_url: "https://s3.example.com",
   s3_access_key_id: "AKIA",
   has_secret_access_key: true,
+  secret_access_key_hint: "••••••••Xk2Q",
   s3_use_path_style: true,
   s3_local_fallback: false,
 };
@@ -45,10 +46,9 @@ describe("StoragePage", () => {
     renderPage();
     const bucket = (await screen.findByLabelText("Bucket")) as HTMLInputElement;
     expect(bucket.value).toBe("existing-bucket");
-    // The secret field is write-only: blank with a "set" placeholder, never the value.
-    const secret = screen.getByLabelText("Secret access key") as HTMLInputElement;
-    expect(secret.value).toBe("");
-    expect(secret.placeholder).toMatch(/unchanged/i);
+    // The secret is write-only: it reads as saved, by its last characters.
+    expect(screen.getByText("••••••••Xk2Q")).toBeInTheDocument();
+    expect(screen.getByText("Saved")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(updateMutate).toHaveBeenCalledTimes(1);
@@ -60,7 +60,9 @@ describe("StoragePage", () => {
 
   it("includes the secret in the payload once typed", async () => {
     renderPage();
-    fireEvent.change(await screen.findByLabelText("Secret access key"), {
+    // Its label opens the field for a new one.
+    fireEvent.click(await screen.findByLabelText("Secret access key"));
+    fireEvent.change(screen.getByLabelText("Secret access key"), {
       target: { value: "brand-new-secret" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));

@@ -22,6 +22,12 @@ Three things happen here and nowhere else:
   address with the installation's id, and one authorization trip follows so
   ``after_connect`` (the plug-in's hook, or a declarative plug-in's request) can check
   who installed it.
+* **A flow an app began.** The app has no session in the browser the vendor
+  returns to, so the callback hands the flow back to the app instead of
+  finishing it (:func:`app_handback`): the code sealed into a one-time
+  handback that only the app's PKCE verifier redeems, and only while it is
+  signed in as the person who started it (:func:`finish_in_app`). A browser
+  that loads the handback address spends it (:func:`spend_handback`).
 * **Tokens.** :func:`seal_tokens` and :func:`unseal_tokens` hold a token set
   in a connection's stored values under reserved keys; :func:`refresh_tokens`
   renews one; :func:`mint_jwt_bearer` mints a token for a connection that
@@ -52,21 +58,29 @@ import logging
 import time
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 import httpx2
 import jwt
+from cryptography.fernet import InvalidToken
 from sqlalchemy import func, text
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.cloud import is_cloud
 from app.core.config import settings
-from app.core.encryption import SALT_PLUGIN_CONFIG, decrypt_field, encrypt_field
+from app.core.encryption import (
+    SALT_PLUGIN_CONFIG,
+    SALT_PLUGIN_CONNECTION_HANDBACK,
+    decrypt_field,
+    encrypt_field,
+)
 from app.core.errors import CodedError
 from app.core.messages import (
     GuildPluginMessages,
+    NativeMessages,
     PluginChannelMessages,
     PluginServiceMessages,
 )
@@ -77,6 +91,7 @@ from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import routed_guild_id, set_rls_context
 from app.models.platform.access_grant import AccessLevel
+from app.models.platform.auth_challenge import AuthChallenge
 from app.models.platform.guild import (
     LIVE_STATUS_VALUES,
     CommunityStatus,
@@ -85,6 +100,8 @@ from app.models.platform.guild import (
 )
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
+from app.services.auth import challenges as challenge_service
+from app.services.auth.native_handoff import is_challenge
 from app.services.auth.oidc._http import (
     OidcHttpError,
     OidcHttpStatusError,
@@ -115,8 +132,10 @@ from app.services.tenant import plugin_config as plugin_config_service
 from app.services.tenant import plugin_connections as connections_service
 from app.services.tenant.connection_flow_state import (
     MAX_INSTALLATION_ID_LENGTH,
+    ConnectingApp,
     ConnectionFlowState,
     FlowStateError,
+    PluginConnectionOutcome,
     code_challenge,
     decode_state,
     encode_state,
@@ -140,18 +159,22 @@ from app.services.webhook_target_url import (
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "APP_HANDBACK_URI",
     "CALLBACK_PATH",
+    "HANDBACK_PATH",
     "OUTCOMES",
     "REFRESH_WINDOW_SECONDS",
     "SETUP_PATH",
     "ConnectionFlowError",
     "HookError",
     "TokenSet",
+    "app_handback",
     "call_hook",
     "callback_url",
     "clear_token_cache",
     "complete_callback",
     "complete_setup",
+    "finish_in_app",
     "flow_of",
     "forget_minted",
     "landing_url",
@@ -160,6 +183,7 @@ __all__ = [
     "refresh_tokens",
     "seal_tokens",
     "setup_url",
+    "spend_handback",
     "start_platform_url",
     "start_url",
     "unseal_tokens",
@@ -172,18 +196,18 @@ CALLBACK_PATH = "/api/v1/plugin-connections/callback"
 SETUP_PATH = "/api/v1/plugin-connections/setup"
 #: Where a vendor sends a plug-in's webhooks, followed by the plug-in's public_id.
 WEBHOOK_PATH = "/api/v1/plugin-hooks"
+#: Where a flow an app began is handed back to it, on this deployment's own
+#: address: the desktop app catches it in the window it opened the vendor in,
+#: and on Initiative Cloud, whose address the phone app claims, the system
+#: hands it to the phone. A browser that loads it spends the handback.
+HANDBACK_PATH = "/api/v1/plugin-connections/handback"
+#: The same, for the phone app on a server whose address it cannot claim.
+APP_HANDBACK_URI = "initiative://plugins/connected"
+#: How long a handback waits for the app it was handed to.
+HANDBACK_TTL = timedelta(minutes=2)
 
 #: How a flow ended, as the landing page reads it.
-OUTCOMES: frozenset[str] = frozenset(
-    {
-        "connected",
-        "refused",
-        "expired",
-        "not_recorded",
-        "awaiting_approval",
-        "sign_in_required",
-    }
-)
+OUTCOMES: frozenset[str] = frozenset(PluginConnectionOutcome)
 
 #: A stored token this close to its expiry is refreshed before it is handed out.
 REFRESH_WINDOW_SECONDS = 120
@@ -292,6 +316,45 @@ def landing_url(path: str | None, outcome: str) -> str:
     base = path if path and path.startswith("/") else "/plugins/connected"
     joiner = "&" if "?" in base else "?"
     return f"{_app_url()}{base}{joiner}{urlencode([('outcome', outcome)])}"
+
+
+def app_handback(app: str | None, challenge: str | None) -> tuple[str, str]:
+    """The app challenge and handback (``connection_flow_state.HANDBACKS``) a
+    flow starts with: both empty for a browser; for an app, its S256 challenge
+    and how it is handed back. The desktop app catches this deployment's own
+    handback address in its window. The phone app is handed a link: on
+    Initiative Cloud that address, which only the project's app may claim, and
+    elsewhere ``initiative://``, the one it can claim on any server."""
+    if app is None and challenge is None:
+        return "", ""
+    if (
+        app not in {known.value for known in ConnectingApp}
+        or not challenge
+        or not is_challenge(challenge)
+    ):
+        raise ConnectionFlowError(NativeMessages.APP_CHALLENGE_INVALID, status_code=400)
+    if app == ConnectingApp.phone and not is_cloud():
+        return challenge, "scheme"
+    return challenge, "https"
+
+
+def _handback_url(state: ConnectionFlowState, params: list[tuple[str, str]]) -> str:
+    """The handback address, naming the flow by the app's challenge so an app
+    with several connections under way finishes each with its own verifier."""
+    base = (
+        f"{_app_url()}{HANDBACK_PATH}"
+        if state.handback == "https"
+        else APP_HANDBACK_URI
+    )
+    return f"{base}?{urlencode([*params, ('challenge', state.app_challenge)])}"
+
+
+def _ending(state: ConnectionFlowState, outcome: str) -> str:
+    """Where a flow that ended with ``outcome`` sends the person: back to the
+    app that began it, or to the landing page."""
+    if state.app_challenge:
+        return _handback_url(state, [("outcome", outcome)])
+    return landing_url(state.return_path, outcome)
 
 
 # --- templates --------------------------------------------------------------
@@ -423,12 +486,17 @@ async def start_url(
     started_by: int,
     public_id: str,
     fields: Mapping[str, Any],
+    app: str | None = None,
+    app_challenge: str | None = None,
 ) -> str:
     """Where to send the person starting this connection's flow.
 
     The vendor's install page for an installation-style flow, its
-    authorization endpoint otherwise. Nothing is stored: the state carries it.
+    authorization endpoint otherwise. Nothing is stored: the state carries it,
+    and for a flow an app begins, how it goes back to the app
+    (:func:`app_handback`).
     """
+    challenge, handback = app_handback(app, app_challenge)
     flow = flow_of(connection)
     if flow is None:
         raise ConnectionFlowError(GuildPluginMessages.CONNECTION_NOT_INTERACTIVE)
@@ -443,6 +511,8 @@ async def start_url(
         return_path=return_path(public_id, str(connection.get("id"))),
         pkce=flow.get("pkce") is not False,
         phase="install" if install else "authorize",
+        app_challenge=challenge,
+        handback=handback,
     )
     if install:
         url = _render_url(install, vendor=vendor, fields=fields)
@@ -451,12 +521,18 @@ async def start_url(
 
 
 async def start_platform_url(
-    *, public_id: str, connection_id: str, started_by: int
+    *,
+    public_id: str,
+    connection_id: str,
+    started_by: int,
+    app: str | None = None,
+    app_challenge: str | None = None,
 ) -> str:
     """Where to send the operator connecting a community connection for every
     community (:mod:`app.services.marketplace.platform_connections`): the
     vendor's install page for an installation-style flow, its authorization
     endpoint otherwise."""
+    challenge, handback = app_handback(app, app_challenge)
     held = await platform_connections.load(public_id, connection_id)
     if held is None:
         raise ConnectionFlowError(
@@ -474,6 +550,8 @@ async def start_platform_url(
         pkce=held.flow.get("pkce") is not False,
         phase="install" if install else "authorize",
         public_id=public_id,
+        app_challenge=challenge,
+        handback=handback,
     )
     if install:
         url = _render_url(install, vendor=vendor, fields=held.fields)
@@ -1163,35 +1241,35 @@ async def complete_setup(
     """The return from an installation-style vendor's install page.
 
     Answers the address to send the person to next: the authorization
-    endpoint, carrying the claimed installation id in a fresh state, or the
-    landing page when the install is waiting on someone's approval or cannot
-    go on.
+    endpoint, carrying the claimed installation id in a fresh state, or where
+    the flow ends (:func:`_ending`) when the install is waiting on someone's
+    approval or cannot go on.
     """
     try:
         state = decode_state(state_token)
     except FlowStateError:
         return landing_url(None, "expired")
     if state.phase != "install":
-        return landing_url(state.return_path, "expired")
-    outcome = await _person_outcome(state, signed_in)
+        return _ending(state, "expired")
+    outcome = await _person_outcome(state, _finisher(state, signed_in))
     if outcome is not None:
-        return landing_url(state.return_path, outcome)
+        return _ending(state, outcome)
     if setup_action == "request":
-        return landing_url(state.return_path, "awaiting_approval")
+        return _ending(state, "awaiting_approval")
     claimed = _clean_installation_id(installation_id)
     if claimed is None:
-        return landing_url(state.return_path, "not_recorded")
+        return _ending(state, "not_recorded")
 
     if state.guild_id is None:
         held = await platform_connections.load(state.public_id, state.connection_id)
         if held is None:
-            return landing_url(state.return_path, "not_recorded")
+            return _ending(state, "not_recorded")
         flow, public_id, fields = held.flow, held.public_id, held.fields
     else:
         async with cohorts.system_session(state.guild_id) as session:
             loaded = await _load_for_flow(session, state)
             if loaded is None:
-                return landing_url(state.return_path, "not_recorded")
+                return _ending(state, "not_recorded")
             fields = without_tokens(
                 (loaded.plugin.config or {}).get(state.connection_id)
             )
@@ -1205,7 +1283,7 @@ async def complete_setup(
             state=state.authorizing(claimed),
         )
     except ConnectionFlowError:
-        return landing_url(state.return_path, "not_recorded")
+        return _ending(state, "not_recorded")
 
 
 async def complete_callback(
@@ -1215,27 +1293,149 @@ async def complete_callback(
     error: str | None,
     signed_in: int | None,
 ) -> str:
-    """The vendor's return with an authorization code. Exchanges it, asks the
-    plug-in's ``after_connect`` hook when the flow says so, stores the result, and
-    answers the landing page's address with how it ended."""
+    """The vendor's return with an authorization code. A browser's flow is
+    finished here (:func:`_finish`) and the person lands on how it ended; an
+    app's is handed back to the app (:func:`_hand_back`)."""
     try:
         state = decode_state(state_token)
     except FlowStateError:
         return landing_url(None, "expired")
     if state.phase != "authorize":
-        return landing_url(state.return_path, "expired")
+        return _ending(state, "expired")
+    if state.app_challenge:
+        return await _hand_back(
+            state, state_token or "", code=code, error=error, signed_in=signed_in
+        )
+    outcome = await _finish(state, code=code, error=error, signed_in=signed_in)
+    return landing_url(state.return_path, outcome)
+
+
+def _finisher(state: ConnectionFlowState, signed_in: int | None) -> int | None:
+    """Who the browser the vendor returned to finishes ``state`` as. A
+    browser's flow: whoever that browser is signed in as. An app's: its
+    starter, unless the browser is signed in as somebody else, because the app
+    proves who it is when it redeems the handback (:func:`finish_in_app`)."""
+    if state.app_challenge and signed_in is None:
+        return state.started_by
+    return signed_in
+
+
+async def _hand_back(
+    state: ConnectionFlowState,
+    state_token: str,
+    *,
+    code: str | None,
+    error: str | None,
+    signed_in: int | None,
+) -> str:
+    """An app's flow, back from the vendor: the code and the state sealed into
+    a one-time handback, recorded against the person who started it and
+    answered only by the app's verifier, and sent to the app. Nothing is
+    exchanged or stored until the app redeems it (:func:`finish_in_app`)."""
+    if _finisher(state, signed_in) != state.started_by:
+        return _ending(state, "sign_in_required")
+    if error or not code:
+        return _ending(state, "refused")
+    sealed = encrypt_field(
+        json.dumps({"state": state_token, "code": code}),
+        SALT_PLUGIN_CONNECTION_HANDBACK,
+    )
+    async with cohorts.system_session(None) as session:
+        await challenge_service.create(
+            session,
+            user_id=state.started_by,
+            purpose=challenge_service.ChallengePurpose.plugin_connection_handback,
+            value=sealed,
+            answer=state.app_challenge,
+            ttl=HANDBACK_TTL,
+        )
+        await session.commit()
+    return _handback_url(state, [("code", sealed)])
+
+
+async def _claim_handback(session: AsyncSession, code: str) -> AuthChallenge | None:
+    """The handback ``code`` names, with one of its attempts taken, or
+    ``None``."""
+    return await challenge_service.claim_attempt(
+        session,
+        value=code,
+        purposes=[challenge_service.ChallengePurpose.plugin_connection_handback],
+    )
+
+
+async def finish_in_app(*, code: str, code_verifier: str, user_id: int) -> str:
+    """Finish a flow an app began, from the handback the app was given, and
+    answer how it ended. It goes on only when ``code_verifier`` answers the
+    challenge the app began with and ``user_id`` started the flow; any answer
+    spends the handback."""
+    async with cohorts.system_session(None) as session:
+        handback = await _claim_handback(session, code)
+        answered = (
+            handback is not None
+            and handback.user_id == user_id
+            and challenge_service.answered_by(
+                handback, value=code, answer=code_challenge(code_verifier)
+            )
+        )
+        spent = handback is not None and await challenge_service.consume(
+            session, handback
+        )
+        await session.commit()
+    if not (answered and spent):
+        return "expired"
+    try:
+        sealed = json.loads(decrypt_field(code, SALT_PLUGIN_CONNECTION_HANDBACK))
+        state = decode_state(sealed["state"])
+        vendor_code = str(sealed["code"])
+    except (
+        FlowStateError,
+        InvalidToken,
+        KeyError,
+        TypeError,
+        UnicodeDecodeError,
+        ValueError,
+    ):
+        return "expired"
+    return await _finish(state, code=vendor_code, error=None, signed_in=user_id)
+
+
+async def spend_handback(*, code: str | None, outcome: str | None) -> str:
+    """A browser loaded the handback address of a flow an app began. The
+    handback is spent, so wherever the address was passed on to cannot finish
+    the flow, and the browser lands on a page saying only the app finishes it.
+    An ending that carries no code lands on that ending."""
+    if not code:
+        return landing_url(None, outcome if outcome in OUTCOMES else "expired")
+    async with cohorts.system_session(None) as session:
+        handback = await _claim_handback(session, code)
+        if handback is not None:
+            await challenge_service.consume(session, handback)
+        await session.commit()
+    return landing_url(None, "app_only")
+
+
+async def _finish(
+    state: ConnectionFlowState,
+    *,
+    code: str | None,
+    error: str | None,
+    signed_in: int | None,
+) -> str:
+    """Finish a flow as ``signed_in``: exchange the code, ask the plug-in's
+    ``after_connect`` hook when the flow says so, store the result, and answer
+    how it ended."""
     outcome = await _person_outcome(state, signed_in)
     if outcome is not None:
-        return landing_url(state.return_path, outcome)
+        return outcome
     if error or not code:
-        return landing_url(state.return_path, "refused")
+        return "refused"
     if state.guild_id is None:
-        return landing_url(state.return_path, await _complete_platform(state, code))
+        return await _complete_platform(state, code)
 
     async with cohorts.system_session(state.guild_id) as session:
         loaded = await _load_for_flow(session, state)
         if loaded is None:
-            return landing_url(state.return_path, "not_recorded")
+            return "not_recorded"
         fields = without_tokens((loaded.plugin.config or {}).get(state.connection_id))
         install_id = loaded.plugin.id
         definition = loaded.plugin.definition
@@ -1254,10 +1454,10 @@ async def complete_callback(
         )
     except VendorRefusedError as exc:
         logger.info("plug-in connection: the vendor refused the code (%s)", exc)
-        return landing_url(state.return_path, "refused")
+        return "refused"
     except (ConnectionFlowError, OidcHttpError) as exc:
         logger.warning("plug-in connection: the code exchange failed (%s)", exc)
-        return landing_url(state.return_path, "not_recorded")
+        return "not_recorded"
 
     values: dict[str, Any] = {}
     label: str | None = None
@@ -1291,20 +1491,20 @@ async def complete_callback(
                 )
         except HookError as exc:
             logger.warning("plug-in connection: after_connect failed (%s)", exc)
-            return landing_url(state.return_path, "not_recorded")
+            return "not_recorded"
         if answer.refused:
             if answer.code is not None:
                 logger.info(
                     "plug-in connection: after_connect refused (%s)", answer.code
                 )
-            return landing_url(state.return_path, "refused")
+            return "refused"
         values = answer.values
         label = answer.account_label
 
     async with cohorts.system_session(state.guild_id) as session:
         loaded = await _load_for_flow(session, state)
         if loaded is None:
-            return landing_url(state.return_path, "not_recorded")
+            return "not_recorded"
         plugin = loaded.plugin
         try:
             if state.user_id is not None:
@@ -1323,7 +1523,7 @@ async def complete_callback(
                 # The deployment closed the community's plug-ins while the
                 # vendor's page was open: its own credential is no longer its
                 # seat's to set.
-                return landing_url(state.return_path, "refused")
+                return "refused"
             else:
                 outcome = await _store_community(
                     session,
@@ -1337,8 +1537,8 @@ async def complete_callback(
             logger.warning(
                 "plug-in connection: after_connect values refused (%s)", exc.code
             )
-            return landing_url(state.return_path, "not_recorded")
-    return landing_url(state.return_path, outcome)
+            return "not_recorded"
+    return outcome
 
 
 def _managed_only(connection: Mapping[str, Any], values: Mapping[str, Any]) -> dict:

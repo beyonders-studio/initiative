@@ -1,7 +1,8 @@
 /**
  * The desktop app's shell: what closing the window does, what a notification
- * click hands back, what the computer is told about opening at sign-in, and
- * when the page hears that the person is at the computer.
+ * click hands back, what the computer is told about opening at sign-in, when
+ * the page hears that the person is at the computer, and the window a vendor
+ * page opens in.
  */
 import type { EventEmitter } from "node:events";
 import { mkdtempSync, readFileSync } from "node:fs";
@@ -10,12 +11,13 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { FakeWindow, FakeNotification, Emitter } = vi.hoisted(() => {
+const { FakeWindow, FakeVendorWindow, FakeNotification, Emitter } = vi.hoisted(() => {
   // Hoisted above the imports, so Node's own module is fetched directly.
   const Emitter = process.getBuiltinModule("node:events").EventEmitter;
   class FakeWindow extends Emitter {
     url = "capacitor://studio.beyonders.initiative/";
     webContents = { getURL: () => this.url };
+    getParentWindow = () => null;
     hide = vi.fn();
     show = vi.fn();
     focus = vi.fn();
@@ -23,6 +25,25 @@ const { FakeWindow, FakeNotification, Emitter } = vi.hoisted(() => {
     isMinimized = () => false;
     setOverlayIcon = vi.fn();
     setTitleBarOverlay = vi.fn();
+  }
+
+  /** A window the app opens over its own. */
+  class FakeVendorWindow extends Emitter {
+    static made: FakeVendorWindow[] = [];
+    openHandler: ((details: { url: string }) => { action: string }) | null = null;
+    webContents = {
+      getURL: () => "https://github.test/",
+      setWindowOpenHandler: (handler: (details: { url: string }) => { action: string }) => {
+        this.openHandler = handler;
+      },
+    };
+    loadURL = vi.fn(async (_url: string) => undefined);
+    close = vi.fn(() => this.emit("closed"));
+    constructor(readonly options: { parent: unknown }) {
+      super();
+      FakeVendorWindow.made.push(this);
+    }
+    getParentWindow = () => this.options.parent;
   }
 
   class FakeNotification extends Emitter {
@@ -34,15 +55,24 @@ const { FakeWindow, FakeNotification, Emitter } = vi.hoisted(() => {
       FakeNotification.made.push(this);
     }
   }
-  return { FakeWindow, FakeNotification, Emitter };
+  return { FakeWindow, FakeVendorWindow, FakeNotification, Emitter };
 });
 type FakeWindow = InstanceType<typeof FakeWindow>;
+type FakeVendorWindow = InstanceType<typeof FakeVendorWindow>;
+type RequestListener = (
+  details: { url: string; resourceType: string },
+  callback: (response: { cancel?: boolean }) => void
+) => void;
 
 const electron = vi.hoisted(() => ({
   windows: [] as unknown[],
   userData: "",
   /** Seconds the computer has gone without input. */
   idle: 0,
+  /** What the vendor pages' session does with each request. */
+  vendorRequests: null as RequestListener | null,
+  partition: "",
+  openedExternally: [] as string[],
   app: null as unknown as EventEmitter & Record<string, ReturnType<typeof vi.fn>>,
 }));
 
@@ -61,7 +91,24 @@ vi.mock("./app.mjs", () => {
   electron.app = app as never;
   return {
     app,
-    BrowserWindow: { getAllWindows: () => electron.windows },
+    BrowserWindow: Object.assign(FakeVendorWindow, { getAllWindows: () => electron.windows }),
+    session: {
+      fromPartition: (name: string) => {
+        electron.partition = name;
+        return {
+          webRequest: {
+            onBeforeRequest: (listener: RequestListener) => {
+              electron.vendorRequests = listener;
+            },
+          },
+        };
+      },
+    },
+    shell: {
+      openExternal: async (url: string) => {
+        electron.openedExternally.push(url);
+      },
+    },
     Menu: { buildFromTemplate: (template: unknown) => template },
     Notification: FakeNotification,
     powerMonitor: { getSystemIdleTime: () => electron.idle },
@@ -102,6 +149,8 @@ const close = (window: FakeWindow) => {
 
 beforeEach(() => {
   electron.userData = mkdtempSync(join(tmpdir(), "initiative-desktop-"));
+  electron.openedExternally = [];
+  FakeVendorWindow.made = [];
   vi.stubEnv("XDG_CONFIG_HOME", mkdtempSync(join(tmpdir(), "initiative-xdg-")));
   FakeNotification.made = [];
   vi.clearAllMocks();
@@ -312,5 +361,84 @@ describe("the person at the computer", () => {
     vi.advanceTimersByTime(30_000);
     expect(notifyListeners).toHaveBeenCalledWith("computerActive");
     vi.useRealTimers();
+  });
+});
+
+describe("a vendor page", () => {
+  const RETURN = "/api/v1/plugin-connections/handback";
+
+  /** What the vendor pages' session answers one request. */
+  const request = (url: string, resourceType = "mainFrame") => {
+    let answer: { cancel?: boolean } | undefined;
+    electron.vendorRequests?.({ url, resourceType }, (response) => {
+      answer = response;
+    });
+    return answer;
+  };
+
+  const opened = (desktop: Desktop) => {
+    const answer = desktop.openVendorPage({
+      url: "https://github.test/login/oauth/authorize?state=s",
+      returnPath: RETURN,
+    });
+    return { answer, page: FakeVendorWindow.made.at(-1) as FakeVendorWindow };
+  };
+
+  it("opens over the app in a session of its own, and takes its flow's return", async () => {
+    const { desktop, window } = started();
+    const { answer, page } = opened(desktop);
+
+    expect(page.options).toMatchObject({
+      parent: window,
+      webPreferences: { partition: "persist:vendor-pages", sandbox: true },
+    });
+    expect(electron.partition).toBe("persist:vendor-pages");
+    expect(page.loadURL).toHaveBeenCalledWith("https://github.test/login/oauth/authorize?state=s");
+    // The server's own callback loads; the address it sends the flow back to does not.
+    expect(request("https://server.test/api/v1/plugin-connections/callback?code=c")).toEqual({});
+    expect(request(`https://server.test${RETURN}?code=h`, "image")).toEqual({});
+    expect(request(`https://server.test${RETURN}?code=h`)).toEqual({ cancel: true });
+
+    await expect(answer).resolves.toEqual({ returned: `https://server.test${RETURN}?code=h` });
+    expect(page.close).toHaveBeenCalled();
+  });
+
+  it("answers nothing when the person closes it, or a newer one replaces it", async () => {
+    const { desktop } = started();
+    const first = opened(desktop);
+    const second = opened(desktop);
+    await expect(first.answer).resolves.toEqual({ returned: null });
+
+    second.page.close();
+    await expect(second.answer).resolves.toEqual({ returned: null });
+    expect(request(`https://server.test${RETURN}?code=h`)).toEqual({});
+  });
+
+  it("sends a window the vendor opens to the browser", () => {
+    const { desktop } = started();
+    const { page } = opened(desktop);
+
+    expect(page.openHandler?.({ url: "https://docs.github.test/" })).toEqual({ action: "deny" });
+    expect(page.openHandler?.({ url: "file:///etc/passwd" })).toEqual({ action: "deny" });
+    expect(electron.openedExternally).toEqual(["https://docs.github.test/"]);
+  });
+
+  it("closes rather than hiding in the tray, as the app's own window does", async () => {
+    onPlatform("win32");
+    const { desktop } = started();
+    await desktop.setTray({ open: "Open", quit: "Quit" });
+    const { page } = opened(desktop);
+    electron.app.emit("browser-window-created", {}, page);
+
+    expect(close(page as unknown as FakeWindow)).toBe(false);
+  });
+
+  it("opens nothing for an address that is not a web page", async () => {
+    const { desktop } = started();
+
+    await expect(
+      desktop.openVendorPage({ url: "file:///etc/passwd", returnPath: RETURN })
+    ).resolves.toEqual({ returned: null });
+    expect(FakeVendorWindow.made).toEqual([]);
   });
 });

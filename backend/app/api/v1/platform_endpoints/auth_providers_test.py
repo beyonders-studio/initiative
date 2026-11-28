@@ -61,6 +61,8 @@ async def test_owner_creates_provider_secret_write_only(
     body = response.json()
     assert body["slug"] == "corp"
     assert body["secret_set"] is True
+    # Too short to spare any of its end.
+    assert body["secret_hint"] is None
     # What the operator registers with their IdP, following the slug.
     assert body["callback_url"].endswith("/api/v1/auth/corp/callback")
     assert "client_secret" not in body
@@ -233,9 +235,10 @@ async def test_update_secret_semantics(
     replaced = await client.patch(
         f"{BASE}{provider_id}",
         headers=headers,
-        json={"enabled": False, "client_secret": "rotated"},
+        json={"enabled": False, "client_secret": "rotated-0123456789abcd"},
     )
     assert replaced.json()["secret_set"] is True
+    assert replaced.json()["secret_hint"] == "••••••••abcd"
     rows = emitted(capfd, AuditEventType.AUTH_PROVIDER_UPDATED)
     assert [(r["actor_user_id"], r["target"]["id"]) for r in rows] == [
         (owner_id, provider_id),
@@ -245,13 +248,13 @@ async def test_update_secret_semantics(
     assert rows[1]["detail"]["changed"] == ["enabled"]
     assert rows[1]["detail"]["values"]["enabled"] == {"from": True, "to": False}
     assert rows[1]["detail"]["secret_changed"] is True
-    assert "rotated" not in json.dumps(rows)
+    assert "rotated-0123456789abcd" not in json.dumps(rows)
     row_id = replaced.json()["id"]
     secret = await session.get(AuthProviderSecret, row_id)
     await session.refresh(secret)
     assert (
         decrypt_field(secret.client_secret_encrypted, SALT_OIDC_CLIENT_SECRET)
-        == "rotated"
+        == "rotated-0123456789abcd"
     )
 
     cleared = await client.patch(

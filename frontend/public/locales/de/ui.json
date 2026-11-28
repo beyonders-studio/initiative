@@ -17,6 +17,13 @@
     "copied": "Kopiert!",
     "unavailable": "Kopieren nicht möglich — bitte manuell kopieren"
   },
+  "secret": {
+    "saved": "Gespeichert",
+    "replace": "Ersetzen",
+    "cancel": "Abbrechen",
+    "show": "Geheimnis anzeigen",
+    "hide": "Geheimnis verbergen"
+  },
   "dateRange": {
     "any": "Beliebiges Datum",
     "fromOnly": "Ab {{date}}",
